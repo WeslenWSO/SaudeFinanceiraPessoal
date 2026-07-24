@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{%block nav_%}
+
+ {%endblock%}
+ {% comment %} {%block sid_Bar%}
+{% include 'parcial/_MenuSideNav.html' %}
+ {%endblock%} {% endcomment %}
+
+
+ 
+{%block conteudo%}
+
+      <a href="{% url 'formapgto:forma-create' %}" role="button" class="btn btn-primary">Incluir</a>
+      {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+
+
+
+{% comment %} <ul>
+
+
+
+{% for forma in object_list %}
+    <li>{{ forma.pub_date|date }} - {{ forma.headline }}
+        <a href="{% url 'formapgto:forma-detail' pk=forma.pk %}">
+        {{forma.id}} - {{forma}}
+        {{forma.descricao }}
+
+    </li>
+{% empty %}
+    <li>No Forma yet.</li>
+{% endfor %}
+</ul> {% endcomment %}
+
+<div class="card mb-4">
+    <div class="card-body">
+      <div class="dataTable-wrapper dataTable-loading no-footer sortable searchable fixed-columns">
+
+
+  <table id="datatablesSimple" class="dataTable-table">
+   <thead>
+    <tr>
+      <th>ID</th>
+      <th>qtparcelas</th>
+      <th>intervaloparcelas</th>
+      <th>tipo</th>
+      <th>descricao</th>
+      <th>Edi.</th>
+      <th>Exc.</th>
+    </tr>
+  </thead>
+  
+  <tbody>
+
+    {% for forma in object_list %}
+
+    <tr>
+        <td> <a class="nav-link"> </a>
+          {{ forma.id }}
+              </td>
+              <td>
+                <a>{{ forma.qtparcelas }}</a>
+              </td>
+        <td>
+          <a>{{ forma.intervaloparcelas }}</a>
+        </td>
+        <td>
+          <a>{{ forma.tipo }}</a>
+        </td>
+        <td>
+          <a>{{ forma.descricao }}</a>
+        </td>
+          <td>
+            <a href="{% url 'formapgto:forma-update' forma.id %}" class="btn btn-primary btn-sm" title="Editar">Editar</a>
+           </td>
+  
+            <td>
+           <a href="#" class="btn btn-danger btn-sm" title="Excluir" onclick="return confirm('Tem certeza que deseja excluir?')">Excluir</a>
+           </td>
+  
+      </tr>
+      {% endfor %}
+  
+    </tbody>
+  </table>
+</div>
+</div>
+</div>
+{%endblock%}

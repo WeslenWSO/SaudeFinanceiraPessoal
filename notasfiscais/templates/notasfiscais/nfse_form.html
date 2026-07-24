@@ -1,0 +1,565 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% endblock %}
+
+{% comment %} {% block sid_Bar %}
+    {% include 'parcial/_MenuSideNav.html' %}
+{% endblock %} {% endcomment %}
+
+
+
+{% block conteudo %}
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mt-4">{{ descricao }}</h1>
+        <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar à Lista
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice"></i> Dados da NFSe
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                            {% include 'parcial/_messages.html' %}
+                        {% endif %}
+
+                        <div class="row">
+                            <!-- Informações Básicas -->
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.numero_nota.id_for_label }}" class="form-label">
+                                    {{ form.numero_nota.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.numero_nota }}
+                                {% if form.numero_nota.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.numero_nota.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.serie.id_for_label }}" class="form-label">
+                                    {{ form.serie.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.serie }}
+                                {% if form.serie.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.serie.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_emissao.id_for_label }}" class="form-label">
+                                    {{ form.data_emissao.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.data_emissao  }}
+                                {% if form.data_emissao.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.data_emissao.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.forma_pagamento.id_for_label }}" class="form-label">
+                                    {{ form.forma_pagamento.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.forma_pagamento }}
+                                {% if form.forma_pagamento.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.forma_pagamento.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                         <div class="col-md-6 mb-3">
+                                <label for="{{ form.nsu.id_for_label }}" class="form-label">
+                                    {{ form.nsu.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.nsu }}
+                                {% if form.nsu.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.nsu.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                              <div class="col-md-6 mb-3">
+                                <label for="{{ form.socio.id_for_label }}" class="form-label">
+                                    {{ form.socio.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.socio }}
+                                {% if form.socio.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.socio.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        <hr>
+
+                        <!-- Dados do Cliente -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-user"></i> Dados do Cliente
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cliente.id_for_label }}" class="form-label">
+                                    {{ form.cliente.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.cliente }}
+                                {% if form.cliente.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cliente.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cnpj_cpf.id_for_label }}" class="form-label">
+                                    {{ form.cnpj_cpf.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.cnpj_cpf }}
+                                {% if form.cnpj_cpf.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cnpj_cpf.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Valores -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-dollar-sign"></i> Valores
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.valor_bruto.id_for_label }}" class="form-label">
+                                    {{ form.valor_bruto.label }} <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_bruto }}
+                                </div>
+                                {% if form.valor_bruto.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.valor_bruto.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.valor_liquido.id_for_label }}" class="form-label">
+                                    {{ form.valor_liquido.label }} <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_liquido }}
+                                </div>
+                                {% if form.valor_liquido.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.valor_liquido.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.aliquota.id_for_label }}" class="form-label">
+                                    {{ form.aliquota.label }} <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">%</span>
+                                    {{ form.aliquota }}
+                                </div>
+                                {% if form.aliquota.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.aliquota.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Serviço -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-tools"></i> Serviço
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="{{ form.discriminacao.id_for_label }}" class="form-label">
+                                {{ form.discriminacao.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.discriminacao }}
+                            {% if form.discriminacao.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.discriminacao.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="extrair_discriminacao_check">
+                            <label class="form-check-label" for="extrair_discriminacao_check">
+                                Extrair dados da discriminação automaticamente
+                            </label>
+                        </div>
+
+<!-- BOTAO PARA PROCESSAR -->
+                        <button type="button" id="extrair_btn" class="btn btn-secondary mb-3" disabled>
+                            <i class="fas fa-magic"></i> Extrair Dados
+                        </button>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.base_servico.id_for_label }}" class="form-label">
+                                    {{ form.base_servico.label }}
+                                </label>
+                                {{ form.base_servico }}
+                                {% if form.base_servico.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.base_servico.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+                                {{ form.observacoes.label }}
+                            </label>
+                            {{ form.observacoes }}
+                            {% if form.observacoes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.observacoes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {% if action == 'update' %}
+                        <hr>
+
+                        <!-- Campos de Edição -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-edit"></i> Campos de Edição
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">
+                                    {{ form.status.label }}
+                                </label>
+                                {{ form.status }}
+
+                                {% if form.status.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.status.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.status_conciliacao.id_for_label }}" class="form-label">
+                                    {{ form.status_conciliacao.label }}
+                                </label>
+                                {{ form.status_conciliacao }}
+                                {% if form.status_conciliacao.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.status_conciliacao.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.base_servico.id_for_label }}" class="form-label">
+                                    {{ form.base_servico.label }}
+                                </label>
+                                {{ form.base_servico }}
+                                {% if form.base_servico.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.base_servico.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_recebimento.id_for_label }}" class="form-label">
+                                    {{ form.data_recebimento.label }}
+                                </label>
+                                {{ form.data_recebimento }}
+                                {% if form.data_recebimento.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.data_recebimento.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.valor_recebido.id_for_label }}" class="form-label">
+                                    {{ form.valor_recebido.label }}
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_recebido }}
+                                </div>
+                                {% if form.valor_recebido.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.valor_recebido.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.banco.id_for_label }}" class="form-label">
+                                    {{ form.banco.label }}
+                                </label>
+                                {{ form.banco }}
+                                {% if form.banco.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.banco.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_cancelamento.id_for_label }}" class="form-label">
+                                    {{ form.data_cancelamento.label }}
+                                </label>
+                                {{ form.data_cancelamento }}
+                                {% if form.data_cancelamento.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.data_cancelamento.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.autorizacao.id_for_label }}" class="form-label">
+                                {{ form.autorizacao.label }}
+                            </label>
+                            {{ form.autorizacao }}
+                            {% if form.autorizacao.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.autorizacao.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary me-md-2">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if action == 'create' %}
+                                    <i class="fas fa-save"></i> Salvar NFSe
+                                {% else %}
+                                    <i class="fas fa-save"></i> Atualizar NFSe
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Ajuda -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-question-circle"></i> Ajuda
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>Campos Obrigatórios:</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="text-danger">*</span> Número da Nota</li>
+                        <li><span class="text-danger">*</span> Série</li>
+                        <li><span class="text-danger">*</span> Data de Emissão</li>
+                        <li><span class="text-danger">*</span> Cliente</li>
+                        <li><span class="text-danger">*</span> CNPJ/CPF</li>
+                        <li><span class="text-danger">*</span> Valor Bruto</li>
+                        <li><span class="text-danger">*</span> Valor Líquido</li>
+                        <li><span class="text-danger">*</span> Discriminação</li>
+                        <li><span class="text-danger">*</span> Forma de Pagamento</li>
+                    </ul>
+
+                    <hr>
+
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-lightbulb"></i>
+                            <strong>Dica:</strong> Após criar a NFSe, você pode editar 
+                            campos adicionais como status, recebimento e conciliação.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Importação Rápida -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> Ação Rápida
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Tem um arquivo XML da NFSe?</p>
+                    <a href="{% url 'notasfiscais:import' %}" class="btn btn-success w-100">
+                        <i class="fas fa-upload"></i> Importar do XML
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+
+.form-control, .form-select {
+    border-radius: 0.375rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.invalid-feedback {
+    display: block;
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: 0.25rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+hr {
+    margin: 1.5rem 0;
+    opacity: 0.25;
+}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkbox = document.getElementById('extrair_discriminacao_check');
+    const button = document.getElementById('extrair_btn');
+    const discriminacaoField = document.getElementById('{{ form.discriminacao.id_for_label }}');
+    const formaPagamentoField = document.getElementById('{{ form.forma_pagamento.id_for_label }}');
+    const socioField = document.getElementById('{{ form.socio.id_for_label }}');
+    const autorizacaoField = document.getElementById('{{ form.autorizacao.id_for_label }}');
+
+    // Enable/disable button based on checkbox
+    checkbox.addEventListener('change', function() {
+        button.disabled = !this.checked;
+    });
+
+    // Parse discriminacao on button click
+    button.addEventListener('click', function() {
+        const text = discriminacaoField.value;
+        if (!text) return;
+
+        // Extract forma de pagamento
+        const formaMatch = text.match(/(?:Forma|Pgto)[:\s]*(.+?)(?:\n|$)/i);
+        if (formaMatch) {
+            formaPagamentoField.value = formaMatch[1].trim();
+        }
+
+        // Extract DR for socio
+        const drMatch = text.match(/(?:DR|dr)[:\s]*(\w+)/i);
+        if (drMatch) {
+            socioField.value = drMatch[1].trim();
+        }
+
+        // Extract AUT / STONEID for autorizacao
+        const autMatch = text.match(/\bAUT[:\s]*([A-Za-z0-9\-\/\.]+)/i)
+            || text.match(/\bSTONE\s*ID[:\s]*([0-9]+)/i)
+            || text.match(/\bSTONEID[:\s]*([0-9]+)/i);
+        if (autMatch) {
+            autorizacaoField.value = autMatch[1].trim();
+        }
+    });
+});
+
+
+</style>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% load static %}
+<div class="grid">
+  <article>
+    <header><strong>A Receber</strong></header>
+    <p><a href="#">Detalhes</a></p>
+  </article>
+  <article>
+    <header><strong>Receber Hoje</strong></header>
+    <p><a href="#">Detalhes</a></p>
+  </article>
+  <article>
+    <header><strong>A Pagar</strong></header>
+    <p><a href="#">Detalhes</a></p>
+  </article>
+  <article>
+    <header><strong>A Pagar Hoje</strong></header>
+    <p><a href="#">Detalhes</a></p>
+  </article>
+</div>
+
+<article style="margin-top: 2rem;">
+  <header><h5>Relatório Mensal</h5></header>
+  <p class="text-center">
+    <a href="{% url 'dashboard:relatorio_mensal' %}">
+      <img src="{% static 'img/chart-icon.png' %}" alt="Gráfico" style="max-height: 100px;" onerror="this.style.display='none'">
+    </a><br>
+    <a href="{% url 'dashboard:relatorio_mensal' %}">Ver relatório mensal</a>
+  </p>
+</article>
+
+<article style="margin-top: 2rem;">
+  <header><h3>Receitas por Categoria - 2025</h3></header>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          {% for nome in meses_nomes %}<th>{{ nome }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for categoria, valores in receitas_por_categoria.items %}
+        <tr>
+          <td>{{ categoria }}</td>
+          {% for val in valores %}<td>R$ {{ val|floatformat:2 }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+        <tr><td><strong>Total Receitas</strong></td>{% for val in total_receitas_por_mes %}<td><strong>R$ {{ val|floatformat:2 }}</strong></td>{% endfor %}</tr>
+      </tbody>
+    </table>
+  </div>
+</article>
+
+<article style="margin-top: 2rem;">
+  <header><h3>Despesas por Categoria - 2025</h3></header>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          {% for nome in meses_nomes %}<th>{{ nome }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for categoria, valores in despesas_por_categoria.items %}
+        <tr>
+          <td>{{ categoria }}</td>
+          {% for val in valores %}<td>R$ {{ val|floatformat:2 }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+        <tr><td><strong>Total Despesas</strong></td>{% for val in total_despesas_por_mes %}<td><strong>R$ {{ val|floatformat:2 }}</strong></td>{% endfor %}</tr>
+      </tbody>
+    </table>
+  </div>
+</article>

@@ -1,0 +1,22 @@
+
+{% extends 'base.html' %}
+{%block nav_%}
+ {% include 'parcial/_MenuSuperior.html' %}
+ {%endblock%}
+ {% comment %} {%block sid_Bar%}
+{% include 'parcial/_MenuSideNav.html' %}
+ {%endblock%} {% endcomment %}
+
+ {%block conteudo%}
+{% include 'parcial/cabTituloListaComBotao.html' %}
+      
+{% include 'parcial/footTituloListaComBotao.html' %}
+
+<h1>{{ object.id }}</h1>
+<p>{{ object.descricao }}</p>
+<p>Reporter: {{ object.reporter }}</p>
+<p>Published: {{ object.pub_date|date }}</p>
+<p>Date: {{ now|date }}</p>
+<a href="{% url 'formapgto:forma-update' pk=object.pk %}">Alterar</>
+
+    {%endblock%}

@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block nav %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Segmentar NFSe</h1>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">NFSe Original</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Número:</strong> {{ nfse.numero_nota }}</p>
+                            <p><strong>Série:</strong> {{ nfse.serie }}</p>
+                            <p><strong>Cliente:</strong> {{ nfse.cliente }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Valor Bruto:</strong> R$ {{ nfse.valor_bruto|floatformat:2 }}</p>
+                            <p><strong>Alíquota:</strong> {{ nfse.aliquota }}%</p>
+                            <p><strong>Data Emissão:</strong> {{ nfse.data_emissao|date:"d/m/Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Configuração dos Segmentos</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="segmentForm">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="numero_segmentos" class="form-label">Número de Segmentos</label>
+                            <input type="number" class="form-control" id="numero_segmentos" name="numero_segmentos"
+                                   value="2" min="2" max="10" required>
+                            <div class="form-text">Mínimo 2, máximo 10 segmentos</div>
+                        </div>
+
+                        <div id="segmentosContainer">
+                            <!-- Segmentos serão adicionados aqui via JavaScript -->
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="alert alert-info">
+                                <strong>Total dos Segmentos:</strong> <span id="totalSegmentos">R$ 0,00</span><br>
+                                <strong>Valor Original:</strong> R$ {{ nfse.valor_bruto|floatformat:2 }}<br>
+                                <strong>Diferença:</strong> <span id="diferenca">R$ {{ nfse.valor_bruto|floatformat:2 }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success" id="btnSegmentar">
+                                <i class="fas fa-cut me-1"></i> Segmentar NFSe
+                            </button>
+                            <a href="{% url 'notasfiscais:list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Instruções</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle text-info me-2"></i>
+                            Defina o número de segmentos desejado
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-dollar-sign text-success me-2"></i>
+                            Distribua o valor total entre os segmentos
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-credit-card text-primary me-2"></i>
+                            Configure forma de pagamento para cada segmento
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-user text-warning me-2"></i>
+                            Atribua sócio responsável para cada segmento
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-file-invoice-dollar text-info me-2"></i>
+                            Configure a regra de imposto para cada segmento
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-layer-group text-primary me-2"></i>
+                            Defina o tipo de base para cada segmento
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-warning mt-3">
+                        <strong>Atenção:</strong> O total dos valores dos segmentos deve ser igual ao valor bruto da NFSe original.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const numeroSegmentosInput = document.getElementById('numero_segmentos');
+        const segmentosContainer = document.getElementById('segmentosContainer');
+        const totalSegmentosSpan = document.getElementById('totalSegmentos');
+        const diferencaSpan = document.getElementById('diferenca');
+        const valorOriginal = parseFloat('{{ nfse.valor_bruto|default:0 }}'.replace(',', '.'));
+
+        console.log('Valor original:', valorOriginal);
+
+    // Dados para os selects
+    const formasPagamento = [
+        {% for forma in formas_pagamento %}
+        {id: {{ forma.id|default:0 }}, descricao: '{{ forma.descricao|default:"" }}'},
+        {% endfor %}
+    ];
+
+    const socios = [
+        {% for socio in socios %}
+        {id: {{ socio.id|default:0 }}, nome: '{{ socio.socio|default:"" }}'},
+        {% endfor %}
+    ];
+
+    const regrasImposto = [
+        {% for regra in regras_imposto %}
+        {id: {{ regra.id|default:0 }}, descricao: '{{ regra.DescricaoRegraImposto|default:"" }}'},
+        {% endfor %}
+    ];
+
+    const tiposBase = [
+        {value: 'NORMAL', label: 'Normal'},
+        {value: 'DEMAIS', label: 'Demais'}
+    ];
+
+    function criarCamposSegmento(segmentoNum) {
+        return `
+            <div class="card mb-3 segmento-card" data-segmento="${segmentoNum}">
+                <div class="card-header">
+                    <h6 class="mb-0">Segmento ${segmentoNum}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% comment %} <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="segmento_${segmentoNum}" class="form-label">Segmento</label>
+                                <input type="text" class="form-control" id="segmento_${segmentoNum}"
+                                       name="segmento_${segmentoNum}" placeholder="Nome do segmento" maxlength="100"> 
+                            </div>
+                        </div> {% endcomment %}
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="valor_bruto_${segmentoNum}" class="form-label">Valor Bruto</label>
+                                <input type="number" class="form-control valor-segmento" id="valor_bruto_${segmentoNum}"
+                                       name="valor_bruto_${segmentoNum}" step="0.01" min="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="forma_pagamento_${segmentoNum}" class="form-label">Forma de Pagamento</label>
+                                <select class="form-select" id="forma_pagamento_${segmentoNum}"
+                                        name="forma_pagamento_${segmentoNum}" required>
+                                    <option value="">Selecione...</option>
+                                    ${formasPagamento.map(forma => `<option value="${forma.id}">${forma.descricao}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="socio_${segmentoNum}" class="form-label">Sócio</label>
+                                <select class="form-select" id="socio_${segmentoNum}"
+                                        name="socio_${segmentoNum}" required>
+                                    <option value="">Selecione...</option>
+                                    ${socios.map(socio => `<option value="${socio.id}">${socio.nome}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="codigo_regra_imposto_${segmentoNum}" class="form-label">Código da Regra do Imposto</label>
+                                <select class="form-select" id="codigo_regra_imposto_${segmentoNum}"
+                                        name="codigo_regra_imposto_${segmentoNum}">
+                                    <option value="">Selecione...</option>
+                                    ${regrasImposto.map(regra => `<option value="${regra.id}">${regra.descricao}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="base_servico_${segmentoNum}" class="form-label">Tipo de Base</label>
+                                <select class="form-select" id="base_servico_${segmentoNum}"
+                                        name="base_servico_${segmentoNum}">
+                                    <option value="">Selecione...</option>
+                                    ${tiposBase.map(tipo => `<option value="${tipo.value}">${tipo.label}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function atualizarSegmentos() {
+        const numeroSegmentos = parseInt(numeroSegmentosInput.value);
+        segmentosContainer.innerHTML = '';
+
+        for (let i = 1; i <= numeroSegmentos; i++) {
+            segmentosContainer.innerHTML += criarCamposSegmento(i);
+        }
+
+        calcularTotal();
+    }
+
+    function calcularTotal() {
+        const valores = document.querySelectorAll('.valor-segmento');
+        let total = 0;
+
+        valores.forEach(input => {
+            const valor = parseFloat(input.value) || 0;
+            total += valor;
+        });
+
+        totalSegmentosSpan.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+        const diferenca = valorOriginal - total;
+        diferencaSpan.textContent = `R$ ${diferenca.toFixed(2).replace('.', ',')}`;
+
+        // Atualizar cor da diferença
+        if (Math.abs(diferenca) < 0.01) {
+            diferencaSpan.className = 'text-success';
+        } else {
+            diferencaSpan.className = 'text-danger';
+        }
+    }
+
+    // Event listeners
+    numeroSegmentosInput.addEventListener('change', atualizarSegmentos);
+
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('valor-segmento')) {
+            calcularTotal();
+        }
+    });
+
+        // Inicializar
+        atualizarSegmentos();
+        console.log('Segmentação NFSe inicializada com sucesso');
+    } catch (error) {
+        console.error('Erro na inicialização da segmentação NFSe:', error);
+        alert('Erro ao carregar a página de segmentação. Verifique o console para mais detalhes.');
+    }
+});
+</script>
+{% endblock %}

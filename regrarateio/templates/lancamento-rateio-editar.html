@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+{% block conteudo %}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">{{ titulo }}</h4>
+                    <small class="text-muted">
+                        {% if principal.tipo_origem == 'pagar' %}
+                        Conta a pagar #{{ principal.titulo_id }}
+                        {% else %}
+                        Conta a receber #{{ principal.titulo_id }}
+                        {% endif %}
+                        — {{ linhas_count }} linha{{ linhas_count|pluralize }} de rateio gravada{{ linhas_count|pluralize }}
+                    </small>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% include 'parcial/_messages.html' %}
+                    {% endif %}
+
+                    <h6 class="text-uppercase text-muted small mb-2">Lançamento principal (título)</h6>
+                    <div class="table-responsive border rounded mb-4">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr>
+                                    <th class="w-25 bg-light">Origem</th>
+                                    <td>{% if principal.tipo_origem == 'pagar' %}Contas a pagar{% else %}Contas a receber{% endif %}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Descrição / ref.</th>
+                                    <td>{{ principal.descricao|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">{% if principal.tipo_origem == 'pagar' %}Fornecedor{% else %}Cliente{% endif %}</th>
+                                    <td>{{ principal.parceiro|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Documento</th>
+                                    <td>{{ principal.numdoc|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Data pagto / receb.</th>
+                                    <td>{% if principal.data_ref %}{{ principal.data_ref|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Status no título</th>
+                                    <td>{{ principal.status }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Valor base do rateio</th>
+                                    <td><strong>R$ {{ principal.valor_base_txt }}</strong>
+                                        <span class="text-muted small">(mesma base usada na geração automática)</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6 class="text-uppercase text-muted small mb-2">Rateio atualmente gravado</h6>
+                    <div class="table-responsive border rounded mb-4">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Sócio</th>
+                                    <th class="text-end">% na regra</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in linhas_det %}
+                                <tr>
+                                    <td>{{ row.socio }}</td>
+                                    <td class="text-end">{{ row.perc }}</td>
+                                    <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor_txt }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-muted text-center py-3">Nenhuma linha.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6 class="text-uppercase text-muted small mb-2">Nova regra e prévia (confirmação)</h6>
+                    <p class="small text-muted">
+                        Ao escolher outra regra, os valores são recalculados <strong>proporcionalmente</strong> para todos os sócios da regra.
+                        A soma das parcelas acompanha o valor base do título (com arredondamento em cada linha).
+                    </p>
+
+                    <form method="post" novalidate id="form-recalc-rateio">
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.regra_rateio.id_for_label }}">{{ form.regra_rateio.label }}</label>
+                            {{ form.regra_rateio }}
+                            {% if form.regra_rateio.help_text %}
+                            <div class="form-text">{{ form.regra_rateio.help_text }}</div>
+                            {% endif %}
+                            {% if form.regra_rateio.errors %}
+                            <div class="text-danger small">{{ form.regra_rateio.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="table-responsive border rounded mb-3">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Prévia — Sócio</th>
+                                        <th class="text-end">%</th>
+                                        <th class="text-end">Valor após gravar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rateio-preview-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.confirmo }}
+                                <label class="form-check-label" for="{{ form.confirmo.id_for_label }}">{{ form.confirmo.label }}</label>
+                            </div>
+                            {% if form.confirmo.errors %}
+                            <div class="text-danger small">{{ form.confirmo.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary" id="btn-gravar-rateio">
+                                <i class="fas fa-check"></i> Gravar rateio com a regra acima
+                            </button>
+                            <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Voltar à lista
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="regras-itens-data">{{ regras_itens_json|safe }}</script>
+<script type="application/json" id="preview-inicial-data">{{ preview_inicial_json|safe }}</script>
+<script>
+(function () {
+    var tipoLanc = "{{ tipo_lanc|escapejs }}";
+    var baseStr = "{{ valor_base_str }}";
+    var elRegra = document.getElementById("id_regra_rateio");
+    var tbody = document.getElementById("rateio-preview-tbody");
+    if (!elRegra || !tbody) return;
+
+    var regrasItens = {};
+    try {
+        var raw = document.getElementById("regras-itens-data");
+        if (raw && raw.textContent) regrasItens = JSON.parse(raw.textContent);
+    } catch (e) { regrasItens = {}; }
+
+    function parseBase() {
+        var x = parseFloat(baseStr.replace(",", "."));
+        return isFinite(x) ? x : 0;
+    }
+
+    function fmtBr(num) {
+        var n = Math.round(num * 100) / 100;
+        var s = n.toFixed(2).replace(".", ",");
+        if (n < 0) return s;
+        return s;
+    }
+
+    function renderPreview(regraId) {
+        var base = parseBase();
+        var itens = regrasItens[String(regraId)];
+        tbody.innerHTML = "";
+        if (!itens || !itens.length) {
+            var tr0 = document.createElement("tr");
+            tr0.innerHTML = '<td colspan="3" class="text-muted text-center py-3">Sem itens nesta regra ou regra inválida.</td>';
+            tbody.appendChild(tr0);
+            return;
+        }
+        itens.forEach(function (item) {
+            var perc = parseFloat(String(item.perc).replace(",", ".")) || 0;
+            var bruto = base * perc / 100;
+            var valor = tipoLanc === "PGTO" ? -Math.round(bruto * 100) / 100 : Math.round(bruto * 100) / 100;
+            var tr = document.createElement("tr");
+            var cls = valor < 0 ? "text-danger" : "text-success";
+            tr.innerHTML =
+                "<td>" + (item.nome || "—") + "</td>" +
+                "<td class=\"text-end\">" + perc + "</td>" +
+                "<td class=\"text-end " + cls + "\">" + fmtBr(valor) + "</td>";
+            tbody.appendChild(tr);
+        });
+    }
+
+    elRegra.addEventListener("change", function () {
+        renderPreview(elRegra.value);
+    });
+
+    try {
+        var pin = document.getElementById("preview-inicial-data");
+        var arr = pin && pin.textContent ? JSON.parse(pin.textContent) : [];
+        if (arr && arr.length) {
+            tbody.innerHTML = "";
+            arr.forEach(function (row) {
+                var v = parseFloat(String(row.valor).replace(",", "."));
+                var tr = document.createElement("tr");
+                var cls = v < 0 ? "text-danger" : "text-success";
+                tr.innerHTML =
+                    "<td>" + (row.socio_nome || "—") + "</td>" +
+                    "<td class=\"text-end\">" + row.perc + "</td>" +
+                    "<td class=\"text-end " + cls + "\">" + String(row.valor).replace(".", ",") + "</td>";
+                tbody.appendChild(tr);
+            });
+        } else {
+            renderPreview(elRegra.value);
+        }
+    } catch (e) {
+        renderPreview(elRegra.value);
+    }
+})();
+</script>
+
+{% endblock %}

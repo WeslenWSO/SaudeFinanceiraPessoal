@@ -1,0 +1,22 @@
+<!-- nfse_rio_branco/templates/nfse_rio_branco/start_download.html -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Coletar NFS-e – Rio Branco</title>
+<style>body{font-family:system-ui;margin:2rem}label{display:block;margin:.5rem 0}</style>
+</head>
+<body>
+<h1>Coletar NFS‑e (Rio Branco – AC)</h1>
+<form method="post">
+{% csrf_token %}
+{{ form.as_p }}
+<button type="submit">Iniciar</button>
+</form>
+{% if messages %}
+<ul>
+{% for message in messages %}<li>{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+</body>
+</html>

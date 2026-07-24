@@ -1,0 +1,10 @@
+{% comment %}
+  Bloco esquerdo do cabeçalho de página (título + subtítulo).
+  Uso: <div class="page-head">{% include 'parcial/_page_head.html' with title="Título" subtitle="Subtítulo" %}<div class="btn-group">...ações...</div></div>
+{% endcomment %}
+<div>
+  <h1 class="page-title">{{ title|default:"Título" }}</h1>
+  {% if subtitle %}
+    <p class="page-subtitle">{{ subtitle }}</p>
+  {% endif %}
+</div>

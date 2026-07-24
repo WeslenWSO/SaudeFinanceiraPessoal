@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+ {%endblock%}
+
+
+
+ 
+ 
+{%block conteudo%}
+ {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+   <div class="card mb-4"> 
+  <div class="card-header"> {{ descricao }}   </div>
+   <div class="card-body">
+
+     <div class="dataTable-wrapper dataTable-loading no-footer sortable searchable fixed-columns"> 
+
+     
+<div class="datatable-container">
+
+
+<p><strong>Razão Social:</strong> {{ object.razao }}</p>
+<p><strong>CNPJ:</strong> {{ object.cnpj }}</p>
+{% if eh_empresa_da_sessao %}
+<p class="small text-muted mb-1">Certificado digital (Windows): no <strong>servidor</strong> onde o sistema roda, consulta a loja Personal (usuário do serviço e computador local) via <code>certutil</code>, filtrando pelo CNPJ acima. Não envia chave privada.</p>
+<button type="button" class="btn btn-outline-secondary btn-sm mb-2" id="btn-certificados-windows">
+  Buscar certificados no Windows (servidor)
+</button>
+<pre id="certificados-windows-saida" class="small bg-light p-2 border rounded d-none" style="white-space: pre-wrap; max-height: 20rem; overflow: auto;"></pre>
+{% endif %}
+<p><strong>Status:</strong> {{ object.status }}</p>
+
+<p><strong>Alguns Dados da Receita Federal:</strong></p>
+{% if dad %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Campo</th>
+            <th>Valor</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key, value in dad.items %}
+        <tr>
+            <td>{{ key }}</td>
+            <td>
+                {% if key == 'atividade_principal' %}
+                    {% if value %}
+                        <ul>
+                            {% for atividade in value %}
+                            <li>{{ atividade.code }} - {{ atividade.text }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% elif key == 'atividades_secundarias' %}
+                    {% if value %}
+                        <ul>
+                            {% for atividade in value %}
+                            <li>{{ atividade.code }} - {{ atividade.text }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% elif key == 'qsa' %}
+                    {% if value %}
+                        <ul>
+                            {% for socio in value %}
+                            <li>{{ socio.nome }} - {{ socio.qual }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% elif key == 'simples' %}
+                    {% if value %}
+                        <ul>
+                            {% for item in value %}
+                            <li>{{ item }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% elif key == 'simei' %}
+                    {% if value %}
+                        <ul>
+                            {% for item in value %}
+                            <li>{{ item }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                {% else %}
+                    {{ value }}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<p class="mb-2">
+  <a href="{% url 'empresa:empresa_edit' object.pk %}">Editar dados da empresa</a>
+  ·
+  <a href="{% url 'empresa:empresa_integracao' object.pk %}">Configuração de integração</a>
+</p>
+<a href="{% url 'empresa:lista' %}">← Voltar para a lista</a>
+
+{% if eh_empresa_da_sessao %}
+<script>
+(function () {
+  const btn = document.getElementById('btn-certificados-windows');
+  const out = document.getElementById('certificados-windows-saida');
+  if (!btn || !out) return;
+  btn.addEventListener('click', function () {
+    out.classList.remove('d-none');
+    out.textContent = 'Consultando…';
+    fetch('{% url "empresa:certificados_windows_sessao" %}', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok) {
+          out.textContent = data.message || 'Erro na consulta.';
+          return;
+        }
+        var lines = [];
+        if (data.aviso) lines.push(data.aviso);
+        lines.push('CNPJ: ' + (data.cnpj || '') + ' | ' + (data.empresa_razao || ''));
+        lines.push('Encontrados: ' + (data.certificados ? data.certificados.length : 0));
+        (data.certificados || []).forEach(function (c, i) {
+          lines.push('--- #' + (i + 1) + ' ---');
+          lines.push(JSON.stringify(c, null, 2));
+        });
+        out.textContent = lines.join('\n');
+      })
+      .catch(function (e) {
+        out.textContent = 'Falha na requisição: ' + e;
+      });
+  });
+})();
+</script>
+{% endif %}
+
+</div>
+
+
+   </div>
+</div> 
+</div> 
+
+{%endblock%}

@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+{% block title %}{{ title }}{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ title }}</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.empresa.label_tag }}
+                                {{ form.empresa }}
+                                {% if form.empresa.errors %}
+                                    <div class="text-danger">{{ form.empresa.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.data_pagamento.label_tag }}
+                                {{ form.data_pagamento }}
+                                {% if form.data_pagamento.errors %}
+                                    <div class="text-danger">{{ form.data_pagamento.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.forma_pagamento.label_tag }}
+                                {{ form.forma_pagamento }}
+                                {% if form.forma_pagamento.errors %}
+                                    <div class="text-danger">{{ form.forma_pagamento.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.bandeira.label_tag }}
+                                {{ form.bandeira }}
+                                {% if form.bandeira.errors %}
+                                    <div class="text-danger">{{ form.bandeira.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form.valor_bruto.label_tag }}
+                                {{ form.valor_bruto }}
+                                {% if form.valor_bruto.errors %}
+                                    <div class="text-danger">{{ form.valor_bruto.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.taxa_maquinha.label_tag }}
+                                {{ form.taxa_maquinha }}
+                                {% if form.taxa_maquinha.errors %}
+                                    <div class="text-danger">{{ form.taxa_maquinha.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.valor_liquido.label_tag }}
+                                {{ form.valor_liquido }}
+                                {% if form.valor_liquido.errors %}
+                                    <div class="text-danger">{{ form.valor_liquido.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.maquinha.label_tag }}
+                                {{ form.maquinha }}
+                                {% if form.maquinha.errors %}
+                                    <div class="text-danger">{{ form.maquinha.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.numero_autorizacao.label_tag }}
+                                {{ form.numero_autorizacao }}
+                                {% if form.numero_autorizacao.errors %}
+                                    <div class="text-danger">{{ form.numero_autorizacao.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.data_venda.label_tag }}
+                                {{ form.data_venda }}
+                                {% if form.data_venda.errors %}
+                                    <div class="text-danger">{{ form.data_venda.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.nsu_doc.label_tag }}
+                                {{ form.nsu_doc }}
+                                {% if form.nsu_doc.errors %}
+                                    <div class="text-danger">{{ form.nsu_doc.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-2">
+                                {{ form.parcela_texto.label_tag }}
+                                {{ form.parcela_texto }}
+                                {% if form.parcela_texto.help_text %}<small class="form-text text-muted">{{ form.parcela_texto.help_text }}</small>{% endif %}
+                                {% if form.parcela_texto.errors %}
+                                    <div class="text-danger">{{ form.parcela_texto.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form.parcelas.label_tag }}
+                                {{ form.parcelas }}
+                                {% if form.parcelas.errors %}
+                                    <div class="text-danger">{{ form.parcelas.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.total_parcelas.label_tag }}
+                                {{ form.total_parcelas }}
+                                {% if form.total_parcelas.errors %}
+                                    <div class="text-danger">{{ form.total_parcelas.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.conciliado.label_tag }}
+                                {{ form.conciliado }}
+                                {% if form.conciliado.errors %}
+                                    <div class="text-danger">{{ form.conciliado.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.identificacao_extrato.label_tag }}
+                                {{ form.identificacao_extrato }}
+                                {% if form.identificacao_extrato.errors %}
+                                    <div class="text-danger">{{ form.identificacao_extrato.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.nota_fiscal.label_tag }}
+                                {{ form.nota_fiscal }}
+                                {% if form.nota_fiscal.errors %}
+                                    <div class="text-danger">{{ form.nota_fiscal.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                {{ form.razao.label_tag }}
+                                {{ form.razao }}
+                                {% if form.razao.errors %}
+                                    <div class="text-danger">{{ form.razao.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">{{ action }}</button>
+                        <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

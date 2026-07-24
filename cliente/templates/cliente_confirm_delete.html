@@ -1,0 +1,19 @@
+<!-- cliente_confirm_delete.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Confirmar Exclusão</title>
+</head>
+<body style="text-align: center; margin-top: 50px;">
+    <h1>Confirmar Exclusão</h1>
+    
+    <p>Tem certeza que deseja excluir o cliente: <strong>{{ object }}</strong>?</p>
+    
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" style="padding: 10px 20px; background-color: red; color: white; border: none;">Confirmar</button>
+        <a href="{% url 'cliente:clieList' %}" style="padding: 10px 20px; background-color: gray; color: white; text-decoration: none;">Cancelar</a>
+    </form>
+</body>
+</html>

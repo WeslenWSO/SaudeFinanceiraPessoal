@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+   {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+	 {%block conteudo%}
+
+
+	   <form method="post" novalidate class="card">
+		{%csrf_token %}
+		{% if messages %}
+		   {% include 'parcial/_messages.html' %}
+		{% endif %}
+	   {% for field in form %}
+		   {{ field.label_tag }}
+		   {{ field }}
+		   {% if field.errors %}
+			   <small class="error" style="color:red">{{ field.errors|striptags  }}</small>
+		   {% endif %}
+	   {% endfor %}
+
+	   <div class="form-buttons">
+		   <input type="submit" value="Save" class="btn btn-primary"/>
+		   <a href="{%url 'extrato:lancamento_list'%}" class="btn btn-outline">Cancel</a>
+	   </div>
+
+
+    </form>
+
+
+
+{%endblock%}

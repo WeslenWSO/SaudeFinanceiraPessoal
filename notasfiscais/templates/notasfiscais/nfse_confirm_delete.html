@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% endblock %}
+
+{% comment %} {% block sid_Bar %}
+    {% include 'parcial/_MenuSideNav.html' %}
+{% endblock %} {% endcomment %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-trash-alt fa-4x text-danger mb-3"></i>
+                        <h4>Confirmar Exclusão</h4>
+                        <p class="text-muted">
+                            Tem certeza que deseja excluir a NFSe 
+                            <strong>{{ nfse.numero_nota }}</strong>?
+                        </p>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita.
+                    </div>
+
+                    <!-- Detalhes da NFSe -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Detalhes da NFSe</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-start">
+                                <div class="col-md-6">
+                                    <p><strong>Número:</strong> {{ nfse.numero_nota }}</p>
+                                    <p><strong>Série:</strong> {{ nfse.serie }}</p>
+                                    <p><strong>Data Emissão:</strong> {{ nfse.data_emissao|date:"d/m/Y" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Cliente:</strong> {{ nfse.cliente|truncatechars:25 }}</p>
+                                    <p><strong>Valor:</strong> R$ {{ nfse.valor_liquido|floatformat:2 }}</p>
+                                    <p><strong>Status:</strong> 
+                                        {% if nfse.status == 'pendente' %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% elif nfse.status == 'pago' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif nfse.status == 'cancelado' %}
+                                            <span class="badge bg-danger">Cancelado</span>
+                                        {% elif nfse.status == 'vencido' %}
+                                            <span class="badge bg-secondary">Vencido</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <a href="{% url  'notasfiscais:detail' pk=object.pk %}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Confirmar Exclusão
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card-header.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.fa-4x {
+    font-size: 4em;
+}
+</style>
+{% endblock %}
+
+
+
+

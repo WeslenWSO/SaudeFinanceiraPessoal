@@ -1,0 +1,1063 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<style>
+.fm-row-actions { position: relative; display: inline-block; }
+.fm-row-actions > summary { list-style: none; cursor: pointer; }
+.fm-row-actions > summary::-webkit-details-marker { display: none; }
+.fm-row-actions-btn { min-width: 2.25rem; }
+.fm-row-actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 40;
+    min-width: 9.5rem;
+    padding: 0.35rem 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12);
+}
+.fm-row-actions-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+.fm-row-actions-item:hover { background: #f3f4f6; color: inherit; text-decoration: none; }
+.fm-row-actions-item-danger:hover { background: #fef2f2; }
+</style>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Faturamentos Médicos</h3>
+                    <div class="card-tools">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-upload"></i> Importar
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'faturamento_medico:importar_unimed' %}">
+                                    <i class="fas fa-file-alt"></i> Importar UNIMED (.txt)
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'faturamento_medico:importar_xml' %}">
+                                    <i class="fas fa-file-code"></i> Importar XML NFSe
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'faturamento_medico:importar_ris' %}">
+                                    <i class="fas fa-file-excel"></i> Importar RIS (.xlsx)
+                                </a></li>
+                            </ul>
+                        </div>
+                        <a href="{% url 'faturamento_medico:listar_cancelados' %}" class="btn btn-danger btn-sm">
+                            <i class="fas fa-ban"></i> Cancelados / Desistência / Deletados
+                        </a>
+                        <a href="{% url 'faturamento_medico:verificar_corrigir_precos' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-balance-scale"></i> Verificar / Corrigir Preços
+                        </a>
+                        <a href="{% url 'faturamento_medico:selecionar_lote_imprimir' %}" class="btn btn-info btn-sm" target="_blank">
+                            <i class="fas fa-print"></i> Imprimir Relatório de Lote
+                        </a>
+                        <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-calendar-check"></i> Fechamento Repasse
+                        </a>
+                        <a href="{% url 'faturamento_medico:exportar_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success btn-sm">
+                            <i class="fas fa-file-excel"></i> Exportar Excel
+                        </a>
+                        <a href="{% url 'faturamento_medico:criar' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Novo Faturamento
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filtros (retrátil) -->
+                <div class="card-body">
+                    <div class="filtro-retratil mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm filtro-retratil-toggle w-100 text-start d-flex align-items-center justify-content-between" id="btnToggleFiltrosFat" aria-expanded="true" aria-controls="painelFiltrosFat">
+                            <span>
+                                <i class="fas fa-filter me-1"></i>
+                                <strong>Filtros</strong>
+                                <span class="text-muted small ms-2" id="filtroResumoFat"></span>
+                            </span>
+                            <i class="fas fa-chevron-up filtro-retratil-chevron" id="filtroChevronFat" aria-hidden="true"></i>
+                        </button>
+                        <div class="filtro-retratil-painel mt-2" id="painelFiltrosFat">
+                    <form method="GET" class="mb-2">
+                        <input type="hidden" name="per_page" value="{{ per_page }}">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <input type="text" name="nome" class="form-control" placeholder="Nome" value="{{ filtros.nome|default:'' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="text" name="guia" class="form-control" placeholder="Guia" value="{{ filtros.guia|default:'' }}">
+                            </div>
+                           <div class="col-md-2">
+                                <input type="text" name="codigo_relatorio" class="form-control" placeholder="Codigo Relatorio" value="{{ filtros.codigo_relatorio|default:'' }}">
+                            </div>
+
+                            <div class="col-md-2">
+                                <input type="text" name="anestesista" class="form-control" placeholder="Anestesista" value="{{ filtros.anestesista|default:'' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                            </div>
+                            <div class="col-md-2">
+                                <select name="convenio" class="form-control" multiple>
+                                    <option value="">Todos os Convênios</option>
+                                    {% for convenio in convenios_disponiveis %}
+                                        <option value="{{ convenio.nome }}" {% if convenio.nome in filtros.convenio %}selected{% endif %}>{{ convenio.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-2">
+                                <select name="status" class="form-control">
+                                    <option value="">Todos os Status</option>
+                                    <option value="pendente" {% if filtros.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                                    <option value="finalizado" {% if filtros.status == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select name="status_conferencia" class="form-control">
+                                    <option value="">Status Conferência (todos)</option>
+                                    {% for value, label in status_conferencia_choices %}
+                                    <option value="{{ value }}" {% if filtros.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select name="lote" class="form-control">
+                                    <option value="">Lote (todos)</option>
+                                    <option value="__sem__" {% if filtros.lote == '__sem__' %}selected{% endif %}>Sem lote</option>
+                                    {% for lote_opt in lotes_filtro %}
+                                    <option value="{{ lote_opt.id }}" {% if filtros.lote == lote_opt.id|stringformat:"s" %}selected{% endif %}>
+                                        Lote {{ lote_opt.id }}{% if lote_opt.convenio %} - {{ lote_opt.convenio }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-secondary me-1">Filtrar</button>
+                                <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary">Limpar</a>
+                            </div>
+                        </div>
+                        
+                    </form>
+                        </div>
+                    </div>
+
+                    <!-- Grid pós-filtragem (modelo RIS) -->
+                    {% if grid_total %}
+                    <form method="POST" action="{% url 'faturamento_medico:gerar_lote' %}" id="form-lote">
+                        {% csrf_token %}
+                        <div class="row mb-3 align-items-end">
+                            <div class="col-md-5">
+                                <label for="lote_existente" class="form-label">Adicionar a Lote Existente (opcional):</label>
+                                <select name="lote_existente" id="lote_existente" class="form-select">
+                                    <option value="">Criar Novo Lote</option>
+                                    {% for lote in lotes_disponiveis %}
+                                        <option value="{{ lote.id }}">Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|floatformat:2 }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus-circle"></i> Gerar/Adicionar Lote dos Selecionados
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex flex-wrap align-items-end justify-content-md-end gap-2">
+                                    <div>
+                                        <label for="per_page_tabela" class="form-label small mb-1 fw-semibold">Qtde. a listar</label>
+                                        <select id="per_page_tabela" class="form-select form-select-sm" style="min-width: 8rem;" title="Quantidade de itens na tabela">
+                                            {% for n in per_page_opcoes %}
+                                            <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }} itens</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <small class="text-muted pb-1">
+                                        Exibindo {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ grid_total }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0 grid-ris">
+                                <thead>
+                                    <tr>
+                                        <th class="grid-ris-th" width="40">
+                                            <input type="checkbox" id="select-all-lote" title="Selecionar todos">
+                                        </th>
+                                        <th class="grid-ris-th">DATA</th>
+                                        <th class="grid-ris-th">PACIENTE</th>
+                                        <th class="grid-ris-th">NOME ASSOCIADO</th>
+                                        <th class="grid-ris-th">NÚMERO DA GUIA</th>
+                                        <th class="grid-ris-th">PROCEDIMENTO</th>
+                                        <th class="grid-ris-th">MODALIDADE</th>
+                                        <th class="grid-ris-th">CONTRASTE</th>
+                                        <th class="grid-ris-th">VALOR</th>
+                                        <th class="grid-ris-th-conf">CONFERENCIA</th>
+                                        <th class="grid-ris-th">STATUS CONFERENCIA</th>
+                                        <th class="grid-ris-th">AÇÕES</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for linha in grid_linhas %}
+                                    <tr class="{% if linha.conferido %}table-success{% endif %}"
+                                        data-status-css="{{ linha.status_conferencia_css }}">
+                                        <td>
+                                            {% if linha.mostrar_selecao_lote and linha.faturamento.status != 'finalizado' %}
+                                                <input type="checkbox" name="faturamentos_selecionados" value="{{ linha.faturamento.id }}" class="faturamento-lote-checkbox">
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ linha.faturamento.data|date:"d/m/Y" }}</td>
+                                        <td>{{ linha.paciente }}</td>
+                                        <td>{{ linha.nome_associado }}</td>
+                                        <td class="text-center">{{ linha.faturamento.guia|default:"-" }}</td>
+                                        <td>{{ linha.procedimento }}</td>
+                                        <td class="text-center">{{ linha.modalidade }}</td>
+                                        <td class="text-center">
+                                            {% if linha.com_contraste %}
+                                                <span class="badge bg-info">Sim</span>
+                                            {% else %}
+                                                <span class="text-muted">Não</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                                        <td class="text-center">
+                                            {% if linha.item %}
+                                            <input type="checkbox"
+                                                   class="form-check-input conferencia-checkbox"
+                                                   data-url="{% url 'faturamento_medico:toggle_conferencia' linha.item.id %}"
+                                                   {% if linha.conferido %}checked{% endif %}
+                                                   title="Marcar conferência">
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if linha.item %}
+                                            <select class="form-select form-select-sm status-conferencia-select status-{{ linha.status_conferencia_css }}"
+                                                    data-url="{% url 'faturamento_medico:alterar_status_conferencia' linha.item.id %}"
+                                                    title="Alterar status de conferência">
+                                                {% for value, label in status_conferencia_choices %}
+                                                <option value="{{ value }}" {% if linha.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            {% else %}
+                                            <span class="badge status-conf badge-{{ linha.status_conferencia_css }}">
+                                                {{ linha.status_conferencia }}
+                                            </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-nowrap">
+                                            <details class="fm-row-actions">
+                                                <summary class="btn btn-sm btn-outline-secondary fm-row-actions-btn" title="Ações" aria-label="Ações">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </summary>
+                                                <div class="fm-row-actions-menu" role="menu">
+                                                    <a href="{% url 'faturamento_medico:detalhes' linha.faturamento.pk %}" class="fm-row-actions-item" role="menuitem">
+                                                        <i class="fas fa-eye text-info"></i> Detalhes
+                                                    </a>
+                                                    <a href="{% url 'faturamento_medico:editar' linha.faturamento.pk %}" class="fm-row-actions-item" role="menuitem">
+                                                        <i class="fas fa-edit text-warning"></i> Editar
+                                                    </a>
+                                                    <a href="{% url 'faturamento_medico:excluir' linha.faturamento.pk %}" class="fm-row-actions-item fm-row-actions-item-danger" role="menuitem">
+                                                        <i class="fas fa-trash text-danger"></i> Excluir
+                                                    </a>
+                                                </div>
+                                            </details>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if page_obj.paginator.num_pages > 1 %}
+                        <nav class="mt-3" aria-label="Paginação da tabela">
+                            <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
+                                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page=1">&laquo;</a>
+                                </li>
+                                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                                    {% if page_obj.has_previous %}
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                    {% else %}
+                                    <span class="page-link">Anterior</span>
+                                    {% endif %}
+                                </li>
+                                {% for num in page_obj.paginator.page_range %}
+                                    {% if num == page_obj.number %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                    {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                                    </li>
+                                    {% endif %}
+                                {% endfor %}
+                                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                                    {% if page_obj.has_next %}
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Próximo</a>
+                                    {% else %}
+                                    <span class="page-link">Próximo</span>
+                                    {% endif %}
+                                </li>
+                                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">&raquo;</a>
+                                </li>
+                            </ul>
+                        </nav>
+                        {% endif %}
+
+                        <div class="row mt-3 mb-2 align-items-stretch">
+                            <div class="col-lg-3 col-md-12 mb-3 mb-lg-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered mb-0 resumo-ris">
+                                        <thead>
+                                            <tr>
+                                                <th colspan="2" class="resumo-ris-header text-center">RESUMO</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in resumo_modalidades %}
+                                            <tr>
+                                                <td class="text-center fw-bold">{{ item.label }}</td>
+                                                <td class="text-center">{{ item.quantidade }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                            <tr>
+                                                <td class="text-center fw-bold">QUANTIDADE TOTAL:</td>
+                                                <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-center fw-bold resumo-ris-valor-label">VALOR TOTAL:</td>
+                                                <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 col-md-6 mb-3 mb-lg-0">
+                                <div class="card border shadow-sm h-100 resumo-modalidade-chart-card">
+                                    <div class="card-header py-2 fw-semibold">
+                                        <i class="fas fa-chart-pie me-1 text-primary"></i>
+                                        Por modalidade
+                                    </div>
+                                    <div class="card-body d-flex align-items-center justify-content-center">
+                                        <div class="w-100" style="max-height: 300px;">
+                                            <canvas id="graficoModalidade" aria-label="Gráfico por modalidade"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-5 col-md-6">
+                                <div class="card border shadow-sm h-100 resumo-modalidade-chart-card">
+                                    <div class="card-header py-2 fw-semibold">
+                                        <i class="fas fa-stethoscope me-1 text-success"></i>
+                                        Por procedimento
+                                    </div>
+                                    <div class="card-body d-flex align-items-center justify-content-center">
+                                        <div class="w-100" style="max-height: 300px;">
+                                            <canvas id="graficoProcedimento" aria-label="Gráfico por procedimento"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>Nenhum faturamento encontrado</h4>
+                        <p>Não há faturamentos que atendam aos filtros aplicados.</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Totais e Valores por Convênio / Anestesista (após o gráfico) -->
+                    <div class="row mt-4 mb-3">
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info"><i class="fas fa-list"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Total de Faturamentos</span>
+                                    <span class="info-box-number">{{ total_faturamentos }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-success"><i class="fas fa-dollar-sign"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Valor Total</span>
+                                    <span class="info-box-number">R$ {{ valor_total_fmt }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if stats_convenio or stats_anestesista %}
+                    <div class="row mb-2 align-items-stretch">
+                        {% if stats_convenio %}
+                        <div class="col-lg-4 mb-3 mb-lg-0">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-building"></i> Valores por Convênio
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Convênio</th>
+                                                    <th class="text-center">Qtde</th>
+                                                    <th class="text-right">Valor Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for stat in stats_convenio %}
+                                                <tr>
+                                                    <td><strong>{{ stat.convenio|default:"Não informado" }}</strong></td>
+                                                    <td class="text-center">{{ stat.quantidade }}</td>
+                                                    <td class="text-right"><strong>R$ {{ stat.total_valor_fmt }}</strong></td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3 mb-lg-0">
+                            <div class="card border shadow-sm h-100 resumo-modalidade-chart-card">
+                                <div class="card-header py-2 fw-semibold">
+                                    <i class="fas fa-chart-pie me-1 text-info"></i>
+                                    Qtde por convênio
+                                    <small class="text-muted fw-normal ms-1">(clique na fatia)</small>
+                                </div>
+                                <div class="card-body d-flex align-items-center justify-content-center">
+                                    <div class="w-100" style="max-height: 300px;">
+                                        <canvas id="graficoConvenioQtde" aria-label="Quantidade por convênio"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3 mb-lg-0">
+                            <div class="card border shadow-sm h-100 resumo-modalidade-chart-card">
+                                <div class="card-header py-2 fw-semibold">
+                                    <i class="fas fa-chart-pie me-1 text-primary"></i>
+                                    Valor por convênio
+                                    <small class="text-muted fw-normal ms-1">(clique na fatia)</small>
+                                </div>
+                                <div class="card-body d-flex align-items-center justify-content-center">
+                                    <div class="w-100" style="max-height: 300px;">
+                                        <canvas id="graficoConvenioValor" aria-label="Valor por convênio"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Modal drill-down convênio -->
+                    <div class="modal fade" id="modalConvenioDetalhe" tabindex="-1" aria-labelledby="modalConvenioDetalheLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-xl modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalConvenioDetalheLabel">Detalhe do convênio</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card border h-100">
+                                                <div class="card-header py-2 fw-semibold">
+                                                    <i class="fas fa-chart-pie me-1 text-primary"></i> Modalidade
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="graficoModalConvenioMod" height="220"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card border h-100">
+                                                <div class="card-header py-2 fw-semibold">
+                                                    <i class="fas fa-stethoscope me-1 text-success"></i> Procedimento
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="graficoModalConvenioProc" height="220"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if stats_anestesista %}
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-user-md"></i> Valores por Anestesista
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Anestesista</th>
+                                                    <th class="text-center">Qtde</th>
+                                                    <th class="text-right">Valor Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for stat in stats_anestesista %}
+                                                <tr>
+                                                    <td><strong>{{ stat.anestesista|default:"Não informado" }}</strong></td>
+                                                    <td class="text-center">{{ stat.quantidade }}</td>
+                                                    <td class="text-right"><strong>R$ {{ stat.total_valor_fmt }}</strong></td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.resumo-ris {
+    font-size: 0.85rem;
+    background: #fff;
+}
+.resumo-ris td,
+.resumo-ris th {
+    border: 1px solid #212529 !important;
+    vertical-align: middle;
+}
+.resumo-ris-header {
+    background-color: #b8d4e8 !important;
+    color: #000;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.resumo-ris tbody td:first-child {
+    text-transform: uppercase;
+}
+.resumo-ris-valor-label {
+    background-color: #b8d4e8 !important;
+}
+.resumo-ris-valor-cell {
+    background-color: #c6efce !important;
+    white-space: nowrap;
+}
+.grid-ris thead th.grid-ris-th {
+    background-color: #2b4b7c;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-color: #1f3a61;
+}
+.grid-ris thead th.grid-ris-th-conf {
+    background-color: #fff;
+    color: #212529;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+    border: 1px solid #dee2e6;
+}
+.grid-ris tbody td {
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+.grid-ris .badge.status-conf {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.4em 0.55em;
+    white-space: normal;
+    text-align: center;
+    max-width: 160px;
+    display: inline-block;
+}
+.grid-ris .badge-success { background-color: #198754; }
+.grid-ris .badge-danger { background-color: #dc3545; }
+.grid-ris .badge-warning { background-color: #ffc107; color: #212529; }
+.grid-ris .badge-secondary { background-color: #6c757d; }
+.grid-ris .badge-info { background-color: #0dcaf0; color: #212529; }
+.grid-ris .status-conferencia-select {
+    min-width: 170px;
+    max-width: 220px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.grid-ris .status-conferencia-select.status-success {
+    background-color: #d1e7dd;
+    border-color: #198754;
+    color: #0f5132;
+}
+.grid-ris .status-conferencia-select.status-danger {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #842029;
+}
+.grid-ris .status-conferencia-select.status-warning {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #664d03;
+}
+.grid-ris .status-conferencia-select.status-secondary {
+    background-color: #e2e3e5;
+    border-color: #6c757d;
+    color: #41464b;
+}
+.grid-ris .status-conferencia-select.status-info {
+    background-color: #cff4fc;
+    border-color: #0dcaf0;
+    color: #055160;
+}
+.resumo-modalidade-chart-card {
+    min-height: 100%;
+}
+.resumo-modalidade-chart-card .card-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.95rem;
+}
+.filtro-retratil-toggle {
+    border-radius: 8px;
+    padding: 0.55rem 0.85rem;
+    background: #f8fafc;
+}
+.filtro-retratil-toggle:hover {
+    background: #eef2f7;
+}
+.filtro-retratil-chevron {
+    transition: transform 0.2s ease;
+}
+.filtro-retratil.is-collapsed .filtro-retratil-chevron {
+    transform: rotate(180deg);
+}
+.filtro-retratil-painel {
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.2s ease, margin 0.2s ease;
+    max-height: 800px;
+    opacity: 1;
+}
+.filtro-retratil.is-collapsed .filtro-retratil-painel {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0 !important;
+    pointer-events: none;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    (function setupFiltroRetratil() {
+        var wrap = document.querySelector('.filtro-retratil');
+        var btn = document.getElementById('btnToggleFiltrosFat');
+        var painel = document.getElementById('painelFiltrosFat');
+        var resumo = document.getElementById('filtroResumoFat');
+        if (!wrap || !btn || !painel) return;
+
+        var key = 'fat_medico_filtros_abertos';
+        var params = new URLSearchParams(window.location.search);
+        var temFiltro = false;
+        params.forEach(function(v) {
+            if (v && String(v).trim() !== '') temFiltro = true;
+        });
+        if (temFiltro && resumo) {
+            resumo.textContent = '(filtros ativos)';
+        }
+
+        function setOpen(open) {
+            wrap.classList.toggle('is-collapsed', !open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) {}
+        }
+
+        var saved = null;
+        try { saved = localStorage.getItem(key); } catch (e) {}
+        // Com filtro na URL, abre; senão respeita preferência (padrão aberto)
+        if (temFiltro) {
+            setOpen(true);
+        } else if (saved === '0') {
+            setOpen(false);
+        } else {
+            setOpen(true);
+        }
+
+        btn.addEventListener('click', function() {
+            setOpen(wrap.classList.contains('is-collapsed'));
+        });
+    })();
+
+    (function setupPerPageTabela() {
+        var sel = document.getElementById('per_page_tabela');
+        if (!sel) return;
+        sel.addEventListener('change', function() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('per_page', this.value);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        });
+    })();
+
+    function criarPizza(canvasId, labelsRaw, valoresRaw, coresAll, opts) {
+        opts = opts || {};
+        var canvas = document.getElementById(canvasId);
+        if (!canvas || typeof Chart === 'undefined') return null;
+        var labels = [];
+        var valores = [];
+        var cores = [];
+        var qtdesFiltradas = [];
+        var keysFiltradas = [];
+        var qtdes = opts.qtdes || [];
+        var keys = opts.keys || [];
+        labelsRaw.forEach(function(label, i) {
+            if ((valoresRaw[i] || 0) > 0) {
+                labels.push(label);
+                valores.push(valoresRaw[i]);
+                cores.push(coresAll[i % coresAll.length]);
+                if (qtdes.length) qtdesFiltradas.push(qtdes[i]);
+                if (keys.length) keysFiltradas.push(keys[i]);
+            }
+        });
+        if (!labels.length) {
+            labels.push('Sem dados');
+            valores.push(1);
+            cores.push('#e5e7eb');
+        }
+        function formatMoeda(v) {
+            try {
+                return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            } catch (e) {
+                return 'R$ ' + v;
+            }
+        }
+        var chart = new Chart(canvas.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: opts.datasetLabel || 'Quantidade',
+                    data: valores,
+                    backgroundColor: cores,
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                onClick: function(evt, elements) {
+                    if (!opts.onSliceClick || !elements || !elements.length) return;
+                    var idx = elements[0].index;
+                    var key = keysFiltradas[idx] || labels[idx];
+                    if (key === 'Sem dados') return;
+                    opts.onSliceClick(key, labels[idx]);
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 10,
+                            padding: 8,
+                            font: { size: 10 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                if (ctx.label === 'Sem dados') return ' Sem dados no filtro';
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var v = ctx.parsed || 0;
+                                var pct = total ? ((v / total) * 100).toFixed(1) : 0;
+                                if (opts.moeda) {
+                                    var idx = ctx.dataIndex;
+                                    var q = qtdesFiltradas[idx];
+                                    var extra = (typeof q !== 'undefined') ? ' · ' + q + ' item(ns)' : '';
+                                    return ' ' + ctx.label + ': ' + formatMoeda(v) + ' (' + pct + '%)' + extra;
+                                }
+                                return ' ' + ctx.label + ': ' + v + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        canvas.style.cursor = opts.onSliceClick ? 'pointer' : 'default';
+        return chart;
+    }
+
+    var coresModalidade = [
+        '#0d9488', '#2563eb', '#db2777', '#ca8a04',
+        '#7c3aed', '#64748b', '#dc2626'
+    ];
+    var coresProcedimento = [
+        '#059669', '#0284c7', '#c026d3', '#d97706',
+        '#4f46e5', '#e11d48', '#0f766e', '#7c3aed', '#64748b'
+    ];
+    var coresConvenio = [
+        '#2563eb', '#0d9488', '#d97706', '#dc2626',
+        '#7c3aed', '#0284c7', '#db2777', '#64748b', '#059669'
+    ];
+
+    var detalheConvenio = {{ detalhe_convenio|default:"{}"|safe }};
+    var convenioKeys = {{ grafico_convenio_keys|default:"[]"|safe }};
+    var convenioLabels = {{ grafico_convenio_labels|default:"[]"|safe }};
+    var convenioValores = {{ grafico_convenio_valores|default:"[]"|safe }};
+    var convenioQtde = {{ grafico_convenio_qtde|default:"[]"|safe }};
+    var chartModalMod = null;
+    var chartModalProc = null;
+
+    function abrirDetalheConvenio(convenioKey, labelCurto) {
+        var detalhe = detalheConvenio[convenioKey];
+        if (!detalhe) {
+            // tenta match case-insensitive / trim
+            var found = null;
+            Object.keys(detalheConvenio).forEach(function(k) {
+                if (!found && k.trim().toLowerCase() === String(convenioKey).trim().toLowerCase()) found = k;
+            });
+            if (found) {
+                convenioKey = found;
+                detalhe = detalheConvenio[found];
+            }
+        }
+        var titulo = document.getElementById('modalConvenioDetalheLabel');
+        if (titulo) titulo.textContent = 'Convênio: ' + (labelCurto || convenioKey);
+        if (!detalhe) {
+            detalhe = {
+                modalidade: { labels: ['Sem dados'], valores: [1] },
+                procedimento: { labels: ['Sem dados'], valores: [1] }
+            };
+        }
+        if (chartModalMod) { chartModalMod.destroy(); chartModalMod = null; }
+        if (chartModalProc) { chartModalProc.destroy(); chartModalProc = null; }
+        var cMod = document.getElementById('graficoModalConvenioMod');
+        var cProc = document.getElementById('graficoModalConvenioProc');
+        if (cMod) {
+            var existing = Chart.getChart ? Chart.getChart(cMod) : null;
+            if (existing) existing.destroy();
+        }
+        if (cProc) {
+            var existingP = Chart.getChart ? Chart.getChart(cProc) : null;
+            if (existingP) existingP.destroy();
+        }
+        chartModalMod = criarPizza(
+            'graficoModalConvenioMod',
+            detalhe.modalidade.labels || [],
+            detalhe.modalidade.valores || [],
+            coresModalidade
+        );
+        chartModalProc = criarPizza(
+            'graficoModalConvenioProc',
+            detalhe.procedimento.labels || [],
+            detalhe.procedimento.valores || [],
+            coresProcedimento
+        );
+        var modalEl = document.getElementById('modalConvenioDetalhe');
+        if (modalEl && window.bootstrap) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    }
+
+    criarPizza(
+        'graficoModalidade',
+        {{ grafico_modalidade_labels|default:"[]"|safe }},
+        {{ grafico_modalidade_valores|default:"[]"|safe }},
+        coresModalidade
+    );
+    criarPizza(
+        'graficoProcedimento',
+        {{ grafico_procedimento_labels|default:"[]"|safe }},
+        {{ grafico_procedimento_valores|default:"[]"|safe }},
+        coresProcedimento
+    );
+    criarPizza(
+        'graficoConvenioQtde',
+        convenioLabels,
+        convenioQtde,
+        coresConvenio,
+        {
+            datasetLabel: 'Quantidade',
+            keys: convenioKeys,
+            onSliceClick: abrirDetalheConvenio
+        }
+    );
+    criarPizza(
+        'graficoConvenioValor',
+        convenioLabels,
+        convenioValores,
+        coresConvenio,
+        {
+            moeda: true,
+            datasetLabel: 'Valor',
+            qtdes: convenioQtde,
+            keys: convenioKeys,
+            onSliceClick: abrirDetalheConvenio
+        }
+    );
+
+    const selectAllLoteCheckbox = document.getElementById('select-all-lote');
+    const faturamentoLoteCheckboxes = document.querySelectorAll('.faturamento-lote-checkbox');
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+    function getCsrfToken() {
+        return document.querySelector('#form-lote [name=csrfmiddlewaretoken]')?.value
+            || document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            || getCookie('csrftoken')
+            || '{{ csrf_token }}';
+    }
+
+    function aplicarStatusNaLinha(row, data) {
+        const checkbox = row.querySelector('.conferencia-checkbox');
+        const select = row.querySelector('.status-conferencia-select');
+        if (checkbox) checkbox.checked = !!data.conferido;
+        row.classList.toggle('table-success', !!data.conferido);
+        if (select && data.status) {
+            select.value = data.status;
+            select.className = 'form-select form-select-sm status-conferencia-select status-' + (data.status_css || 'secondary');
+        }
+    }
+
+    if (selectAllLoteCheckbox) {
+        selectAllLoteCheckbox.addEventListener('change', function() {
+            faturamentoLoteCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllLoteCheckbox.checked;
+            });
+        });
+
+        faturamentoLoteCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const checkedBoxes = document.querySelectorAll('.faturamento-lote-checkbox:checked');
+                selectAllLoteCheckbox.checked = checkedBoxes.length === faturamentoLoteCheckboxes.length;
+                selectAllLoteCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < faturamentoLoteCheckboxes.length;
+            });
+        });
+    }
+
+    document.querySelectorAll('.conferencia-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const row = this.closest('tr');
+            const formData = new FormData();
+            formData.append('conferido', this.checked ? '1' : '0');
+            fetch(this.dataset.url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            })
+            .then(async r => {
+                const data = await r.json().catch(() => ({ ok: false }));
+                if (!r.ok || !data.ok) {
+                    this.checked = !this.checked;
+                    return;
+                }
+                aplicarStatusNaLinha(row, data);
+            })
+            .catch(() => {
+                this.checked = !this.checked;
+            });
+        });
+    });
+
+    document.querySelectorAll('.status-conferencia-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const row = this.closest('tr');
+            const anterior = this.dataset.previous || this.value;
+            const formData = new FormData();
+            formData.append('status', this.value);
+            fetch(this.dataset.url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            })
+            .then(async r => {
+                const data = await r.json().catch(() => ({ ok: false }));
+                if (!r.ok || !data.ok) {
+                    this.value = anterior;
+                    return;
+                }
+                this.dataset.previous = data.status;
+                aplicarStatusNaLinha(row, data);
+            })
+            .catch(() => {
+                this.value = anterior;
+            });
+        });
+        select.dataset.previous = select.value;
+    });
+
+    document.querySelectorAll('.fm-row-actions').forEach(function(details) {
+        details.addEventListener('toggle', function() {
+            if (!this.open) return;
+            document.querySelectorAll('.fm-row-actions[open]').forEach(function(other) {
+                if (other !== details) other.removeAttribute('open');
+            });
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.fm-row-actions')) return;
+        document.querySelectorAll('.fm-row-actions[open]').forEach(function(d) {
+            d.removeAttribute('open');
+        });
+    });
+});
+</script>
+{% endblock %}

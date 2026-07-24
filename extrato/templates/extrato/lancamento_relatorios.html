@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block nav %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+
+<h1>Relatórios Conciliados</h1>
+
+<!-- Informações do Lançamento -->
+<div class="lancamento-info" style="background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+  <h5 style="margin-bottom: 15px; color: #1976d2;">
+    <i class="fas fa-receipt me-2"></i>Lançamento: {{ lancamento.fitid }}
+  </h5>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+    <div>
+      <strong>Data:</strong> {{ lancamento.data|date:"d/m/Y" }}
+    </div>
+    <div>
+      <strong>Valor:</strong>
+      <span style="{% if lancamento.valor >= 0 %}color: #28a745;{% else %}color: #dc3545;{% endif %}">
+        {% if lancamento.valor >= 0 %}+{% endif %}R$ {{ lancamento.valor|floatformat:2 }}
+      </span>
+    </div>
+    <div>
+      <strong>Histórico:</strong> {{ lancamento.historico }}
+    </div>
+    <div>
+      <strong>Status:</strong>
+      {% if lancamento.conciliado %}
+        <span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 8px; font-size: 12px;">Conciliado</span>
+      {% else %}
+        <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 8px; font-size: 12px;">Pendente</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Estatísticas -->
+{% if relatorios %}
+<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+    <div style="font-size: 24px; font-weight: bold; color: #007bff;">{{ total_relatorios }}</div>
+    <div style="font-size: 14px; color: #666;">Relatórios Encontrados</div>
+  </div>
+  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+    <div style="font-size: 24px; font-weight: bold; color: #28a745;">
+      R$ {{ total_bruto|floatformat:2 }}
+    </div>
+    <div style="font-size: 14px; color: #666;">Total Bruto</div>
+  </div>
+
+  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+    <div style="font-size: 24px; font-weight: bold; color: #28a745;">
+      R$ {{ total_tarifa|floatformat:2 }}
+    </div>
+    <div style="font-size: 14px; color: #666;">Total Tarifa</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Lista de Relatórios -->
+<div class="relatorios-container" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+
+  {% if relatorios %}
+  <div class="table-responsive">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead style="background: #f8f9fa;">
+        <tr>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">ID</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Data Pagamento</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Forma</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Bandeira</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Máquina</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Nota</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Razao</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Valor Bruto</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Valor Tarifa</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Valor Líquido</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Status</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for relatorio in relatorios %}
+        <tr style="border-bottom: 1px solid #f1f3f4; {% if forloop.counter0|divisibleby:2 %}background: #fafbfc;{% endif %}">
+          <td style="padding: 12px; font-weight: 500;">{{ relatorio.id }}</td>
+          <td style="padding: 12px;">{{ relatorio.data_pagamento|date:"d/m/Y" }}</td>
+          <td style="padding: 12px;">{{ relatorio.forma_pagamento|default:"-" }}</td>
+          <td style="padding: 12px;">
+            {% if relatorio.bandeira %}
+              {% with bandeira_lower=relatorio.bandeira|lower %}
+                {% if 'visa' in bandeira_lower %}
+                  <i class="fab fa-cc-visa text-primary" title="Visa"></i>
+                {% elif 'mastercard' in bandeira_lower or 'master' in bandeira_lower %}
+                  <i class="fab fa-cc-mastercard text-danger" title="Mastercard"></i>
+                {% elif 'amex' in bandeira_lower or 'american express' in bandeira_lower %}
+                  <i class="fab fa-cc-amex text-blue" title="American Express"></i>
+                {% elif 'elo' in bandeira_lower %}
+                  <i class="fas fa-credit-card text-success" title="Elo"></i>
+                {% else %}
+                  <i class="fas fa-credit-card text-secondary" title="Cartão"></i>
+                {% endif %}
+              {% endwith %}
+              {{ relatorio.bandeira }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td style="padding: 12px;">{{ relatorio.maquinha|default:"-" }}</td>
+<td style="padding: 12px;">{{ relatorio.nota_fiscal|default:"-" }}</td>
+<td style="padding: 12px;">{{ relatorio.razao|default:"-" }}</td>
+
+
+  <td style="padding: 12px; text-align: right; font-weight: 500; color: #28a745;">
+            R$ {{ relatorio.valor_bruto|floatformat:2 }}
+          </td>
+
+            <td style="padding: 12px; text-align: right; font-weight: 500; color: #28a745;">
+            R$ {{ relatorio.taxa_maquinha|floatformat:2 }}
+          </td>
+
+
+          <td style="padding: 12px; text-align: right; font-weight: 500; color: #28a745;">
+            R$ {{ relatorio.valor_liquido|floatformat:2 }}
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            {% if relatorio.conciliado %}
+              <span style="background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">✓ Conciliado</span>
+            {% else %}
+              <span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">⏳ Pendente</span>
+            {% endif %}
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            <a href="{% url 'relatoriorecebiveis:detail' relatorio.id %}" class="btn btn-sm btn-outline-info" title="Ver Detalhes">
+              <i class="fas fa-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  
+ 
+
+  {% else %}
+  <!-- Nenhum relatório encontrado -->
+  <div style="padding: 40px; text-align: center; color: #666;">
+    <i class="fas fa-file-invoice-dollar fa-3x mb-3" style="color: #dee2e6;"></i>
+    <h5>Nenhum relatório conciliado encontrado</h5>
+    <p>Este lançamento ainda não foi conciliado com nenhum relatório de recebíveis.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Botão Voltar -->
+<div style="margin-top: 20px; text-align: center;">
+  <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary">
+    <i class="fas fa-arrow-left me-2"></i>Voltar para Lançamentos
+  </a>
+</div>
+
+{% endblock %}

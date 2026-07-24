@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ title }}</h1>
+        <a href="{% url 'notasfiscais:list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Voltar para NFSe
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-gradient-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h5>
+        </div>
+        <div class="card-body bg-light">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" id="search" name="search"
+                           value="{{ search }}" placeholder="Buscar por número, cliente ou CNPJ...">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio"
+                           value="{{ data_inicio }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" class="form-control" id="data_fim" name="data_fim"
+                           value="{{ data_fim }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Logs -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Logs de Notas Fiscais Excluídas</h5>
+        </div>
+        <div class="card-body">
+            {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Série</th>
+                            <th>Data Emissão</th>
+                            <th>Cliente</th>
+                            <th>Valor Líquido</th>
+                            <th>Data Segmentação</th>
+                            <th>Motivo</th>
+                            <th>Usuário</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr>
+                            <td>{{ log.numero_nota }}</td>
+                            <td>{{ log.serie }}</td>
+                            <td>{{ log.data_emissao|date:"d/m/Y" }}</td>
+                            <td>{{ log.cliente|truncatechars:30 }}</td>
+                            <td>R$ {{ log.valor_liquido|floatformat:2 }}</td>
+                            <td>{{ log.data_segmentacao|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ log.motivo_exclusao|title }}</span>
+                            </td>
+                            <td>
+                                {% if log.usuario_segmentacao %}
+                                    {{ log.usuario_segmentacao.get_full_name|default:log.usuario_segmentacao.username }}
+                                {% else %}
+                                    Sistema
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'notasfiscais:restaurar_nota_fiscal' log.id %}"
+                                   class="btn btn-sm btn-success"
+                                   onclick="return confirm('Tem certeza que deseja restaurar esta nota fiscal?')">
+                                    <i class="fas fa-undo me-1"></i>Restaurar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Paginação">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum log encontrado</h5>
+                <p class="text-muted">Não há notas fiscais excluídas no momento.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

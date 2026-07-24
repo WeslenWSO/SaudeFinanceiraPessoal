@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load faturamento_extras %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h3 class="mb-0"><i class="fas fa-chart-pie text-primary"></i> {{ title }}</h3>
+        <small class="text-muted">{{ empresa.nome_fantasia|default:empresa.razao }}</small>
+    </div>
+</div>
+
+{% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+<form method="get" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <div class="d-flex flex-wrap gap-2 me-auto">
+        {% for g in grupos %}
+        <a href="{{ g.url }}" class="btn btn-outline-{{ g.meta.cor }} btn-sm">
+            <i class="fas {{ g.meta.icone }}"></i> {{ g.meta.titulo }}
+            <span class="badge bg-{{ g.meta.cor }} ms-1">{{ g.qtd }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted fw-semibold text-nowrap">Período</span>
+        <div class="input-group input-group-sm" style="width: auto;">
+            <span class="input-group-text">De</span>
+            <input type="date" class="form-control" id="data_ini" name="data_ini"
+                   value="{{ data_ini|date:'Y-m-d' }}" required style="width: 9.5rem;">
+            <span class="input-group-text">até</span>
+            <input type="date" class="form-control" id="data_fim" name="data_fim"
+                   value="{{ data_fim|date:'Y-m-d' }}" required style="width: 9.5rem;">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-filter"></i> Filtrar
+        </button>
+        <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            Mês atual
+        </a>
+    </div>
+</form>
+
+<div class="row g-2 mb-2 row-cols-2 row-cols-md-3 row-cols-xl-5">
+    {% for g in grupos %}
+    <div class="col">
+        <div class="card h-100 border-{{ g.meta.cor }}-subtle shadow-sm">
+            <div class="card-body p-2">
+                <div class="d-flex justify-content-between align-items-center gap-1 mb-1">
+                    <div class="fw-semibold small text-truncate" title="{{ g.meta.titulo }}">
+                        <i class="fas {{ g.meta.icone }} text-{{ g.meta.cor }}"></i>
+                        {{ g.meta.titulo }}
+                    </div>
+                    <span class="badge bg-{{ g.meta.cor }}">{{ g.qtd }}</span>
+                </div>
+                <div class="fw-bold text-dark mb-1">R$ {{ g.total|moeda_br }}</div>
+                <div class="d-flex justify-content-between align-items-center gap-1">
+                    <span class="text-muted" style="font-size: 0.7rem;">
+                        {% if g.qtd_lanc %}{{ g.qtd_lanc }} lanç.{% else %}0 lanç.{% endif %}
+                    </span>
+                    <a href="{{ g.url }}" class="btn btn-{{ g.meta.cor }} btn-sm py-0 px-2" style="font-size: 0.75rem;">
+                        Abrir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mb-3">
+    <div class="card border-{% if resultado >= 0 %}success{% else %}danger{% endif %}-subtle shadow-sm">
+        <div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="fw-semibold">
+                    <i class="fas fa-balance-scale text-{% if resultado >= 0 %}success{% else %}danger{% endif %}"></i>
+                    Resultado no período
+                </div>
+                <span class="badge bg-{% if resultado >= 0 %}success{% else %}danger{% endif %}">
+                    {% if resultado >= 0 %}Positivo{% else %}Negativo{% endif %}
+                </span>
+                <span class="text-muted small">
+                    Receitas R$ {{ total_receitas|moeda_br }}
+                    − Despesas R$ {{ total_despesas|moeda_br }}
+                    − Impostos R$ {{ total_impostos|moeda_br }}
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="fs-5 fw-bold {% if resultado >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">
+                    R$ {{ resultado|moeda_br }}
+                </div>
+                <a href="#graficoTorreOrcamento" class="btn btn-{% if resultado >= 0 %}success{% else %}danger{% endif %} btn-sm">
+                    <i class="fas fa-chart-bar"></i> Gráfico
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4" id="graficoTorreOrcamento">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="mb-0">
+            <i class="fas fa-chart-bar text-primary"></i>
+            Gráfico de torre — por mês
+        </h5>
+        <small class="text-muted">Receitas × Despesas × Impostos no período filtrado</small>
+    </div>
+    <div class="card-body">
+        {% if grafico_torre.tem_dados %}
+        <div style="position: relative; height: 340px;">
+            <canvas id="canvasGraficoTorreOrcamento" aria-label="Gráfico de torre do planejamento"></canvas>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            Sem lançamentos no período para montar o gráfico.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="mb-0">
+            <i class="fas fa-table text-secondary"></i>
+            Demonstrativo mensal
+        </h5>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <small class="text-muted">
+                Receitas, despesas, impostos e resultado ·
+                {{ data_ini|date:"d/m/Y" }} → {{ data_fim|date:"d/m/Y" }}
+            </small>
+            <a href="{% url 'planejamento_orcamentario:exportar_excel' %}?{{ periodo_qs }}"
+               class="btn btn-success btn-sm">
+                <i class="fas fa-file-excel"></i> Exportar Excel
+            </a>
+        </div>
+    </div>
+    <div class="card-body table-responsive p-0">
+        {% if tabela_despesas.grupos %}
+        <table class="table table-sm table-hover table-bordered mb-0 align-middle text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="min-width: 16rem;">Descrição</th>
+                    {% for m in tabela_despesas.meses %}
+                    <th class="text-end">{{ m.rotulo }}</th>
+                    {% endfor %}
+                    <th class="text-end pe-3">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for grupo in tabela_despesas.grupos %}
+                <tr class="table-secondary">
+                    <td class="ps-3 fw-semibold" colspan="{{ tabela_despesas.meses|length|add:2 }}">
+                        <i class="fas {{ grupo.meta.icone }} text-{{ grupo.meta.cor }}"></i>
+                        {{ grupo.meta.titulo }}
+                    </td>
+                </tr>
+                {% for linha in grupo.linhas %}
+                <tr>
+                    <td class="ps-3">
+                        {{ linha.nome }}
+                        {% if linha.categoria %}
+                        <span class="badge bg-light text-dark border ms-1">{{ linha.categoria }}</span>
+                        {% endif %}
+                    </td>
+                    {% for v in linha.valores_lista %}
+                    <td class="text-end {% if v %}{% else %}text-muted{% endif %}">
+                        {% if v %}R$ {{ v|moeda_br }}{% else %}—{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-end fw-semibold pe-3">R$ {{ linha.total|moeda_br }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="table-light">
+                    <td class="ps-3 fw-semibold">Subtotal — {{ grupo.meta.titulo }}</td>
+                    {% for v in grupo.subtotal_lista %}
+                    <td class="text-end fw-semibold">R$ {{ v|moeda_br }}</td>
+                    {% endfor %}
+                    <td class="text-end fw-bold pe-3">R$ {{ grupo.subtotal|moeda_br }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-success">
+                    <td class="ps-3 fw-bold">Total das receitas</td>
+                    {% for v in tabela_despesas.receitas_lista %}
+                    <td class="text-end fw-bold">R$ {{ v|moeda_br }}</td>
+                    {% endfor %}
+                    <td class="text-end fw-bold pe-3">R$ {{ tabela_despesas.receitas_total|moeda_br }}</td>
+                </tr>
+                <tr class="table-secondary">
+                    <td class="ps-3 fw-bold">Total das despesas</td>
+                    {% for v in tabela_despesas.despesas_lista %}
+                    <td class="text-end fw-bold">R$ {{ v|moeda_br }}</td>
+                    {% endfor %}
+                    <td class="text-end fw-bold pe-3">R$ {{ tabela_despesas.despesas_total|moeda_br }}</td>
+                </tr>
+                <tr class="table-danger">
+                    <td class="ps-3 fw-bold">Total dos impostos</td>
+                    {% for v in tabela_despesas.impostos_lista %}
+                    <td class="text-end fw-bold">R$ {{ v|moeda_br }}</td>
+                    {% endfor %}
+                    <td class="text-end fw-bold pe-3">R$ {{ tabela_despesas.impostos_total|moeda_br }}</td>
+                </tr>
+                <tr class="{% if tabela_despesas.resultado_total >= 0 %}table-primary{% else %}table-warning{% endif %}">
+                    <td class="ps-3 fw-bold">
+                        <i class="fas fa-balance-scale"></i> Resultado
+                        <span class="fw-normal small">(Receitas − Despesas − Impostos)</span>
+                    </td>
+                    {% for v in tabela_despesas.resultado_lista %}
+                    <td class="text-end fw-bold {% if v >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        R$ {{ v|moeda_br }}
+                    </td>
+                    {% endfor %}
+                    <td class="text-end fw-bold pe-3 {% if tabela_despesas.resultado_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        R$ {{ tabela_despesas.resultado_total|moeda_br }}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            Nenhum lançamento no período filtrado.
+            Cadastre itens e amplie o período (ex.: vários meses) para ver as colunas mensais.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<p class="small text-muted mt-4 mb-0">
+    Totais somam os <strong>lançamentos</strong> com data dentro do período filtrado.
+</p>
+
+{% if grafico_torre.tem_dados %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+  const el = document.getElementById('canvasGraficoTorreOrcamento');
+  if (!el) return;
+
+  const labels = {{ grafico_torre.labels_json|safe }};
+  const receitas = {{ grafico_torre.receitas_json|safe }};
+  const despesas = {{ grafico_torre.despesas_json|safe }};
+  const impostos = {{ grafico_torre.impostos_json|safe }};
+  const resultado = {{ grafico_torre.resultado_json|safe }};
+
+  function fmtMoeda(v) {
+    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Receitas',
+          data: receitas,
+          backgroundColor: 'rgba(25, 135, 84, 0.85)',
+          borderColor: 'rgba(25, 135, 84, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+          maxBarThickness: 48
+        },
+        {
+          label: 'Despesas',
+          data: despesas,
+          backgroundColor: 'rgba(108, 117, 125, 0.85)',
+          borderColor: 'rgba(108, 117, 125, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+          maxBarThickness: 48
+        },
+        {
+          label: 'Impostos',
+          data: impostos,
+          backgroundColor: 'rgba(220, 53, 69, 0.85)',
+          borderColor: 'rgba(220, 53, 69, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+          maxBarThickness: 48
+        },
+        {
+          label: 'Resultado',
+          data: resultado,
+          backgroundColor: 'rgba(13, 110, 253, 0.75)',
+          borderColor: 'rgba(13, 110, 253, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+          maxBarThickness: 48
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) {
+              return (ctx.dataset.label || '') + ': ' + fmtMoeda(ctx.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function (value) {
+              return Number(value).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                maximumFractionDigits: 0
+              });
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

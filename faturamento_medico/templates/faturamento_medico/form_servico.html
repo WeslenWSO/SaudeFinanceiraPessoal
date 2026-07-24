@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ titulo }}</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:listar_servicos' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Código e Descrição -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.codigo.id_for_label }}">Código do Serviço *</label>
+                                    {{ form.codigo }}
+                                    {% if form.codigo.errors %}
+                                        <div class="text-danger">
+                                            {{ form.codigo.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.descricao.id_for_label }}">Descrição do Serviço *</label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger">
+                                            {{ form.descricao.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Porte e Valor Base -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.porte.id_for_label }}">Porte Anestésico</label>
+                                    {{ form.porte }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.valor_base.id_for_label }}">Valor Base (R$)</label>
+                                    {{ form.valor_base }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Categoria e Subcategoria -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.categoria.id_for_label }}">Categoria</label>
+                                    {{ form.categoria }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.subcategoria.id_for_label }}">Subcategoria</label>
+                                    {{ form.subcategoria }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Ativo -->
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        {{ form.ativo }}
+                                        <label class="form-check-label" for="{{ form.ativo.id_for_label }}">
+                                            Serviço Ativo
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                        <a href="{% url 'faturamento_medico:listar_servicos' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

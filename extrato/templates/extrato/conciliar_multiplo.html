@@ -1,0 +1,525 @@
+ "Transferência" no campo "Tipo de Conciliação"{% extends "base.html" %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>{{ title }}</h1>
+    <div>
+        <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+</div>
+
+<!-- Informações do Lançamento Base -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Lançamento Base</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <strong>Data:</strong> {{ lancamento_base.data|date:"d/m/Y" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Histórico:</strong> {{ lancamento_base.historico }}
+            </div>
+            <div class="col-md-3">
+                <strong>Valor:</strong> R$ {{ lancamento_base.valor|floatformat:2 }}
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-3">
+                <strong>Conta:</strong> {{ lancamento_base.conta }}
+            </div>
+            <div class="col-md-3">
+                <strong>Documento:</strong> {{ lancamento_base.documento|default:"-" }}
+            </div>
+            <div class="col-md-3">
+                <strong>Status:</strong>
+                {% if lancamento_base.conciliado %}
+                    <span class="badge bg-success">Conciliado</span>
+                {% else %}
+                    <span class="badge bg-warning">Pendente</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="post" action="" onsubmit="console.log('Formulário enviado'); console.log('Contas selecionadas:', document.querySelectorAll('.conta-checkbox:checked').length); return true;">
+    {% csrf_token %}
+    <input type="hidden" name="tipo_conta" value="{{ tipo_conta }}">
+
+    <!-- Filtros para buscar contas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros para Buscar Contas</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="tipoConta" class="form-label">Tipo de Conta</label>
+                        <select class="form-select" id="tipoConta" name="tipo_conta">
+                            <option value="receber" {% if tipo_conta == 'receber' %}selected{% endif %}>Contas a Receber</option>
+                            <option value="pagar" {% if tipo_conta == 'pagar' %}selected{% endif %}>Contas a Pagar</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="dataInicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="dataInicio" name="data_inicio" value="{{ data_inicio }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="dataFim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="dataFim" name="data_fim" value="{{ data_fim }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="clienteFornecedor" class="form-label">Cliente/Fornecedor</label>
+                        <input type="text" class="form-control" id="clienteFornecedor" name="cliente_fornecedor" value="{{ cliente_fornecedor }}" placeholder="Buscar por nome...">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <button type="button" class="btn btn-primary" id="btnBuscarContas">
+                        <i class="fas fa-search me-2"></i>Buscar Contas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de contas encontradas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Contas Encontradas</h5>
+        </div>
+        <div class="card-body">
+            <div id="contasEncontradas">
+                <div class="text-center text-muted">
+                    <i class="fas fa-search me-2"></i>Use os filtros acima para buscar contas
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo da conciliação -->
+    <div class="card mb-4" id="resumoConciliacao" style="display: block;">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Resumo da Conciliação</h5>
+        </div>
+        <div class="card-body">
+            <div id="resumoTexto">
+                <div class="text-muted">Selecione contas para ver o resumo</div>
+            </div>
+            <div id="alertaAjustes" class="alert alert-warning mt-3" style="display: none;">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Atenção:</strong> Alguns valores foram ajustados (Valor Líquido - Desconto + Juros - Tarifas). Certifique-se de que os ajustes estão corretos.
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de ação -->
+    <div class="d-flex justify-content-between">
+        <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary">
+            <i class="fas fa-times me-2"></i>Cancelar
+        </a>
+        <button type="submit" class="btn btn-success" id="btnConciliarMultiplo" disabled onclick="console.log('Botão Conciliar Selecionadas clicado');">
+            <i class="fas fa-check me-2"></i>Conciliar Selecionadas
+        </button>
+        <input type="hidden" name="lancamento_base_id" value="{{ lancamento_base.id }}">
+    </div>
+</form>
+
+<script>
+// Função para converter valor brasileiro (com vírgula) para float
+function parseValorBrasileiro(valorStr) {
+    // Remove R$, espaços e converte para formato numérico
+    // Exemplo: "R$ 23.779,00" -> 23779.00
+    return parseFloat(
+        valorStr
+            .replace('R$', '')
+            .replace(/\s/g, '')
+            .replace(/\./g, '')  // Remove pontos (separadores de milhares)
+            .replace(',', '.')   // Substitui vírgula por ponto (decimal)
+    );
+}
+
+// Função para formatar valor como brasileiro
+function formatarValorBrasileiro(valor) {
+    return valor.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// Função para calcular valor a receber
+function calcularValorReceber(valorLiquido, desconto, juros, tarifas) {
+    const vl = parseValorBrasileiro(valorLiquido);
+    const desc = parseFloat(desconto.replace(',', '.')) || 0;
+    const jur = parseFloat(juros.replace(',', '.')) || 0;
+    const tar = parseFloat(tarifas.replace(',', '.')) || 0;
+
+    return vl - desc + jur - tar;
+}
+
+// Função para atualizar valor a receber
+function atualizarValorReceber(contaId) {
+    console.log('atualizarValorReceber chamado para contaId:', contaId);
+
+    const valorLiquidoEl = document.getElementById(`valor_liquido_${contaId}`);
+    const descontoEl = document.getElementById(`desconto_${contaId}`);
+    const jurosEl = document.getElementById(`juros_${contaId}`);
+    const tarifasEl = document.getElementById(`tarifas_${contaId}`);
+    const valorReceberEl = document.getElementById(`valor_receber_${contaId}`);
+
+    console.log('Elementos encontrados:', {
+        valorLiquidoEl: !!valorLiquidoEl,
+        descontoEl: !!descontoEl,
+        jurosEl: !!jurosEl,
+        tarifasEl: !!tarifasEl,
+        valorReceberEl: !!valorReceberEl
+    });
+
+    if (!valorLiquidoEl || !descontoEl || !jurosEl || !tarifasEl || !valorReceberEl) {
+        console.error('Um ou mais elementos não encontrados para contaId:', contaId);
+        return;
+    }
+
+    const valorLiquido = valorLiquidoEl.textContent;
+    const desconto = descontoEl.value;
+    const juros = jurosEl.value;
+    const tarifas = tarifasEl.value;
+
+    console.log('Valores extraídos:', { valorLiquido, desconto, juros, tarifas });
+
+    const valorReceber = calcularValorReceber(valorLiquido, desconto, juros, tarifas);
+    console.log('Valor a receber calculado:', valorReceber);
+
+    const formatted = 'R$ ' + formatarValorBrasileiro(valorReceber);
+    console.log('Valor formatado:', formatted);
+
+    valorReceberEl.textContent = formatted;
+
+    // Verificar se houve ajustes
+    const vlNum = parseValorBrasileiro(valorLiquido);
+    const ajustes = Math.abs(valorReceber - vlNum) > 0.01;
+    console.log('Verificação de ajustes:', { vlNum, valorReceber, ajustes });
+
+    const ajusteEl = document.getElementById(`ajuste_${contaId}`);
+    if (ajusteEl) {
+        ajusteEl.style.display = ajustes ? 'inline' : 'none';
+    } else {
+        console.error('Elemento ajuste não encontrado para contaId:', contaId);
+    }
+
+    atualizarResumoConciliacao();
+}
+
+// Função para buscar contas
+document.getElementById('btnBuscarContas').addEventListener('click', function() {
+    const tipoConta = document.getElementById('tipoConta').value;
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    const clienteFornecedor = document.getElementById('clienteFornecedor').value;
+
+    console.log('Valor do select tipoConta:', tipoConta);
+    console.log('Elemento select:', document.getElementById('tipoConta'));
+
+    const contasDiv = document.getElementById('contasEncontradas');
+    contasDiv.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Buscando contas...</p>
+        </div>
+    `;
+
+    console.log('Enviando requisição AJAX com:', {
+        tipo_conta: tipoConta,
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        cliente_fornecedor: clienteFornecedor
+    });
+
+    // Fazer requisição AJAX
+    fetch(`{% url 'extrato:buscar_contas_conciliacao_multipla' lancamento_base.id %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            tipo_conta: tipoConta,
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            cliente_fornecedor: clienteFornecedor
+        }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        return response.text().then(text => {
+            console.log('Response text:', text);
+            return JSON.parse(text);
+        });
+    })
+    .then(data => {
+        if (data.success) {
+            mostrarContasEncontradas(data.contas, tipoConta);
+        } else {
+            contasDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${data.error || 'Erro ao buscar contas'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro na requisição:', error);
+        contasDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Erro ao buscar contas: ${error.message}
+            </div>
+        `;
+    });
+});
+
+// Função para mostrar contas encontradas
+function mostrarContasEncontradas(contas, tipoConta) {
+    const contasDiv = document.getElementById('contasEncontradas');
+
+    if (contas.length === 0) {
+        contasDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Nenhuma conta encontrada com os filtros selecionados.
+            </div>
+        `;
+        document.getElementById('btnConciliarMultiplo').disabled = true;
+        return;
+    }
+
+    let html = `
+ 
+<div style="max-height: 400px;  overflow-y: auto;  position: relative;">
+  <table class="table table-bordered">
+    <thead>
+      <tr style="background: #000; position: sticky;   top: 0; color: #fff; background: #fff;  z-index: 3;">
+        <th style="background: #000; text-align: center; top: 0; padding: 8px; vertical-align: middle;">
+          <input style="display: block;   margin: 0 auto;  transform: scale(1.2); class="form-check-input" id="select-all-contas" type="checkbox">
+        </th>
+                        <th>Cliente/Fornecedor</th>
+                        <th>Data Emissão</th>
+                        <th>Data Vencimento</th>
+                        <th>Documento</th>
+                        <th>Forma Pgto</th>
+                        <th>Valor</th>
+                        <th>Valor Líquido</th>
+                        <th>Desconto</th>
+                        <th>Juros</th>
+                        <th>Tarifas</th>
+                        <th>Valor a Receber</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    contas.forEach(conta => {
+        html += `
+            <tr style="position: static !important;   left: auto !important;  right: auto !important;">
+                <td style="position: static !important;   left: auto !important;  right: auto !important;">
+                    <input class="form-check-input" type="checkbox"
+                           value="${conta.id}" id="conta_${conta.id}" name="contas_selecionadas"  style="display:block; margin:0 auto;">
+                </td>
+                <td>${conta.cliente}</td>
+                <td>${conta.data_emissao}</td>
+                <td>${conta.data_vencimento}</td>
+                <td>${conta.documento}</td>
+                <td>${conta.forma_pgto}</td>
+                <td>R$ ${parseFloat(conta.valor).toFixed(2).replace('.', ',')}</td>
+                <td id="valor_liquido_${conta.id}">R$ ${parseFloat(conta.valor_liquido).toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <input type="text" class="form-control form-control-sm desconto-input"
+                           id="desconto_${conta.id}" name="desconto_${conta.id}"
+                           value="${conta.desconto}" style="width: 80px;"
+                           onchange="atualizarValorReceber(${conta.id})">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm juros-input"
+                           id="juros_${conta.id}" name="juros_${conta.id}"
+                           value="${conta.juros}" style="width: 80px;"
+                           onchange="atualizarValorReceber(${conta.id})">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm tarifas-input"
+                           id="tarifas_${conta.id}" name="tarifas_${conta.id}"
+                           value="${conta.tarifas}" style="width: 80px;"
+                           onchange="atualizarValorReceber(${conta.id})">
+                </td>
+                <td id="valor_receber_${conta.id}">R$ ${parseFloat(conta.valor_receber).toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <span class="badge ${conta.status === 'Pendente' ? 'bg-warning' : conta.status === 'Vencido' ? 'bg-danger' : 'bg-secondary'}">${conta.status}</span>
+                    <span id="ajuste_${conta.id}" style="display: none;" class="badge bg-info ms-1" title="Valor ajustado">A</span>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    contasDiv.innerHTML = html;
+
+    // Adicionar event listener para "selecionar todas"
+    const selectAllCheckbox = document.getElementById('select-all-contas');
+    console.log('selectAllCheckbox encontrado:', !!selectAllCheckbox);
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            console.log('Select all checkbox alterado:', this.checked);
+            const checkboxes = document.querySelectorAll('input[name="contas_selecionadas"]');
+            console.log('Checkboxes encontrados para select all:', checkboxes.length);
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            atualizarResumoConciliacao();
+        });
+    }
+
+    // Adicionar event listeners para checkboxes individuais
+    const checkboxesIndividuais = document.querySelectorAll('input[name="contas_selecionadas"]');
+    console.log('Checkboxes individuais encontrados:', checkboxesIndividuais.length);
+    checkboxesIndividuais.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            console.log('Checkbox individual alterado:', this.value, 'checked:', this.checked);
+            atualizarResumoConciliacao();
+        });
+    });
+
+    // Atualizar resumo inicial
+    atualizarResumoConciliacao();
+}
+
+// Função para atualizar resumo da conciliação
+function atualizarResumoConciliacao() {
+    console.log('atualizarResumoConciliacao chamado');
+    const lancamentoBaseValor = parseFloat("{{ lancamento_base.valor|floatformat:'2'|default:'0.00' }}".replace(',', '.'));
+    const contasSelecionadas = document.querySelectorAll('input[name="contas_selecionadas"]:checked');
+    const tipoConta = document.getElementById('tipoConta').value;
+
+    console.log('Lançamento base valor:', lancamentoBaseValor);
+    console.log('Contas selecionadas:', contasSelecionadas.length);
+    console.log('Tipo conta:', tipoConta);
+
+    let totalContas = 0;
+    let temAjustes = false;
+
+    contasSelecionadas.forEach(checkbox => {
+        const contaId = checkbox.value;
+        const valorReceberText = document.getElementById(`valor_receber_${contaId}`).textContent;
+        const valor = parseValorBrasileiro(valorReceberText);
+        console.log('Conta', contaId, 'valor:', valor, 'texto:', valorReceberText);
+
+        // Para contas a pagar, o valor deve ser negativo (despesa)
+        const valorAjustado = tipoConta === 'pagar' ? -Math.abs(valor) : valor;
+        console.log('Tipo conta:', tipoConta, 'valor original:', valor, 'valor ajustado:', valorAjustado);
+
+        totalContas += valorAjustado;
+        console.log('Total contas acumulado:', totalContas);
+
+        // Verificar se há ajustes
+        const ajusteEl = document.getElementById(`ajuste_${contaId}`);
+        if (ajusteEl && ajusteEl.style.display !== 'none') {
+            temAjustes = true;
+        }
+    });
+
+    console.log('Total contas:', totalContas);
+
+    const resumoDiv = document.getElementById('resumoConciliacao');
+    const resumoTexto = document.getElementById('resumoTexto');
+    const alertaAjustes = document.getElementById('alertaAjustes');
+    const btnConciliar = document.getElementById('btnConciliarMultiplo');
+
+    console.log('Verificando se há contas selecionadas:', contasSelecionadas.length);
+
+    if (contasSelecionadas.length > 0) {
+        const diferenca = Math.abs(lancamentoBaseValor - totalContas);
+        const tipoDisplay = tipoConta === 'receber' ? 'receber' : 'pagar';
+
+        console.log('Calculando diferença: Math.abs(', lancamentoBaseValor, '-', totalContas, ') =', diferenca);
+
+        const resumoHtml = `
+            <div class="row">
+                <div class="col-md-4">
+                    <strong>Lançamento base:</strong><br>
+                    R$ ${formatarValorBrasileiro(lancamentoBaseValor)}
+                </div>
+                <div class="col-md-4">
+                    <strong>${contasSelecionadas.length} conta(s) a ${tipoDisplay}:</strong><br>
+                    R$ ${formatarValorBrasileiro(totalContas)}
+                </div>
+                <div class="col-md-4">
+                    <strong>Diferença:</strong><br>
+                    <span class="${diferenca > 0.01 ? 'text-danger' : 'text-success'}">
+                        R$ ${formatarValorBrasileiro(diferenca)}
+                        ${diferenca > 0.01 ? ' ⚠️' : ' ✓'}
+                    </span>
+                </div>
+            </div>
+        `;
+
+        console.log('HTML do resumo:', resumoHtml);
+        resumoTexto.innerHTML = resumoHtml;
+
+        resumoDiv.style.display = 'block';
+        alertaAjustes.style.display = temAjustes ? 'block' : 'none';
+
+        // Só habilitar o botão se a diferença for menor ou igual a R$ 0,01
+        btnConciliar.disabled = diferenca > 0.01;
+        console.log('Diferença:', diferenca, 'Limite: 0.01, Botão habilitado:', !btnConciliar.disabled);
+        console.log('Condição: diferenca > 0.01 =', diferenca > 0.01, '-> disabled =', btnConciliar.disabled);
+
+        // Forçar habilitação se diferença for muito pequena (problema de precisão)
+        if (diferenca <= 0.011) {
+            btnConciliar.disabled = false;
+            console.log('Botão forçadamente habilitado devido a diferença muito pequena');
+        }
+    } else {
+        console.log('Nenhuma conta selecionada - ocultando resumo');
+        resumoDiv.style.display = 'none';
+        alertaAjustes.style.display = 'none';
+        btnConciliar.disabled = true;
+        console.log('Botão desabilitado - nenhuma conta selecionada');
+    }
+}
+
+// Inicializar busca automática ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    // Se já há filtros preenchidos, fazer busca automática
+    if (document.getElementById('dataInicio').value || document.getElementById('clienteFornecedor').value) {
+        document.getElementById('btnBuscarContas').click();
+    }
+});
+</script>
+
+{% endblock %}

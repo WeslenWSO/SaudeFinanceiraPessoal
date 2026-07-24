@@ -1,0 +1,479 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% endblock %}
+
+{% comment %} {% block sid_Bar %}
+    {% include 'parcial/_MenuSideNav.html' %}
+{% endblock %} {% endcomment %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mt-4">Detalhes da NFSe</h1>
+        <div>
+            <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Voltar à Lista
+            </a>
+            <a href="{% url 'notasfiscais:update' nfse.pk %}" class="btn btn-warning me-2">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            {% if nfse.status == 'pendente' %}
+            <a href="{% url 'notasfiscais:recebimento' nfse.pk %}" class="btn btn-success me-2">
+                <i class="fas fa-dollar-sign"></i> Recebimento
+            </a>
+            {% endif %}
+            <a href="{% url 'notasfiscais:delete' nfse.pk %}" class="btn btn-danger">
+                <i class="fas fa-trash"></i> Excluir
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Informações Principais -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice"></i> Informações da NFSe
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Número da Nota:</label>
+                                <p class="mb-0">{{ nfse.numero_nota }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Série:</label>
+                                <p class="mb-0">{{ nfse.serie }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Data de Emissão:</label>
+                                <p class="mb-0">{{ nfse.data_emissao|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Forma de Pagamento:</label>
+                                <p class="mb-0">
+                                    {% if nfse.forma_pagamento %}
+                                        <span class="badge bg-info fs-6">{{ nfse.forma_pagamento.descricao }}</span>
+                                        <br><small class="text-muted">
+                                            {% if nfse.forma_pagamento.tipo == '0' %}A Vista{% else %}A Prazo{% endif %}
+                                            {% if nfse.forma_pagamento.qtparcelas != '1' %} - {{ nfse.forma_pagamento.qtparcelas }}x{% endif %}
+                                        </small>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Autorizacao:</label>
+                                <p class="mb-0">
+                                    {% if nfse.nsu %}
+                                        <span class="badge bg-info fs-6">{{ nfse.nsu }}</span>
+                                        <br>
+                                    {% else %}
+                                        <span class="text-muted"></span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                             <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Socio:</label>
+                                    
+                                </label>
+                                {{ nfse.socio }}
+                                {% if nfse.socio.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in nfse.socio.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                        </div>
+
+
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Status da Nota:</label>
+                                <p class="mb-0 d-flex flex-wrap align-items-center gap-2">
+                                    {% if nfse.is_cancelada %}
+                                        <span class="badge bg-danger">Cancelada</span>
+                                        {% if nfse.data_cancelamento %}
+                                            <small class="text-muted">(desde {{ nfse.data_cancelamento|date:"d/m/Y" }})</small>
+                                        {% endif %}
+                                        <form method="post" action="{% url 'notasfiscais:detail' nfse.pk %}cancelar/" class="d-inline"
+                                              onsubmit="return confirm('Reativar esta NFSe (remover cancelamento)?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="reativar">
+                                            <input type="hidden" name="next" value="{% url 'notasfiscais:detail' nfse.pk %}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-undo"></i> Reativar
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <span class="badge bg-success">Ativa</span>
+                                        <form method="post" action="{% url 'notasfiscais:detail' nfse.pk %}cancelar/" class="d-inline"
+                                              onsubmit="return confirm('Marcar esta NFSe como cancelada? Valor bruto, líquido e retenções serão zerados.');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="cancelar">
+                                            <input type="hidden" name="next" value="{% url 'notasfiscais:detail' nfse.pk %}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-ban"></i> Marcar cancelada
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Status de Conciliação:</label>
+                                <p class="mb-0">
+                                    {% if nfse.status_conciliacao == 'conciliado' %}
+                                        <span class="badge bg-success">Conciliado</span>
+                                    {% elif nfse.status_conciliacao == 'parcialmente_conciliado' %}
+                                        <span class="badge bg-warning">Parcialmente Conciliado</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Não Conciliado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados do Cliente -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user"></i> Dados do Cliente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Cliente:</label>
+                                <p class="mb-0">{{ nfse.cliente }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">CNPJ/CPF:</label>
+                                <p class="mb-0">{{ nfse.cnpj_cpf }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Valores -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-dollar-sign"></i> Valores
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Valor Bruto:</label>
+                                <p class="mb-0 text-primary fs-5">R$ {{ nfse.valor_bruto|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Valor Líquido:</label>
+                                <p class="mb-0 text-success fs-5">R$ {{ nfse.valor_liquido|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Valor Recebido:</label>
+                                <p class="mb-0">
+                                    {% if nfse.valor_recebido %}
+                                        <span class="text-success fs-5">R$ {{ nfse.valor_recebido|floatformat:2 }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if nfse.valor_recebido %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Valor Pendente:</label>
+                                <p class="mb-0">
+                                    {% if nfse.get_valor_pendente > 0 %}
+                                        <span class="text-warning fs-5">R$ {{ nfse.get_valor_pendente|floatformat:2 }}</span>
+                                    {% else %}
+                                        <span class="text-success fs-5">R$ 0,00</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Data do Recebimento:</label>
+                                <p class="mb-0">
+                                    {% if nfse.data_recebimento %}
+                                        {{ nfse.data_recebimento|date:"d/m/Y" }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Serviço -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools"></i> Serviço
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Base de Serviço:</label>
+                        <p class="mb-0">
+                            {% if nfse.base_servico %}
+                                <span class="badge bg-info">{{ nfse.get_base_servico_display }}</span>
+                            {% else %}
+                                <span class="text-muted">Não informado</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Discriminação:</label>
+                        <p class="mb-0">{{ nfse.discriminacao|linebreaks }}</p>
+                    </div>
+                    
+                    {% if nfse.observacoes %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observações:</label>
+                        <p class="mb-0">{{ nfse.observacoes|linebreaks }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informações de Recebimento -->
+            {% if nfse.valor_recebido or nfse.banco %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-university"></i> Informações de Recebimento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if nfse.banco %}
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Banco:</label>
+                                <p class="mb-0">{{ nfse.banco }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if nfse.data_recebimento %}
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Data do Recebimento:</label>
+                                <p class="mb-0">{{ nfse.data_recebimento|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Informações de Cancelamento -->
+            {% if nfse.data_cancelamento %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-ban"></i> Informações de Cancelamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Data de Cancelamento:</label>
+                                <p class="mb-0">{{ nfse.data_cancelamento|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                        {% if nfse.autorizacao %}
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Autorização:</label>
+                                <p class="mb-0">{{ nfse.autorizacao }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Resumo -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i> Resumo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="display-4 text-primary mb-2">
+                            {% if nfse.is_pago %}
+                                <i class="fas fa-check-circle text-success"></i>
+                            {% elif nfse.is_cancelada %}
+                                <i class="fas fa-times-circle text-danger"></i>
+                            {% else %}
+                                <i class="fas fa-clock text-warning"></i>
+                            {% endif %}
+                        </div>
+                        <h5>
+                            {% if nfse.is_pago %}
+                                NFSe Paga
+                            {% elif nfse.is_cancelada %}
+                                NFSe Cancelada
+                            {% else %}
+                                NFSe Pendente
+                            {% endif %}
+                        </h5>
+                    </div>
+
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Status</span>
+                            <span class="badge bg-primary rounded-pill">{{ nfse.get_status_display }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Conciliação</span>
+                            <span class="badge bg-info rounded-pill">{{ nfse.get_status_conciliacao_display }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Valor Total</span>
+                            <span class="fw-bold">R$ {{ nfse.valor_liquido|floatformat:2 }}</span>
+                        </div>
+                        {% if nfse.valor_recebido %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Recebido</span>
+                            <span class="fw-bold text-success">R$ {{ nfse.valor_recebido|floatformat:2 }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Pendente</span>
+                            <span class="fw-bold {% if nfse.get_valor_pendente > 0 %}text-warning{% else %}text-success{% endif %}">
+                                R$ {{ nfse.get_valor_pendente|floatformat:2 }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> Ações Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'notasfiscais:update' nfse.pk %}" class="btn btn-warning">
+                            <i class="fas fa-edit"></i> Editar NFSe
+                        </a>
+                        
+                        {% if nfse.status == 'pendente' %}
+                        <a href="{% url 'notasfiscais:recebimento' nfse.pk %}" class="btn btn-success">
+                            <i class="fas fa-dollar-sign"></i> Registrar Recebimento
+                        </a>
+                        {% endif %}
+                        
+                        <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list"></i> Ver Todas as NFSe
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informações de Auditoria -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Auditoria
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Criada em</span>
+                            <small class="text-muted">{{ nfse.data_criacao|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Atualizada em</span>
+                            <small class="text-muted">{{ nfse.data_atualizacao|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
+.badge {
+    font-size: 0.875em;
+}
+
+.display-4 {
+    font-size: 3rem;
+}
+
+.fs-5 {
+    font-size: 1.25rem !important;
+}
+</style>
+{% endblock %}

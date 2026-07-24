@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Cadastrar Conta a Receber</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="cliente" class="form-label">Cliente</label>
+                                <input type="text" class="form-control" id="cliente" name="cliente" list="clientes">
+                                <datalist id="clientes">
+                                    {% for cliente in clientes %}
+                                    <option value="{{ cliente.razao }}">
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <a href="#" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCliente">Cadastrar Cliente</a>
+                            </div>
+                        </div>
+                            <div class="col-md-6">
+                                <label for="valor" class="form-label">Valor</label>
+                                <input type="text" class="form-control" id="valor" name="valor" required>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <label for="data_emissao" class="form-label">Data de Emissão</label>
+                                <input type="date" class="form-control" id="data_emissao" name="data_emissao" value="{{ hoje|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="data_vencimento" class="form-label">Data de Vencimento</label>
+                                <input type="date" class="form-control" id="data_vencimento" name="data_vencimento" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="nota" class="form-label">Número da Nota</label>
+                                <input type="text" class="form-control" id="nota" name="nota">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="doc" class="form-label">Documento</label>
+                                <input type="text" class="form-control" id="doc" name="doc">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="autorizacao" class="form-label">Autorização</label>
+                                <input type="text" class="form-control" id="autorizacao" name="autorizacao">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="forma_pagamento" class="form-label">Cobrança</label>
+                                <select class="form-select" id="forma_pagamento" name="forma_pagamento">
+                                    <option value="">Selecione...</option>
+                                    {% for forma in formas_pagamento %}
+                                    <option value="{{ forma.id }}">{{ forma.descricao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="conta_bancaria" class="form-label">Conta Bancária</label>
+                                <select class="form-control" id="conta_bancaria" name="conta_bancaria">
+                                    <option value="">Selecione...</option>
+                                    {% for conta in contas_bancarias %}
+                                    <option value="{{ conta.id }}">{{ conta.banco.nome }} - {{ conta.agencia }}/{{ conta.conta }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="forma_pagamento" class="form-label">Cobrança</label>
+                                <select class="form-control" id="forma_pagamento" name="forma_pagamento">
+                                    <option value="">Selecione...</option>
+                                    {% for forma in formas_pagamento %}
+                                    <option value="{{ forma.id }}">{{ forma.descricao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="socio" class="form-label">Sócio</label>
+                                <select class="form-select" id="socio" name="socio">
+                                    <option value="">Selecione...</option>
+                                    {% for socio in socios %}
+                                    <option value="{{ socio.id }}">{{ socio.socio }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="categoria" class="form-label">Categoria</label>
+                                <input type="text" class="form-control" id="categoria" name="categoria" placeholder="Digite pelo menos 4 letras para buscar...">
+                                <input type="hidden" id="categoria_id" name="categoria_id">
+                                <div class="form-text">A busca automática começa após 4 letras digitadas.</div>
+                                <div id="resultadosCategoria" class="mt-2" style="max-height: 200px; overflow-y: auto; display: none;">
+                                    <!-- Resultados da busca aparecerão aqui -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                                <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{%endblock%}
+
+<!-- Modal para Cadastrar Cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1" aria-labelledby="modalClienteLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalClienteLabel">Cadastrar Novo Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCliente">
+                    <div class="mb-3">
+                        <label for="nomeCliente" class="form-label">Nome</label>
+                        <input type="text" class="form-control" id="nomeCliente" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailCliente" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="emailCliente">
+                    </div>
+                    <div class="mb-3">
+                        <label for="telefoneCliente" class="form-label">Telefone</label>
+                        <input type="text" class="form-control" id="telefoneCliente">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="cadastrarCliente()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const categoriaInput = document.getElementById('categoria');
+    const resultadosDiv = document.getElementById('resultadosCategoria');
+    let timeoutId;
+    let categoriaSelecionada = null;
+
+    // Função para buscar categorias
+    function buscarCategorias(termo) {
+        if (termo.length < 4) return;
+
+        fetch('/contasareceber/buscar_categorias/?q=' + encodeURIComponent(termo))
+            .then(response => response.json())
+            .then(data => {
+                mostrarResultados(data.categorias);
+            })
+            .catch(error => {
+                console.error('Erro na busca:', error);
+                resultadosDiv.innerHTML = '<div class="alert alert-danger">Erro ao buscar categorias.</div>';
+                resultadosDiv.style.display = 'block';
+            });
+    }
+
+    // Função para mostrar resultados
+    function mostrarResultados(categorias) {
+        if (categorias.length === 0) {
+            resultadosDiv.innerHTML = '<div class="alert alert-info">Nenhuma categoria encontrada.</div>';
+            resultadosDiv.style.display = 'block';
+            return;
+        }
+
+        let html = '<div class="list-group">';
+        categorias.forEach(categoria => {
+            html += `
+                <button type="button" class="list-group-item list-group-item-action categoria-item"
+                        data-id="${categoria.id}" data-nome="${categoria.nome_completo}">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${categoria.nome_completo}</h6>
+                        <small class="text-muted">${categoria.tipo_display}</small>
+                    </div>
+                    <small class="text-muted">${categoria.grupo || 'Sem grupo'}</small>
+                </button>
+            `;
+        });
+        html += '</div>';
+        resultadosDiv.innerHTML = html;
+        resultadosDiv.style.display = 'block';
+
+        // Adicionar event listeners para seleção
+        document.querySelectorAll('.categoria-item').forEach(item => {
+            item.addEventListener('click', function() {
+                // Remover seleção anterior
+                document.querySelectorAll('.categoria-item').forEach(el => el.classList.remove('active'));
+                // Selecionar este item
+                this.classList.add('active');
+                categoriaSelecionada = {
+                    id: this.dataset.id,
+                    nome: this.dataset.nome
+                };
+                categoriaInput.value = this.dataset.nome;
+                resultadosDiv.style.display = 'none';
+            });
+        });
+    }
+
+    // Event listener para input de categoria
+    categoriaInput.addEventListener('input', function() {
+        const termo = this.value.trim();
+        clearTimeout(timeoutId);
+
+        if (termo.length >= 4) {
+            timeoutId = setTimeout(() => buscarCategorias(termo), 300);
+        } else {
+            resultadosDiv.style.display = 'none';
+            categoriaSelecionada = null;
+        }
+    });
+
+    // Event listener para quando o campo perde o foco
+    categoriaInput.addEventListener('blur', function() {
+        // Pequeno delay para permitir clique nos resultados
+        setTimeout(() => {
+            if (!categoriaSelecionada) {
+                categoriaInput.value = '';
+            }
+        }, 150);
+    });
+
+    // Event listener para quando o campo ganha foco
+    categoriaInput.addEventListener('focus', function() {
+        if (this.value.trim().length >= 4) {
+            buscarCategorias(this.value.trim());
+        }
+    });
+});
+
+function cadastrarCliente() {
+    // Lógica para cadastrar cliente via AJAX (a implementar)
+    alert('Funcionalidade em desenvolvimento.');
+    $('#modalCliente').modal('hide');
+}
+</script>

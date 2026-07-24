@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load faturamento_extras %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'planejamento_orcamentario:dashboard' %}">Planejamento</a>
+                </li>
+                <li class="breadcrumb-item active">{{ meta.titulo }}</li>
+            </ol>
+        </nav>
+        <h3 class="mb-0">
+            <i class="fas {{ meta.icone }} text-{{ meta.cor }}"></i> {{ meta.titulo }}
+        </h3>
+        <small class="text-muted">{{ meta.ajuda }}</small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'planejamento_orcamentario:dashboard' %}?{{ periodo_qs }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+        <a href="{% url 'planejamento_orcamentario:criar' tipo=tipo %}" class="btn btn-{{ meta.cor }} btn-sm">
+            <i class="fas fa-plus"></i> Novo item
+        </a>
+    </div>
+</div>
+
+{% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+<form method="get" class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small mb-0 fw-semibold">Período da consulta</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">De</span>
+                    <input type="date" class="form-control" name="data_ini"
+                           value="{{ data_ini|date:'Y-m-d' }}" required>
+                    <span class="input-group-text">até</span>
+                    <input type="date" class="form-control" name="data_fim"
+                           value="{{ data_fim|date:'Y-m-d' }}" required>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+            </div>
+            <div class="col-auto">
+                <span class="small text-muted">
+                    {{ data_ini|date:"d/m/Y" }} → {{ data_fim|date:"d/m/Y" }}
+                </span>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="card mb-3">
+    <div class="card-body py-2 d-flex flex-wrap justify-content-between gap-2">
+        <span>Total no período (ativos): <strong>R$ {{ total_tipo|moeda_br }}</strong></span>
+        {% if tipo == 'imposto' or tipo == 'variavel' %}
+        <span class="small text-muted">Receitas no período: R$ {{ total_receitas|moeda_br }}</span>
+        {% if total_receitas == 0 %}
+        <span class="small text-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            Sem receita lançada neste período — o % sobre receitas fica R$ 0,00.
+            Ajuste o filtro para o mês da receita.
+        </span>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Categoria</th>
+                    <th>Período</th>
+                    <th>Forma</th>
+                    <th class="text-end">Valor / alíquota</th>
+                    <th class="text-end">Total no período</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in itens %}
+                <tr class="{% if not it.ativo %}table-secondary opacity-75{% endif %}">
+                    <td>
+                        <strong>{{ it.nome }}</strong>
+                        {% if it.observacao %}
+                        <small class="text-muted d-block text-truncate" style="max-width:18rem;" title="{{ it.observacao }}">{{ it.observacao }}</small>
+                        {% endif %}
+                        {% if tipo == 'semi_fixa' %}
+                        {% if it.valor_min or it.valor_max %}
+                        <small class="text-muted d-block">
+                            Faixa: R$ {{ it.valor_min|moeda_br }} – R$ {{ it.valor_max|moeda_br }}
+                        </small>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if it.categoria %}
+                        <span class="badge bg-light text-dark border">{{ it.categoria.nome }}</span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small>{{ it.periodo }}</small>
+                        {% if it.qtd_lanc %}
+                        <span class="badge bg-light text-dark border">{{ it.qtd_lanc }} lanç.</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if it.forma_calculo == 'percentual' %}
+                        <span class="badge bg-danger-subtle text-danger">% sobre receitas</span>
+                        {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary">Valor previsto</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if it.forma_calculo == 'percentual' %}
+                        {{ it.aliquota_pct }}%
+                        {% else %}
+                        R$ {{ it.valor_mensal|moeda_br }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold">R$ {{ it.estimado|moeda_br }}</td>
+                    <td>
+                        {% if it.ativo %}
+                        <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'planejamento_orcamentario:editar' it.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form method="post" action="{% url 'planejamento_orcamentario:excluir' it.pk %}" class="d-inline"
+                              onsubmit="return confirm('Excluir “{{ it.nome }}”?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        Nenhum item cadastrado.
+                        <a href="{% url 'planejamento_orcamentario:criar' tipo=tipo %}">Cadastrar o primeiro</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

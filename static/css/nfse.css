@@ -1,0 +1,113 @@
+/* Estilos específicos para NFSe */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.form-floating > .form-control:focus,
+.form-floating > .form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-floating > label {
+    color: #6c757d;
+}
+
+.btn-group .btn {
+    border-radius: 0.375rem;
+    margin-left: 0.25rem;
+}
+
+.btn-group .btn:first-child {
+    margin-left: 0;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.badge a:hover {
+    opacity: 0.8;
+}
+
+/* Otimizações para layout em 2 linhas */
+.form-floating {
+    height: 100%;
+}
+
+.d-flex.gap-2 {
+    gap: 0.75rem !important;
+}
+
+.btn.flex-fill {
+    min-width: 120px;
+}
+
+/* Estilos para mensagens */
+#mensagensContainer .alert {
+    border-radius: 0.375rem;
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+#mensagensContainer .alert-success {
+    background-color: #d1edff;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+#mensagensContainer .alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+#mensagensContainer .alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+#mensagensContainer .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+@media (max-width: 768px) {
+    .card-header .text-end {
+        text-align: center !important;
+        margin-top: 1rem;
+    }
+
+    .btn-group {
+        width: 100%;
+    }
+
+    .btn-group .btn {
+        flex: 1;
+        margin-left: 0;
+    }
+
+    /* Em dispositivos móveis, os campos de data ficam em colunas separadas */
+    .col-md-6 {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Em telas muito pequenas, todos os campos ficam em coluna única */
+    .col-lg-4, .col-lg-3, .col-lg-5, .col-lg-6 {
+        margin-bottom: 1rem;
+    }
+
+    .d-flex.gap-2 {
+        flex-direction: column;
+        gap: 0.5rem !important;
+    }
+
+    .btn.flex-fill {
+        min-width: auto;
+    }
+}

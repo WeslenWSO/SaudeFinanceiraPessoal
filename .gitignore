@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtualenv
+venv/
+.venv/
+env/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs e temporários
+*.log
+debug*.log
+_*.txt
+_*.png
+_fix_db_cols.py
+
+# Documentos e amostras locais
+*.pdf
+*.xls
+*.xlsx
+UNIMED.txt
+ARQUIVOS_PARA_SUBIR_SERVIDOR.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+*.pem
+credentials.json

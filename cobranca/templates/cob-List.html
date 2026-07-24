@@ -1,0 +1,84 @@
+
+{% extends 'base.html' %}
+{%block nav_%}
+ {% include 'parcial/_nav.html' %}
+ {%endblock%}
+ {% comment %} {%block sid_Bar%}
+ <!-- Menu lateral desabilitado - usando apenas navegação horizontal -->
+ {%endblock%} {% endcomment %}
+
+
+ 
+{%block conteudo%}
+<style>
+  .card .dataTable-table thead tr th {
+    background-color: #000 !important;
+    color: #fff !important;
+    border-color: #333;
+  }
+  .card .dataTable-table tbody tr:nth-child(odd) {
+    background-color: #f2f2f2 !important;
+  }
+  .card .dataTable-table tbody tr:nth-child(even) {
+    background-color: #fff !important;
+  }
+</style>
+      <a href="{% url 'cobranca:cob-create' %}" role="button" class="btn btn-primary">Nova Cobranca</a> 
+      {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+
+<div class="card mb-4"> 
+   <div class="card-body">
+     <div class="dataTable-wrapper dataTable-loading no-footer sortable searchable fixed-columns"> 
+
+      
+
+<table id="datatablesSimple" class="dataTable-table">
+   <thead>
+    <tr>
+      <th>ID</th>
+      <th>formapgto</th>
+      <th>descricao</th>
+      <th>tipo</th>
+      <th>Edi.</th>
+      <th>Exc.</th>
+    </tr>
+   </thead>
+
+  <tbody>
+
+    {% for cob in object_list %}
+
+    <tr>
+        <td> <a class="nav-link">  {{ cob.id }}  </a>  </td>
+        <td> <a>{{ cob.formapgto }}</a></td>   
+        <td>  <a>{{ cob.descricao }}</a>  </td>
+        <td>  <a>{{ cob.tipo }}</a>   </td>
+        <td>  <a href="{% url 'cobranca:cob-update' cob.id %}" class="btn btn-primary"> 
+                  <i class="fa-solid fa-pen-to-square"></i>
+               </a>
+        </td>
+
+          <td>
+        
+        <a href="#"    class="btn btn-danger">
+            <i class="fas fa-trash"></i>
+        </a>
+
+        </td>
+
+    </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+     </div>
+   </div>
+</div> 
+
+
+
+
+{%endblock%}

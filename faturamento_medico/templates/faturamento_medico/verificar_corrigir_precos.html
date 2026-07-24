@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Verificar e Corrigir Preços</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="mb-4">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-2">
+                                <label class="form-label">Data início</label>
+                                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Data fim</label>
+                                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Convênio</label>
+                                <select name="convenio" class="form-select" required>
+                                    <option value="">Selecione o convênio</option>
+                                    {% for convenio in convenios_disponiveis %}
+                                    <option value="{{ convenio.nome }}" {% if filtros.convenio == convenio.nome %}selected{% endif %}>
+                                        {{ convenio.nome }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Procedimento</label>
+                                <input type="text" name="procedimento" class="form-control"
+                                       placeholder="Ex.: US - Transvaginal"
+                                       value="{{ filtros.procedimento|default:'' }}">
+                            </div>
+                            <div class="col-md-1">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" name="so_divergentes" value="1" id="so_divergentes"
+                                           {% if filtros.so_divergentes %}checked{% endif %}>
+                                    <label class="form-check-label" for="so_divergentes">Só diverg.</label>
+                                </div>
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    {% if not filtros.convenio %}
+                    <div class="alert alert-info mb-0">
+                        Selecione o <strong>período</strong> e o <strong>convênio</strong> para listar os procedimentos e comparar com a tabela de preços.
+                    </div>
+                    {% else %}
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info"><i class="fas fa-list"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Procedimentos</span>
+                                    <span class="info-box-number">{{ resumo.total }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-success"><i class="fas fa-check"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">OK</span>
+                                    <span class="info-box-number">{{ resumo.ok }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-danger"><i class="fas fa-exclamation"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Divergentes</span>
+                                    <span class="info-box-number">{{ resumo.divergente }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-warning"><i class="fas fa-question"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Sem preço na tabela</span>
+                                    <span class="info-box-number">{{ resumo.sem_preco }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if linhas %}
+                    <form method="POST" id="form-corrigir-precos">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="aplicar">
+                        <input type="hidden" name="data_inicio" value="{{ filtros.data_inicio }}">
+                        <input type="hidden" name="data_fim" value="{{ filtros.data_fim }}">
+                        <input type="hidden" name="convenio" value="{{ filtros.convenio }}">
+                        <input type="hidden" name="procedimento" value="{{ filtros.procedimento }}">
+                        {% if filtros.so_divergentes %}<input type="hidden" name="so_divergentes" value="1">{% endif %}
+
+                        <div class="mb-3 d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-selecionar-divergentes">
+                                Selecionar divergentes
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-limpar-selecao">
+                                Limpar seleção
+                            </button>
+                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Aplicar o preço da tabela nos itens selecionados?');">
+                                <i class="fas fa-check-double"></i> Aplicar preço correto nos selecionados
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-sm mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th width="40">
+                                            <input type="checkbox" id="select-all-corrigir" title="Selecionar todos corrigíveis">
+                                        </th>
+                                        <th>DATA</th>
+                                        <th>PACIENTE</th>
+                                        <th>PROCEDIMENTO</th>
+                                        <th>CÓDIGO</th>
+                                        <th class="text-end">VALOR ATUAL</th>
+                                        <th class="text-end">VALOR TABELA</th>
+                                        <th class="text-end">DIFERENÇA</th>
+                                        <th>SITUAÇÃO</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for linha in linhas %}
+                                    <tr class="{% if linha.situacao == 'DIVERGENTE' %}table-danger{% elif linha.situacao == 'SEM PRECO' %}table-warning{% endif %}">
+                                        <td class="text-center">
+                                            {% if linha.pode_corrigir %}
+                                            <input type="checkbox"
+                                                   class="item-corrigir-checkbox"
+                                                   name="itens_selecionados"
+                                                   value="{{ linha.item.id }}">
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ linha.faturamento.data|date:"d/m/Y" }}</td>
+                                        <td>{{ linha.faturamento.nome }}</td>
+                                        <td>
+                                            {{ linha.item.servico }}
+                                            {% if linha.descricao_tabela and linha.descricao_tabela != linha.item.servico %}
+                                            <br><small class="text-muted">Tabela: {{ linha.descricao_tabela }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {{ linha.item.codigo_servico|default:linha.codigo_tabela|default:"-" }}
+                                        </td>
+                                        <td class="text-end">R$ {{ linha.valor_atual|floatformat:2 }}</td>
+                                        <td class="text-end">
+                                            {% if linha.valor_esperado != None %}
+                                            R$ {{ linha.valor_esperado|floatformat:2 }}
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            {% if linha.diferenca != None %}
+                                            R$ {{ linha.diferenca|floatformat:2 }}
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-{{ linha.situacao_css }}">{{ linha.situacao }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>Nenhum procedimento encontrado</h4>
+                        <p>Ajuste o período/convênio ou desmarque “Só divergentes”.</p>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('select-all-corrigir');
+    const checkboxes = () => document.querySelectorAll('.item-corrigir-checkbox');
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes().forEach(cb => { cb.checked = selectAll.checked; });
+        });
+    }
+    const btnDiv = document.getElementById('btn-selecionar-divergentes');
+    if (btnDiv) {
+        btnDiv.addEventListener('click', function() {
+            checkboxes().forEach(cb => { cb.checked = true; });
+            if (selectAll) selectAll.checked = true;
+        });
+    }
+    const btnLimpar = document.getElementById('btn-limpar-selecao');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', function() {
+            checkboxes().forEach(cb => { cb.checked = false; });
+            if (selectAll) selectAll.checked = false;
+        });
+    }
+});
+</script>
+{% endblock %}

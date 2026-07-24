@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Exportar Conciliação</h5>
+                </div>
+                <div class="card-body text-center">
+                    <p class="lead">{{ mensagem }}</p>
+                    {% if cnpj_formatado %}
+                    <p><code>{{ cnpj_formatado }}</code></p>
+                    {% endif %}
+                    <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{%endblock%}

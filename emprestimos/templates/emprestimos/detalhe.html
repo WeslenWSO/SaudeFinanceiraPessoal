@@ -1,0 +1,1539 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.emp-resumo .card { height: 100%; }
+.emp-parcelas-aberta { background: #fffbeb; }
+.emp-sim-box { border-left: 4px solid #0d6efd; }
+.emp-cabecalho dt {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.15rem;
+}
+.emp-cabecalho dd {
+    margin-bottom: 0.65rem;
+    color: #111827;
+}
+.emp-cabecalho .emp-cab-topo {
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
+}
+.emp-collapse-icon {
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+.emp-collapse-icon.collapsed {
+    transform: rotate(180deg);
+}
+</style>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-1">Contrato {{ emprestimo.numero_contrato }}</h3>
+            <div class="text-muted">{{ emprestimo.cliente }} · {{ emprestimo.indicador_display }}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalSimularCalculo"
+                    title="Simular conforme o indicador de cálculo do contrato">
+                <i class="fas fa-calculator"></i>
+            {% if metodo_calculo == 'sac' %}
+            Simular SAC
+            {% else %}
+            Simular Tabela Price
+            {% endif %}
+            </button>
+            {% if is_sac_emprestimo and ultima_parcela %}
+            <button type="button"
+                    class="btn btn-outline-warning btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalGerarParcelasSac"
+                    title="Criar parcelas em aberto a partir do último lançamento">
+                <i class="fas fa-plus-circle"></i> Gerar parcelas em aberto
+            </button>
+            {% endif %}
+            <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}"
+               class="btn btn-outline-success btn-sm"
+               title="Simulações salvas deste contrato">
+                <i class="fas fa-folder-open"></i> Simulações
+            </a>
+            <a href="https://www.youtube.com/watch?v=xVoxV1z8c1E"
+               class="btn btn-outline-danger btn-sm"
+               target="_blank"
+               rel="noopener noreferrer"
+               title="Vídeo: cálculo do empréstimo (Tabela Price)">
+                <i class="fab fa-youtube"></i> Vídeo
+            </a>
+            <button type="button"
+                    class="btn btn-outline-success btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalImportarParcelasPdf"
+                    title="Importar/corrigir parcelas em aberto conforme o PDF do extrato (provisão)">
+                <i class="fas fa-file-import"></i> Importar parcelas do PDF
+            </button>
+            <a href="{% url 'emprestimos:importar' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-sync"></i> Reimportar PDF
+            </a>
+            <a href="{% url 'emprestimos:listar' %}" class="btn btn-secondary btn-sm">Voltar</a>
+            <form method="post" action="{% url 'emprestimos:excluir' emprestimo.pk %}" onsubmit="return confirm('Excluir este empréstimo e todas as parcelas?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash"></i></button>
+            </form>
+        </div>
+    </div>
+
+    {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+    <div class="card mb-3 emp-cabecalho">
+        <div class="card-header d-flex justify-content-between align-items-center py-2"
+             role="button"
+             data-bs-toggle="collapse"
+             data-bs-target="#empCadastroCollapse"
+             aria-expanded="true"
+             aria-controls="empCadastroCollapse"
+             id="empCadastroToggle"
+             style="cursor:pointer;user-select:none;">
+            <strong><i class="fas fa-file-alt me-1"></i> Cadastro do empréstimo</strong>
+            <span class="text-muted small">
+                <i class="fas fa-chevron-up emp-collapse-icon" id="empCadastroIcon"></i>
+            </span>
+        </div>
+        <div class="collapse show" id="empCadastroCollapse">
+        <div class="card-body">
+            <div class="emp-cab-topo">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-4">
+                        <div class="text-muted small">Banco</div>
+                        <div class="d-flex align-items-center gap-2 fw-semibold">
+                            {% if emprestimo.banco and emprestimo.banco.logo %}
+                            <img src="{{ emprestimo.banco.logo.url }}" alt="{{ emprestimo.banco.nome }}"
+                                 style="width: 36px; height: 36px; object-fit: contain;">
+                            {% elif emprestimo.banco %}
+                            <div class="d-flex align-items-center justify-content-center rounded bg-light"
+                                 style="width: 36px; height: 36px; font-size: 11px; font-weight: bold;">
+                                {{ emprestimo.banco.nome|slice:":2" }}
+                            </div>
+                            {% else %}
+                            <i class="fas fa-university text-muted"></i>
+                            {% endif %}
+                            <span>{% if emprestimo.banco %}{{ emprestimo.banco.nome }}{% else %}—{% endif %}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Cooperativa</div>
+                        <div class="fw-semibold">{{ emprestimo.cooperativa|default:"—" }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Cliente</div>
+                        <div class="fw-semibold">{{ emprestimo.cliente|default:"—" }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-sm-6 col-lg-4">
+                    <dl class="mb-0">
+                        <dt>Número Contrato</dt>
+                        <dd>{{ emprestimo.numero_contrato }}</dd>
+                        <dt>Modalidade</dt>
+                        <dd>{{ emprestimo.modalidade|default:"—" }}</dd>
+                        <dt>Valor Contrato</dt>
+                        <dd>R$ {{ emprestimo.valor_contrato|moeda_br }}</dd>
+                        <dt>Indicador Cálculo</dt>
+                        <dd>
+                            {{ emprestimo.indicador_display }}
+                            {% if emprestimo.indicador %}
+                            <span class="badge bg-secondary ms-1">{{ emprestimo.indicador.get_tipo_display }}</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <dl class="mb-0">
+                        <dt>Data Operação</dt>
+                        <dd>{{ emprestimo.data_operacao|date:"d/m/Y"|default:"—" }}</dd>
+                        <dt>Data Vencimento</dt>
+                        <dd>{{ emprestimo.data_vencimento|date:"d/m/Y"|default:"—" }}</dd>
+                        <dt>Prazo em dias</dt>
+                        <dd>{% if emprestimo.prazo_dias %}{{ emprestimo.prazo_dias }}{% else %}—{% endif %}</dd>
+                        <dt>Data do extrato</dt>
+                        <dd>{{ emprestimo.data_extrato|date:"d/m/Y"|default:"—" }}</dd>
+                    </dl>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <dl class="mb-0">
+                        <dt>Índice de Correção</dt>
+                        <dd>{{ emprestimo.indice_correcao|default:"—" }}</dd>
+                        <dt>Índice Correção Atraso</dt>
+                        <dd>{{ emprestimo.indice_correcao_atraso|default:"—" }}</dd>
+                        <dt>Arquivo origem</dt>
+                        <dd class="text-break">{{ emprestimo.arquivo_origem|default:"—" }}</dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="border rounded mt-3 bg-light">
+                <div class="d-flex justify-content-between align-items-center px-3 py-2"
+                     role="button"
+                     data-bs-toggle="collapse"
+                     data-bs-target="#empTaxasCollapse"
+                     aria-expanded="true"
+                     aria-controls="empTaxasCollapse"
+                     style="cursor:pointer;user-select:none;">
+                    <div class="fw-semibold small mb-0">
+                        <i class="fas fa-percentage me-1 text-primary"></i>
+                        Taxas do extrato (editáveis)
+                    </div>
+                    <span class="text-muted small">
+                        <i class="fas fa-chevron-up emp-collapse-icon" id="empTaxasIcon"></i>
+                    </span>
+                </div>
+                <div class="collapse show" id="empTaxasCollapse">
+                <form method="post" action="{% url 'emprestimos:atualizar_taxas' emprestimo.pk %}"
+                      class="px-3 pb-3">
+                {% csrf_token %}
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editTaxaJuros">Taxa Juros % a.m.</label>
+                        <input type="text" class="form-control form-control-sm" id="editTaxaJuros" name="taxa_juros_am"
+                               value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}" inputmode="decimal" required>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editTaxaMora">Taxa Mora % a.m.</label>
+                        <input type="text" class="form-control form-control-sm" id="editTaxaMora" name="taxa_mora_am"
+                               value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}" inputmode="decimal" required>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editTaxaMulta">Taxa Juros Inad. % a.m.</label>
+                        <input type="text" class="form-control form-control-sm" id="editTaxaMulta" name="taxa_multa_am"
+                               value="{{ emprestimo.taxa_multa_am|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editTaxaJurosAa">Taxa Juros Anual %</label>
+                        <input type="text" class="form-control form-control-sm" id="editTaxaJurosAa" name="taxa_juros_aa"
+                               value="{{ emprestimo.taxa_juros_aa|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editIndice">Índice Correção</label>
+                        <input type="text" class="form-control form-control-sm" id="editIndice" name="indice_correcao"
+                               value="{{ emprestimo.indice_correcao }}" maxlength="40"
+                               placeholder="CDI">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editPctIndice">% Índice</label>
+                        <input type="text" class="form-control form-control-sm" id="editPctIndice" name="pct_correcao_am"
+                               value="{{ emprestimo.pct_correcao_am|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editIndiceAtraso">Índice Correção Atraso</label>
+                        <input type="text" class="form-control form-control-sm" id="editIndiceAtraso" name="indice_correcao_atraso"
+                               value="{{ emprestimo.indice_correcao_atraso }}" maxlength="40"
+                               placeholder="CDI">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1" for="editPctAtraso">% Correção Atraso</label>
+                        <input type="text" class="form-control form-control-sm" id="editPctAtraso" name="pct_correcao_atraso_am"
+                               value="{{ emprestimo.pct_correcao_atraso_am|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <div class="form-label small fw-semibold mb-1">Juros+Mora (ref.)</div>
+                        <div class="form-control form-control-sm bg-white" id="editTaxaSoma">
+                            {{ emprestimo.taxa_calculo_am }}%
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="fas fa-save"></i> Salvar taxas
+                        </button>
+                    </div>
+                </div>
+                <div class="form-text mt-2 mb-0">
+                    Mapeamento do extrato: em SAC/CDI a <strong>Taxa Juros</strong> costuma ser 0 —
+                    o juros da tabela usa <strong>% Índice</strong> (ex.: 192% do CDI).
+                    Reimporte o PDF ou ajuste e salve aqui.
+                </div>
+            </form>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3 emp-resumo">
+        <div class="col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-muted small">Valor do contrato</div>
+                <div class="fs-5 fw-bold">R$ {{ emprestimo.valor_contrato|moeda_br }}</div>
+                <div class="small mt-2">
+                    <div class="d-flex justify-content-between gap-2">
+                        <span class="text-muted">+ Tributos</span>
+                        <span>R$ {{ emprestimo.valor_tributos|moeda_br }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-2">
+                        <span class="text-muted">+ Tarifas</span>
+                        <span>R$ {{ emprestimo.valor_tarifas|moeda_br }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-2">
+                        <span class="text-muted">+ Registros</span>
+                        <span>R$ {{ emprestimo.valor_registros|moeda_br }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-2">
+                        <span class="text-muted">+ Pgtos. servs. terceiros</span>
+                        <span>R$ {{ emprestimo.valor_servicos_terceiros|moeda_br }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-2 fw-semibold border-top pt-1 mt-1">
+                        <span>Total</span>
+                        <span>R$ {{ emprestimo.valor_total_operacao|moeda_br }}</span>
+                    </div>
+                </div>
+                {% if emprestimo.saldo_devedor_atualizado %}
+                <div class="small mt-2 pt-2 border-top">
+                    <div class="d-flex justify-content-between gap-2">
+                        <span class="text-muted">Saldo devedor</span>
+                        <span class="fw-semibold text-primary">R$ {{ emprestimo.saldo_devedor_atualizado|moeda_br }}</span>
+                    </div>
+                    <div class="text-muted">
+                        Emissão {{ emprestimo.data_extrato|date:"d/m/Y"|default:"—" }}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="small mt-2">
+                    Taxa cálculo {{ emprestimo.taxa_calculo_am }}% a.m.
+                    <span class="text-muted">(juros {{ emprestimo.taxa_juros_am }}% + mora {{ emprestimo.taxa_mora_am }}%)</span>
+                    {% if emprestimo.taxa_juros_aa %} · {{ emprestimo.taxa_juros_aa }}% a.a.{% endif %}
+                    {% if emprestimo.indicador %} · {{ emprestimo.indicador.rotulo }}{% endif %}
+                </div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-muted small">Parcelas em aberto</div>
+                <div class="fs-5 fw-bold">{{ abertas|length }} / {{ parcelas|length }}</div>
+                <div class="small">Operação {{ emprestimo.data_operacao|date:"d/m/Y"|default:"-" }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-muted small">Saldo principal (amortização)</div>
+                <div class="fs-5 fw-bold text-primary">R$ {{ saldo_principal|moeda_br }}</div>
+                <div class="small text-muted">Soma amort. parcelas em aberto</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="text-muted small">Total parcelas abertas</div>
+                <div class="fs-5 fw-bold">R$ {{ total_aberto|moeda_br }}</div>
+                <div class="small">Juros remanescentes R$ {{ total_juros_aberto|moeda_br }}</div>
+            </div></div>
+        </div>
+    </div>
+
+    {% if simulacoes_recentes %}
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong><i class="fas fa-history"></i> Simulações salvas deste contrato</strong>
+            <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+        </div>
+        <div class="card-body table-responsive p-0">
+            <table class="table table-sm mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Salva em</th>
+                        <th>Título</th>
+                        <th>Data quitação</th>
+                        <th>Parcelas</th>
+                        <th>Quitação total</th>
+                        <th>Novo saldo</th>
+                        <th>Nova parcela</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in simulacoes_recentes %}
+                    <tr>
+                        <td>{{ s.criado_em|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {{ s.titulo|default:"—" }}
+                            {% if s.sim_parcial %}
+                            <small class="text-muted d-block">{{ s.remanescentes_rotulo }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ s.data_quitacao|date:"d/m/Y" }}</td>
+                        <td>{{ s.qtd_parcelas }} <small class="text-muted">({{ s.parcelas_numeros }})</small></td>
+                        <td class="fw-semibold">R$ {{ s.valor_quitacao|moeda_br }}</td>
+                        <td>{% if s.novo_saldo_devedor %}R$ {{ s.novo_saldo_devedor|moeda_br }}{% else %}—{% endif %}</td>
+                        <td class="text-success">{% if s.nova_parcela %}R$ {{ s.nova_parcela|moeda_br }}{% else %}—{% endif %}</td>
+                        <td class="text-end">
+                            <form method="post" action="{% url 'emprestimos:simulacao_excluir' s.pk %}" class="d-inline"
+                                  onsubmit="return confirm('Excluir esta simulação?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="detalhe">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card" id="formSimular">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <strong>Parcelas</strong>
+                    <button type="button"
+                            class="btn btn-sm btn-link text-primary text-decoration-none ms-2 p-0 align-baseline"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalSimularCalculo">
+                        <i class="fas fa-calculator"></i>
+                        {% if metodo_calculo == 'sac' %}Simular SAC{% else %}Simular Tabela Price{% endif %}
+                    </button>
+                    <a href="https://www.youtube.com/watch?v=xVoxV1z8c1E"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-sm btn-link text-danger text-decoration-none ms-1 p-0 align-baseline"
+                       title="Vídeo no YouTube">
+                        <i class="fab fa-youtube"></i>
+                    </a>
+                    {% if is_sac_emprestimo and ultima_parcela %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-warning ms-2"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalGerarParcelasSac">
+                        <i class="fas fa-plus-circle"></i> Gerar parcelas em aberto
+                    </button>
+                    {% endif %}
+                    {% if is_sac_emprestimo and abertas %}
+                    <form method="post"
+                          action="{% url 'emprestimos:atualizar_parcelas_sac' emprestimo.pk %}"
+                          class="d-inline ms-2"
+                          onsubmit="return confirm('Recalcular todas as parcelas EM ABERTO pela regra SAC (amortização constante + juros CDI × % índice)?\n\nParcelas pagas não serão alteradas.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="fas fa-sync-alt"></i> Atualizar valores SAC
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if not is_sac_emprestimo and abertas %}
+                    <form method="post"
+                          action="{% url 'emprestimos:atualizar_parcelas_price' emprestimo.pk %}"
+                          class="d-inline ms-2"
+                          onsubmit="return confirm('Recalcular parcelas EM ABERTO pela Tabela Price?\n\nJuros = saldo × taxa juros a.m. (por dias)\nAmortização = parcela − juros\nParcela permanece fixa.\n\nParcelas pagas não serão alteradas.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="fas fa-sync-alt"></i> Atualizar valores Price
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if abertas %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btnSelTodasAbertas"
+                            title="Marcar todas as parcelas em aberto">
+                        <i class="fas fa-check-double"></i> Selecionar todos
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnLimparFlagsAbertas"
+                            title="Limpar seleção">
+                        Limpar
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body table-responsive p-0">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:2.75rem;" class="text-center" title="Flag — parcelas em aberto">
+                                {% if abertas %}
+                                <input type="checkbox" class="form-check-input" id="chkFlagAbertasTodas"
+                                       title="Marcar/desmarcar todas em aberto">
+                                {% else %}
+                                <i class="fas fa-flag text-muted"></i>
+                                {% endif %}
+                            </th>
+                            <th>Nº</th>
+                            <th>Vencimento</th>
+                            <th>Parcela</th>
+                            <th>Amortização</th>
+                            <th>Juros</th>
+                            <th>Taxas</th>
+                            <th>Pagamento</th>
+                            <th>Valor pago</th>
+                            <th>Mora</th>
+                            <th>Correção</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in parcelas %}
+                        <tr class="{% if p.status == 'aberta' %}emp-parcelas-aberta{% endif %} {% if p.id in selecionadas_ids %}table-info{% endif %}"
+                            data-status="{{ p.status }}"
+                            data-parcela-id="{{ p.id }}">
+                            <td class="text-center">
+                                {% if p.status == 'aberta' %}
+                                <input type="checkbox"
+                                       class="form-check-input chk-flag-aberta"
+                                       name="flag_aberta"
+                                       value="{{ p.id }}"
+                                       data-numero="{{ p.numero }}"
+                                       title="Parcela {{ p.numero }} em aberto"
+                                       style="width:1.15rem;height:1.15rem;cursor:pointer;">
+                                {% elif p.status == 'paga' %}
+                                <span class="text-success small" title="Paga">✓</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p.numero }}</td>
+                            <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
+                            <td>R$ {{ p.valor_parcela|moeda_br }}</td>
+                            <td>R$ {{ p.amortizacao|moeda_br }}</td>
+                            <td>
+                                {% if simulacao and simulacao.is_sac and p.numero == simulacao.parcela_ref_numero %}
+                                <span class="fw-bold text-danger" title="Juros SELIC sobre soma das amortizações selecionadas">
+                                    R$ {{ simulacao.juros_parcela_ref|moeda_br }}
+                                </span>
+                                {% else %}
+                                R$ {{ p.juros|moeda_br }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if p.taxa_mil != None %}
+                                {{ p.taxa_mil|floatformat:4 }}%
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td>{{ p.data_pagamento|date:"d/m/Y"|default:"—" }}</td>
+                            <td>{% if p.valor_pago != None %}R$ {{ p.valor_pago|moeda_br }}{% else %}—{% endif %}</td>
+                            <td>R$ {{ p.mora|moeda_br }}</td>
+                            <td>R$ {{ p.correcao|moeda_br }}</td>
+                            <td>
+                                {% if p.status == 'aberta' %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-flag"></i> Em aberto
+                                </span>
+                                {% elif p.status == 'paga' %}
+                                <span class="badge bg-success">Paga</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ p.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal — importar/corrigir parcelas a partir do PDF #}
+<div class="modal fade" id="modalImportarParcelasPdf" tabindex="-1" aria-labelledby="modalImportarParcelasPdfLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post"
+                  action="{% url 'emprestimos:importar_parcelas_pdf' emprestimo.pk %}"
+                  enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalImportarParcelasPdfLabel">
+                        <i class="fas fa-file-import"></i> Importar parcelas do PDF
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small mb-3">
+                        Envie o <strong>PDF do extrato</strong> deste contrato
+                        (<strong>{{ emprestimo.numero_contrato }}</strong>) —
+                        Sicoob ou Bradesco.
+                        Parcelas <strong>já baixadas no sistema não são alteradas</strong>.
+                        A atualização começa após a última paga
+                        (ex.: se a 31 está paga, importa da <strong>32</strong> em diante).
+                        Grava valor da parcela, juros e amortização para a provisão.
+                    </p>
+                    <div class="alert alert-warning small py-2">
+                        <i class="fas fa-info-circle"></i>
+                        Use o PDF do banco deste contrato (Sicoob ou Bradesco).
+                        Não reabre parcelas liquidadas.
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold" for="pdf_parcelas_file">Arquivo PDF</label>
+                        <input type="file"
+                               class="form-control"
+                               name="pdf_file"
+                               id="pdf_parcelas_file"
+                               accept=".pdf,application/pdf"
+                               required>
+                        {% if emprestimo.arquivo_origem %}
+                        <div class="form-text">Último arquivo: {{ emprestimo.arquivo_origem }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> Verificar e corrigir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Modal — gerar parcelas em aberto (SAC) #}
+{% if is_sac_emprestimo and ultima_parcela %}
+<div class="modal fade" id="modalGerarParcelasSac" tabindex="-1" aria-labelledby="modalGerarParcelasSacLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'emprestimos:gerar_parcelas_sac' emprestimo.pk %}">
+                {% csrf_token %}
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="modalGerarParcelasSacLabel">
+                        <i class="fas fa-plus-circle"></i> Gerar parcelas em aberto (SAC)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        O PDF importou só as parcelas pagas. Esta ação cria as demais em aberto
+                        a partir do <strong>último lançamento</strong>, com
+                        <strong>amortização constante</strong> e vencimento todo mês no dia informado.
+                    </p>
+                    <div class="border rounded p-2 mb-3 small bg-light">
+                        <div>Última parcela: <strong>nº {{ ultima_parcela.numero }}</strong>
+                            · {{ ultima_parcela.data_vencimento|date:"d/m/Y" }}</div>
+                        <div>Amortização (constante): <strong class="text-primary">R$ {{ ultima_parcela.amortizacao|moeda_br }}</strong></div>
+                        <div>Próxima a criar: <strong>nº {{ ultima_parcela.numero|add:1 }}</strong> em diante</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="total_parcelas_sac">Total de parcelas do contrato</label>
+                        <input type="number" class="form-control" name="total_parcelas" id="total_parcelas_sac"
+                               min="{{ ultima_parcela.numero|add:1 }}" max="600" required
+                               value="{{ sugestao_total_parcelas|default:ultima_parcela.numero }}">
+                        <div class="form-text">
+                            Ex.: se a última paga é a 4 e o contrato tem 48 parcelas, informe 48.
+                            Serão criadas da {{ ultima_parcela.numero|add:1 }} até esse total.
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold" for="dia_vencimento_sac">Dia do vencimento</label>
+                        <input type="number" class="form-control" name="dia_vencimento" id="dia_vencimento_sac"
+                               min="1" max="31" required
+                               value="{{ sugestao_dia_vencimento|default:10 }}">
+                        <div class="form-text">
+                            Usa o último vencimento e avança 1 mês por parcela, sempre neste dia
+                            (ex.: dia 10 → 10/10, 10/11, 10/12…).
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning"
+                            onclick="return confirm('Gerar as parcelas em aberto com amortização constante do último lançamento?');">
+                        <i class="fas fa-plus"></i> Criar parcelas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Modal — simulação conforme indicador de cálculo (Price / SAC) #}
+<div class="modal fade" id="modalSimularCalculo" tabindex="-1" aria-labelledby="modalSimularCalculoLabel" aria-hidden="true"
+     data-metodo="{{ metodo_calculo|default:'price' }}">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSimularCalculoLabel">
+                    <i class="fas fa-calculator text-primary"></i>
+                    {% if metodo_calculo == 'sac' %}
+                    Simular SAC — {{ metodo_calculo_rotulo }}
+                    {% else %}
+                    Simular Tabela Price — {{ metodo_calculo_rotulo }}
+                    {% endif %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <span class="badge {% if metodo_calculo == 'sac' %}bg-info text-dark{% else %}bg-primary{% endif %}">
+                        Indicador: {{ metodo_calculo_rotulo }}
+                    </span>
+                    <span class="text-muted small ms-2">Método aplicado conforme o cadastro do contrato</span>
+                </div>
+
+                <div class="alert alert-light border mb-3" id="priceFormulasBox">
+                    {% if metodo_calculo == 'sac' %}
+                    <div class="fw-semibold mb-2">Regras — Tabela SAC (CDI)</div>
+                    <ul class="mb-2 small">
+                        <li><strong>Amortização</strong> = valor financiado ÷ nº de parcelas <span class="text-muted">(fixa)</span></li>
+                        <li>
+                            <strong>Juros (J)</strong> =
+                            <code>saldo × (fator_CDI − 1) × (pct/100)</code>
+                            <span class="text-muted">— CDI acumulado no período, depois × % Índice (ex.: 192)</span>
+                        </li>
+                        <li><strong>Valor da parcela</strong> = amortização + juros</li>
+                        <li><strong>Saldo devedor</strong> = saldo anterior − amortização</li>
+                    </ul>
+                    <div class="small text-info bg-info-subtle border border-info-subtle rounded p-2 mb-2">
+                        <strong>Parcelas pagas:</strong> amortização, juros e valor vêm do <strong>extrato</strong> (já quitados).
+                        <strong>Em aberto:</strong> juros pelo CDI (BCB) × % do índice; amortização constante.
+                    </div>
+                    {% else %}
+                    <div class="fw-semibold mb-2">Fórmulas — Tabela Price</div>
+                    <ul class="mb-2 small">
+                        <li>
+                            <strong>Parcela (PMT)</strong> = <em>valor fixo</em> em todas as prestações
+                            (do extrato ou PGTO teórico
+                            <code>PV × i × (1+i)^n / ((1+i)^n − 1)</code>)
+                        </li>
+                        <li>
+                            <strong>Juros</strong> =
+                            <code>saldo × ((1+i)<sup>dias/30</sup> − 1)</code>
+                            <span class="text-muted">— i = <strong>taxa de juros a.m.</strong> (sem mora); diminui a cada mês</span>
+                        </li>
+                        <li>
+                            <strong>Amortização</strong> = <code>parcela − juros</code>
+                            <span class="text-muted">— aumenta a cada mês (é o que muda)</span>
+                        </li>
+                        <li><strong>Saldo</strong> = saldo anterior − amortização</li>
+                    </ul>
+                    <div class="small text-info bg-info-subtle border border-info-subtle rounded p-2 mb-2">
+                        <strong>Pagas:</strong> valores da lista/extrato.
+                        <strong>Em aberto:</strong> parcela <strong>fixa</strong>; recalcula só juros e amortização.
+                    </div>
+                    {% endif %}
+                    <a href="https://www.youtube.com/watch?v=xVoxV1z8c1E"
+                       target="_blank" rel="noopener noreferrer" class="small text-danger text-decoration-none">
+                        <i class="fab fa-youtube"></i> Ver vídeo explicativo
+                    </a>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="pricePv">Valor financiado (PV)</label>
+                        <input type="text" class="form-control" id="pricePv"
+                               value="{{ emprestimo.valor_contrato|stringformat:'f' }}"
+                               inputmode="decimal">
+                    </div>
+                    {% if metodo_calculo == 'sac' %}
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="sacPctIndice">% do Índice (CDI)</label>
+                        <input type="text" class="form-control" id="sacPctIndice"
+                               value="{% if emprestimo.pct_correcao_am %}{{ emprestimo.pct_correcao_am|stringformat:'f' }}{% else %}192{% endif %}"
+                               inputmode="decimal">
+                        <div class="form-text">Ex.: 192 = 192% do CDI diário</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceDataInicio">Data início (operação)</label>
+                        <input type="date" class="form-control" id="priceDataInicio"
+                               value="{{ emprestimo.data_operacao|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceNper">Nº de parcelas (n)</label>
+                        <input type="number" class="form-control" id="priceNper"
+                               value="{{ parcelas|length }}" min="1" max="600">
+                    </div>
+                    <div class="col-md-8">
+                        <div class="form-text pt-md-4" id="sacCdiStatus">
+                            Juros calculados com CDI diário (BCB) × % do índice nos dias úteis de cada período.
+                        </div>
+                    </div>
+                    {# campos ocultos para o JS compartilhado (Price) #}
+                    <input type="hidden" id="priceTaxaJuros" value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}">
+                    <input type="hidden" id="priceTaxaMora" value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}">
+                    <input type="hidden" id="priceTaxa" value="{{ emprestimo.taxa_calculo_am|stringformat:'f' }}" data-so-aa="0">
+                    {% else %}
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceTaxaJuros">Taxa de Juros (% a.m.)</label>
+                        <input type="text" class="form-control" id="priceTaxaJuros"
+                               value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}"
+                               inputmode="decimal">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceTaxaMora">Taxa de Mora (% a.m.)</label>
+                        <input type="text" class="form-control" id="priceTaxaMora"
+                               value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}"
+                               inputmode="decimal">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceTaxa">Taxa p/ cálculo (soma)</label>
+                        <input type="text" class="form-control" id="priceTaxa"
+                               value="{{ emprestimo.taxa_calculo_am|stringformat:'f' }}"
+                               inputmode="decimal" readonly
+                               data-so-aa="0"
+                               title="Juros + Mora">
+                        <div class="form-text">Juros + Mora (referência). Na Tabela Price o cálculo usa <strong>só a Taxa de Juros</strong>.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold" for="priceNper">Nº de parcelas (n)</label>
+                        <input type="number" class="form-control" id="priceNper"
+                               value="{{ parcelas|length }}" min="1" max="600">
+                    </div>
+                    {% endif %}
+                    {% if metodo_calculo != 'sac' %}
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold" for="priceParcelaExtrato">Parcela fixa (R$)</label>
+                        <input type="text" class="form-control" id="priceParcelaExtrato"
+                               value="{% if parcela_fixa_price %}{{ parcela_fixa_price|stringformat:'f' }}{% endif %}"
+                               inputmode="decimal">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="priceUsarParcelaExtrato" checked>
+                            <label class="form-check-label small" for="priceUsarParcelaExtrato">
+                                Usar parcela da lista (igual à tela anterior)
+                            </label>
+                        </div>
+                        <div class="form-text">Valor atual da lista (última paga / em aberto), não a 1ª parcela histórica.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold" for="priceDataInicio">Data início (operação)</label>
+                        <input type="date" class="form-control" id="priceDataInicio"
+                               value="{{ emprestimo.data_operacao|date:'Y-m-d' }}">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="priceJurosPorDias" checked>
+                            <label class="form-check-label small" for="priceJurosPorDias">
+                                Juros por dias reais: saldo × ((1+i)<sup>dias/30</sup> − 1)
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <script type="application/json" id="priceVencimentosJson">[
+                    {% for p in parcelas %}
+                    {"n": {{ p.numero }}, "id": {{ p.id }}, "status": "{{ p.status }}", "venc": "{{ p.data_vencimento|date:'Y-m-d' }}", "amort": "{{ p.amortizacao }}", "juros": "{{ p.juros }}", "parcela": "{{ p.valor_parcela }}"}{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ]</script>
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                    <form method="post" action="{% url 'emprestimos:quitacao' emprestimo.pk %}" id="formPriceParaQuitacao" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="entrar_simulacao">
+                        <input type="hidden" name="dados_price_json" id="dados_price_json_goto" value="">
+                        <input type="hidden" name="taxa_juros_am" id="gotoTaxaJuros" value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}">
+                        <input type="hidden" name="taxa_mora_am" id="gotoTaxaMora" value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}">
+                        <button type="submit"
+                                class="btn btn-success"
+                                id="btnPriceParaQuitacao"
+                                {% if not abertas %}disabled{% endif %}>
+                            <i class="fas fa-hand-holding-usd"></i> Simulação de quitação
+                        </button>
+                    </form>
+                    <div class="ms-md-2">
+                        <span class="text-muted small" id="pricePmtHint">
+                            {% if metodo_calculo == 'sac' %}Amortização / 1ª parcela:{% else %}Parcela fixa (Price):{% endif %}
+                        </span>
+                        <strong id="pricePmtLabel" class="text-primary">—</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function bindCollapseIcon(collapseId, iconId) {
+        const el = document.getElementById(collapseId);
+        const icon = document.getElementById(iconId);
+        if (!el || !icon) return;
+        el.addEventListener('show.bs.collapse', function() { icon.classList.remove('collapsed'); });
+        el.addEventListener('hide.bs.collapse', function() { icon.classList.add('collapsed'); });
+        if (!el.classList.contains('show')) icon.classList.add('collapsed');
+    }
+    bindCollapseIcon('empCadastroCollapse', 'empCadastroIcon');
+    bindCollapseIcon('empTaxasCollapse', 'empTaxasIcon');
+
+    function setFlagsAbertas(marcar) {
+        const chks = document.querySelectorAll('#formSimular .chk-flag-aberta, .chk-flag-aberta');
+        let n = 0;
+        chks.forEach(function(chk) {
+            chk.checked = !!marcar;
+            // força estado no DOM (alguns browsers/CSS de form-check)
+            if (marcar) chk.setAttribute('checked', 'checked');
+            else chk.removeAttribute('checked');
+            const tr = chk.closest('tr');
+            if (tr) tr.classList.toggle('table-warning', !!marcar);
+            n += 1;
+        });
+        const chkTodas = document.getElementById('chkFlagAbertasTodas');
+        if (chkTodas) {
+            chkTodas.checked = !!marcar && n > 0;
+            chkTodas.indeterminate = false;
+        }
+        return n;
+    }
+
+    function syncChkFlagTodas() {
+        const chkTodas = document.getElementById('chkFlagAbertasTodas');
+        if (!chkTodas) return;
+        const todas = document.querySelectorAll('.chk-flag-aberta');
+        const marcadas = document.querySelectorAll('.chk-flag-aberta:checked');
+        chkTodas.checked = todas.length > 0 && marcadas.length === todas.length;
+        chkTodas.indeterminate = marcadas.length > 0 && marcadas.length < todas.length;
+    }
+
+    // Delegação: funciona mesmo se a tabela for re-renderizada
+    document.addEventListener('click', function(ev) {
+        const btnSel = ev.target.closest('#btnSelTodasAbertas');
+        if (btnSel) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const n = setFlagsAbertas(true);
+            if (!n) {
+                alert('Não há parcelas em aberto para selecionar.');
+            }
+            return;
+        }
+        const btnLimpar = ev.target.closest('#btnLimparFlagsAbertas');
+        if (btnLimpar) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setFlagsAbertas(false);
+        }
+    });
+
+    document.addEventListener('change', function(ev) {
+        const t = ev.target;
+        if (!t) return;
+        if (t.id === 'chkFlagAbertasTodas') {
+            setFlagsAbertas(t.checked);
+            return;
+        }
+        if (t.classList && t.classList.contains('chk-flag-aberta')) {
+            const tr = t.closest('tr');
+            if (tr) tr.classList.toggle('table-warning', t.checked);
+            syncChkFlagTodas();
+        }
+    });
+
+    function parseBrNumber(v) {
+        if (v == null) return NaN;
+        let s = String(v).trim().replace(/\s/g, '');
+        if (s.indexOf(',') >= 0) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        }
+        return parseFloat(s);
+    }
+
+    function fmtBr(n) {
+        if (!isFinite(n)) return '—';
+        return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    /** PGTO Excel: =PGTO(i; n; -pv) — mês cheio */
+    function pmtExcel(i, n, pv) {
+        if (n <= 0) return NaN;
+        if (Math.abs(i) < 1e-12) return pv / n;
+        const f = Math.pow(1 + i, n);
+        return pv * i * f / (f - 1);
+    }
+
+    /** Juros compostos por dias (padrão Sicoob Price) */
+    function jurosPorDias(saldo, i, dias) {
+        if (!(dias > 0) || !(saldo > 0)) return 0;
+        return saldo * (Math.pow(1 + i, dias / 30) - 1);
+    }
+
+    function parseIsoDate(s) {
+        if (!s) return null;
+        const p = String(s).split('-');
+        if (p.length !== 3) return null;
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+
+    function diffDias(a, b) {
+        if (!a || !b) return 30;
+        const ms = b.getTime() - a.getTime();
+        return Math.max(0, Math.round(ms / 86400000));
+    }
+
+    function loadVencimentos() {
+        const el = document.getElementById('priceVencimentosJson');
+        if (!el) return [];
+        try { return JSON.parse(el.textContent); } catch (e) { return []; }
+    }
+
+    function metodoAtual() {
+        const el = document.getElementById('modalSimularCalculo');
+        return (el && el.getAttribute('data-metodo')) || 'price';
+    }
+
+    let priceSoAbertas = false;
+    const priceBaixaSelecionadas = new Set();
+    let priceLinhasPorId = {};
+
+    function atualizarHintBaixa() {
+        /* hint removido do modal — seleção automática das abertas na quitação */
+    }
+
+    function selecionarTodasAbertasPrice() {
+        priceBaixaSelecionadas.clear();
+        loadVencimentos().forEach(function(v) {
+            if (v && v.status === 'aberta' && v.id) {
+                priceBaixaSelecionadas.add(String(v.id));
+            }
+        });
+    }
+
+    /** Faixa real de nº das parcelas (ex.: 2…42 se a 1 não veio no PDF). */
+    function faixaNumerosParcelas(vencs, nFallback) {
+        const nums = (vencs || []).map(function(v) { return parseInt(v.n, 10); })
+            .filter(function(x) { return isFinite(x) && x > 0; });
+        if (!nums.length) {
+            const n = parseInt(nFallback, 10) || 0;
+            return { min: 1, max: Math.max(1, n) };
+        }
+        return { min: Math.min.apply(null, nums), max: Math.max.apply(null, nums) };
+    }
+
+    function aplicarFiltroPriceAbertas() {
+        const tbody = document.getElementById('priceTabelaBody');
+        if (!tbody) return;
+        tbody.querySelectorAll('tr[data-status]').forEach(function(tr) {
+            const aberta = tr.getAttribute('data-status') === 'aberta';
+            tr.style.display = (priceSoAbertas && !aberta) ? 'none' : '';
+        });
+    }
+
+    function registrarLinhaPrice(ext, k, amort, juros, parcela, saldoInicio, saldoFim, dias) {
+        if (!ext || !ext.id) return;
+        priceLinhasPorId[String(ext.id)] = {
+            n: k,
+            amort: amort,
+            juros: juros,
+            parcela: parcela,
+            saldoInicio: saldoInicio,
+            saldoFim: saldoFim,
+            dias: dias,
+            status: ext.status || ''
+        };
+    }
+
+    function celulaFlagBaixa(ext) {
+        if (!ext || !ext.id) {
+            return '<td class="text-center text-muted">—</td>';
+        }
+        if (ext.status !== 'aberta') {
+            return '<td class="text-center"><i class="fas fa-check text-success" title="Paga"></i></td>';
+        }
+        const checked = priceBaixaSelecionadas.has(String(ext.id)) ? ' checked' : '';
+        return '<td class="text-center">' +
+            '<input type="checkbox" class="form-check-input chk-price-baixa" ' +
+            'value="' + ext.id + '" data-numero="' + ext.n + '"' + checked +
+            ' title="Flag: parcela ' + ext.n + ' em aberto">' +
+            '</td>';
+    }
+
+    function finalizarTabelaGerada(tbody) {
+        if (tbody) {
+            tbody.querySelectorAll('.chk-price-baixa').forEach(function(chk) {
+                chk.addEventListener('change', function() {
+                    if (chk.checked) priceBaixaSelecionadas.add(chk.value);
+                    else priceBaixaSelecionadas.delete(chk.value);
+                    atualizarHintBaixa();
+                });
+            });
+            aplicarFiltroPriceAbertas();
+        }
+        selecionarTodasAbertasPrice();
+        atualizarHintBaixa();
+    }
+
+    function gerarTabelaSacCdi() {
+        const tbody = document.getElementById('priceTabelaBody');
+        const pmtLabel = document.getElementById('pricePmtLabel');
+        const statusEl = document.getElementById('sacCdiStatus');
+        const pv = parseBrNumber(document.getElementById('pricePv').value);
+        const n = parseInt(document.getElementById('priceNper').value, 10);
+        const pctEl = document.getElementById('sacPctIndice');
+        const pct = pctEl ? parseBrNumber(pctEl.value) : 192;
+        const dataInicio = (document.getElementById('priceDataInicio') || {}).value || '';
+        const vencs = loadVencimentos();
+
+        Object.keys(priceLinhasPorId).forEach(function(k) { delete priceLinhasPorId[k]; });
+
+        if (!(pv > 0) || !(n > 0) || !isFinite(pct) || pct <= 0) {
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-danger text-center py-3">Informe PV, nº de parcelas e % do índice (ex.: 192).</td></tr>';
+            }
+            if (pmtLabel) pmtLabel.textContent = '—';
+            return;
+        }
+
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Consultando CDI (BCB)…</td></tr>';
+        }
+        if (statusEl) statusEl.textContent = 'Consultando CDI diário no Banco Central…';
+
+        const params = new URLSearchParams({
+            pv: String(pv),
+            n: String(n),
+            pct_indice: String(pct),
+            data_inicio: dataInicio
+        });
+        const url = '{% url "emprestimos:sac_tabela_cdi" emprestimo.pk %}?' + params.toString();
+
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function(r) { return r.json().then(function(j) { return { okHttp: r.ok, j: j }; }); })
+            .then(function(res) {
+                if (!res.okHttp || !res.j || !res.j.ok) {
+                    const erro = (res.j && res.j.erro) ? res.j.erro : 'Falha ao gerar tabela SAC/CDI.';
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="9" class="text-danger text-center py-3">' + erro + '</td></tr>';
+                    }
+                    if (pmtLabel) pmtLabel.textContent = '—';
+                    if (statusEl) statusEl.textContent = erro;
+                    return;
+                }
+                const data = res.j;
+                let html = '';
+                let primeira = null;
+                (data.linhas || []).forEach(function(L) {
+                    const amort = parseFloat(L.amortizacao);
+                    const juros = parseFloat(L.juros);
+                    const parcela = parseFloat(L.parcela);
+                    const saldoInicio = parseFloat(L.saldo_inicio);
+                    const saldoFim = parseFloat(L.saldo_fim);
+                    const dias = L.dias_uteis || 0;
+                    const doExtrato = L.origem === 'extrato' || L.status === 'paga';
+                    if (primeira == null && !doExtrato) primeira = parcela;
+                    if (primeira == null) primeira = parcela;
+                    const ext = vencs.find(function(v) { return v.n === L.numero; }) || {
+                        id: L.id, n: L.numero, status: L.status || '', amort: L.amort_extrato
+                    };
+                    registrarLinhaPrice(ext, L.numero, amort, juros, parcela, saldoInicio, saldoFim, dias);
+                    if (tbody) {
+                        const rowClass = doExtrato ? ' table-success' : '';
+                        const diasCell = doExtrato
+                            ? '<span class="text-success" title="Valores do extrato (paga)">Extrato</span>'
+                            : String(dias);
+                        html += '<tr class="' + rowClass.trim() + '" data-status="' + (L.status || '') + '" data-numero="' + L.numero + '" data-origem="' + (L.origem || '') + '">' +
+                            celulaFlagBaixa(ext) +
+                            '<td>' + L.numero + '</td>' +
+                            '<td title="' + (doExtrato ? 'Parcela paga — valores do extrato' : 'Dias úteis CDI') + '">' + diasCell + '</td>' +
+                            '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                            '<td>R$ ' + fmtBr(juros) + '</td>' +
+                            '<td>R$ ' + fmtBr(amort) + '</td>' +
+                            '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                            '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                            '<td>' + (L.amort_extrato != null ? ('R$ ' + fmtBr(parseFloat(L.amort_extrato))) : '—') + '</td>' +
+                            '</tr>';
+                    }
+                });
+                if (tbody) {
+                    tbody.innerHTML = html || '<tr><td colspan="9" class="text-muted text-center">Sem linhas.</td></tr>';
+                }
+                if (pmtLabel) {
+                    pmtLabel.innerHTML = 'Amort. constante R$ ' + fmtBr(parseFloat(data.amort_fixa)) +
+                        ' · 1ª parc. R$ ' + fmtBr(primeira) +
+                        ' <span class="text-muted small fw-normal">(CDI × ' + String(data.pct_indice).replace('.', ',') + '%)</span>';
+                }
+                if (statusEl) {
+                    const avisos = (data.avisos || []).join(' ');
+                    statusEl.textContent = 'Juros = saldo × (fator CDI ' + String(data.pct_indice).replace('.', ',') +
+                        '% − 1); parcela = amort + juros.' + (avisos ? (' ' + avisos) : '');
+                }
+                finalizarTabelaGerada(tbody);
+            })
+            .catch(function(err) {
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-danger text-center py-3">Erro de rede ao consultar CDI.</td></tr>';
+                }
+                if (pmtLabel) pmtLabel.textContent = '—';
+                if (statusEl) statusEl.textContent = String(err);
+            });
+    }
+
+    function gerarTabelaAmortizacao() {
+        syncTaxaCalculoPrice();
+        const metodo = metodoAtual();
+        if (metodo === 'sac') {
+            gerarTabelaSacCdi();
+            return;
+        }
+        const pv = parseBrNumber(document.getElementById('pricePv').value);
+        // Price: usa só taxa de juros a.m. (não juros+mora)
+        const taxaJurosEl = document.getElementById('priceTaxaJuros');
+        const taxaPct = taxaJurosEl
+            ? (parseBrNumber(taxaJurosEl.value) || 0)
+            : parseBrNumber(document.getElementById('priceTaxa').value);
+        const n = parseInt(document.getElementById('priceNper').value, 10);
+        const tbody = document.getElementById('priceTabelaBody');
+        const pmtLabel = document.getElementById('pricePmtLabel');
+        const vencs = loadVencimentos();
+
+        Object.keys(priceLinhasPorId).forEach(function(k) { delete priceLinhasPorId[k]; });
+
+        if (!(pv > 0) || !(n > 0) || !isFinite(taxaPct) || !(taxaPct > 0)) {
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-danger text-center py-3">Informe valor, taxa de juros e nº de parcelas válidos.</td></tr>';
+            }
+            if (pmtLabel) pmtLabel.textContent = '—';
+            return;
+        }
+
+        const i = taxaPct / 100;
+        let saldo = pv;
+
+        const usarExtrato = document.getElementById('priceUsarParcelaExtrato');
+        const porDias = document.getElementById('priceJurosPorDias');
+        const parcelaExtratoInput = parseBrNumber((document.getElementById('priceParcelaExtrato') || {}).value);
+        // Parcela fixa da lista = última paga ou 1ª aberta com valor (igual à tela anterior)
+        let parcelaFixaLista = NaN;
+        vencs.forEach(function(v) {
+            if (v.status === 'paga') {
+                const vp = parseFloat(v.parcela);
+                if (isFinite(vp) && vp > 0) parcelaFixaLista = vp;
+            }
+        });
+        if (!isFinite(parcelaFixaLista) || parcelaFixaLista <= 0) {
+            const ab = vencs.find(function(v) {
+                return v.status === 'aberta' && isFinite(parseFloat(v.parcela)) && parseFloat(v.parcela) > 0;
+            });
+            if (ab) parcelaFixaLista = parseFloat(ab.parcela);
+        }
+        const pmtTeorico = pmtExcel(i, n, pv);
+        let pmt = pmtTeorico;
+        if (usarExtrato && usarExtrato.checked) {
+            // Prioriza a parcela atual da lista (ex.: 67.828,07), não a 1ª histórica (63.310,37)
+            if (isFinite(parcelaFixaLista) && parcelaFixaLista > 0) pmt = parcelaFixaLista;
+            else if (parcelaExtratoInput > 0) pmt = parcelaExtratoInput;
+        }
+        const elPmtInput = document.getElementById('priceParcelaExtrato');
+        if (elPmtInput && isFinite(parcelaFixaLista) && parcelaFixaLista > 0) {
+            elPmtInput.value = String(parcelaFixaLista);
+        }
+        if (pmtLabel) {
+            pmtLabel.innerHTML = 'Parcela fixa R$ ' + fmtBr(pmt) +
+                ' <span class="text-muted small fw-normal">(@ ' +
+                String(taxaPct).replace('.', ',') + '% a.m. juros)</span>' +
+                (Math.abs(pmt - pmtTeorico) > 0.02
+                    ? ' <span class="text-muted small fw-normal">(PGTO teórico R$ ' + fmtBr(pmtTeorico) + ')</span>'
+                    : '');
+        }
+        let dataAnt = parseIsoDate((document.getElementById('priceDataInicio') || {}).value);
+        let qtdExtrato = 0;
+        let html = '';
+        const faixa = faixaNumerosParcelas(vencs, n);
+        for (let k = faixa.min; k <= faixa.max; k++) {
+            const saldoInicio = saldo;
+            const ext = vencs.find(v => v.n === k);
+            const dataVenc = ext ? parseIsoDate(ext.venc) : null;
+            const status = (ext && ext.status) || '';
+            const doExtrato = status === 'paga';
+            const isUltima = (k === faixa.max);
+
+            let dias = 30;
+            let juros, amort, parcela, saldoFim;
+
+            if (doExtrato && ext) {
+                amort = parseFloat(ext.amort);
+                juros = parseFloat(ext.juros);
+                parcela = parseFloat(ext.parcela);
+                if (!isFinite(amort)) amort = 0;
+                if (!isFinite(juros)) juros = 0;
+                if (!isFinite(parcela) || parcela <= 0) parcela = amort + juros;
+                if (amort <= 0 && parcela > juros) amort = parcela - juros;
+                if (dataAnt && dataVenc) dias = diffDias(dataAnt, dataVenc);
+                saldoFim = saldoInicio - amort;
+                if (saldoFim < 0) saldoFim = 0;
+                qtdExtrato += 1;
+            } else {
+                if (porDias && porDias.checked) {
+                    if (dataAnt && dataVenc) dias = diffDias(dataAnt, dataVenc);
+                    else if (!dataAnt && dataVenc) dias = 30;
+                }
+                // Saldo já zerou antes do fim: mantém valores do extrato nas abertas restantes
+                // (evita parcelas finais a R$ 0,00 quando a PMT do extrato amortiza mais rápido).
+                const saldoEsgotado = !(saldoInicio > 0.005);
+                const amortExtAberta = ext ? parseFloat(ext.amort) : NaN;
+                const jurosExtAberta = ext ? parseFloat(ext.juros) : NaN;
+                const parcExtAberta = ext ? parseFloat(ext.parcela) : NaN;
+                if (saldoEsgotado && ext && status === 'aberta' &&
+                    ((isFinite(parcExtAberta) && parcExtAberta > 0) ||
+                     (isFinite(amortExtAberta) && amortExtAberta > 0))) {
+                    amort = isFinite(amortExtAberta) ? amortExtAberta : 0;
+                    juros = isFinite(jurosExtAberta) ? jurosExtAberta : 0;
+                    parcela = (isFinite(parcExtAberta) && parcExtAberta > 0)
+                        ? parcExtAberta
+                        : (amort + juros);
+                    saldoFim = 0;
+                } else {
+                    juros = (porDias && porDias.checked)
+                        ? jurosPorDias(saldoInicio, i, dias)
+                        : saldoInicio * i;
+                    if (juros < 0) juros = 0;
+                    parcela = pmt;
+                    amort = pmt - juros;
+                    if (amort < 0) amort = 0;
+                    if (isUltima || amort >= saldoInicio - 0.005) {
+                        amort = saldoInicio;
+                        parcela = amort + juros;
+                        saldoFim = 0;
+                    } else {
+                        saldoFim = saldoInicio - amort;
+                    }
+                    if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
+                    if (saldoFim < 0) saldoFim = 0;
+                }
+            }
+
+            const amortExt = ext ? parseFloat(ext.amort) : NaN;
+            registrarLinhaPrice(ext, k, amort, juros, parcela, saldoInicio, saldoFim, dias);
+
+            if (tbody) {
+                const rowClass = doExtrato
+                    ? ' table-success'
+                    : ((isFinite(amortExt) && Math.abs(amort - amortExt) > 1) ? ' table-warning' : '');
+                const diasCell = doExtrato
+                    ? '<span class="text-success" title="Valores da lista/extrato (paga)">Extrato</span>'
+                    : String(dias);
+                html += '<tr class="' + rowClass.trim() + '" data-status="' + status + '" data-numero="' + k + '" data-origem="' + (doExtrato ? 'extrato' : 'calculado') + '">' +
+                    celulaFlagBaixa(ext) +
+                    '<td>' + k + '</td>' +
+                    '<td title="' + (doExtrato ? 'Parcela paga — valores da lista' : 'Dias do período') + '">' + diasCell + '</td>' +
+                    '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                    '<td>R$ ' + fmtBr(juros) + '</td>' +
+                    '<td>R$ ' + fmtBr(amort) + '</td>' +
+                    '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                    '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                    '<td>' + (isFinite(amortExt) ? ('R$ ' + fmtBr(amortExt)) : '—') + '</td>' +
+                    '</tr>';
+            }
+            saldo = saldoFim;
+            if (dataVenc) dataAnt = dataVenc;
+        }
+        if (tbody) tbody.innerHTML = html;
+        if (qtdExtrato > 0 && pmtLabel) {
+            pmtLabel.innerHTML = 'Parcela fixa R$ ' + fmtBr(pmt) +
+                ' <span class="text-muted small fw-normal">(' + qtdExtrato +
+                ' paga' + (qtdExtrato === 1 ? '' : 's') + ' da lista · abertas: amort = parcela − juros)</span>';
+        }
+        finalizarTabelaGerada(tbody);
+    }
+
+    function syncTaxaCalculoPrice() {
+        const jEl = document.getElementById('priceTaxaJuros');
+        const mEl = document.getElementById('priceTaxaMora');
+        const somaEl = document.getElementById('priceTaxa');
+        if (!jEl || !mEl || !somaEl) return 0;
+        const j = parseBrNumber(jEl.value) || 0;
+        const m = parseBrNumber(mEl.value) || 0;
+        const soma = Math.round((j + m) * 10000) / 10000;
+        somaEl.value = String(soma).replace('.', ',');
+        const hj = document.getElementById('gotoTaxaJuros');
+        const hm = document.getElementById('gotoTaxaMora');
+        if (hj) hj.value = jEl.value;
+        if (hm) hm.value = mEl.value;
+        return soma;
+    }
+
+    function syncTaxaCalculoCabecalho() {
+        const jEl = document.getElementById('editTaxaJuros');
+        const mEl = document.getElementById('editTaxaMora');
+        const somaEl = document.getElementById('editTaxaSoma');
+        if (!jEl || !mEl || !somaEl) return;
+        const j = parseBrNumber(jEl.value) || 0;
+        const m = parseBrNumber(mEl.value) || 0;
+        const soma = Math.round((j + m) * 10000) / 10000;
+        somaEl.textContent = String(soma).replace('.', ',') + '%';
+    }
+
+    const btnGerarPrice = document.getElementById('btnGerarPrice');
+    if (btnGerarPrice) btnGerarPrice.addEventListener('click', gerarTabelaAmortizacao);
+    const modalEl = document.getElementById('modalSimularCalculo');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', gerarTabelaAmortizacao);
+    }
+    ['priceUsarParcelaExtrato', 'priceJurosPorDias'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', gerarTabelaAmortizacao);
+    });
+    ['priceTaxaJuros', 'priceTaxaMora'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                syncTaxaCalculoPrice();
+            });
+            el.addEventListener('change', gerarTabelaAmortizacao);
+        }
+    });
+    const sacPctEl = document.getElementById('sacPctIndice');
+    if (sacPctEl) {
+        sacPctEl.addEventListener('change', gerarTabelaAmortizacao);
+    }
+    ['editTaxaJuros', 'editTaxaMora'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', syncTaxaCalculoCabecalho);
+    });
+
+    const btnSoAbertas = document.getElementById('btnPriceSoAbertas');
+    if (btnSoAbertas) {
+        btnSoAbertas.addEventListener('click', function() {
+            priceSoAbertas = !priceSoAbertas;
+            aplicarFiltroPriceAbertas();
+        });
+    }
+
+    const chkBaixaTodas = document.getElementById('chkPriceBaixaTodas');
+    function setPriceFlagsTodas(marcar) {
+        let n = 0;
+        document.querySelectorAll('#priceTabelaBody .chk-price-baixa').forEach(function(chk) {
+            const tr = chk.closest('tr');
+            if (tr && tr.style.display === 'none') return;
+            chk.checked = !!marcar;
+            if (marcar) chk.setAttribute('checked', 'checked');
+            else chk.removeAttribute('checked');
+            if (chk.checked) priceBaixaSelecionadas.add(String(chk.value));
+            else priceBaixaSelecionadas.delete(String(chk.value));
+            n += 1;
+        });
+        if (chkBaixaTodas) {
+            chkBaixaTodas.checked = !!marcar && n > 0;
+            chkBaixaTodas.indeterminate = false;
+        }
+        atualizarHintBaixa();
+        return n;
+    }
+    if (chkBaixaTodas) {
+        chkBaixaTodas.addEventListener('change', function() {
+            setPriceFlagsTodas(chkBaixaTodas.checked);
+        });
+    }
+    // Delegação também no modal Price (clique no ícone do botão)
+    document.addEventListener('click', function(ev) {
+        if (ev.target.closest('#btnPriceSelTodas')) {
+            ev.preventDefault();
+            const n = setPriceFlagsTodas(true);
+            if (!n) alert('Gere a tabela e use "Mostrar só as abertas" se necessário. Não há flags visíveis.');
+            return;
+        }
+        if (ev.target.closest('#btnPriceLimparSel')) {
+            ev.preventDefault();
+            setPriceFlagsTodas(false);
+        }
+    });
+
+    // Ir para página de quitação com valores calculados (todas as abertas)
+    const formPriceQuit = document.getElementById('formPriceParaQuitacao');
+    if (formPriceQuit) {
+        formPriceQuit.addEventListener('submit', function(ev) {
+            gerarTabelaAmortizacao();
+            selecionarTodasAbertasPrice();
+            // SAC assíncrono: se linhas ainda não chegaram, aguarda um pouco
+            const metodo = metodoAtual();
+            if (metodo === 'sac' && Object.keys(priceLinhasPorId).length === 0) {
+                ev.preventDefault();
+                const btn = document.getElementById('btnPriceParaQuitacao');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculando CDI…';
+                }
+                let tentativas = 0;
+                const timer = setInterval(function() {
+                    tentativas += 1;
+                    selecionarTodasAbertasPrice();
+                    if (Object.keys(priceLinhasPorId).length > 0 || tentativas >= 40) {
+                        clearInterval(timer);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-hand-holding-usd"></i> Simulação de quitação';
+                        }
+                        if (Object.keys(priceLinhasPorId).length === 0) {
+                            alert('Aguarde o cálculo do CDI e tente novamente.');
+                            return;
+                        }
+                        montarEEnviarQuitacao(formPriceQuit);
+                    }
+                }, 250);
+                return;
+            }
+            if (priceBaixaSelecionadas.size === 0) {
+                ev.preventDefault();
+                alert('Não há parcelas em aberto para simular a quitação.');
+                return;
+            }
+            let ids = Array.from(priceBaixaSelecionadas);
+            let faltando = ids.filter(function(id) { return !priceLinhasPorId[id]; });
+            if (faltando.length) {
+                // Recalcula (ex.: numeração 2…42 com n=41) e tenta de novo
+                gerarTabelaAmortizacao();
+                selecionarTodasAbertasPrice();
+                ids = Array.from(priceBaixaSelecionadas);
+                faltando = ids.filter(function(id) { return !priceLinhasPorId[id]; });
+            }
+            if (faltando.length) {
+                ev.preventDefault();
+                alert(
+                    'Não foi possível montar a simulação para ' + faltando.length +
+                    ' parcela(s). Feche o modal, abra de novo e clique em Simulação de quitação.'
+                );
+                return;
+            }
+            const linhas = {};
+            Object.keys(priceLinhasPorId).forEach(function(id) {
+                const L = priceLinhasPorId[id];
+                linhas[id] = {
+                    n: L.n,
+                    amort: Number(L.amort.toFixed(2)),
+                    juros: Number(L.juros.toFixed(2)),
+                    parcela: Number(L.parcela.toFixed(2)),
+                    saldo_inicio: Number(L.saldoInicio.toFixed(2)),
+                    saldo_fim: Number(L.saldoFim.toFixed(2)),
+                    dias: L.dias,
+                    status: L.status
+                };
+            });
+            const hidden = document.getElementById('dados_price_json_goto');
+            if (hidden) {
+                hidden.value = JSON.stringify({
+                    origem: metodo === 'sac' ? 'sac' : 'price',
+                    selecionadas: ids,
+                    linhas: linhas
+                });
+            }
+        });
+    }
+
+    function montarEEnviarQuitacao(form) {
+        selecionarTodasAbertasPrice();
+        const ids = Array.from(priceBaixaSelecionadas);
+        const linhas = {};
+        Object.keys(priceLinhasPorId).forEach(function(id) {
+            const L = priceLinhasPorId[id];
+            linhas[id] = {
+                n: L.n,
+                amort: Number(L.amort.toFixed(2)),
+                juros: Number(L.juros.toFixed(2)),
+                parcela: Number(L.parcela.toFixed(2)),
+                saldo_inicio: Number(L.saldoInicio.toFixed(2)),
+                saldo_fim: Number(L.saldoFim.toFixed(2)),
+                dias: L.dias,
+                status: L.status
+            };
+        });
+        const hidden = document.getElementById('dados_price_json_goto');
+        if (hidden) {
+            const metodo = metodoAtual();
+            hidden.value = JSON.stringify({
+                origem: metodo === 'sac' ? 'sac' : 'price',
+                selecionadas: ids,
+                linhas: linhas
+            });
+        }
+        form.submit();
+    }
+})();
+</script>
+{% endblock %}

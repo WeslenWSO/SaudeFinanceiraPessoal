@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+{%block nav_%}
+ {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ titulo }}</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if messages %}
+                            {% include 'parcial/_messages.html' %}
+                        {% endif %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if form.errors %}
+                            <div class="alert alert-warning small" role="alert">
+                                Corrija os erros abaixo antes de salvar.
+                            </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.categoria.id_for_label }}" class="form-label">Categoria</label>
+                                    {{ form.categoria }}
+                                    {% if form.categoria.errors %}
+                                        <div class="text-danger small">{{ form.categoria.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Opcional quando Tipo de Conciliação é Transferência</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.forma_pagamento.id_for_label }}" class="form-label">Forma de Pagamento</label>
+                                    {{ form.forma_pagamento }}
+                                    {% if form.forma_pagamento.errors %}
+                                        <div class="text-danger small">{{ form.forma_pagamento.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Opcional quando Tipo de Conciliação é Transferência</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.fornecedor.id_for_label }}" class="form-label">Fornecedor</label>
+                                    {{ form.fornecedor }}
+                                    {% if form.fornecedor.errors %}
+                                        <div class="text-danger small">{{ form.fornecedor.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Opcional</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.cliente.id_for_label }}" class="form-label">Cliente</label>
+                                    {{ form.cliente }}
+                                    {% if form.cliente.errors %}
+                                        <div class="text-danger small">{{ form.cliente.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Opcional</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.descricao.id_for_label }}" class="form-label">Descrição *</label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger small">{{ form.descricao.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.tipo_lancamento.id_for_label }}" class="form-label">Tipo de Lançamento *</label>
+                                    {{ form.tipo_lancamento }}
+                                    {% if form.tipo_lancamento.errors %}
+                                        <div class="text-danger small">{{ form.tipo_lancamento.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="{{ form.tipo_conciliacao.id_for_label }}" class="form-label">Tipo de Conciliação *</label>
+                                    {{ form.tipo_conciliacao }}
+                                    {% if form.tipo_conciliacao.errors %}
+                                        <div class="text-danger small">{{ form.tipo_conciliacao.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row" id="banco_destino_row" style="display: none;">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="{{ form.conta_bancaria_destino.id_for_label }}" class="form-label">Conta Bancária Destino *</label>
+                                    {{ form.conta_bancaria_destino }}
+                                    {% if form.conta_bancaria_destino.errors %}
+                                        <div class="text-danger small">{{ form.conta_bancaria_destino.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Campo obrigatório quando Tipo de Conciliação é Transferência</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="{{ form.definicao_historico.id_for_label }}" class="form-label">Definição para Histórico *</label>
+                                    {{ form.definicao_historico }}
+                                    {% if form.definicao_historico.errors %}
+                                        <div class="text-danger small">{{ form.definicao_historico.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Salvar
+                            </button>
+                            <a href="{% url 'regraConciliacao:regraList' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoConciliacaoSelect = document.getElementById('id_tipo_conciliacao');
+    const bancoDestinoRow = document.getElementById('banco_destino_row');
+
+    const contaBancariaDestinoSelect = document.getElementById('id_conta_bancaria_destino');
+    const categoriaSelect = document.getElementById('id_categoria');
+    const formaPagamentoSelect = document.getElementById('id_forma_pagamento');
+
+    function toggleCampos() {
+        if (tipoConciliacaoSelect.value === 'transferencia') {
+            bancoDestinoRow.style.display = 'block';
+            contaBancariaDestinoSelect.required = true;
+            categoriaSelect.required = false;
+            formaPagamentoSelect.required = false;
+        } else {
+            bancoDestinoRow.style.display = 'none';
+            contaBancariaDestinoSelect.required = false;
+            categoriaSelect.required = true;
+            formaPagamentoSelect.required = true;
+        }
+    }
+
+    // Verificar valor inicial
+    toggleCampos();
+
+    // Adicionar listener para mudanças
+    tipoConciliacaoSelect.addEventListener('change', toggleCampos);
+});
+</script>
+
+
+{%endblock%}

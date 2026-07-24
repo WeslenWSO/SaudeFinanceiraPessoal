@@ -1,0 +1,1528 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{% block conteudo %}
+<form id="csrfForm" style="display: none;">{% csrf_token %}</form>
+<style>
+.nfse-row-actions { position: relative; display: inline-block; }
+.nfse-row-actions > summary { list-style: none; cursor: pointer; }
+.nfse-row-actions > summary::-webkit-details-marker { display: none; }
+.nfse-row-actions-btn { min-width: 2rem; }
+.nfse-row-actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 40;
+    min-width: 9.5rem;
+    padding: 0.35rem 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12);
+}
+.nfse-row-actions-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+.nfse-row-actions-item:hover { background: #f3f4f6; }
+.nfse-row-actions-item-danger:hover { background: #fef2f2; }
+.table-wrap { overflow: visible; }
+.panel-nfse-table .table-wrap { overflow-x: auto; overflow-y: visible; }
+</style>
+<div class="page">
+    <div class="page-head">
+        {% include 'parcial/_page_head.html' with title="Notas Fiscais de Serviço" subtitle="Gerencie e filtre as NFSe da empresa." %}
+        <div class="btn-group">
+            <a href="{% url 'notasfiscais:create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Nova NFSe</a>
+            <a href="{% url 'notasfiscais:import' %}" class="btn btn-secondary"><i class="fas fa-upload"></i> Importar XML</a>
+            <a href="{% url 'notasfiscais:portal_extensao_import' %}{% if data_inicio or data_fim %}?{% if data_inicio %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% endif %}" class="btn btn-secondary" title="Portal nacional: Selenium e importação da pasta do mês"><i class="fas fa-puzzle-piece"></i> Portal (extensão)</a>
+            <a href="{% url 'notasfiscais:logs_notas_fiscais' %}" class="btn btn-muted"><i class="fas fa-history"></i> Logs NFSe</a>
+            <a href="{% url 'notasfiscais:export_excel' %}?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}" class="btn btn-muted"><i class="fas fa-file-excel"></i> Exportar Excel</a>
+        </div>
+    </div>
+
+    <!-- Indicadores (quantidades) -->
+    <div class="indicadores-nfse">
+        <div class="indicador-card indicador-total">
+            <span class="indicador-numero">{{ stats.total|default:0 }}</span>
+            <span class="indicador-label">Total de NFSe</span>
+            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-file-invoice"></i></span>
+        </div>
+        <div class="indicador-card indicador-pendente">
+            <span class="indicador-numero">{{ stats.pendente|default:0 }}</span>
+            <span class="indicador-label">Pendentes</span>
+            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-clock"></i></span>
+        </div>
+        <div class="indicador-card indicador-pago">
+            <span class="indicador-numero">{{ stats.pago|default:0 }}</span>
+            <span class="indicador-label">Pagas</span>
+            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-check-circle"></i></span>
+        </div>
+        <div class="indicador-card indicador-cancelado">
+            <span class="indicador-numero">{{ stats.cancelado|default:0 }}</span>
+            <span class="indicador-label">Canceladas</span>
+            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-times-circle"></i></span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <section class="panel panel-tight">
+        <details open>
+            <summary><i class="fas fa-filter"></i> Filtros e Pesquisa</summary>
+            <form method="get" id="filtrosForm" class="filtros-form">
+                <div class="filtros-grid">
+                    <div>
+                        <label for="search">Buscar</label>
+                        <input type="text" id="search" name="search" value="{{ search }}" placeholder="Número, Cliente, CNPJ, Série, Autorização (NSU)..." autocomplete="off">
+                    </div>
+                    <div>
+                        <label for="valor">Valor</label>
+                        <input type="text" id="valor" name="valor" value="{{ valor_filter }}" placeholder="Ex: 1500,00" inputmode="decimal" autocomplete="off">
+                    </div>
+                    <div>
+                        <label for="status">Status</label>
+                        <select id="status" name="status">
+                            <option value="">Todos os Status</option>
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="status_nota">Status da Nota</label>
+                        <select id="status_nota" name="status_nota">
+                            <option value="">Ativas e Canceladas</option>
+                            <option value="ativa" {% if status_nota_filter == 'ativa' %}selected{% endif %}>Ativas</option>
+                            <option value="cancelada" {% if status_nota_filter == 'cancelada' %}selected{% endif %}>Canceladas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="forma_pagamento">Forma de Pagamento</label>
+                        <select id="forma_pagamento" name="forma_pagamento">
+                            <option value="" {% if not forma_pagamento_filter %}selected{% endif %}>Todas as Formas</option>
+                            {% for forma in forma_pagamento_choices %}
+                            <option value="{{ forma.id }}" {% if forma_pagamento_filter == forma.id|stringformat:"s" %}selected{% endif %}>{{ forma.descricao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filtro_socio">Sócio responsável</label>
+                        <select id="filtro_socio" name="socio">
+                            <option value="" {% if not socio_filter %}selected{% endif %}>Todos os sócios</option>
+                            <option value="sem" {% if socio_filter == 'sem' %}selected{% endif %}>Sem sócio definido</option>
+                            {% for s in socios %}
+                            <option value="{{ s.id }}" {% if socio_filter == s.id|stringformat:"s" %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="data_inicio">Data Início</label>
+                        <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}" required>
+                    </div>
+                    <div>
+                        <label for="data_fim">Data Fim</label>
+                        <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}" required>
+                    </div>
+                    <div>
+                        <label for="paginate_by">Por página</label>
+                        <select id="paginate_by" name="paginate_by">
+                            <option value="10" {% if paginate_by == '10' %}selected{% endif %}>10 por página</option>
+                            <option value="20" {% if paginate_by == '20' %}selected{% endif %}>20 por página</option>
+                            <option value="50" {% if paginate_by == '50' %}selected{% endif %}>50 por página</option>
+                            <option value="100" {% if paginate_by == '100' %}selected{% endif %}>100 por página</option>
+                            <option value="500" {% if paginate_by == '500' %}selected{% endif %}>500 por página</option>
+                            <option value="1000" {% if paginate_by == '1000' %}selected{% endif %}>1000 por página</option>
+                        </select>
+                    </div>
+                    <div class="btn-group-filtros">
+                        <button type="submit" class="btn btn-primary" id="btnFiltrar"><i class="fas fa-search"></i> Filtrar</button>
+                        <button type="button" class="btn btn-muted" id="btnMesAtual" title="Filtrar mês atual"><i class="fas fa-calendar-alt"></i> Mês Atual</button>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Indicadores de Filtros Ativos -->
+            {% if search or valor_filter or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio or data_fim %}
+            <div class="toolbar" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--muted-border-color);">
+                <div class="toolbar-left">
+                    <small style="color: var(--muted-color); margin-right: 0.5rem;"><i class="fas fa-info-circle"></i> Filtros ativos:</small>
+                    <div class="toolbar-left" style="gap: 0.5rem;">
+                        {% if search %}
+                        <span class="badge badge-success"><i class="fas fa-search"></i> {{ search }}</span>
+                        {% endif %}
+                        {% if valor_filter %}
+                        <span class="badge badge-success"><i class="fas fa-dollar-sign"></i> R$ {{ valor_filter }}</span>
+                        {% endif %}
+                        {% if status_filter %}
+                        <span class="badge badge-muted">{% for value, label in status_choices %}{% if value == status_filter %}{{ label }}{% endif %}{% endfor %}</span>
+                        {% endif %}
+                        {% if status_nota_filter %}
+                        <span class="badge badge-info">{% if status_nota_filter == 'ativa' %}Notas Ativas{% else %}Notas Canceladas{% endif %}</span>
+                        {% endif %}
+                        {% if forma_pagamento_filter %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-credit-card me-1"></i>{% for forma in forma_pagamento_choices %}{% if forma.id|stringformat:"s" == forma_pagamento_filter %}{{ forma.descricao }}{% endif %}{% endfor %}
+                            <a href="?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or socio_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or socio_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or socio_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}"
+                               class="text-white text-decoration-none ms-1" title="Remover filtro">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </span>
+                        {% endif %}
+                        {% if socio_filter %}
+                        <span class="badge badge-secondary">
+                            <i class="fas fa-user me-1"></i>{% if socio_filter == 'sem' %}Sem sócio definido{% else %}{% for s in socios %}{% if s.id|stringformat:"s" == socio_filter %}{{ s }}{% endif %}{% endfor %}{% endif %}
+                        </span>
+                        {% endif %}
+                        {% if data_inicio_display %}
+                        <span class="badge badge-warning"><i class="fas fa-calendar"></i> De: {{ data_inicio_display }}</span>
+                        {% endif %}
+                        {% if data_fim_display %}
+                        <span class="badge badge-warning"><i class="fas fa-calendar"></i> Até: {{ data_fim_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
+    <div id="mensagensContainer" style="display: none; margin-bottom: 1rem;"></div>
+
+    <div class="panel panel-nfse-table" style="padding: 0; overflow-x: auto;">
+        <div class="toolbar" style="margin: 0; padding: 1rem 1.25rem; border-bottom: 1px solid var(--muted-border-color);">
+            <div class="toolbar-left"><strong>Lista de NFSe</strong></div>
+            <div class="toolbar-right">
+                <button type="button" class="btn btn-muted btn-sm" id="btnColunasNfse" title="Ocultar ou reordenar colunas"><i class="fas fa-columns"></i> Colunas</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnExtrairDiscriminacao" disabled><i class="fas fa-magic"></i> Extrair Discriminação</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnAlterarSocio" disabled title="Alterar sócio das notas selecionadas"><i class="fas fa-user-edit"></i> Alterar Sócio</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnAplicarCobranca" disabled title="Aplicar cobrança (forma de pagamento) nas notas selecionadas"><i class="fas fa-money-check-alt"></i> Aplicar Cobrança</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnAplicarRegraImposto" {% if periodo_fechado %}onclick="alert('Período fechado - vá para Apuração de Impostos e reabra o período para alterar regras.');" title="Período fechado"{% else %}onclick="document.getElementById('modalRegraImposto').showModal();" title="Aplicar regra de imposto"{% endif %}><i class="fas fa-calculator"></i> Aplicar Regra Imposto</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnSegmentar" disabled><i class="fas fa-cut"></i> Segmentar NFSe</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnAISegmentacao" disabled><i class="fas fa-brain"></i> IA Segmentação</button>
+            </div>
+        </div>
+        <div>
+            {% if notas %}
+            <div class="table-wrap">
+                <table class="table-nfse-list" id="tabelaNfse" style="table-layout: auto;">
+                    <thead>
+                        <tr>
+                            <th data-col="sel" style="width: 2.5rem;"><input type="checkbox" id="chkTodos"></th>
+                            <th data-col="numero" style="min-width: 4rem;">Número</th>
+                            <th data-col="data_emissao" style="min-width: 5.5rem;">Data Emissão</th>
+                            <th data-col="cnpj" style="min-width: 10rem;">CNPJ/CPF</th>
+                            <th data-col="cliente" style="min-width: 100px;">Cliente</th>
+                            <th data-col="socio" style="min-width: 100px;">Sócio</th>
+                            <th data-col="base_servico" style="min-width: 5rem;">Base Serviço</th>
+                            <th data-col="regra_imposto" style="min-width: 8rem;">Regra Imposto</th>
+                            <th data-col="status_nota" style="min-width: 4.5rem;">Status Nota</th>
+                            <th data-col="valor_bruto" style="min-width: 5rem;">Valor Bruto</th>
+                            <th data-col="iss_retido" style="min-width: 4rem;">Iss Retido</th>
+                            <th data-col="aliquota_iss" style="min-width: 4rem;">Aliquota Iss</th>
+                            <th data-col="valor_iss_retido" style="min-width: 5rem;">Valor Iss Retido</th>
+                            <th data-col="valor_pis" style="min-width: 4rem;">Valor Pis</th>
+                            <th data-col="valor_cofins" style="min-width: 4.5rem;">Valor Cofins</th>
+                            <th data-col="valor_csll" style="min-width: 4rem;">Valor Csll</th>
+                            <th data-col="valor_irpj" style="min-width: 4rem;">Valor Irpj</th>
+                            <th data-col="valor_outras_ret" style="min-width: 4.5rem;">Valor Outras Ret.</th>
+                            <th data-col="valor_inss" style="min-width: 4rem;">Valor Inss</th>
+                            <th data-col="valor_liquido" style="min-width: 5rem;">Valor Líquido</th>
+                            <th data-col="discriminacao" style="min-width: 180px;">Discriminação</th>
+                            <th data-col="forma_pag" style="min-width: 5.5rem;">Forma Pag.</th>
+                            <th data-col="autorizacao" style="min-width: 4rem;">Autorizacao</th>
+                            <th data-col="conta_rec" style="min-width: 3.5rem;">Conta a Rec.</th>
+                            <th data-col="conciliacao" style="min-width: 4.5rem;">Conciliação</th>
+                            <th data-col="acoes" style="min-width: 6rem;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for nfse in notas %}
+                        <tr>
+                            <td data-col="sel"><input type="checkbox" class="chk-nf" value="{{ nfse.id }}"></td>
+                            <td data-col="numero">
+                                <strong>{{ nfse.numero_nota }}</strong>
+                            </td>
+                            <td data-col="data_emissao">{{ nfse.data_emissao|date:"d/m/Y" }}</td>
+                            <td data-col="cnpj">{{ nfse.cnpj_cpf }}</td>
+                            <td data-col="cliente" class="text-wrap" style="min-width: 100px; max-width: 160px; white-space: normal; word-break: break-word;" title="{{ nfse.cliente }}">{{ nfse.cliente }}</td>
+                            
+                            <td data-col="socio" class="text-wrap" style="min-width: 100px; max-width: 160px; white-space: normal; word-break: break-word;">
+                                {% if nfse.socio %}
+                                    <span title="{{ nfse.socio }}">{{ nfse.socio }}</span>
+                                {% else %}
+                                    <span class="text-muted">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="base_servico">
+                                {% if nfse.base_servico %}
+                                    <span class="badge bg-info">{{ nfse.get_base_servico_display }}</span>
+                                {% else %}
+                                    <span class="text-muted">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="regra_imposto">
+                                <select class="select-regra-imposto form-select form-select-sm" data-nota-id="{{ nfse.id }}" {% if periodo_fechado %}disabled{% endif %} title="{% if periodo_fechado %}Período fechado{% else %}Alterar regra de imposto{% endif %}">
+                                    <option value="">Sem Regra</option>
+                                    {% for regra in regras_imposto %}
+                                    <option value="{{ regra.id }}" {% if nfse.codigo_da_regra_do_imposto_id == regra.id %}selected{% endif %}>{{ regra.DescricaoRegraImposto }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td data-col="status_nota">
+                                <select class="form-select form-select-sm select-status-nota {% if nfse.is_cancelada %}border-danger text-danger{% else %}border-success text-success{% endif %}"
+                                        data-nota-id="{{ nfse.id }}"
+                                        data-url="{% url 'notasfiscais:detail' nfse.pk %}cancelar/"
+                                        {% if periodo_fechado %}disabled{% endif %}
+                                        title="{% if periodo_fechado %}Período fechado{% else %}Alterar status da nota{% endif %}"
+                                        style="min-width: 7.5rem; font-weight: 600;">
+                                    <option value="ativa" {% if not nfse.is_cancelada %}selected{% endif %}>Ativa</option>
+                                    <option value="cancelada" {% if nfse.is_cancelada %}selected{% endif %}>Cancelada</option>
+                                </select>
+                            </td>
+                            <td data-col="valor_bruto">R$ {{ nfse.valor_bruto|moeda_br }}</td>
+                            <td data-col="iss_retido">
+                                {% if nfse.iss_retido %}
+                                    <span class="badge bg-warning">Sim</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Não</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="aliquota_iss">{{ nfse.aliquota }}</td>
+                            <td data-col="valor_iss_retido">{{ nfse.valor_iss_retido }}</td>
+                            <td data-col="valor_pis">{{ nfse.valor_pis }}</td>
+                            <td data-col="valor_cofins">{{ nfse.valor_cofins }}</td>
+                            <td data-col="valor_csll">{{ nfse.valor_csll }}</td>
+                            <td data-col="valor_irpj">{{ nfse.valor_ir }}</td>
+                            <td data-col="valor_outras_ret">{{ nfse.outras_retencoes }}</td>
+                            <td data-col="valor_inss">{{ nfse.valor_inss }}</td>
+                            <td data-col="valor_liquido">R$ {{ nfse.valor_liquido|moeda_br }}</td>
+                            
+                            <td data-col="discriminacao" class="text-wrap" style="min-width: 180px; max-width: 240px; white-space: normal; word-break: break-word;">
+                                {% if nfse.discriminacao %}
+                                    <span title="{{ nfse.discriminacao }}">{{ nfse.discriminacao|truncatechars:60 }}</span>
+                                {% else %}
+                                    <span class="text-muted">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="forma_pag">
+                                {% if nfse.forma_pagamento %}
+                                    <span class="badge bg-info">{{ nfse.forma_pagamento.descricao }}</span>
+                                {% else %}
+                                    <span class="text-muted">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="autorizacao">{{ nfse.nsu }}</td>
+                            
+                            <td data-col="conta_rec" class="text-center">
+                                {% if nfse.id in notas_com_conta %}
+                                    <i class="fas fa-check-circle text-success" title="Conta a Receber já gerada"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-muted" title="Conta a Receber não gerada"></i>
+                                {% endif %}
+                            </td>
+                            <td data-col="conciliacao">
+                                {% if nfse.status_conciliacao == 'conciliado' %}
+                                    <span class="badge bg-success">Conciliado</span>
+                                {% elif nfse.status_conciliacao == 'parcialmente_conciliado' %}
+                                    <span class="badge bg-warning">Parcial</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Não Conciliado</span>
+                                {% endif %}
+                            </td>
+                            <td data-col="acoes">
+                                <details class="nfse-row-actions">
+                                    <summary class="btn btn-sm btn-outline-secondary nfse-row-actions-btn" title="Ações" aria-label="Ações">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </summary>
+                                    <div class="nfse-row-actions-menu" role="menu">
+                                        <button type="button" class="nfse-row-actions-item" role="menuitem"
+                                                onclick="this.closest('details').removeAttribute('open'); document.getElementById('modalDetalhes').showModal(); carregarDetalhes('nf', {{ nfse.pk }});">
+                                            <i class="fas fa-eye text-info"></i> Detalhes
+                                        </button>
+                                        <a href="javascript:void(0)" class="nfse-row-actions-item" role="menuitem"
+                                           onclick="{% if periodo_fechado %}alert('Período fechado - vá para Apuração de Impostos e reabra o período para editar notas.'); return false;{% else %}window.location.href='{% url 'notasfiscais:update' nfse.pk %}';{% endif %}">
+                                            <i class="fas fa-edit {% if periodo_fechado %}text-muted{% else %}text-warning{% endif %}"></i> Editar
+                                        </a>
+                                        <a href="javascript:void(0)" class="nfse-row-actions-item nfse-row-actions-item-danger" role="menuitem"
+                                           onclick="{% if periodo_fechado %}alert('Período fechado - vá para Apuração de Impostos e reabra o período para excluir notas.'); return false;{% else %}window.location.href='{% url 'notasfiscais:delete' nfse.pk %}';{% endif %}">
+                                            <i class="fas fa-trash {% if periodo_fechado %}text-muted{% else %}text-danger{% endif %}"></i> Excluir
+                                        </a>
+                                    </div>
+                                </details>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            {% if is_paginated %}
+            <nav aria-label="Paginação">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-file-invoice"></i></div>
+                <h3>Nenhuma NFSe encontrada</h3>
+                <p>Comece criando uma nova nota fiscal ou importando um XML.</p>
+                <a href="{% url 'notasfiscais:create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Criar NFSe</a>
+                <a href="{% url 'notasfiscais:import' %}" class="btn btn-secondary"><i class="fas fa-upload"></i> Importar XML</a>
+                <a href="{% url 'notasfiscais:portal_extensao_import' %}{% if data_inicio or data_fim %}?{% if data_inicio %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% endif %}" class="btn btn-secondary" title="Portal nacional: Selenium e importação da pasta do mês"><i class="fas fa-puzzle-piece"></i> Portal (extensão)</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <dialog id="modalRegraImposto" aria-labelledby="modalRegraImpostoLabel">
+        <article style="max-width: 480px;">
+            <header>
+                <h3 id="modalRegraImpostoLabel"><i class="fas fa-calculator"></i> Aplicar Regra de Imposto</h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalRegraImposto').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <p>Selecione a regra de imposto que será aplicada às NFSe selecionadas:</p>
+            <label for="selectRegraImposto">Regra de Imposto</label>
+            <select id="selectRegraImposto">
+                <option value="">Selecione uma regra...</option>
+                {% for regra in regras_imposto %}
+                <option value="{{ regra.id }}">{{ regra.DescricaoRegraImposto }}</option>
+                {% endfor %}
+            </select>
+            <div class="alert-modern warning" style="margin-top: 1rem;">
+                <span class="alert-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                <div><strong>Atenção:</strong> Esta ação irá atualizar a regra de imposto de todas as NFSe selecionadas.</div>
+            </div>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--muted-border-color);">
+                <div class="toolbar-left">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalRegraImposto').close();">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarAplicarRegra"><i class="fas fa-check"></i> Aplicar Regra</button>
+                </div>
+            </footer>
+        </article>
+    </dialog>
+
+    <dialog id="modalAlterarSocio" aria-labelledby="modalAlterarSocioLabel">
+        <article style="max-width: 480px;">
+            <header>
+                <h3 id="modalAlterarSocioLabel"><i class="fas fa-user-edit"></i> Alterar Sócio</h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalAlterarSocio').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <p>Selecione o sócio que será aplicado às NFSe selecionadas:</p>
+            <label for="selectSocioBulk">Sócio</label>
+            <select id="selectSocioBulk">
+                <option value="">Selecione um sócio...</option>
+                {% for socio in socios %}
+                <option value="{{ socio.id }}">{{ socio.socio }}{% if socio.lastname %} {{ socio.lastname }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <div class="alert-modern warning" style="margin-top: 1rem;">
+                <span class="alert-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                <div><strong>Atenção:</strong> Esta ação irá alterar o sócio de todas as NFSe selecionadas.</div>
+            </div>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--muted-border-color);">
+                <div class="toolbar-left">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalAlterarSocio').close();">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarAlterarSocio"><i class="fas fa-check"></i> Aplicar</button>
+                </div>
+            </footer>
+        </article>
+    </dialog>
+
+    <dialog id="modalAplicarCobranca" aria-labelledby="modalAplicarCobrancaLabel">
+        <article style="max-width: 480px;">
+            <header>
+                <h3 id="modalAplicarCobrancaLabel"><i class="fas fa-money-check-alt"></i> Aplicar Cobrança</h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalAplicarCobranca').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <p>Selecione a cobrança (forma de pagamento) que será aplicada às NFSe selecionadas:</p>
+            <label for="selectCobrancaBulk">Cobrança</label>
+            <select id="selectCobrancaBulk" class="form-select">
+                <option value="">Selecione...</option>
+                {% for forma in forma_pagamento_choices %}
+                <option value="{% if forma.id == 'none' %}__clear__{% else %}{{ forma.id }}{% endif %}">{{ forma.descricao }}</option>
+                {% endfor %}
+            </select>
+            <div class="alert-modern warning" style="margin-top: 1rem;">
+                <span class="alert-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                <div><strong>Atenção:</strong> Esta ação altera a forma de pagamento (cobrança) em todas as NFSe marcadas.</div>
+            </div>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--muted-border-color);">
+                <div class="toolbar-left">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalAplicarCobranca').close();">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarAplicarCobranca"><i class="fas fa-check"></i> Aplicar</button>
+                </div>
+            </footer>
+        </article>
+    </dialog>
+
+    <dialog id="modalDetalhes" aria-labelledby="modalDetalhesLabel" style="max-width: 90vw; width: 600px;">
+        <article>
+            <header>
+                <h3 id="modalDetalhesLabel"><i class="fas fa-info-circle"></i> Detalhes</h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalDetalhes').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <div id="modalDetalhesBody">
+                <p>Carregando detalhes...</p>
+            </div>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalDetalhes').close();">Fechar</button>
+            </footer>
+        </article>
+    </dialog>
+
+    <dialog id="modalRetencoes" aria-labelledby="modalRetencoesLabel" style="max-width: 90vw; width: 560px;">
+        <article>
+            <header>
+                <h3 id="modalRetencoesLabel">Dados de Retenção - Nota Fiscal <span id="notaNumero"></span></h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalRetencoes').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Campo</th><th>Valor</th></tr></thead>
+                    <tbody id="tabelaRetencoes"></tbody>
+                </table>
+            </div>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalRetencoes').close();">Fechar</button>
+            </footer>
+        </article>
+    </dialog>
+
+    <dialog id="modalColunasNfse" aria-labelledby="modalColunasNfseLabel" style="max-width: 28rem; width: 95vw;">
+        <article>
+            <header>
+                <h3 id="modalColunasNfseLabel"><i class="fas fa-columns"></i> Colunas da lista</h3>
+                <button type="button" class="btn btn-muted btn-sm btn-icon" onclick="document.getElementById('modalColunasNfse').close();" aria-label="Fechar">&times;</button>
+            </header>
+            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.75rem;">Marque para exibir. Use as setas para mudar a ordem. Preferência salva neste navegador.</p>
+            <div class="btn-group" style="margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.35rem;">
+                <button type="button" class="btn btn-muted btn-sm" id="btnColunasOcultarRetencoes">Ocultar retenções</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnColunasMostrarTodas">Mostrar todas</button>
+                <button type="button" class="btn btn-muted btn-sm" id="btnColunasRestaurar">Restaurar padrão</button>
+            </div>
+            <ul id="listaColunasNfse" style="list-style: none; padding: 0; margin: 0; max-height: 55vh; overflow: auto;"></ul>
+            <footer class="toolbar" style="margin-top: 1rem; padding-top: 1rem;">
+                <button type="button" class="btn btn-primary" id="btnColunasAplicar">Aplicar</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalColunasNfse').close();">Fechar</button>
+            </footer>
+        </article>
+    </dialog>
+</div>
+
+
+<!-- JavaScript para melhorar a experiência -->
+<script>
+    // Função para abrir modal de retenções
+    function abrirModalRetencoes(notaId) {
+        // Verificar se o modal existe
+        const modalElement = document.getElementById('modalRetencoes');
+        if (!modalElement) {
+            alert('Erro: Modal não encontrado');
+            return;
+        }
+
+        // Primeiro, testar se o modal aparece com dados mock
+        document.getElementById('notaNumero').textContent = `Nota ${notaId}`;
+
+        const tbody = document.getElementById('tabelaRetencoes');
+        tbody.innerHTML = '';
+
+        // Dados mock para teste
+        const campos = [
+            {label: 'Iss Retido', valor: 'Sim'},
+            {label: 'Alíquota Iss', valor: '5.00%'},
+            {label: 'Valor Iss Retido', valor: 'R$ 50.00'},
+            {label: 'Valor Pis', valor: 'R$ 10.00'},
+            {label: 'Valor Cofins', valor: 'R$ 20.00'},
+            {label: 'Valor Csll', valor: 'R$ 15.00'},
+            {label: 'Valor Irpj', valor: 'R$ 25.00'},
+            {label: 'Valor Outras Retenções', valor: 'R$ 5.00'},
+            {label: 'Valor Inss', valor: 'R$ 30.00'}
+        ];
+
+        campos.forEach(campo => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><strong>${campo.label}</strong></td><td>${campo.valor}</td>`;
+            tbody.appendChild(tr);
+        });
+
+        modalElement.showModal();
+
+        // Agora tentar carregar dados reais
+        fetch(`/notasfiscais/retencoes/${notaId}/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Atualizar com dados reais
+                    document.getElementById('notaNumero').textContent = data.nota.numero_nota;
+
+                    const tbody = document.getElementById('tabelaRetencoes');
+                    tbody.innerHTML = '';
+
+                    const camposReais = [
+                        {label: 'Iss Retido', valor: data.nota.iss_retido ? 'Sim' : 'Não'},
+                        {label: 'Alíquota Iss', valor: data.nota.aliquota ? `${data.nota.aliquota}%` : '0%'},
+                        {label: 'Valor Iss Retido', valor: `R$ ${parseFloat(data.nota.valor_iss_retido || 0).toFixed(2)}`},
+                        {label: 'Valor Pis', valor: `R$ ${parseFloat(data.nota.valor_pis || 0).toFixed(2)}`},
+                        {label: 'Valor Cofins', valor: `R$ ${parseFloat(data.nota.valor_cofins || 0).toFixed(2)}`},
+                        {label: 'Valor Csll', valor: `R$ ${parseFloat(data.nota.valor_csll || 0).toFixed(2)}`},
+                        {label: 'Valor Irpj', valor: `R$ ${parseFloat(data.nota.valor_ir || 0).toFixed(2)}`},
+                        {label: 'Valor Outras Retenções', valor: `R$ ${parseFloat(data.nota.outras_retencoes || 0).toFixed(2)}`},
+                        {label: 'Valor Inss', valor: `R$ ${parseFloat(data.nota.valor_inss || 0).toFixed(2)}`}
+                    ];
+
+                    camposReais.forEach(campo => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td><strong>${campo.label}</strong></td><td>${campo.valor}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    if (data.error && data.error.includes('Empresa não selecionada')) {
+                        alert('Sua sessão expirou. Por favor, recarregue a página e selecione uma empresa.');
+                    } else {
+                        alert('Erro ao carregar dados da nota: ' + data.error);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+                alert('Erro ao carregar dados da nota: ' + error.message);
+            });
+    }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Colunas: ocultar / reordenar (localStorage) ---
+    (function initColunasNfse() {
+        const STORAGE_KEY = 'nfse_list_colunas_v1';
+        const LOCKED = { sel: true, acoes: true };
+        const RETENCAO_COLS = [
+            'iss_retido', 'aliquota_iss', 'valor_iss_retido', 'valor_pis',
+            'valor_cofins', 'valor_csll', 'valor_irpj', 'valor_outras_ret', 'valor_inss'
+        ];
+        const DEFAULT_ORDER = [
+            'sel', 'numero', 'data_emissao', 'cnpj', 'cliente', 'socio', 'base_servico',
+            'regra_imposto', 'status_nota', 'valor_bruto', 'iss_retido', 'aliquota_iss',
+            'valor_iss_retido', 'valor_pis', 'valor_cofins', 'valor_csll', 'valor_irpj',
+            'valor_outras_ret', 'valor_inss', 'valor_liquido', 'discriminacao', 'forma_pag',
+            'autorizacao', 'conta_rec', 'conciliacao', 'acoes'
+        ];
+        const LABELS = {
+            sel: 'Seleção', numero: 'Número', data_emissao: 'Data Emissão', cnpj: 'CNPJ/CPF',
+            cliente: 'Cliente', socio: 'Sócio', base_servico: 'Base Serviço', regra_imposto: 'Regra Imposto',
+            status_nota: 'Status Nota', valor_bruto: 'Valor Bruto', iss_retido: 'Iss Retido',
+            aliquota_iss: 'Aliquota Iss', valor_iss_retido: 'Valor Iss Retido', valor_pis: 'Valor Pis',
+            valor_cofins: 'Valor Cofins', valor_csll: 'Valor Csll', valor_irpj: 'Valor Irpj',
+            valor_outras_ret: 'Valor Outras Ret.', valor_inss: 'Valor Inss', valor_liquido: 'Valor Líquido',
+            discriminacao: 'Discriminação', forma_pag: 'Forma Pag.', autorizacao: 'Autorizacao',
+            conta_rec: 'Conta a Rec.', conciliacao: 'Conciliação', acoes: 'Ações'
+        };
+
+        function defaultPrefs() {
+            return {
+                order: DEFAULT_ORDER.slice(),
+                visible: DEFAULT_ORDER.reduce(function(acc, k) { acc[k] = true; return acc; }, {})
+            };
+        }
+
+        function loadPrefs() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return defaultPrefs();
+                const parsed = JSON.parse(raw);
+                const base = defaultPrefs();
+                const order = Array.isArray(parsed.order) ? parsed.order.filter(function(k) { return LABELS[k]; }) : [];
+                DEFAULT_ORDER.forEach(function(k) { if (order.indexOf(k) === -1) order.push(k); });
+                const mid = order.filter(function(k) { return k !== 'sel' && k !== 'acoes'; });
+                base.order = ['sel'].concat(mid).concat(['acoes']);
+                base.visible = Object.assign({}, base.visible, parsed.visible || {});
+                base.visible.sel = true;
+                base.visible.acoes = true;
+                return base;
+            } catch (e) {
+                return defaultPrefs();
+            }
+        }
+
+        function savePrefs(p) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+        }
+
+        function applyToTable(p) {
+            const table = document.getElementById('tabelaNfse');
+            if (!table) return;
+            table.querySelectorAll('tr').forEach(function(row) {
+                const byKey = {};
+                Array.from(row.children).forEach(function(cell) {
+                    const key = cell.getAttribute('data-col');
+                    if (key) byKey[key] = cell;
+                });
+                p.order.forEach(function(key) {
+                    const cell = byKey[key];
+                    if (!cell) return;
+                    row.appendChild(cell);
+                    cell.style.display = p.visible[key] === false ? 'none' : '';
+                });
+            });
+        }
+
+        let prefs = loadPrefs();
+        applyToTable(prefs);
+
+        function renderLista() {
+            const ul = document.getElementById('listaColunasNfse');
+            if (!ul) return;
+            ul.innerHTML = '';
+            prefs.order.forEach(function(key, idx) {
+                if (LOCKED[key]) return;
+                const li = document.createElement('li');
+                li.style.cssText = 'display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.25rem;border-bottom:1px solid var(--muted-border-color,#e5e7eb);';
+                const checked = prefs.visible[key] !== false ? 'checked' : '';
+                li.innerHTML =
+                    '<input type="checkbox" class="col-vis" data-key="' + key + '" ' + checked + ' id="colvis_' + key + '">' +
+                    '<label for="colvis_' + key + '" style="flex:1;margin:0;cursor:pointer;">' + (LABELS[key] || key) + '</label>' +
+                    '<button type="button" class="btn btn-muted btn-sm btn-icon col-up" data-key="' + key + '" title="Subir"' + (idx <= 1 ? ' disabled' : '') + '><i class="fas fa-arrow-up"></i></button>' +
+                    '<button type="button" class="btn btn-muted btn-sm btn-icon col-down" data-key="' + key + '" title="Descer"' + (idx >= prefs.order.length - 2 ? ' disabled' : '') + '><i class="fas fa-arrow-down"></i></button>';
+                ul.appendChild(li);
+            });
+        }
+
+        function moveKey(key, dir) {
+            const order = prefs.order.slice();
+            const i = order.indexOf(key);
+            const j = i + dir;
+            if (i < 0 || j < 1 || j >= order.length - 1) return;
+            const tmp = order[i];
+            order[i] = order[j];
+            order[j] = tmp;
+            prefs.order = order;
+            renderLista();
+        }
+
+        const btnOpen = document.getElementById('btnColunasNfse');
+        const modal = document.getElementById('modalColunasNfse');
+        if (btnOpen && modal) {
+            btnOpen.addEventListener('click', function() {
+                prefs = loadPrefs();
+                renderLista();
+                modal.showModal();
+            });
+        }
+
+        const listaEl = document.getElementById('listaColunasNfse');
+        if (listaEl) {
+            listaEl.addEventListener('change', function(e) {
+                if (!e.target.classList.contains('col-vis')) return;
+                prefs.visible[e.target.dataset.key] = e.target.checked;
+            });
+            listaEl.addEventListener('click', function(e) {
+                const up = e.target.closest('.col-up');
+                const down = e.target.closest('.col-down');
+                if (up) moveKey(up.dataset.key, -1);
+                if (down) moveKey(down.dataset.key, 1);
+            });
+        }
+
+        const btnAplicar = document.getElementById('btnColunasAplicar');
+        if (btnAplicar) {
+            btnAplicar.addEventListener('click', function() {
+                savePrefs(prefs);
+                applyToTable(prefs);
+                if (modal) modal.close();
+            });
+        }
+
+        const btnOcultarRet = document.getElementById('btnColunasOcultarRetencoes');
+        if (btnOcultarRet) {
+            btnOcultarRet.addEventListener('click', function() {
+                RETENCAO_COLS.forEach(function(k) { prefs.visible[k] = false; });
+                renderLista();
+            });
+        }
+        const btnMostrar = document.getElementById('btnColunasMostrarTodas');
+        if (btnMostrar) {
+            btnMostrar.addEventListener('click', function() {
+                Object.keys(LABELS).forEach(function(k) { prefs.visible[k] = true; });
+                renderLista();
+            });
+        }
+        const btnRest = document.getElementById('btnColunasRestaurar');
+        if (btnRest) {
+            btnRest.addEventListener('click', function() {
+                prefs = defaultPrefs();
+                renderLista();
+            });
+        }
+    })();
+
+    // Fechar outros menus de ações ao abrir um
+    document.querySelectorAll('.nfse-row-actions').forEach(function(details) {
+        details.addEventListener('toggle', function() {
+            if (!this.open) return;
+            document.querySelectorAll('.nfse-row-actions[open]').forEach(function(other) {
+                if (other !== details) other.removeAttribute('open');
+            });
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.nfse-row-actions')) return;
+        document.querySelectorAll('.nfse-row-actions[open]').forEach(function(d) {
+            d.removeAttribute('open');
+        });
+    });
+
+    // Função para obter primeiro e último dia do mês atual
+    function getPrimeiroUltimoDiaMes() {
+        const hoje = new Date();
+        const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+        
+        return {
+            primeiro: primeiroDia.toISOString().split('T')[0],
+            ultimo: ultimoDia.toISOString().split('T')[0]
+        };
+    }
+    
+    // Definir datas padrão se os campos estiverem vazios
+    const dataInicio = document.getElementById('data_inicio');
+    const dataFim = document.getElementById('data_fim');
+    
+    if (!dataInicio.value) {
+        const datas = getPrimeiroUltimoDiaMes();
+        dataInicio.value = datas.primeiro;
+    }
+    
+    if (!dataFim.value) {
+        const datas = getPrimeiroUltimoDiaMes();
+        dataFim.value = datas.ultimo;
+    }
+    
+    // Validação de datas apenas no envio do formulário (não no change), para o usuário poder digitar a data completa sem alertas
+    var filtrosForm = document.getElementById('filtrosForm');
+    filtrosForm.addEventListener('submit', function(e) {
+        var ini = dataInicio.value.trim(), fim = dataFim.value.trim();
+        if (ini && fim && ini > fim) {
+            e.preventDefault();
+            alert('Data de fim não pode ser menor que a data de início.');
+            dataFim.focus();
+            return false;
+        }
+    });
+    
+    // Botão "Mês Atual" - define as datas para o mês atual
+    document.getElementById('btnMesAtual').addEventListener('click', function() {
+        const datas = getPrimeiroUltimoDiaMes();
+        dataInicio.value = datas.primeiro;
+        dataFim.value = datas.ultimo;
+        document.getElementById('filtrosForm').submit();
+    });
+    
+    // Auto-submit ao pressionar Enter no campo de busca / valor
+    ['search', 'valor'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('filtrosForm').submit();
+            }
+        });
+    });
+    
+    // Feedback visual ao filtrar
+    document.getElementById('filtrosForm').addEventListener('submit', function() {
+        const btnFiltrar = document.getElementById('btnFiltrar');
+        btnFiltrar.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Filtrando...';
+        btnFiltrar.disabled = true;
+    });
+
+    // Gerenciamento da seleção de checkboxes e botões de ação
+    const checkboxes = document.querySelectorAll('.chk-nf');
+    const chkTodos = document.getElementById('chkTodos');
+    const btnExtrair = document.getElementById('btnExtrairDiscriminacao');
+    const btnAplicarRegra = document.getElementById('btnAplicarRegraImposto');
+    const btnSegmentar = document.getElementById('btnSegmentar');
+    const btnGerarContas = document.getElementById('btnGerarContasReceber');
+    const btnAISegmentacao = document.getElementById('btnAISegmentacao');
+
+    // Array para armazenar IDs selecionados (apenas da página atual)
+    let selectedIds = [];
+
+    // Função para atualizar estado dos botões e checkbox "Selecionar Todos"
+    function atualizarBotoes() {
+        const selecionados = document.querySelectorAll('.chk-nf:checked');
+        selectedIds = Array.from(selecionados).map(cb => parseInt(cb.value));
+        btnExtrair.disabled = selectedIds.length === 0;
+        btnAplicarRegra.disabled = selectedIds.length === 0;
+        btnSegmentar.disabled = selectedIds.length !== 1;  // Só habilita se exatamente 1 selecionado
+        btnGerarContas.disabled = selectedIds.length === 0;
+        btnAISegmentacao.disabled = selectedIds.length === 0;
+        const btnAlterarSocio = document.getElementById('btnAlterarSocio');
+        if (btnAlterarSocio) btnAlterarSocio.disabled = selectedIds.length === 0;
+        const btnAplicarCobranca = document.getElementById('btnAplicarCobranca');
+        if (btnAplicarCobranca) btnAplicarCobranca.disabled = selectedIds.length === 0;
+
+        // Atualizar checkbox "Selecionar Todos" baseado na página atual
+        const totalCheckboxes = checkboxes.length;
+        const totalSelecionados = selecionados.length;
+        chkTodos.checked = totalSelecionados === totalCheckboxes && totalCheckboxes > 0;
+        chkTodos.indeterminate = totalSelecionados > 0 && totalSelecionados < totalCheckboxes;
+
+    }
+
+    // Checkbox "Selecionar Todos"
+    chkTodos.addEventListener('change', function() {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        atualizarBotoes();
+    });
+
+    // Adicionar event listeners aos checkboxes individuais
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            atualizarBotoes();
+        });
+    });
+
+    // Atualizar estado inicial
+    atualizarBotoes();
+
+    // Marcar NFSe como Ativa / Cancelada
+    document.querySelectorAll('.select-status-nota').forEach(function(select) {
+        select.addEventListener('change', function() {
+            if (this.disabled) return;
+            const self = this;
+            const valorAnterior = self.value === 'cancelada' ? 'ativa' : 'cancelada';
+            const acao = self.value === 'cancelada' ? 'cancelar' : 'reativar';
+            const confirmMsg = acao === 'cancelar'
+                ? 'Marcar esta NFSe como cancelada? Valor bruto, líquido e retenções serão zerados.'
+                : 'Reativar esta NFSe (remover cancelamento)? Os valores zerados não são restaurados automaticamente.';
+            if (!confirm(confirmMsg)) {
+                self.value = valorAnterior;
+                return;
+            }
+            const formData = new FormData();
+            formData.append('acao', acao);
+            self.disabled = true;
+            fetch(self.getAttribute('data-url'), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    mostrarMensagem(data.message || 'Status atualizado.', 'success');
+                    setTimeout(function() { location.reload(); }, 600);
+                } else {
+                    mostrarMensagem(data.error || 'Erro ao alterar status.', 'error');
+                    self.value = valorAnterior;
+                    self.disabled = false;
+                }
+            })
+            .catch(function(err) {
+                mostrarMensagem('Erro: ' + err.message, 'error');
+                self.value = valorAnterior;
+                self.disabled = false;
+            });
+        });
+    });
+
+    // Aplicar regra ao mudar o select na linha (uma nota por vez)
+    document.querySelectorAll('.select-regra-imposto').forEach(function(select) {
+        select.addEventListener('change', function() {
+            if (this.disabled) return;
+            const notaId = this.getAttribute('data-nota-id');
+            const regraId = (this.value || '').trim();
+            const dataInicio = document.getElementById('data_inicio') ? document.getElementById('data_inicio').value : '';
+            const dataFim = document.getElementById('data_fim') ? document.getElementById('data_fim').value : '';
+            if (!dataInicio || !dataFim) {
+                mostrarMensagem('Defina Data Início e Data Fim nos filtros para aplicar a regra.', 'warning');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('ids[]', notaId);
+            formData.append('regra_imposto_id', regraId);
+            formData.append('data_inicio', dataInicio);
+            formData.append('data_fim', dataFim);
+            const self = this;
+            self.disabled = true;
+            fetch('{% url "notasfiscais:nfse_aplicar_regra_imposto_bulk" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: formData
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    mostrarMensagem(data.message || 'Regra atualizada.', 'success');
+                    setTimeout(function() { location.reload(); }, 800);
+                } else {
+                    mostrarMensagem(data.error || 'Erro ao aplicar regra.', 'error');
+                    self.disabled = false;
+                }
+            })
+            .catch(function(err) {
+                mostrarMensagem('Erro: ' + err.message, 'error');
+                self.disabled = false;
+            });
+        });
+    });
+
+    // Debug: verificar se o JavaScript está carregando
+    console.log('JavaScript NFSe carregado com sucesso!');
+    console.log('Checkboxes encontrados:', checkboxes.length);
+    console.log('Botão Extrair encontrado:', btnExtrair ? 'Sim' : 'Não');
+    console.log('Botão Segmentar encontrado:', btnSegmentar ? 'Sim' : 'Não');
+    console.log('Botão IA Segmentação encontrado:', btnAISegmentacao ? 'Sim' : 'Não');
+
+    // Função para mostrar mensagens
+    function mostrarMensagem(mensagem, tipo) {
+        const container = document.getElementById('mensagensContainer');
+        if (!container) {
+            console.error('Container de mensagens não encontrado!');
+            return;
+        }
+
+        const alertClass = tipo === 'success' ? 'alert-success' :
+                          tipo === 'error' ? 'alert-danger' :
+                          tipo === 'warning' ? 'alert-warning' : 'alert-info';
+
+        const iconClass = tipo === 'success' ? 'fa-check-circle' :
+                         tipo === 'error' ? 'fa-exclamation-triangle' :
+                         tipo === 'warning' ? 'fa-exclamation-circle' : 'fa-info-circle';
+
+        container.innerHTML = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas ${iconClass} me-2"></i>
+                ${mensagem}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+        `;
+        container.style.display = 'block';
+
+        // Auto-ocultar após 5 segundos para mensagens de sucesso
+        if (tipo === 'success') {
+            setTimeout(() => {
+                const alert = container.querySelector('.alert');
+                if (alert) {
+                    alert.classList.remove('show');
+                    setTimeout(() => container.style.display = 'none', 150);
+                }
+            }, 5000);
+        }
+
+        // Scroll para o topo para mostrar a mensagem
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Função para extrair discriminação das notas selecionadas
+    btnExtrair.addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para extrair a discriminação.', 'warning');
+            return;
+        }
+
+        // Desabilitar botão e mostrar loading
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processando...';
+
+        // Preparar dados para envio
+        const formData = new FormData();
+        selectedIds.forEach(id => {
+            formData.append('ids[]', id.toString());
+        });
+
+        // Enviar requisição AJAX
+        fetch('{% url "notasfiscais:nfse_aplicar_discriminacao_bulk" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                const mensagem = data.message || `Extração concluída com sucesso! ${data.atualizados} NFSe(s) atualizada(s).`;
+                mostrarMensagem(mensagem, 'success');
+                // Limpar seleções após sucesso
+                checkboxes.forEach(cb => cb.checked = false);
+                chkTodos.checked = false;
+                chkTodos.indeterminate = false;
+                atualizarBotoes();
+                // Recarregar a página para mostrar as mudanças
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                const mensagemErro = data.error || 'Erro ao processar a extração.';
+                mostrarMensagem(mensagemErro, 'error');
+                // Mostrar avisos se houver
+                if (data.avisos && data.avisos.length > 0) {
+                    setTimeout(() => {
+                        mostrarMensagem('Avisos: ' + data.avisos.join('; '), 'warning');
+                    }, 1000);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarMensagem('Erro ao processar a requisição: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reabilitar botão
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    // Abrir modal Alterar Sócio ao clicar no botão
+    const btnAlterarSocio = document.getElementById('btnAlterarSocio');
+    if (btnAlterarSocio) {
+        btnAlterarSocio.addEventListener('click', function() {
+            document.getElementById('modalAlterarSocio').showModal();
+        });
+    }
+
+    const btnAplicarCobrancaToolbar = document.getElementById('btnAplicarCobranca');
+    if (btnAplicarCobrancaToolbar) {
+        btnAplicarCobrancaToolbar.addEventListener('click', function() {
+            document.getElementById('modalAplicarCobranca').showModal();
+        });
+    }
+
+    // Função para aplicar sócio às notas selecionadas
+    document.getElementById('btnConfirmarAlterarSocio').addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para alterar o sócio.', 'warning');
+            return;
+        }
+        const selectSocio = document.getElementById('selectSocioBulk');
+        const socioId = (selectSocio && selectSocio.value) ? selectSocio.value.trim() : '';
+        if (!socioId) {
+            mostrarMensagem('Selecione um sócio.', 'warning');
+            return;
+        }
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Aplicando...';
+        const formData = new FormData();
+        selectedIds.forEach(id => formData.append('ids[]', id.toString()));
+        formData.append('socio_id', socioId);
+        fetch('{{ aplicar_socio_url|default:"/notasfiscais/nfse/aplicar-socio/" }}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                mostrarMensagem(data.message || 'Sócio alterado com sucesso!', 'success');
+                document.getElementById('modalAlterarSocio').close();
+                checkboxes.forEach(cb => cb.checked = false);
+                chkTodos.checked = false;
+                chkTodos.indeterminate = false;
+                atualizarBotoes();
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                mostrarMensagem(data.error || 'Erro ao alterar sócio.', 'error');
+            }
+        })
+        .catch(err => {
+            mostrarMensagem('Erro: ' + err.message, 'error');
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    document.getElementById('btnConfirmarAplicarCobranca').addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para aplicar a cobrança.', 'warning');
+            return;
+        }
+        const selectCob = document.getElementById('selectCobrancaBulk');
+        const formaId = (selectCob && selectCob.value) ? selectCob.value.trim() : '';
+        if (!formaId) {
+            mostrarMensagem('Selecione uma cobrança ou “Sem forma definida”.', 'warning');
+            return;
+        }
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Aplicando...';
+        const formData = new FormData();
+        selectedIds.forEach(id => formData.append('ids[]', id.toString()));
+        formData.append('forma_pagamento_id', formaId);
+        fetch('{{ aplicar_cobranca_url|default:"/notasfiscais/nfse/aplicar-cobranca/" }}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                mostrarMensagem(data.message || 'Cobrança aplicada com sucesso!', 'success');
+                document.getElementById('modalAplicarCobranca').close();
+                checkboxes.forEach(cb => cb.checked = false);
+                chkTodos.checked = false;
+                chkTodos.indeterminate = false;
+                atualizarBotoes();
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                mostrarMensagem(data.error || 'Erro ao aplicar cobrança.', 'error');
+            }
+        })
+        .catch(err => {
+            mostrarMensagem('Erro: ' + err.message, 'error');
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    // Função para aplicar regra de imposto às notas selecionadas
+    document.getElementById('btnConfirmarAplicarRegra').addEventListener('click', function() {
+        // Verificar se o período está fechado
+        {% if periodo_fechado %}
+        alert('Período fechado - vá para Apuração de Impostos e reabra o período para alterar regras.');
+        return;
+        {% endif %}
+
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para aplicar a regra de imposto.', 'warning');
+            return;
+        }
+
+        const selectRegra = document.getElementById('selectRegraImposto');
+        const regraId = selectRegra.value;
+
+        if (!regraId) {
+            mostrarMensagem('Selecione uma regra de imposto.', 'warning');
+            return;
+        }
+
+        // Desabilitar botão e mostrar loading
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Aplicando...';
+
+        // Preparar dados para envio
+        const formData = new FormData();
+        selectedIds.forEach(id => {
+            formData.append('ids[]', id.toString());
+        });
+        formData.append('regra_imposto_id', regraId);
+
+        // Adicionar datas do filtro atual
+        const dataInicio = document.getElementById('data_inicio').value;
+        const dataFim = document.getElementById('data_fim').value;
+        formData.append('data_inicio', dataInicio);
+        formData.append('data_fim', dataFim);
+
+        // Enviar requisição AJAX
+        fetch('{% url "notasfiscais:nfse_aplicar_regra_imposto_bulk" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                const mensagem = data.message || `Regra aplicada com sucesso! ${data.atualizados} NFSe(s) atualizada(s).`;
+                mostrarMensagem(mensagem, 'success');
+                document.getElementById('modalRegraImposto').close();
+                // Limpar seleções após sucesso
+                checkboxes.forEach(cb => cb.checked = false);
+                chkTodos.checked = false;
+                chkTodos.indeterminate = false;
+                atualizarBotoes();
+                // Recarregar a página para mostrar as mudanças
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                const mensagemErro = data.error || 'Erro ao aplicar a regra de imposto.';
+                mostrarMensagem(mensagemErro, 'error');
+                // Mostrar avisos se houver
+                if (data.avisos && data.avisos.length > 0) {
+                    setTimeout(() => {
+                        mostrarMensagem('Avisos: ' + data.avisos.join('; '), 'warning');
+                    }, 1000);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarMensagem('Erro ao processar a requisição: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reabilitar botão
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    // Função para segmentar NFSe
+    btnSegmentar.addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione uma NFSe para segmentar.', 'warning');
+            return;
+        }
+
+        if (selectedIds.length > 1) {
+            mostrarMensagem('Selecione apenas uma NFSe para segmentar.', 'warning');
+            return;
+        }
+
+        // Redirecionar para a página de segmentação
+        const nfseId = selectedIds[0];
+        window.location.href = `/notasfiscais/${nfseId}/segmentar/`;
+    });
+
+    // Função para gerar contas a receber das notas selecionadas
+    btnGerarContas.addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para gerar contas a receber.', 'warning');
+            return;
+        }
+
+        // Desabilitar botão e mostrar loading
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Gerando...';
+
+        // Preparar dados para envio
+        const formData = new FormData();
+        selectedIds.forEach(id => {
+            formData.append('ids[]', id.toString());
+        });
+
+        // Enviar requisição AJAX
+        fetch('{% url "notasfiscais:nfse_gerar_contas_receber_bulk" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                const mensagem = data.message || `${data.contas_criadas} conta(s) a receber criada(s).`;
+                mostrarMensagem(mensagem, 'success');
+                // Limpar seleções após sucesso
+                checkboxes.forEach(cb => cb.checked = false);
+                chkTodos.checked = false;
+                chkTodos.indeterminate = false;
+                atualizarBotoes();
+                // Recarregar a página para mostrar as mudanças
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                const mensagemErro = data.error || 'Erro ao gerar contas a receber.';
+                mostrarMensagem(mensagemErro, 'error');
+                // Mostrar avisos se houver
+                if (data.avisos && data.avisos.length > 0) {
+                    setTimeout(() => {
+                        mostrarMensagem('Avisos: ' + data.avisos.join('; '), 'warning');
+                    }, 1000);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarMensagem('Erro ao processar a requisição: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reabilitar botão
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    // Função para IA Segmentação
+    btnAISegmentacao.addEventListener('click', function() {
+        if (selectedIds.length === 0) {
+            mostrarMensagem('Selecione pelo menos uma NFSe para análise por IA.', 'warning');
+            return;
+        }
+
+        // Desabilitar botão e mostrar loading
+        this.disabled = true;
+        const textoOriginal = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Analisando...';
+
+        // Preparar dados para envio
+        const formData = new FormData();
+        selectedIds.forEach(id => {
+            formData.append('ids[]', id.toString());
+        });
+
+        // Enviar requisição AJAX
+        fetch('{% url "notasfiscais:ai_segmentacao" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                const mensagem = `Análise por IA concluída! ${data.notas_analisadas} nota(s) analisada(s).`;
+                mostrarMensagem(mensagem, 'success');
+                // Mostrar resposta da IA em um modal ou alert
+                setTimeout(() => {
+                    alert('Resposta da IA:\n\n' + data.ai_response);
+                }, 1000);
+            } else {
+                const mensagemErro = data.error || 'Erro na análise por IA.';
+                mostrarMensagem(mensagemErro, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarMensagem('Erro ao processar a requisição: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // Reabilitar botão
+            this.disabled = false;
+            this.innerHTML = textoOriginal;
+        });
+    });
+
+    // Função para carregar detalhes no modal
+    window.carregarDetalhes = function(tipo, id) {
+        const modalBody = document.getElementById('modalDetalhesBody');
+        modalBody.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p>Carregando detalhes...</p>
+            </div>
+        `;
+
+        // Fazer requisição AJAX
+        fetch(`/notasfiscais/detalhes/${tipo}/${id}/`)
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Se não é JSON, provavelmente é HTML (login page ou erro)
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    // Verificar se é página de login
+                    return response.text().then(text => {
+                        if (text.includes('<html') || text.includes('<HTML')) {
+                            // Redirecionar para login
+                            window.location.href = '/accounts/login/';
+                            throw new Error('Sessão expirada. Redirecionando para login...');
+                        } else {
+                            throw new Error('Resposta inesperada do servidor');
+                        }
+                    });
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            ${data.error}
+                        </div>
+                    `;
+                } else {
+                    modalBody.innerHTML = data.html;
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar detalhes: ${error.message}
+                    </div>
+                `;
+            });
+    };
+});
+</script>
+{% endblock %}

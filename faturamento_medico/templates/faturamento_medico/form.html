@@ -1,0 +1,462 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid fat-form-page">
+    <div class="row">
+        <div class="col-12">
+            <div class="card fat-form-card">
+                <div class="card-header fat-form-header">
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="card-body">
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Identificação</h6>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
+                                    {{ form.lote }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.guia.id_for_label }}">Guia</label>
+                                    {{ form.guia }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.carteirinha.id_for_label }}">Carteirinha</label>
+                                    {{ form.carteirinha }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.codigo_relatorio.id_for_label }}">Código Relatório</label>
+                                    {{ form.codigo_relatorio }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.agendado_via.id_for_label }}">Agendado Via</label>
+                                    {{ form.agendado_via }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
+                                    {{ form.nome }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.nome_associado.id_for_label }}">Nome do Associado</label>
+                                    {{ form.nome_associado }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.convenio.id_for_label }}">Convênio (Viabilidade)</label>
+                                    {{ form.convenio }}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Datas e valores</h6>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.data.id_for_label }}">Data</label>
+                                    {{ form.data }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.data_autorizacao.id_for_label }}">Data da Autorização</label>
+                                    {{ form.data_autorizacao }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.total.id_for_label }}">Total</label>
+                                    {{ form.total }}
+                                    <div class="form-text">Calculado automaticamente pelos itens de serviço</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.urgencia.id_for_label }}">Urgência</label>
+                                    {{ form.urgencia }}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Atendimento</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.local.id_for_label }}">Local</label>
+                                    {{ form.local }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
+                                    {{ form.prioridade }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.horario_inicio.id_for_label }}">Horário de Início</label>
+                                    {{ form.horario_inicio }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.horario_fim.id_for_label }}">Horário de Fim</label>
+                                    {{ form.horario_fim }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.status_agendamento.id_for_label }}">Status do Agendamento</label>
+                                    {{ form.status_agendamento }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.motivo_cancelamento.id_for_label }}">Motivo Cancelamento/Desistência/Deleção</label>
+                                    {{ form.motivo_cancelamento }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.medico.id_for_label }}">Médico</label>
+                                    {{ form.medico }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.medico_solicitante.id_for_label }}">Médico Solicitante</label>
+                                    {{ form.medico_solicitante }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.anestesista.id_for_label }}">Anestesista</label>
+                                    {{ form.anestesista }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.tecnico.id_for_label }}">Técnico</label>
+                                    {{ form.tecnico }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.checkin_por.id_for_label }}">Check-in Por</label>
+                                    {{ form.checkin_por }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.agendado_por.id_for_label }}">Agendado Por</label>
+                                    {{ form.agendado_por }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.tag.id_for_label }}">Tag</label>
+                                    {{ form.tag }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.receber_por.id_for_label }}">Receber Por</label>
+                                    {{ form.receber_por }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.apartamento_enfermaria.id_for_label }}">Apartamento ou Enfermaria</label>
+                                    {{ form.apartamento_enfermaria }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="{{ form.cpf.id_for_label }}">CPF</label>
+                                    {{ form.cpf }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
+                                    {{ form.indicacao_clinica }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
+                                    {{ form.descricao }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
+                                    {{ form.observacao }}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Documentação e fechamento</h6>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Guia Lançada</label>
+                                    {{ form.guia_lancada }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">Número da Guia Lançada</label>
+                                    {{ form.numero_guia_lancada }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">Nota Fiscal</label>
+                                    {{ form.nota_fiscal }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.codigo_fechamento.id_for_label }}">Código do Fechamento</label>
+                                    {{ form.codigo_fechamento }}
+                                    <div class="form-text">Gerado no fechamento de repasse</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Extração de documento</h6>
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
+                                    {{ form.documento_upload }}
+                                    <div class="form-text">{{ form.documento_upload.help_text }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" id="extrair-dados-btn" class="btn btn-info btn-sm">
+                                            <i class="fas fa-magic"></i> Extrair com IA
+                                        </button>
+                                        <button type="button" id="extrair-dados-ocr-btn" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-search"></i> Extrair com OCR
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        {% if form.instance.pk %}
+                        <section class="fat-section fat-section-itens">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fat-section-title mb-0">
+                                    <i class="fas fa-list"></i> Itens de Serviço
+                                    {% if form.instance.itens_servico.exists %}
+                                        <span class="badge bg-secondary">{{ form.instance.itens_servico.count }}</span>
+                                    {% endif %}
+                                </h6>
+                                <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-plus"></i> Adicionar Item
+                                </a>
+                            </div>
+                            {% if form.instance.itens_servico.exists %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Serviço</th>
+                                                <th>Modalidade</th>
+                                                <th>Contraste</th>
+                                                <th class="text-end">Valor</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in form.instance.itens_servico.all %}
+                                            <tr>
+                                                <td>{{ item.codigo_servico|default:"-" }}</td>
+                                                <td>{{ item.servico|default:"Serviço não informado" }}</td>
+                                                <td>{{ item.modalidade|default:"-" }}</td>
+                                                <td>{% if item.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                                                <td class="text-end">R$ {{ item.total|floatformat:2 }}</td>
+                                                <td class="text-center text-nowrap">
+                                                    <a href="{% url 'faturamento_medico:editar_item_servico' item.pk %}"
+                                                       class="btn btn-sm btn-warning" title="Editar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="{% url 'faturamento_medico:excluir_item_servico' item.pk %}"
+                                                       class="btn btn-sm btn-danger" title="Excluir"
+                                                       onclick="return confirm('Tem certeza que deseja excluir este item?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-light">
+                                                <th colspan="4">Total da Guia</th>
+                                                <th class="text-end">R$ {{ form.instance.total|floatformat:2 }}</th>
+                                                <th></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-list fa-2x mb-2"></i>
+                                    <p class="mb-2">Nenhum item de serviço cadastrado ainda.</p>
+                                    <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Adicionar Primeiro Item
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </section>
+                        {% else %}
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle"></i>
+                            Após salvar o faturamento, você poderá adicionar os itens de serviço.
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer fat-form-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.fat-form-page {
+    --fat-accent: #2b4b7c;
+    --fat-border: #e5e9f0;
+    --fat-muted: #6c757d;
+}
+.fat-form-card {
+    border: 1px solid var(--fat-border);
+    box-shadow: 0 2px 10px rgba(43, 75, 124, 0.06);
+}
+.fat-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f7f9fc;
+    border-bottom: 1px solid var(--fat-border);
+}
+.fat-form-header .card-title {
+    color: var(--fat-accent);
+    font-weight: 700;
+}
+.fat-section {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--fat-border);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.fat-section-title {
+    color: var(--fat-accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #d9e2ef;
+}
+.fat-form-page .form-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #334155;
+    margin-bottom: 0.35rem;
+}
+.fat-form-page .form-control,
+.fat-form-page .form-select {
+    width: 100%;
+    min-height: 2.4rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.95rem;
+    background-color: #fff;
+}
+.fat-form-page .form-control:focus,
+.fat-form-page .form-select:focus {
+    border-color: var(--fat-accent);
+    box-shadow: 0 0 0 0.2rem rgba(43, 75, 124, 0.15);
+}
+.fat-form-page .form-control[readonly] {
+    background-color: #f1f5f9;
+    color: #475569;
+}
+.fat-form-page textarea.form-control {
+    min-height: 6rem;
+    resize: vertical;
+}
+.fat-form-page .form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.78rem;
+    color: var(--fat-muted);
+}
+.fat-section-itens {
+    background: #f8fafc;
+}
+.fat-form-footer {
+    background: #f7f9fc;
+    border-top: 1px solid var(--fat-border);
+    display: flex;
+    gap: 0.5rem;
+}
+</style>
+
+<script>
+window.addEventListener('load', function() {
+    function popularCamposFormulario(data) {
+        if (data.nome) document.getElementById('{{ form.nome.id_for_label }}').value = data.nome;
+        if (data.nome_associado) document.getElementById('{{ form.nome_associado.id_for_label }}').value = data.nome_associado;
+        else if (data.nome) document.getElementById('{{ form.nome_associado.id_for_label }}').value = data.nome;
+        if (data.carteirinha) document.getElementById('{{ form.carteirinha.id_for_label }}').value = data.carteirinha;
+        if (data.guia) document.getElementById('{{ form.guia.id_for_label }}').value = data.guia;
+        if (data.numero_guia_lancada) document.getElementById('{{ form.numero_guia_lancada.id_for_label }}').value = data.numero_guia_lancada;
+        if (data.data_autorizacao) document.getElementById('{{ form.data_autorizacao.id_for_label }}').value = data.data_autorizacao;
+        if (data.data_internacao_cirurgia) document.getElementById('{{ form.data.id_for_label }}').value = data.data_internacao_cirurgia;
+        if (data.medico) document.getElementById('{{ form.medico.id_for_label }}').value = data.medico;
+        if (data.anestesista) document.getElementById('{{ form.anestesista.id_for_label }}').value = data.anestesista;
+        if (data.local) document.getElementById('{{ form.local.id_for_label }}').value = data.local;
+        if (data.apartamento_enfermaria) document.getElementById('{{ form.apartamento_enfermaria.id_for_label }}').value = data.apartamento_enfermaria;
+        if (data.convenio) document.getElementById('{{ form.convenio.id_for_label }}').value = data.convenio;
+        if (data.urgencia) document.getElementById('{{ form.urgencia.id_for_label }}').value = data.urgencia;
+        if (data.servicos && data.servicos.length > 0) {
+            var servicosTexto = data.servicos.map(function(s) {
+                return s.descricao + ' (Qtd: ' + s.quantidade + ', Valor: ' + s.valor_unitario + ')';
+            }).join('\n');
+            alert('Serviços extraídos:\n' + servicosTexto);
+        }
+    }
+
+    var btnIa = document.getElementById('extrair-dados-btn');
+    var btnOcr = document.getElementById('extrair-dados-ocr-btn');
+    if (btnIa) {
+        btnIa.addEventListener('click', function() {
+            var fileInput = document.getElementById('{{ form.documento_upload.id_for_label }}');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Selecione um documento primeiro.');
+                return;
+            }
+            var formData = new FormData();
+            formData.append('documento', fileInput.files[0]);
+            fetch('{% url "faturamento_medico:extrair_dados" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                popularCamposFormulario(data);
+                alert('Dados extraídos com sucesso! Verifique os campos preenchidos.');
+            })
+            .catch(error => alert('Erro ao extrair dados com IA: ' + error));
+        });
+    }
+    if (btnOcr) {
+        btnOcr.addEventListener('click', function() {
+            var fileInput = document.getElementById('{{ form.documento_upload.id_for_label }}');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Selecione um documento primeiro.');
+                return;
+            }
+            var formData = new FormData();
+            formData.append('documento', fileInput.files[0]);
+            fetch('{% url "faturamento_medico:extrair_dados_ocr" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                popularCamposFormulario(data);
+                alert('Dados extraídos com sucesso via OCR! Verifique os campos preenchidos.');
+            })
+            .catch(error => alert('Erro ao extrair dados com OCR: ' + error));
+        });
+    }
+});
+</script>
+{% endblock %}

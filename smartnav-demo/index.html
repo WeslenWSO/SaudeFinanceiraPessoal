@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmartNav Demo - Saúde Financeira</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav id="smart-nav" class="smart-nav" role="navigation" aria-label="Menu principal">
+    <div class="smart-nav-inner">
+      <a href="/" class="smart-nav-brand">Saúde Financeira</a>
+      <ul class="smart-nav-menu">
+        <li class="smart-nav-item">
+          <a href="/" class="smart-nav-trigger-link">Dashboard</a>
+        </li>
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-cadastro" id="trigger-cadastro">Cadastro</button>
+          <ul class="smart-nav-dropdown" id="dropdown-cadastro" role="menu" aria-labelledby="trigger-cadastro">
+            <li role="none"><a href="/cadastro/empresa" role="menuitem" class="smart-nav-link">Empresa</a></li>
+            <li role="none"><a href="/cadastro/fornecedor" role="menuitem" class="smart-nav-link">Fornecedor</a></li>
+            <li role="none"><a href="/cadastro/cliente" role="menuitem" class="smart-nav-link">Cliente</a></li>
+            <li role="none"><a href="/cadastro/cobranca" role="menuitem" class="smart-nav-link">Cobrança</a></li>
+            <li role="none"><a href="/cadastro/categoria" role="menuitem" class="smart-nav-link">Categoria</a></li>
+            <li role="none"><a href="/cadastro/socios" role="menuitem" class="smart-nav-link">Sócios</a></li>
+            <li role="none"><a href="/cadastro/regras-imposto" role="menuitem" class="smart-nav-link">Regras do Imposto</a></li>
+            <li role="none"><a href="/cadastro/regra-rateio" role="menuitem" class="smart-nav-link">Regra do Rateio</a></li>
+            <li role="none"><a href="/cadastro/forma-pagto" role="menuitem" class="smart-nav-link">Forma de Pagto</a></li>
+            <li role="none"><a href="/cadastro/usuario" role="menuitem" class="smart-nav-link">Usuário</a></li>
+            <li role="none"><a href="/cadastro/faturamento-medico" role="menuitem" class="smart-nav-link">Faturamento Médico</a></li>
+            <li role="none"><a href="/cadastro/convenios" role="menuitem" class="smart-nav-link">Convênios</a></li>
+            <li role="none"><a href="/cadastro/cabecalhos" role="menuitem" class="smart-nav-link">Cabeçalhos</a></li>
+            <li role="none"><a href="/cadastro/servicos-medicos" role="menuitem" class="smart-nav-link">Serviços Médicos</a></li>
+            <li role="none"><a href="/cadastro/tabela-precos" role="menuitem" class="smart-nav-link">Tabela de Preços</a></li>
+          </ul>
+        </li>
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-fiscal" id="trigger-fiscal">Fiscal</button>
+          <ul class="smart-nav-dropdown" id="dropdown-fiscal" role="menu" aria-labelledby="trigger-fiscal">
+            <li role="none"><a href="/fiscal/notas-fiscais" role="menuitem" class="smart-nav-link">Notas Fiscais Prestado</a></li>
+            <li role="none"><a href="/fiscal/dashboard-nfse" role="menuitem" class="smart-nav-link">Dashboard NFSe</a></li>
+            <li role="none"><a href="/fiscal/apuracao-nfse" role="menuitem" class="smart-nav-link">Apuração NFSe</a></li>
+            <li role="none"><a href="/fiscal/apuracao-simples" role="menuitem" class="smart-nav-link">Apuração Simples</a></li>
+            <li role="none"><a href="/fiscal/importar-xml" role="menuitem" class="smart-nav-link">Importar XML</a></li>
+            <li role="none"><a href="/fiscal/download-nfse" role="menuitem" class="smart-nav-link">Download NFSE</a></li>
+            <li role="none"><a href="/fiscal/nf-comercio" role="menuitem" class="smart-nav-link">NF Comércio e Tomador</a></li>
+          </ul>
+        </li>
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-financeiro" id="trigger-financeiro">Financeiro</button>
+          <ul class="smart-nav-dropdown" id="dropdown-financeiro" role="menu" aria-labelledby="trigger-financeiro">
+            <li role="none"><a href="/financeiro/contas-bancarias" role="menuitem" class="smart-nav-link">Contas Bancárias</a></li>
+            <li role="none"><a href="/financeiro/contas-pagar" role="menuitem" class="smart-nav-link">Contas a Pagar</a></li>
+            <li role="none"><a href="/financeiro/contas-receber" role="menuitem" class="smart-nav-link">Contas a Receber</a></li>
+            <li role="none"><a href="/financeiro/extrato-importar" role="menuitem" class="smart-nav-link">Extrato Bancário (Importar)</a></li>
+            <li role="none"><a href="/financeiro/lancamentos" role="menuitem" class="smart-nav-link">Lançamentos Importados</a></li>
+            <li role="none"><a href="/financeiro/movimentos" role="menuitem" class="smart-nav-link">Movimentos / Conciliação</a></li>
+            <li role="none"><a href="/financeiro/recebiveis" role="menuitem" class="smart-nav-link">Recebíveis Maquininha</a></li>
+            <li role="none"><a href="/financeiro/fluxo-caixa" role="menuitem" class="smart-nav-link">Fluxo de Caixa</a></li>
+          </ul>
+        </li>
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-relatorios" id="trigger-relatorios">Relatórios</button>
+          <ul class="smart-nav-dropdown" id="dropdown-relatorios" role="menu" aria-labelledby="trigger-relatorios">
+            <li role="none"><a href="/relatorios/contas-receber" role="menuitem" class="smart-nav-link">Contas a Receber/Recebido</a></li>
+            <li role="none"><a href="/relatorios/contas-pagar" role="menuitem" class="smart-nav-link">Contas a Pagar/Pagas</a></li>
+            <li role="none"><a href="/relatorios/por-categoria" role="menuitem" class="smart-nav-link">Por Categoria</a></li>
+            <li role="none"><a href="/relatorios/por-socio" role="menuitem" class="smart-nav-link">Por Sócio</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </nav>
+  <main class="app-content-with-nav">
+    <div style="padding: 2rem; max-width: 800px; margin: 0 auto;">
+      <h1>SmartNav Demo</h1>
+      <p>Passe o mouse em Cadastro, Fiscal, Financeiro ou Relatórios para abrir os dropdowns.</p>
+      <p>Use Enter/Espaço para abrir pelo teclado, ESC para fechar, clique fora para fechar.</p>
+    </div>
+  </main>
+  <script src="menu.js"></script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Baixar Conta a Pagar</h3>
+                    <div>
+                        <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-secondary">Voltar</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Informações da conta -->
+                    <div class="alert alert-info">
+                        <h5>Conta Selecionada:</h5>
+                        <p><strong>Fornecedor:</strong> {{ conta.fornecedor.razao }}</p>
+                        <p><strong>Descrição:</strong> {{ conta.descricao }}</p>
+                        <p><strong>Valor:</strong> R$ {{ conta.valorDoc|floatformat:2 }}</p>
+                        <p><strong>Vencimento:</strong> {{ conta.dtvenc|date:"d/m/Y" }}</p>
+                        {% if conta.is_vencida %}
+                        <p class="text-danger"><strong>Status:</strong> VENCIDA</p>
+                        {% endif %}
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="rateio" class="form-label">Regra de rateio</label>
+                                    <select name="rateio" id="rateio" class="form-control">
+                                        <option value="">Nenhuma</option>
+                                        {% for r in regras_rateio %}
+                                        <option value="{{ r.id }}" {% if conta.rateio_id == r.id %}selected{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text small">Pode definir ou alterar na baixa; necessária para rateio entre sócios após o pagamento.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_pagamento" class="form-label">Data de Pagamento *</label>
+                                    <input type="date" name="data_pagamento" class="form-control" value="{% now 'Y-m-d' %}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="conta_banco" class="form-label">Conta Bancária</label>
+                                    <select name="conta_banco" id="conta_banco" class="form-control">
+                                        <option value="">Selecione uma conta...</option>
+                                        {% for conta_banco in contas_bancarias %}
+                                        <option value="{{ conta_banco.id }}" data-tipo="{{ conta_banco.tipo }}">{{ conta_banco.banco.nome }} - {{ conta_banco.descricao }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="valor_pago" class="form-label">Valor Pago *</label>
+                                    <input type="text" name="valor_pago" class="form-control" value="{{ conta.get_valor_pendente|floatformat:2|default_if_none:'' }}" placeholder="0,00" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="desconto" class="form-label">Desconto</label>
+                                    <input type="text" name="desconto" class="form-control" value="0,00" placeholder="0,00">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="juros" class="form-label">Juros/Multa</label>
+                                    <input type="text" name="juros" class="form-control" value="0,00" placeholder="0,00">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Atenção:</h6>
+                            <ul class="mb-0">
+                                <li>A conta será marcada como paga após a confirmação</li>
+                                <li>Se uma conta bancária do tipo "Conta Corrente" for selecionada, você poderá conciliar com lançamentos do extrato</li>
+                                <li>Se uma conta bancária de outro tipo for selecionada, será criado um movimento no extrato</li>
+                                <li>Esta ação não pode ser desfeita</li>
+                            </ul>
+                        </div>
+
+                        <!-- Modal para seleção de lançamentos -->
+                        <div class="modal fade" id="modalConciliarLancamentos" tabindex="-1" aria-labelledby="modalConciliarLancamentosLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="modalConciliarLancamentosLabel">
+                                            <i class="fas fa-link me-2"></i>Conciliar com Lançamentos do Extrato
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-info">
+                                            <strong>Conta selecionada:</strong> <span id="contaSelecionadaNome"></span><br>
+                                            <strong>Valor da conta:</strong> R$ <span id="valorContaPagar"></span><br>
+                                            <strong>Valor selecionado:</strong> R$ <span id="valorSelecionado">0,00</span>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Lançamentos disponíveis (valores negativos):</label>
+                                            <div id="lancamentosContainer" style="max-height: 300px; overflow-y: auto;">
+                                                <div class="text-center">
+                                                    <div class="spinner-border" role="status">
+                                                        <span class="visually-hidden">Carregando...</span>
+                                                    </div>
+                                                    <p>Carregando lançamentos...</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="button" class="btn btn-success" id="btnConfirmarConciliacao" disabled>
+                                            <i class="fas fa-check me-2"></i>Confirmar Conciliação
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success">Confirmar Pagamento</button>
+                                <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Formatar valores como moeda brasileira
+function formatarMoeda(input) {
+    input.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value) {
+            value = (parseInt(value) / 100).toFixed(2);
+            e.target.value = value.replace('.', ',');
+        }
+    });
+}
+
+// Aplicar formatação aos campos de valor
+formatarMoeda(document.querySelector('input[name="valor_pago"]'));
+formatarMoeda(document.querySelector('input[name="desconto"]'));
+formatarMoeda(document.querySelector('input[name="juros"]'));
+
+// Calcular valor total
+function calcularTotal() {
+    const valorPago = parseFloat(document.querySelector('input[name="valor_pago"]').value.replace(',', '.')) || 0;
+    const desconto = parseFloat(document.querySelector('input[name="desconto"]').value.replace(',', '.')) || 0;
+    const juros = parseFloat(document.querySelector('input[name="juros"]').value.replace(',', '.')) || 0;
+
+    const total = valorPago - desconto + juros;
+    console.log('Valor Total:', total.toFixed(2));
+}
+
+// Recalcular quando os valores mudarem
+document.querySelectorAll('input[name="valor_pago"], input[name="desconto"], input[name="juros"]').forEach(input => {
+    input.addEventListener('input', calcularTotal);
+});
+
+// Variáveis para controlar a conciliação
+let lancamentosSelecionados = [];
+let contaSelecionadaId = null;
+let valorContaPagar = parseFloat("{{ conta.get_valor_pendente|default:0 }}".replace(',', '.'));
+console.log('Valor da conta a pagar:', valorContaPagar);
+console.log('Valor pendente raw:', "{{ conta.get_valor_pendente|default:0 }}");
+console.log('Valor total com ajustes:', "{{ conta.get_valor_total_com_ajustes|default:0 }}");
+
+// Event listener para mudança na conta bancária
+document.getElementById('conta_banco').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const tipoConta = selectedOption.getAttribute('data-tipo');
+    console.log('Conta selecionada:', this.value, 'Tipo:', tipoConta);
+
+    if (tipoConta === 'CONTA_CORRENTE' && this.value) {
+        console.log('Abrindo modal para conta corrente');
+        contaSelecionadaId = this.value;
+        const contaNome = selectedOption.text;
+        abrirModalConciliar(contaNome);
+    } else {
+        console.log('Tipo de conta não é conta corrente ou valor vazio');
+    }
+});
+
+// Função para abrir modal de conciliação
+function abrirModalConciliar(contaNome) {
+    console.log('Abrindo modal de conciliação para conta:', contaNome);
+    document.getElementById('contaSelecionadaNome').textContent = contaNome;
+    document.getElementById('valorContaPagar').textContent = valorContaPagar.toFixed(2).replace('.', ',');
+
+    // Carregar lançamentos disponíveis
+    carregarLancamentosDisponiveis();
+
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('modalConciliarLancamentos'));
+    modal.show();
+}
+
+// Função para carregar lançamentos disponíveis
+function carregarLancamentosDisponiveis() {
+    const container = document.getElementById('lancamentosContainer');
+
+    // Mostrar loading
+    container.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Carregando lançamentos...</p>
+        </div>
+    `;
+
+    // Fazer requisição AJAX para buscar lançamentos
+    fetch(`/contasapagar/buscar_lancamentos_conciliacao/${contaSelecionadaId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarLancamentos(data.lancamentos);
+            } else {
+                container.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            container.innerHTML = `<div class="alert alert-danger">Erro ao carregar lançamentos.</div>`;
+        });
+}
+
+// Função para mostrar lançamentos
+function mostrarLancamentos(lancamentos) {
+    const container = document.getElementById('lancamentosContainer');
+
+    if (lancamentos.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">Nenhum lançamento disponível para conciliação.</div>';
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    lancamentos.forEach(lancamento => {
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="form-check">
+                        <input class="form-check-input lancamento-checkbox" type="checkbox"
+                               value="${lancamento.id}" data-valor="${lancamento.valor}"
+                               id="lancamento_${lancamento.id}">
+                        <label class="form-check-label" for="lancamento_${lancamento.id}">
+                            <strong>${lancamento.data}</strong> - ${lancamento.historico}<br>
+                            <small class="text-muted">Valor: R$ ${Math.abs(lancamento.valor).toFixed(2).replace('.', ',')}</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Adicionar event listeners para checkboxes
+    document.querySelectorAll('.lancamento-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', atualizarValorSelecionado);
+    });
+}
+
+// Função para atualizar valor selecionado
+function atualizarValorSelecionado() {
+    lancamentosSelecionados = [];
+    let totalSelecionado = 0;
+
+    document.querySelectorAll('.lancamento-checkbox:checked').forEach(checkbox => {
+        const lancamentoId = checkbox.value;
+        const valor = parseFloat(checkbox.getAttribute('data-valor'));
+        lancamentosSelecionados.push(lancamentoId);
+        totalSelecionado += Math.abs(valor); // Usar valor absoluto pois são débitos (negativos)
+    });
+
+    // Atualizar display do valor selecionado
+    document.getElementById('valorSelecionado').textContent = totalSelecionado.toFixed(2).replace('.', ',');
+
+    // Atualizar valor pago no formulário principal
+    const valorPagoInput = document.querySelector('input[name="valor_pago"]');
+    if (totalSelecionado > 0) {
+        valorPagoInput.value = totalSelecionado.toFixed(2).replace('.', ',');
+    }
+
+    // Habilitar/desabilitar botão de confirmação
+    const btnConfirmar = document.getElementById('btnConfirmarConciliacao');
+    const valorConta = valorContaPagar;
+    console.log('Valor conta:', valorConta, 'Valor selecionado:', totalSelecionado, 'Diferença:', Math.abs(totalSelecionado - valorConta));
+    btnConfirmar.disabled = Math.abs(totalSelecionado - valorConta) > 0.01; // Tolerância de 1 centavo
+}
+
+// Event listener para botão de confirmar conciliação
+document.getElementById('btnConfirmarConciliacao').addEventListener('click', function() {
+    if (lancamentosSelecionados.length > 0) {
+        // Adicionar lançamentos selecionados ao formulário
+        lancamentosSelecionados.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'lancamentos_conciliacao';
+            input.value = id;
+            document.querySelector('form').appendChild(input);
+        });
+
+        // Fechar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalConciliarLancamentos'));
+        modal.hide();
+
+        // Mostrar mensagem de sucesso
+        alert('Lançamentos selecionados para conciliação!');
+    }
+});
+</script>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

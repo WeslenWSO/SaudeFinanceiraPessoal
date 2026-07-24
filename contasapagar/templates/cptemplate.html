@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% if messages %}
+  
+      {% include 'parcial/_messages.html' %}
+
+   {% endif %}
+
+
+{%block conteudo%}
+{% include 'parcial/cabTituloListaComBotao.html' %}
+     <a href="{% url 'contabanco:Tela_Cad' %}" role="button" class="btn btn-primary">Nova Conta</a> 
+     
+{% include 'parcial/footTituloListaComBotao.html' %}
+
+    
+        {% if tipodealteracao == "Apagar" %}
+              {% include 'contaaPagar.html' %}
+         
+              {% else %}
+                 {% include 'contaaPagar.html' %}
+              {% endif %}
+     
+
+{%endblock%}

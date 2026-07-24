@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Lote {{ lote.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 20px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .header p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .signature {
+            margin-top: 50px;
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 20px;
+        }
+        .signature p {
+            margin: 10px 0;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>{{ empresa.razao }}</h2>
+        <p><strong>CNPJ:</strong> {{ empresa.cnpj }}</p>
+        <p><strong>Período:</strong> {% if periodo_inicio and periodo_fim %}{{ periodo_inicio|date:"d/m/Y" }} a {{ periodo_fim|date:"d/m/Y" }}{% else %}Não definido{% endif %}</p>
+        <p><strong>Lote:</strong> {{ lote.id }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>GUIA</th>
+                <th>DATA DA INTERNAÇÃO</th>
+                <th>BENEFICIÁRIO</th>
+                <th>Código do Serviço</th>
+                <th>Descrição do Serviço</th>
+                <th>PORTE</th>
+                <th>QTD</th>
+                <th>Vlr Unitário</th>
+                <th>Total</th>
+                <th>LOCAL</th>
+                <th>ANESTESISTA</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for beneficiario, items_list in grouped_items.items %}
+                {% for item in items_list %}
+            <tr>
+                <td>{{ item.faturamento.guia|default:"-" }}</td>
+                <td>{% if item.faturamento.data %}{{ item.faturamento.data|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                <td>{{ item.faturamento.nome|default:"-" }}</td>
+                <td>{{ item.codigo_servico|default:"-" }}</td>
+                <td>{{ item.servico|default:"-" }}</td>
+                <td>{{ item.porte|default:"-" }}</td>
+                <td>{{ item.qt|default:0 }}</td>
+                <td>R$ {{ item.valor|floatformat:2 }}</td>
+                <td>R$ {{ item.total|floatformat:2 }}</td>
+                <td>{{ item.faturamento.local|default:"-" }}</td>
+                <td>{{ item.faturamento.anestesista|default:"-" }}</td>
+            </tr>
+                {% endfor %}
+                {% if not forloop.last %}
+            <tr>
+                <td colspan="11" style="border: none; height: 10px;"></td>
+            </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight: bold; background-color: #f0f0f0;">
+                <td colspan="8" style="text-align: right;">TOTAL GERAL:</td>
+                <td>R$ {{ total_geral|floatformat:2 }}</td>
+                <td colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="signature">
+        <p><strong>Assinatura:</strong> _______________________________</p>
+        <p>{{ empresa.razao }}</p>
+        <p>CNPJ: {{ empresa.cnpj }}</p>
+    </div>
+
+    <div class="no-print" style="text-align: center; margin-top: 20px;">
+        <button onclick="window.print()">Imprimir</button>
+    </div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SaudeFinanceira — NFSe emitidas (automático)",
+  "version": "1.0.0",
+  "description": "Recebe período da app local e automatiza filtros e pedidos de XML/PDF na página oficial Notas emitidas do Emissor Nacional.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxtkViFgQFj7CoTHF8ipjgy2l2JmZivQv5UzzT+a+7kEzkK/VLJ0btMrXOSxOdB6VaV/c26FyYOq4jkLz20e/kN5C814yfZWdSvtL+gRBRMSKz7tsRHxk0ADF+w8QH3EIG3AKQ0te2bYJRFktaZwFJijgdkxBEg4+a6XNxiPaXsfFOkqNv8EQGqLjiL0jLSAEZOtA+AWNlFgYlfgFynJQRG2WvpPZEVPFqTVa+xgTSSTsdpRYeX9nFQDgI35P9CF7ozuCErrbrPK6xeeQxWfoZjT95KrKOSJ4FMpj80vmL5NYVnjr88gj8qwU1dHaZffUSuyNiajhYDmdZe55cyl9FQIDAQAB",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": ["https://www.nfse.gov.br/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.nfse.gov.br/EmissorNacional/Notas/Emitidas*"],
+      "js": ["content_emitidas.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://127.0.0.1/*",
+      "http://localhost/*",
+      "http://[::1]/*"
+    ]
+  }
+}

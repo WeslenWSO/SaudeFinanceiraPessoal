@@ -1,0 +1,511 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+
+
+{%block conteudo %}
+ {% if messages %}
+  
+      {% include 'parcial/_messages.html' %}
+
+   {% endif %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Contas a Pagar</h3>
+                    <div>
+                        <a href="{% url 'contasapagar:importar_pdf' %}" class="btn btn-info mr-2">
+                            <i class="fas fa-file-pdf"></i> Importar PDF
+                        </a>
+                        <a href="{% url 'contasapagar:importar_relatorio_liquidos' %}" class="btn btn-success mr-2">
+                            <i class="fas fa-file-invoice-dollar"></i> Relatório de Líquidos
+                        </a>
+                        <a href="{% url 'contasapagar:cadastrar' %}" class="btn btn-primary">Cadastrar Conta a Pagar</a>
+                        
+                    </div>
+                </div>
+                <div class="card-body">
+
+                    <!-- Indicadores (valores em R$) -->
+                    <div class="indicadores-nfse indicadores-contas">
+                        <div class="indicador-card indicador-moeda indicador-total">
+                            <span class="indicador-numero">R$ {{ total_contas_pagar|floatformat:2 }}</span>
+                            <span class="indicador-label">Total Contas a Pagar</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-file-invoice-dollar"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-pendente">
+                            <span class="indicador-numero">R$ {{ total_pendente|floatformat:2 }}</span>
+                            <span class="indicador-label">Total Pendente</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-clock"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-vencido">
+                            <span class="indicador-numero">R$ {{ total_vencido|floatformat:2 }}</span>
+                            <span class="indicador-label">Total Vencido</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-exclamation-triangle"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-pago">
+                            <span class="indicador-numero">R$ {{ total_pago|floatformat:2 }}</span>
+                            <span class="indicador-label">Total Pago</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-check-circle"></i></span>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <section class="panel panel-tight mb-4">
+                        <details open>
+                            <summary><i class="fas fa-filter"></i> Filtros e Pesquisa</summary>
+                            <form method="get" class="filtros-form">
+                                <div class="filtros-grid">
+                                    <div>
+                                        <label for="search">Buscar</label>
+                                        <input type="text" id="search" name="search" placeholder="Fornecedor, descrição..." value="{{ filtros.search }}">
+                                    </div>
+                                    <div>
+                                        <label for="status">Status</label>
+                                        <select id="status" name="status">
+                                            <option value="">Todos os Status</option>
+                                            <option value="pendente" {% if filtros.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                                            <option value="pago" {% if filtros.status == 'pago' %}selected{% endif %}>Pago</option>
+                                            <option value="cancelado" {% if filtros.status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                                            <option value="vencido" {% if filtros.status == 'vencido' %}selected{% endif %}>Vencido</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="categoria">Categoria</label>
+                                        <select id="categoria" name="categoria">
+                                            <option value="">Todas as Categorias</option>
+                                            {% for categoria in categorias %}
+                                            <option value="{{ categoria.id }}" {% if filtros.categoria == categoria.id|stringformat:"s" %}selected{% endif %}>{{ categoria.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="forma_pagamento">Cobrança</label>
+                                        <select id="forma_pagamento" name="forma_pagamento">
+                                            <option value="">Todas as Cobranças</option>
+                                            {% for forma in formas_pagamento %}
+                                            <option value="{{ forma.id }}" {% if filtros.forma_pagamento == forma.id|stringformat:"s" %}selected{% endif %}>{{ forma.descricao }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="data_inicio">Data Início</label>
+                                        <input type="date" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
+                                    </div>
+                                    <div>
+                                        <label for="data_fim">Data Fim</label>
+                                        <input type="date" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
+                                    </div>
+                                    <div>
+                                        <label for="per_page">Por página</label>
+                                        <select id="per_page" name="per_page" title="Itens por página">
+                                            <option value="25" {% if filtros.per_page == 25 %}selected{% endif %}>25</option>
+                                            <option value="50" {% if filtros.per_page == 50 %}selected{% endif %}>50</option>
+                                            <option value="100" {% if filtros.per_page == 100 %}selected{% endif %}>100</option>
+                                            <option value="150" {% if filtros.per_page == 150 %}selected{% endif %}>150</option>
+                                        </select>
+                                    </div>
+                                    <div class="btn-group-filtros">
+                                        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filtrar</button>
+                                        <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-secondary"><i class="fas fa-times"></i> Limpar</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </details>
+                    </section>
+
+                    <!-- Form para seleção múltipla -->
+                    <form method="post" id="contas-form">
+                        {% csrf_token %}
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button type="button" class="btn btn-success btn-sm" id="baixar-selecionadas-btn">
+                                    <i class="fas fa-check"></i> Baixar Selecionadas
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="escolher-categoria-btn">
+                                    <i class="fas fa-tags"></i> Escolher Categoria
+                                </button>
+                            </div>
+                            <small class="text-muted">Selecione contas para aplicar ações em lote</small>
+                        </div>
+
+                        <!-- Tabela -->
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="select-all">
+                                        </th>
+                                        <th>Fornecedor</th>
+                                        <th>CPF/CNPJ</th>
+                                        <th>Categoria</th>
+                                        <th>Forma Pgto</th>
+                                        <th>Data Emissão</th>
+                                        <th>Data Vencimento</th>
+                                        <th>Data Pagamento</th>
+                                        <th>Descrição</th>
+                                        <th>Documento</th>
+                                        <th>Parcela</th>
+                                        <th>Valor</th>
+                                        <th>Valor Pendente</th>
+                                        <th>Valor Líquido</th>
+                                        <th>Desconto</th>
+                                        <th>Juros</th>
+                                        <th>Multa</th>
+                                        <th>Status</th>
+                                        <th>Dias Atraso</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for conta in contas %}
+                                    <tr class="{% if conta.is_vencida %}table-warning{% endif %}">
+                                        <td>
+                                            {% if conta.status == 'pendente' %}
+                                            <input type="checkbox" name="contas" value="{{ conta.pk }}" class="conta-checkbox">
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if conta.fornecedor %}{{ conta.fornecedor.razao }}{% else %}-{% endif %}</td>
+                                        <td>{{ conta.cpf_cnpj|default:"-" }}</td>
+                                        <td>{% if conta.categoria %}{{ conta.categoria.nome }}{% else %}-{% endif %}</td>
+                                        <td>{% if conta.cobranca %}{{ conta.cobranca.descricao }}{% else %}-{% endif %}</td>
+                                        <td>{{ conta.dtEmissao|date:"d/m/Y" }}</td>
+                                        <td>{{ conta.dtvenc|date:"d/m/Y" }}</td>
+                                        <td>{{ conta.dtPag|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>{{ conta.descricao|truncatechars:30 }}</td>
+                                        <td>{{ conta.numdoc|default:"-" }}</td>
+                                        <td>{{ conta.parcela|default:"-" }}</td>
+                                        <td>R$ {{ conta.valorDoc|floatformat:2 }}</td>
+                                        <td>R$ {{ conta.get_valor_pendente|floatformat:2|default:0 }}</td>
+                                        <td>R$ {{ conta.get_valor_total_com_ajustes|floatformat:2 }}</td>
+                                        <td>R$ {{ conta.desconto|default:0|floatformat:2 }}</td>
+                                        <td>R$ {{ conta.juros|default:0|floatformat:2 }}</td>
+                                        <td>R$ {{ conta.multa|default:0|floatformat:2 }}</td>
+                                        <td>
+                                            <span class="badge {% if conta.status == 'pago' %}badge-success{% elif conta.status == 'pendente' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                                {{ conta.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ conta.dias_atraso }}</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-info" title="Detalhes"
+                                                    data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                                                    onclick="carregarDetalhes('conta_pagar', {{ conta.pk }}, 'contasapagar')">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if conta.status != 'pago' %}
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="window.location.href='{% url 'contasapagar:editar' conta.pk %}'">Editar</button>
+                                            <button type="button" class="btn btn-sm btn-success" onclick="window.location.href='{% url 'contasapagar:baixar' conta.pk %}'">Baixar</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Excluir" onclick="excluirConta({{ conta.pk }})">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="18" class="text-center">Nenhuma conta a pagar encontrada.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if contas %}
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                <button type="button" class="btn btn-success" id="baixar-selecionadas-bottom-btn">
+                                    <i class="fas fa-check"></i> Baixar Selecionadas
+                                </button>
+                               
+                                <button type="button" class="btn btn-primary" id="escolher-categoria-bottom-btn">
+                                    <i class="fas fa-tags"></i> Escolher Categoria
+                                </button>
+                            </div>
+                            <div class="pagination-info">
+                                Mostrando {{ contas.start_index }} a {{ contas.end_index }} de {{ contas.paginator.count }} contas
+                            </div>
+                        </div>
+                        {% endif %}
+                    </form>
+
+                    <!-- Paginação -->
+                    {% if is_paginated %}
+                    <div class="d-flex justify-content-center mt-4">
+                        <nav aria-label="Navegação de páginas">
+                            <ul class="pagination">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+                                </li>
+
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Próxima</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}">Última</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesLabel">
+                    <i class="fas fa-info-circle me-2"></i>Detalhes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Select all functionality
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.conta-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+
+    // Baixar selecionadas buttons
+    document.getElementById('baixar-selecionadas-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para baixar.');
+            return;
+        }
+        // Alterar action do formulário e submeter
+        const form = document.getElementById('contas-form');
+        form.action = '/contasapagar/baixar_selecionadas/';
+        form.submit();
+    });
+
+    document.getElementById('baixar-selecionadas-bottom-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para baixar.');
+            return;
+        }
+        // Alterar action do formulário e submeter
+        const form = document.getElementById('contas-form');
+        form.action = '/contasapagar/baixar_selecionadas/';
+        form.submit();
+    });
+
+    // Desconciliar selecionadas buttons
+    document.getElementById('desconciliar-selecionadas-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para desconciliar.');
+            return;
+        }
+        if (confirm('Tem certeza que deseja desconciliar as contas selecionadas? Esta ação não pode ser desfeita.')) {
+            // Criar formulário dinâmico para POST
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/contasapagar/desconciliar/';
+
+            // Adicionar CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken.value;
+                form.appendChild(csrfInput);
+            }
+
+            // Adicionar contas selecionadas
+            checkedBoxes.forEach(checkbox => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'contas';
+                input.value = checkbox.value;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+
+    document.getElementById('desconciliar-selecionadas-bottom-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para desconciliar.');
+            return;
+        }
+        if (confirm('Tem certeza que deseja desconciliar as contas selecionadas? Esta ação não pode ser desfeita.')) {
+            // Criar formulário dinâmico para POST
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/contasapagar/desconciliar/';
+
+            // Adicionar CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken.value;
+                form.appendChild(csrfInput);
+            }
+
+            // Adicionar contas selecionadas
+            checkedBoxes.forEach(checkbox => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'contas';
+                input.value = checkbox.value;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+
+    // Escolher categoria buttons
+    document.getElementById('escolher-categoria-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para alterar categoria.');
+            return;
+        }
+        // Implementar modal de escolher categoria
+        alert('Funcionalidade de escolher categoria será implementada.');
+    });
+
+    document.getElementById('escolher-categoria-bottom-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para alterar categoria.');
+            return;
+        }
+        // Implementar modal de escolher categoria
+        alert('Funcionalidade de escolher categoria será implementada.');
+    });
+
+    // Função para carregar detalhes no modal
+    window.carregarDetalhes = function(tipo, id, app) {
+        const modalBody = document.getElementById('modalDetalhesBody');
+        modalBody.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p>Carregando detalhes...</p>
+            </div>
+        `;
+
+        // Fazer requisição AJAX
+        fetch(`/${app}/detalhes/${tipo}/${id}/`)
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Se não é JSON, provavelmente é HTML (login page ou erro)
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    // Verificar se é página de login
+                    return response.text().then(text => {
+                        if (text.includes('<html') || text.includes('<HTML')) {
+                            // Redirecionar para login
+                            window.location.href = '/accounts/login/';
+                            throw new Error('Sessão expirada. Redirecionando para login...');
+                        } else {
+                            throw new Error('Resposta inesperada do servidor');
+                        }
+                    });
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            ${data.error}
+                        </div>
+                    `;
+                } else {
+                    modalBody.innerHTML = data.html;
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar detalhes: ${error.message}
+                    </div>
+                `;
+            });
+    };
+
+    // Função para excluir conta
+    window.excluirConta = function(id) {
+        if (confirm('Tem certeza que deseja excluir esta conta?')) {
+            // Criar formulário dinâmico para POST
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/contasapagar/excluir/${id}/`;
+
+            // Adicionar CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken.value;
+                form.appendChild(csrfInput);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    };
+});
+</script>
+
+{% endblock %}

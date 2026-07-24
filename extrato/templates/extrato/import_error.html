@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Erro na Importação{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Erro na Importação</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'extrato:upload_ofx' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5><i class="icon fas fa-exclamation-triangle"></i> Erro!</h5>
+                        {% if error_type == "duplicado" %}
+                            <p>Os lançamentos do arquivo <strong>{{ arquivo }}</strong> já foram importados anteriormente.</p>
+                            <p>{{ message }}</p>
+                            <p>Verifique se o arquivo já foi processado ou se contém dados duplicados.</p>
+                        {% else %}
+                            <p>{{ message }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'extrato:upload_ofx' %}" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Tentar Novamente
+                    </a>
+                    <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> Ver Lançamentos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

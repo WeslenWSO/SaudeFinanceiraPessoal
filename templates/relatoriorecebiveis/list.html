@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+{% block title %}{{ title }}{% endblock %}
+
+{% block conteudo %}
+<style>
+.rr-row-actions { position: relative; display: inline-block; }
+.rr-row-actions > summary { list-style: none; cursor: pointer; }
+.rr-row-actions > summary::-webkit-details-marker { display: none; }
+.rr-row-actions-btn { min-width: 2.25rem; }
+.rr-row-actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 40;
+    min-width: 9.5rem;
+    padding: 0.35rem 0;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+    box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12);
+}
+.rr-row-actions-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+.rr-row-actions-item:hover { background: #f3f4f6; color: inherit; text-decoration: none; }
+.rr-row-actions-item-danger:hover { background: #fef2f2; }
+.rr-filtros .rr-filtro-box {
+    max-height: 150px;
+    overflow-y: auto;
+    background: #fff;
+}
+.rr-filtros .form-label {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+</style>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ title }}</h3>
+                    <div class="card-tools">
+                        <button type="submit" form="conciliate-form" class="btn btn-warning btn-sm">
+                            <i class="fas fa-link"></i> Conciliar com Extrato
+                        </button>
+                        <a href="{% url 'relatoriorecebiveis:import_csv' %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-upload"></i> Importar CSV
+                        </a>
+                        <a href="{% url 'relatoriorecebiveis:import_xlsx_cielo' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-file-excel"></i> Importar XLSX (Cielo)
+                        </a>
+                        <a href="{% url 'relatoriorecebiveis:import_pdf_infinitepay' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-file-pdf"></i> Importar PDF (Infinite Pay)
+                        </a>
+                        <a href="{% url 'relatoriorecebiveis:create' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Novo Relatório
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="mb-3">
+                        <div class="row g-3 align-items-start rr-filtros">
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label for="periodo" class="form-label">Período:</label>
+                                <select name="periodo" id="periodo" class="form-control">
+                                    <option value="todos" {% if periodo == 'todos' %}selected{% endif %}>Todos</option>
+                                    <option value="mes_atual" {% if periodo == 'mes_atual' %}selected{% endif %}>Mês Atual</option>
+                                    <option value="mes_anterior" {% if periodo == 'mes_anterior' %}selected{% endif %}>Mês Anterior</option>
+                                    <option value="personalizado" {% if periodo == 'personalizado' %}selected{% endif %}>Personalizado</option>
+                                </select>
+                            </div>
+                            <div id="datas" class="col-12 col-sm-6 col-lg-2" style="{% if periodo != 'personalizado' %}display: none;{% endif %}">
+                                <label for="data_inicio" class="form-label">De:</label>
+                                <input type="date" name="data_inicio" id="data_inicio" class="form-control mb-2" value="{{ data_inicio }}">
+                                <label for="data_fim" class="form-label">Até:</label>
+                                <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ data_fim }}">
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label">Máquina:</label>
+                                <div class="border rounded p-2 rr-filtro-box">
+                                    {% for codigo, label in maquinas_distinct %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="maquina" value="{{ codigo }}" id="maquina_{{ forloop.counter }}" {% if codigo in maquina_filtro %}checked{% endif %}>
+                                        <label class="form-check-label" for="maquina_{{ forloop.counter }}">
+                                            {{ label }}
+                                        </label>
+                                    </div>
+                                    {% empty %}
+                                    <small class="text-muted">Nenhuma máquina</small>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label">Bandeira:</label>
+                                <div class="border rounded p-2 rr-filtro-box">
+                                    {% for b in bandeiras_distinct %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="bandeira" value="{{ b }}" id="bandeira_{{ forloop.counter }}" {% if b in bandeira_filtro %}checked{% endif %}>
+                                        <label class="form-check-label" for="bandeira_{{ forloop.counter }}">
+                                            {% with bandeira_lower=b|lower %}
+                                                {% if 'visa' in bandeira_lower %}
+                                                    <i class="fab fa-cc-visa text-primary"></i>
+                                                {% elif 'mastercard' in bandeira_lower or 'master' in bandeira_lower %}
+                                                    <i class="fab fa-cc-mastercard text-danger"></i>
+                                                {% elif 'amex' in bandeira_lower or 'american express' in bandeira_lower %}
+                                                    <i class="fab fa-cc-amex text-blue"></i>
+                                                {% elif 'diners' in bandeira_lower %}
+                                                    <i class="fab fa-cc-diners-club text-warning"></i>
+                                                {% elif 'discover' in bandeira_lower %}
+                                                    <i class="fab fa-cc-discover text-warning"></i>
+                                                {% elif 'jcb' in bandeira_lower %}
+                                                    <i class="fab fa-cc-jcb text-info"></i>
+                                                {% elif 'elo' in bandeira_lower %}
+                                                    <i class="fas fa-credit-card text-success"></i>
+                                                {% else %}
+                                                    <i class="fas fa-credit-card text-secondary"></i>
+                                                {% endif %}
+                                            {% endwith %}
+                                            {{ b }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label">Forma Pgto:</label>
+                                <div class="border rounded p-2 rr-filtro-box">
+                                    {% for f in formas_distinct %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="forma_pagamento" value="{{ f }}" id="forma_{{ forloop.counter }}" {% if f in forma_pagamento_filtro %}checked{% endif %}>
+                                        <label class="form-check-label" for="forma_{{ forloop.counter }}">
+                                            {{ f }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-1 d-flex flex-column gap-2 justify-content-end">
+                                <label class="form-label d-none d-lg-block">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary">Filtrar</button>
+                                <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-outline-secondary">Limpar</a>
+                            </div>
+                        </div>
+                    </form>
+                    {% if totals.total_bruto %}
+                    <div class="mt-3">
+                        <h5>Totais Gerais</h5>
+                        <p><strong>Valor Bruto Total:</strong> R$ {{ totals.total_bruto|floatformat:2 }}</p>
+                        <p><strong>Taxa Máquina Total:</strong> R$ {{ totals.total_taxa|floatformat:2 }}</p>
+                        <p><strong>Valor Líquido Total:</strong> R$ {{ totals.total_liquido|floatformat:2 }}</p>
+                    </div>
+                    {% endif %}
+                    {% if bandeira_totals %}
+                    <div class="mt-3">
+                        <h5>Totais por Bandeira</h5>
+                        <div class="row">
+                            {% for bt in bandeira_totals %}
+                            <div class="col-md-4 mb-3">
+                                {% if bt.bandeira %}
+                                    {% with bandeira_lower=bt.bandeira|lower %}
+                                        {% if 'visa' in bandeira_lower %}
+                                            <div class="card bg-primary text-white">
+                                        {% elif 'mastercard' in bandeira_lower or 'master' in bandeira_lower %}
+                                            <div class="card bg-danger text-white">
+                                        {% elif 'amex' in bandeira_lower or 'american express' in bandeira_lower %}
+                                            <div class="card bg-info text-white">
+                                        {% elif 'diners' in bandeira_lower %}
+                                            <div class="card bg-warning text-dark">
+                                        {% elif 'discover' in bandeira_lower %}
+                                            <div class="card bg-warning text-dark">
+                                        {% elif 'jcb' in bandeira_lower %}
+                                            <div class="card bg-secondary text-white">
+                                        {% elif 'elo' in bandeira_lower %}
+                                            <div class="card bg-success text-white">
+                                        {% else %}
+                                            <div class="card bg-light text-dark">
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    <div class="card bg-light text-dark">
+                                {% endif %}
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            {% if bt.bandeira %}
+                                                {% with bandeira_lower=bt.bandeira|lower %}
+                                                    {% if 'visa' in bandeira_lower %}
+                                                        <i class="fab fa-cc-visa" title="Visa"></i> {{ bt.bandeira }}
+                                                    {% elif 'mastercard' in bandeira_lower or 'master' in bandeira_lower %}
+                                                        <i class="fab fa-cc-mastercard" title="Mastercard"></i> {{ bt.bandeira }}
+                                                    {% elif 'amex' in bandeira_lower or 'american express' in bandeira_lower %}
+                                                        <i class="fab fa-cc-amex" title="American Express"></i> {{ bt.bandeira }}
+                                                    {% elif 'diners' in bandeira_lower %}
+                                                        <i class="fab fa-cc-diners-club" title="Diners Club"></i> {{ bt.bandeira }}
+                                                    {% elif 'discover' in bandeira_lower %}
+                                                        <i class="fab fa-cc-discover" title="Discover"></i> {{ bt.bandeira }}
+                                                    {% elif 'jcb' in bandeira_lower %}
+                                                        <i class="fab fa-cc-jcb" title="JCB"></i> {{ bt.bandeira }}
+                                                    {% elif 'elo' in bandeira_lower %}
+                                                        <i class="fas fa-credit-card" title="Elo"></i> {{ bt.bandeira }}
+                                                    {% else %}
+                                                        <i class="fas fa-credit-card" title="Cartão"></i> {{ bt.bandeira }}
+                                                    {% endif %}
+                                                {% endwith %}
+                                            {% else %}
+                                                Não informado
+                                            {% endif %}
+                                        </h6>
+                                        <p class="card-text">
+                                            <strong>Valor Bruto:</strong> R$ {{ bt.total_bruto|floatformat:2 }}<br>
+                                            <strong>Taxa Máquina:</strong> R$ {{ bt.total_taxa|floatformat:2 }}<br>
+                                            <strong>Valor Líquido:</strong> R$ {{ bt.total_liquido|floatformat:2 }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body table-responsive p-0">
+                    <form id="conciliate-form" method="post" action="{% url 'relatoriorecebiveis:conciliate' %}">
+                        {% csrf_token %}
+                        <table class="table table-hover text-nowrap">
+                            <thead>
+                                <tr>
+                                    <th>Selecionar</th>
+                                    <th>ID</th>
+                                <th>Data Pagamento</th>
+                                <th>Forma Pagamento</th>
+                                <th>Bandeira</th>
+                                <th>Maquinha</th>
+                                <th>Valor Bruto</th>
+                                <th>Taxa Máquina</th>
+                                <th>Valor Taxa</th>
+                                <th>Valor Líquido</th>
+                                <th>N° Autorização</th>
+                                <th>Data Venda</th>
+                                <th>NSU</th>
+                                <th>Parcelas</th><th>Total de Parcelas</th>
+                                <th>Conciliado</th>
+                                <th>Identificação Extrato</th>
+                                <th>Nota Fiscal</th>
+                                <th>Razão</th>
+                                <th>Conta Bancária</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for relatorio in relatorios %}
+                            <tr>
+                                <td>
+                                    {% if relatorio.conciliado == False %}
+                                        <input type="checkbox" name="selected_ids" value="{{ relatorio.id }}">
+                                    {% endif %}
+                                </td>
+                                <td>{{ relatorio.id }}</td>
+                                <td>{{ relatorio.data_pagamento|date:"d/m/Y" }}</td>
+                                <td>{{ relatorio.forma_pagamento }}</td>
+                                <td>
+                                    {% if relatorio.bandeira %}
+                                        {% with bandeira_lower=relatorio.bandeira|lower %}
+                                            {% if 'visa' in bandeira_lower %}
+                                                <i class="fab fa-cc-visa text-primary" title="Visa"></i> {{ relatorio.bandeira }}
+                                            {% elif 'mastercard' in bandeira_lower or 'master' in bandeira_lower %}
+                                                <i class="fab fa-cc-mastercard text-danger" title="Mastercard"></i> {{ relatorio.bandeira }}
+                                            {% elif 'amex' in bandeira_lower or 'american express' in bandeira_lower %}
+                                                <i class="fab fa-cc-amex text-blue" title="American Express"></i> {{ relatorio.bandeira }}
+                                            {% elif 'diners' in bandeira_lower %}
+                                                <i class="fab fa-cc-diners-club text-warning" title="Diners Club"></i> {{ relatorio.bandeira }}
+                                            {% elif 'discover' in bandeira_lower %}
+                                                <i class="fab fa-cc-discover text-orange" title="Discover"></i> {{ relatorio.bandeira }}
+                                            {% elif 'jcb' in bandeira_lower %}
+                                                <i class="fab fa-cc-jcb text-info" title="JCB"></i> {{ relatorio.bandeira }}
+                                            {% elif 'elo' in bandeira_lower %}
+                                                <i class="fas fa-credit-card text-success" title="Elo"></i> {{ relatorio.bandeira }}
+                                            {% else %}
+                                                <i class="fas fa-credit-card text-secondary" title="Cartão"></i> {{ relatorio.bandeira }}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ relatorio.maquinha|default:"-" }}</td>
+                                <td>R$ {{ relatorio.valor_bruto }}</td>
+                                <td>{{ relatorio.taxa_perc }}%</td>
+                                <td>R$ {{ relatorio.taxa_maquinha|default:0 }}</td>
+                                <td>R$ {{ relatorio.valor_liquido }}</td>
+                                <td>{{ relatorio.numero_autorizacao|default:"-" }}</td>
+                                <td>
+                                    {% if relatorio.data_venda_iso and cobranca_cartao_debito_id and cobranca_cartao_credito_id %}
+                                        {% with fp=relatorio.forma_pagamento|default:''|lower %}
+                                        <a href="{% url 'contasareceber:crlistar' %}?forma_pagamento={% if 'débito' in fp or 'debito' in fp %}{{ cobranca_cartao_debito_id }}{% else %}{{ cobranca_cartao_credito_id }}{% endif %}&data_inicio={{ relatorio.data_venda_iso }}&data_fim={{ relatorio.data_venda_iso }}"
+                                           class="link-data-venda"
+                                           title="Contas a Receber: emissão = {{ relatorio.data_venda_display }} · {% if 'débito' in fp or 'debito' in fp %}Cartão Débito{% else %}Cartão Crédito{% endif %}"
+                                           target="_blank"
+                                           rel="noopener noreferrer">
+                                            {{ relatorio.data_venda_display }}
+                                        </a>
+                                        {% endwith %}
+                                    {% else %}
+                                        {{ relatorio.data_venda_display }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ relatorio.NSU|default:"-" }}</td>
+                                <td>{% if relatorio.parcela_texto %}{{ relatorio.parcela_texto }}{% else %}{{ relatorio.parcelas|default:"-" }}{% endif %}</td>
+                                <td>{% if relatorio.parcela_texto %}-{% else %}{{ relatorio.total_parcelas|default:"-" }}{% endif %}</td>
+                                <td>
+                                    {% if relatorio.conciliado %}
+                                        <span class="badge badge-success">Sim</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">Não</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ relatorio.identificacao_extrato }}</td>
+                                <td>
+                                    {% if relatorio.conta_a_receber %}
+                                        {{ relatorio.conta_a_receber.nota.numero_nota|default:relatorio.nota_fiscal|default:"-" }}
+                                    {% else %}
+                                        {{ relatorio.nota_fiscal|default:"-" }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ relatorio.razao|default:"-" }}</td>
+                                <td>{{ relatorio.conta_bancaria|default:"-" }}</td>
+                                <td>
+                                    <details class="rr-row-actions">
+                                        <summary class="btn btn-sm btn-outline-secondary rr-row-actions-btn" title="Ações" aria-label="Ações">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </summary>
+                                        <div class="rr-row-actions-menu" role="menu">
+                                            <a href="{% url 'relatoriorecebiveis:detail' relatorio.pk %}" class="rr-row-actions-item" role="menuitem">
+                                                <i class="fas fa-eye text-info"></i> Visualizar
+                                            </a>
+                                            {% if not relatorio.conciliado %}
+                                            <a href="{% url 'relatoriorecebiveis:update' relatorio.pk %}" class="rr-row-actions-item" role="menuitem">
+                                                <i class="fas fa-edit text-warning"></i> Editar
+                                            </a>
+                                            <a href="{% url 'relatoriorecebiveis:delete' relatorio.pk %}" class="rr-row-actions-item rr-row-actions-item-danger" role="menuitem">
+                                                <i class="fas fa-trash text-danger"></i> Excluir
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </details>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="21" class="text-center">Nenhum relatório encontrado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.link-data-venda {
+    color: #0d6efd;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+}
+.link-data-venda:hover {
+    color: #0a58ca;
+}
+</style>
+<script>
+    document.getElementById('periodo').addEventListener('change', function() {
+        var datas = document.getElementById('datas');
+        if (this.value === 'personalizado') {
+            datas.style.display = 'block';
+        } else {
+            datas.style.display = 'none';
+        }
+    });
+
+    document.querySelectorAll('.rr-row-actions').forEach(function(details) {
+        details.addEventListener('toggle', function() {
+            if (!this.open) return;
+            document.querySelectorAll('.rr-row-actions[open]').forEach(function(other) {
+                if (other !== details) other.removeAttribute('open');
+            });
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.rr-row-actions')) return;
+        document.querySelectorAll('.rr-row-actions[open]').forEach(function(d) {
+            d.removeAttribute('open');
+        });
+    });
+</script>
+{% endblock %}

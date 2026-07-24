@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Confirmar Reabertura de Fechamento{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Confirmar Reabertura de Fechamento</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Você está prestes a reabrir o fechamento deste repasse.
+                    </div>
+
+                    <p>Esta ação irá:</p>
+                    <ul>
+                        <li>Remover a data de fechamento</li>
+                        <li>Alterar o status para "Pendente"</li>
+                        <li>Limpar o código de fechamento</li>
+                        <li>Manter os valores de comissão e imposto calculados</li>
+                    </ul>
+
+                    <p><strong>Faturamento:</strong> {{ faturamento }}</p>
+                    <p><strong>Código de Fechamento:</strong> {{ faturamento.codigo_fechamento|default:"Não informado" }}</p>
+                    <p><strong>Data de Fechamento:</strong> {{ faturamento.data_fechamento|date:"d/m/Y"|default:"Não informado" }}</p>
+
+                    <div class="mt-4">
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-undo"></i> Confirmar Reabertura
+                            </button>
+                            <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+{% comment %} {%block sid_Bar%}
+{% include 'parcial/_MenuSideNav.html' %}
+{%endblock%} {% endcomment %}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">{{ titulo }} - {{ descricao }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% include 'parcial/_messages.html' %}
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="row">
+                             <div class="col-md-12">
+                                 <div class="mb-3">
+                                     {{ form.DescricaoRegraImposto.label_tag }}
+                                     {{ form.DescricaoRegraImposto }}
+                                     {% if form.DescricaoRegraImposto.errors %}
+                                         <div class="text-danger">
+                                             {{ form.DescricaoRegraImposto.errors|striptags }}
+                                         </div>
+                                     {% endif %}
+                                 </div>
+                             </div>
+                         </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.aliquota_pis.label_tag }}
+                                    {{ form.aliquota_pis }}
+                                    {% if form.aliquota_pis.errors %}
+                                        <div class="text-danger">
+                                            {{ form.aliquota_pis.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.aliquota_cofins.label_tag }}
+                                    {{ form.aliquota_cofins }}
+                                    {% if form.aliquota_cofins.errors %}
+                                        <div class="text-danger">
+                                            {{ form.aliquota_cofins.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.aliquota_csll.label_tag }}
+                                    {{ form.aliquota_csll }}
+                                    {% if form.aliquota_csll.errors %}
+                                        <div class="text-danger">
+                                            {{ form.aliquota_csll.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.aliquota_irpj.label_tag }}
+                                    {{ form.aliquota_irpj }}
+                                    {% if form.aliquota_irpj.errors %}
+                                        <div class="text-danger">
+                                            {{ form.aliquota_irpj.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.aliquota_iss_apuracao.label_tag }}
+                                    {{ form.aliquota_iss_apuracao }}
+                                    {% if form.aliquota_iss_apuracao.errors %}
+                                        <div class="text-danger">
+                                            {{ form.aliquota_iss_apuracao.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    {{ form.percentual_calculo.label_tag }}
+                                    {{ form.percentual_calculo }}
+                                    {% if form.percentual_calculo.errors %}
+                                        <div class="text-danger">
+                                            {{ form.percentual_calculo.errors|striptags }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'regraimposto:ListaRegra' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Salvar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{%endblock%}

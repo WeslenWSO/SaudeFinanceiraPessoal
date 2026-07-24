@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">{{ titulo }}</h1>
+
+    <!-- Filtros -->
+    <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-gradient-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h5>
+        </div>
+        <div class="card-body bg-light">
+            <form method="get" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-3">
+                    <label for="anexo" class="form-label">Anexo</label>
+                    <select id="anexo" name="anexo" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="I" {% if request.GET.anexo == 'I' %}selected{% endif %}>Anexo I</option>
+                        <option value="II" {% if request.GET.anexo == 'II' %}selected{% endif %}>Anexo II</option>
+                        <option value="III" {% if request.GET.anexo == 'III' %}selected{% endif %}>Anexo III</option>
+                        <option value="IV" {% if request.GET.anexo == 'IV' %}selected{% endif %}>Anexo IV</option>
+                        <option value="V" {% if request.GET.anexo == 'V' %}selected{% endif %}>Anexo V</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="ano_vigencia" class="form-label">Ano de Vigência</label>
+                    <input type="number" id="ano_vigencia" name="ano_vigencia" class="form-control"
+                           value="{{ request.GET.ano_vigencia }}" min="2000" max="2030">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <a href="{% url 'notasfiscais:anexos_simples_list' %}" class="btn btn-secondary w-100">Limpar</a>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <a href="{% url 'notasfiscais:anexos_simples_create' %}" class="btn btn-success w-100">
+                        <i class="fas fa-plus me-1"></i>Cadastrar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de anexos -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Anexos Cadastrados</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Anexo</th>
+                            <th>Faixa</th>
+                            <th>Limite Inferior</th>
+                            <th>Limite Superior</th>
+                            <th>Alíquota</th>
+                            <th>Valor a Deduzir</th>
+                            <th>Ano de Vigência</th>
+                            <th>Percentuais Tributos</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anexo in anexos %}
+                        <tr>
+                            <td>{{ anexo.anexo }}</td>
+                            <td>{{ anexo.faixa }}</td>
+                            <td>R$ {{ anexo.limite_inferior|floatformat:2 }}</td>
+                            <td>
+                                {% if anexo.limite_superior %}
+                                    R$ {{ anexo.limite_superior|floatformat:2 }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ anexo.aliquota }}%</td>
+                            <td>R$ {{ anexo.valor_deduzir|floatformat:2 }}</td>
+                            <td>{{ anexo.ano_vigencia }}</td>
+                            <td>
+                                {% if anexo.percentual_irpj or anexo.percentual_csll or anexo.percentual_cofins or anexo.percentual_pis or anexo.percentual_cpp or anexo.percentual_iss %}
+                                    <small>
+                                        IRPJ: {{ anexo.percentual_irpj }}% |
+                                        CSLL: {{ anexo.percentual_csll }}% |
+                                        COFINS: {{ anexo.percentual_cofins }}% |
+                                        PIS: {{ anexo.percentual_pis }}% |
+                                        CPP: {{ anexo.percentual_cpp }}% |
+                                        ISS: {{ anexo.percentual_iss }}%
+                                    </small>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'notasfiscais:anexos_simples_update' anexo.pk %}"
+                                   class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                                <a href="{% url 'notasfiscais:anexos_simples_delete' anexo.pk %}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Tem certeza que deseja excluir este anexo?')">
+                                    <i class="fas fa-trash"></i> Excluir
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center">Nenhum anexo cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

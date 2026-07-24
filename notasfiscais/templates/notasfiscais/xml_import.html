@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4 mb-4">Importar NFSe do XML</h1>
+
+    <!-- Verificação de Empresa Selecionada -->
+    {% if not request.session.empresa_id %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Atenção!</strong> Você precisa selecionar uma empresa antes de importar XMLs.
+        <a href="{% url 'empresa:lista' %}" class="btn btn-warning btn-sm ms-3">
+            <i class="fas fa-building me-1"></i>Selecionar Empresa
+        </a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% else %}
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Empresa Selecionada:</strong> {{ request.session.empresa_nome }}
+        <small class="d-block mt-1">Apenas XMLs desta empresa poderão ser importados.</small>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Formulário de Upload -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-upload"></i> Upload de Arquivo XML
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="xmlUploadForm">
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                            {% include 'parcial/_messages.html' %}
+                        {% endif %}
+                        
+                        <!-- Relatório de Importação -->
+                        {% if resultado_importacao %}
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-bar"></i> Relatório de Importação
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card bg-success text-white">
+                                            <div class="card-body text-center">
+                                                <h4>{{ resultado_importacao.total_importadas }}</h4>
+                                                <p class="mb-0">Importadas</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-warning text-dark">
+                                            <div class="card-body text-center">
+                                                <h4>{{ resultado_importacao.total_ignoradas }}</h4>
+                                                <p class="mb-0">Ignoradas</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-info text-white">
+                                            <div class="card-body text-center">
+                                                <h4>{{ resultado_importacao.total_processadas }}</h4>
+                                                <p class="mb-0">Processadas</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {% if resultado_importacao.notas_importadas %}
+                                <div class="mt-4">
+                                    <h6 class="text-success">
+                                        <i class="fas fa-check-circle"></i> Notas Importadas com Sucesso
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-success">
+                                            <thead>
+                                                <tr>
+                                                    <th>Número</th>
+                                                    <th>Cliente</th>
+                                                    <th>Valor</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for nota in resultado_importacao.notas_importadas %}
+                                                <tr>
+                                                    <td><strong>{{ nota.numero_nota }}</strong></td>
+                                                    <td>{{ nota.cliente }}</td>
+                                                    <td>R$ {{ nota.valor_liquido|floatformat:2 }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if resultado_importacao.notas_ignoradas %}
+                                <div class="mt-4">
+                                    <h6 class="text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> Notas Ignoradas
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-warning">
+                                            <thead>
+                                                <tr>
+                                                    <th>Número</th>
+                                                    <th>Cliente</th>
+                                                    <th>Motivo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for nota in resultado_importacao.notas_ignoradas %}
+                                                <tr>
+                                                    <td><strong>{{ nota.numero_nota }}</strong></td>
+                                                    <td>{{ nota.cliente }}</td>
+                                                    <td><small>{{ nota.motivo }}</small></td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.xml_file.id_for_label }}" class="form-label">
+                                {{ form.xml_file.label }}
+                            </label>
+
+                            <!-- Input file múltiplo -->
+                            <div class="mb-3">
+                                <input type="file" name="{{ form.xml_file.name }}"
+                                       id="xmlFileInput"
+                                       class="form-control" accept=".xml" multiple required>
+                                <div class="form-text">Selecione um ou mais arquivos XML de NFSe válidos (máximo 5MB cada)</div>
+                            </div>
+                            
+                            {% if form.xml_file.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.xml_file.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-check mb-3">
+                            {{ form.importar_canceladas }}
+                            <label class="form-check-label" for="{{ form.importar_canceladas.id_for_label }}">
+                                {{ form.importar_canceladas.label }}
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary me-md-2">
+                                Cancelar
+                            </a>
+                            <button type="submit" name="action" value="preview" class="btn btn-info me-md-2" id="previewBtn">
+                                <i class="fas fa-eye"></i> Visualizar Notas
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-upload"></i> Importar XML
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+
+
+
+            <!-- Preview das Notas para Importação -->
+            {% if show_preview and notas_preview %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Notas Encontradas no XML
+                        <span class="badge bg-light text-dark ms-2">{{ total_notas }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Arquivos:</strong> {{ xml_file_name }} |
+                        <strong>Empresa:</strong> {{ empresa.razao }}
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Série</th>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>CNPJ/CPF</th>
+                                    <th>Base Serviço</th>
+                                    <th>Valor Bruto</th>
+                                    <th>Valor Líquido</th>
+                                    <th>Status</th>
+                                    {% if importar_canceladas %}
+                                    <th>Situação na Importação</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for nota in notas_preview %}
+                                <tr class="{% if nota.status == 'valido' %}table-success{% else %}table-danger{% endif %}">
+                                    <td><strong>{{ nota.numero_nota }}</strong></td>
+                                    <td>{{ nota.serie }}</td>
+                                    <td>
+                                        {% if nota.data_emissao %}
+                                            {{ nota.data_emissao|slice:":10" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if nota.cliente %}
+                                            {{ nota.cliente }}
+                                        {% else %}
+                                            <span class="text-muted">Cliente não identificado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if nota.base_servico %}
+                                            {{ nota.base_servico }}
+                                        {% else %}
+                                            <span class="text-muted">Normal</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if nota.cnpj_cpf %}
+                                            {{ nota.cnpj_cpf }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>R$ {{ nota.valor_bruto|floatformat:2 }}</td>
+                                    <td>R$ {{ nota.valor_liquido|floatformat:2 }}</td>
+                                    <td>
+                                        {% if nota.status == 'valido' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> Válida
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times"></i> Inválida
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    {% if importar_canceladas %}
+                                    <td>
+                                        <span class="badge bg-danger">
+                                            Será importada como Cancelada (valores zerados)
+                                        </span>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% if nota.discriminacao %}
+                                <tr class="{% if nota.status == 'valido' %}table-success{% else %}table-danger{% endif %}">
+                                    <td colspan="8">
+                                        <small class="text-muted">
+                                            <strong>Discriminação:</strong> {{ nota.discriminacao|truncatechars:100 }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Resumo e Ações -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Resumo</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li><strong>Total de Notas:</strong> {{ total_notas }}</li>
+                                        <li><strong>Válidas:</strong> 
+                                            <span class="text-success">{{ valid_count|default:0 }}</span>
+                                        </li>
+                                        <li><strong>Inválidas:</strong> 
+                                            <span class="text-danger">{{ invalid_count|default:0 }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Ações</h6>
+                                    <form method="post" enctype="multipart/form-data" id="importForm">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="confirm_import">
+                                        {% if importar_canceladas %}
+                                        <input type="hidden" name="importar_canceladas" value="on">
+                                        {% endif %}
+                                        <p class="small text-muted mb-2">
+                                            Os arquivos XML foram guardados ao visualizar; não é preciso escolher o arquivo de novo.
+                                        </p>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-upload"></i> Confirmar Importação
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Status da Importação -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle"></i> Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="importStatus">
+                        <p class="text-muted mb-0">Aguardando arquivo...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos do DOM
+    const fileInput = document.getElementById('xmlFileInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const previewBtn = document.getElementById('previewBtn');
+    const importStatus = document.getElementById('importStatus');
+
+    // File input change - validação simples
+    fileInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+
+        if (files && files.length > 0) {
+            console.log('Arquivos selecionados:', files.length);
+
+            let validFiles = 0;
+            let invalidFiles = 0;
+            let fileNames = [];
+
+            for (let file of files) {
+                console.log('Arquivo:', file.name, file.size, 'bytes');
+
+                // Validação básica
+                if (!file.name.endsWith('.xml')) {
+                    invalidFiles++;
+                    continue;
+                }
+
+                if (file.size > 5 * 1024 * 1024) { // 5MB
+                    invalidFiles++;
+                    continue;
+                }
+
+                validFiles++;
+                fileNames.push(file.name);
+            }
+
+            if (invalidFiles > 0) {
+                alert(`Encontrados ${invalidFiles} arquivo(s) inválido(s). Apenas arquivos XML com até 5MB são aceitos.`);
+                fileInput.value = '';
+                submitBtn.disabled = true;
+                previewBtn.disabled = true;
+                importStatus.innerHTML = `<p class="text-muted mb-0">Aguardando arquivo...</p>`;
+                return;
+            }
+
+            // Habilita os botões
+            submitBtn.disabled = false;
+            previewBtn.disabled = false;
+
+            // Atualiza status
+            importStatus.innerHTML = `
+                <div class="text-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    ${validFiles} arquivo(s) selecionado(s): ${fileNames.join(', ')}
+                </div>
+            `;
+        } else {
+            // Desabilita os botões
+            submitBtn.disabled = true;
+            previewBtn.disabled = true;
+
+            // Atualiza status
+            importStatus.innerHTML = `
+                <p class="text-muted mb-0">Aguardando arquivo...</p>
+            `;
+        }
+    });
+
+    // Form submit - validação final
+    document.getElementById('xmlUploadForm').addEventListener('submit', function(e) {
+        const files = fileInput.files;
+
+        if (!files || files.length === 0) {
+            e.preventDefault();
+            alert('Por favor, selecione um ou mais arquivos XML antes de continuar.');
+            return false;
+        }
+
+        // Atualiza status
+        importStatus.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                    <span class="visually-hidden">Processando...</span>
+                </div>
+                <span class="text-primary">Processando ${files.length} arquivo(s) XML...</span>
+            </div>
+        `;
+    });
+});
+</script>
+{% endblock %}
+
+

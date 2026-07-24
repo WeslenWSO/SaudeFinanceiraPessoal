@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+   {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+	 {%block conteudo%}
+
+
+	   <form method="post" novalidate class="card">
+		{%csrf_token %}
+		{% if messages %}
+		   {% include 'parcial/_messages.html' %}
+		{% endif %}
+	   {% for field in form %}
+		   {% if field.name == 'completed' %}
+			   <p>
+				   {{ field.label_tag }}
+				   {{ field }}
+			   </p>
+			   {% if field.errors %}
+				   <small class="error">{{ field.errors|striptags  }}</small>
+			   {% endif %}
+		   {% else %}
+			   {{ field.label_tag }}
+			   {{ field }}
+			   {% if field.errors %}
+				   <small class="error" style="color:red">{{ field.errors|striptags  }}</small>
+			   {% endif %}
+		   {% endif %}
+	   {% endfor %}
+
+	   <div class="form-buttons">
+		   <input type="submit" value="Save" class="btn btn-primary"/>
+		   <a href="{%url 'servicos_medicos:servicos_list'%}" class="btn btn-outline">Cancel</a>
+	   </div>
+
+
+    </form>
+
+
+
+{%endblock%}

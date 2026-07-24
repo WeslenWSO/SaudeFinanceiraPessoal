@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Confirmar Exclusão{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Confirmar Exclusão de Documento</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:detalhes' documento.faturamento.pk %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Você está prestes a excluir o documento abaixo.
+                        Esta ação não pode ser desfeita.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <dl class="row">
+                                <dt class="col-sm-3">Documento:</dt>
+                                <dd class="col-sm-9">
+                                    <strong>{{ documento.nome|default:documento.arquivo.name }}</strong>
+                                </dd>
+
+                                <dt class="col-sm-3">Faturamento:</dt>
+                                <dd class="col-sm-9">{{ documento.faturamento }}</dd>
+
+                                <dt class="col-sm-3">Tipo:</dt>
+                                <dd class="col-sm-9">
+                                    <span class="badge badge-info">{{ documento.get_file_extension|upper }}</span>
+                                </dd>
+
+                                <dt class="col-sm-3">Tamanho:</dt>
+                                <dd class="col-sm-9">{{ documento.get_file_size }}</dd>
+
+                                <dt class="col-sm-3">Data de Upload:</dt>
+                                <dd class="col-sm-9">{{ documento.data_upload|date:"d/m/Y H:i" }}</dd>
+
+                                {% if documento.descricao %}
+                                <dt class="col-sm-3">Descrição:</dt>
+                                <dd class="col-sm-9">{{ documento.descricao }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Sim, Excluir Documento
+                        </button>
+                        <a href="{% url 'faturamento_medico:detalhes' documento.faturamento.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

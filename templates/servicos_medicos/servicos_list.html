@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+      <a href="{% url 'servicos_medicos:servicos_create' %}" role="button" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+          <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+          <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+        </svg>
+        Novo Serviço Médico</a>
+      {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+   <div class="row mb-3">
+     <div class="col-md-6">
+       <form method="get" class="d-flex">
+         <input type="text" name="q" class="form-control me-2" placeholder="Buscar por código ou serviço..." value="{{ request.GET.q }}">
+         <button type="submit" class="btn btn-outline-primary">
+           <i class="fas fa-search"></i> Pesquisar
+         </button>
+       </form>
+     </div>
+   </div>
+
+<div class="card mb-4">
+  <div class="card-header"> {{ descricao }}   </div>
+   <div class="card-body">
+
+     <div class="dataTable-wrapper dataTable-loading no-footer sortable searchable fixed-columns">
+
+<div class="datatable-container">
+
+<table id="datatablesSimple" class="dataTable-table">
+   <thead>
+    <tr>
+      <th>ID</th>
+      <th>Código</th>
+      <th>Serviços</th>
+      <th>Porte Anestésico</th>
+      <th>Edi.</th>
+    </tr>
+  </thead>
+
+  <tbody>
+
+    {% for servico in page_obj %}
+
+     <tr>
+      <td> <a class="nav-link"> </a>
+        {{ servico.id }}
+            </td>
+      <td>
+        {{ servico.codigo }}
+      </td>
+      <td>
+        {{ servico.servicos }}
+      </td>
+      <td>
+        {{ servico.porte_anestesico }}
+      </td>
+
+        <td>
+
+               <a href="{% url 'servicos_medicos:servicos_update' servico.id %}" class="btn btn-primary">
+                <i class="fa-solid fa-pen-to-square"></i>
+               </a>
+
+        </td>
+
+    </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+     </div>
+
+   </div>
+
+   {% if is_paginated %}
+   <nav aria-label="Paginação">
+     <ul class="pagination justify-content-center">
+       {% if page_obj.has_previous %}
+       <li class="page-item">
+         <a class="page-link" href="?page=1">&laquo; Primeira</a>
+       </li>
+       <li class="page-item">
+         <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+       </li>
+       {% endif %}
+
+       <li class="page-item disabled">
+         <span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+       </li>
+
+       {% if page_obj.has_next %}
+       <li class="page-item">
+         <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+       </li>
+       <li class="page-item">
+         <a class="page-link" href="?page={{ paginator.num_pages }}">Última &raquo;</a>
+       </li>
+       {% endif %}
+     </ul>
+   </nav>
+   {% endif %}
+
+</div>
+</div>
+
+{%endblock%}

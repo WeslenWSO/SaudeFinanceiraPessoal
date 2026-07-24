@@ -1,0 +1,1980 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.emp-sim-box { border-left: 4px solid #0d6efd; }
+#tabelaQuitacaoParcelas thead th { white-space: nowrap; }
+#quitValoresQuitarBox .quit-valores-table {
+    margin-bottom: 0;
+    background: #fff;
+}
+#quitValoresQuitarBox .quit-valores-table th,
+#quitValoresQuitarBox .quit-valores-table td {
+    vertical-align: middle;
+    padding: 0.65rem 0.85rem;
+}
+#quitValoresQuitarBox .quit-valores-table thead th {
+    background: #198754;
+    color: #fff;
+    font-weight: 600;
+    border-color: #198754;
+}
+#quitValoresQuitarBox .quit-valores-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+#quitValoresQuitarBox .quit-eco-cell {
+    background: #f8fff9;
+    width: 32%;
+    min-width: 12rem;
+}
+#quitParcialValorBox .quit-parcial-table {
+    margin-bottom: 0;
+    background: #fff;
+}
+#quitParcialValorBox .quit-parcial-table th,
+#quitParcialValorBox .quit-parcial-table td {
+    vertical-align: middle;
+    padding: 0.65rem 0.85rem;
+}
+#quitParcialValorBox .quit-parcial-table thead th {
+    background: #198754;
+    color: #fff;
+    font-weight: 600;
+    border-color: #198754;
+}
+#quitParcialValorBox .quit-parcial-table tbody td {
+    background: #f0faf3;
+}
+</style>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-1">
+                <i class="fas fa-hand-holding-usd text-success"></i>
+                Simular quitação — parcelas em aberto
+            </h3>
+            <div class="text-muted">
+                Contrato {{ emprestimo.numero_contrato }} · {{ emprestimo.cliente }}
+                · {{ emprestimo.indicador_display }}
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'emprestimos:detalhe' emprestimo.pk %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Voltar ao contrato
+            </a>
+            <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}"
+               class="btn btn-outline-success btn-sm">
+                <i class="fas fa-folder-open"></i> Simulações
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+    {% if simulacao %}
+    <div class="alert alert-primary emp-sim-box mb-3">
+        <h5 class="alert-heading"><i class="fas fa-calculator"></i> Resultado da simulação</h5>
+        <p class="mb-1">
+            Data pretendida: <strong>{{ simulacao.data_quitacao|date:"d/m/Y" }}</strong>
+            · Parcelas: <strong>{{ simulacao.numeros|join:", " }}</strong> ({{ simulacao.qtd }})
+        </p>
+        <ul class="mb-2">
+            <li>Soma amortizações selecionadas (saldo): <strong>R$ {{ simulacao.total_amortizacao|moeda_br }}</strong></li>
+            {% if simulacao.origem_price %}
+            <li class="small text-info"><i class="fas fa-calculator"></i>
+                Price: <strong>principal (extrato) + juros a.m.</strong> até a data de quitação
+            </li>
+            {% endif %}
+            {% if simulacao.is_sac %}
+            <li>
+                <strong>Juros / correção {% if simulacao.selic_info.indice %}{{ simulacao.selic_info.indice }}{% else %}CDI{% endif %}</strong>
+                (sobre o saldo, de {{ simulacao.data_referencia|date:"d/m/Y" }}
+                até {{ simulacao.data_fim_juros|date:"d/m/Y" }}, {{ simulacao.dias_juros }} dia{{ simulacao.dias_juros|pluralize }}):
+                <strong class="text-danger">R$ {{ simulacao.juros_parcela_ref|moeda_br }}</strong>
+            </li>
+            <li>Correção: R$ {{ simulacao.juros_selic|moeda_br }}
+                {% if simulacao.juros_aa %} + taxa a.a. R$ {{ simulacao.juros_aa|moeda_br }}{% endif %}
+            </li>
+            {% if simulacao.valor_parcela_ref %}
+            <li>Parcela {{ simulacao.parcela_ref_numero }} efetiva (amort. + juros): <strong>R$ {{ simulacao.valor_parcela_ref|moeda_br }}</strong></li>
+            {% endif %}
+            {% if simulacao.selic_info.mensagem %}
+            <li class="small text-muted">{{ simulacao.selic_info.mensagem }}</li>
+            {% endif %}
+            {% else %}
+            <li>Juros das selecionadas (no extrato): <strong>R$ {{ simulacao.total_juros|moeda_br }}</strong></li>
+            <li>
+                Juros pro rata até a data
+                ({{ simulacao.dias_juros }} dia{{ simulacao.dias_juros|pluralize }} desde {{ simulacao.data_referencia|date:"d/m/Y" }},
+                {{ simulacao.taxa_juros_am }}% a.m.):
+                <strong>R$ {{ simulacao.juros_pro_rata|moeda_br }}</strong>
+            </li>
+            {% endif %}
+            <li>Quitação estimada (principal + juros): <strong class="fs-5">R$ {{ simulacao.valor_quitacao_estimado|moeda_br }}</strong></li>
+            <li>Restariam {{ simulacao.parcelas_restantes }} parcela(s) — principal R$ {{ simulacao.saldo_restante_amort|moeda_br }}</li>
+        </ul>
+        <small class="text-muted">
+            {% if simulacao.is_sac %}
+            SAC/CDI (SACD): saldo p/ quitação = amortizações + CDI × % índice
+            × taxa prefixada a.m. (se houver) até a data. Confirme com o banco.
+            {% else %}
+            Estimativa linear (taxa a.m. ÷ 30). Confirme a quitação com o banco.
+            {% endif %}
+        </small>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" id="formQuitacaoModal" action="{% url 'emprestimos:quitacao' emprestimo.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="simular">
+                <input type="hidden" name="dados_price_json" id="dados_price_json" value="">
+                <script type="application/json" id="dadosPriceJsonBoot">{{ dados_price_json|default:'null'|safe }}</script>
+
+                {% if not abertas %}
+                <div class="alert alert-success mb-0">Não há parcelas em aberto neste contrato.</div>
+                {% else %}
+                <div id="quitOrigemPriceBox" class="alert alert-info py-2 small {% if not origem_price and not origem_sac %}d-none{% endif %}">
+                    <i class="fas fa-calculator"></i>
+                    {% if origem_sac or metodo_calculo == 'sac' %}
+                    <strong>Valores da simulação SAC</strong> — amortização das abertas da tabela SAC.
+                    Quitação: saldo principal + <strong>CDI × % índice</strong>
+                    {% if emprestimo.taxa_juros_am %}× <strong>taxa {{ emprestimo.taxa_juros_am }}% a.m.</strong>{% endif %}
+                    até a data informada (como o “Saldo p/ Quitação” do extrato).
+                    {% else %}
+                    <strong>Valores da Tabela Price</strong> — saldo p/ quitação =
+                    <strong>saldo principal + juros</strong> até a data:
+                    <code>saldo × ((1+i)<sup>dias/30</sup> − 1)</code>
+                    com a <strong>taxa de juros a.m.</strong> (sem mora), como no extrato Sicoob.
+                    {% endif %}
+                </div>
+                <p class="text-muted small mb-3">
+                    Calcula o valor estimado para quitar as parcelas selecionadas na data informada
+                    (método <strong>{{ metodo_calculo_rotulo }}</strong>).
+                    Confirme sempre o valor com o banco.
+                </p>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-3">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Contrato (abertas)</div>
+                            <div class="fw-bold" id="quitResumoQtd">{{ abertas|length }} parcela{{ abertas|length|pluralize }}</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Valor principal total</div>
+                            <div class="fw-bold text-primary" id="quitResumoSaldo">R$ {{ saldo_principal|moeda_br }}</div>
+                            <div class="form-text mb-0" style="font-size:0.7rem;" id="quitResumoSaldoHint">Total do contrato — fixo ao desmarcar</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Valor do juros</div>
+                            <div class="fw-bold text-danger" id="quitResumoJuros">R$ 0,00</div>
+                            <div class="form-text mb-0" style="font-size:0.7rem;" id="quitResumoJurosHint">Juros do contrato até a data</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Total parcelas (face)</div>
+                            <div class="fw-bold" id="quitResumoTotal">R$ {{ total_aberto|moeda_br }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border rounded mb-3 overflow-hidden"
+                     id="quitValoresQuitarBox"
+                     data-metodo="{{ metodo_calculo|default:'price' }}"
+                     data-taxa-am="{{ taxa_quitacao_am|stringformat:'f' }}"
+                     data-taxa-juros-am="{{ emprestimo.taxa_juros_am|stringformat:'f' }}"
+                     data-taxa-aa="{{ taxa_quitacao_aa|default:0|stringformat:'f' }}"
+                     data-saldo-principal="{{ saldo_principal|stringformat:'f' }}"
+                     data-pct-indice="{% if emprestimo.pct_correcao_am %}{{ emprestimo.pct_correcao_am|stringformat:'f' }}{% else %}192{% endif %}"
+                     data-indice="{{ emprestimo.indice_correcao|default:'CDI' }}"
+                     data-ref-juros="{{ data_ref_quitacao|date:'Y-m-d' }}"
+                     data-preview-url="{% url 'emprestimos:quitacao_juros_preview' emprestimo.pk %}">
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle quit-valores-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th colspan="2">
+                                        <i class="fas fa-hand-holding-usd"></i> Valores para quitar
+                                        <span class="fw-normal small opacity-75">— total do contrato</span>
+                                    </th>
+                                    <th class="text-center" id="quitValDiffTitulo">Economia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="width:52%;">
+                                        <strong>a)</strong>
+                                        Saldo principal
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <strong class="text-primary" id="quitValA">R$ 0,00</strong>
+                                    </td>
+                                    <td class="quit-eco-cell text-center" rowspan="3">
+                                        <div class="small text-muted mb-1" id="quitValDiffFormula">
+                                            Parcelas selecionadas − valor a quitar
+                                        </div>
+                                        <div class="fs-4 fw-bold" id="quitValDiff">R$ 0,00</div>
+                                        <div class="small mt-1" id="quitValDiffHint">
+                                            Economia para o cliente
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <strong>b)</strong>
+                                        {% if is_sac_emprestimo %}
+                                        Juros / correção {% if emprestimo.indice_correcao %}{{ emprestimo.indice_correcao }}{% else %}CDI/SELIC{% endif %}
+                                        {% else %}
+                                        Juros até a data (taxa a.m.)
+                                        {% endif %}
+                                        <div class="small text-muted" id="quitValBDias"></div>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <strong class="text-danger" id="quitValB">R$ 0,00</strong>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <strong>c)</strong> Valor para quitar
+                                        <span class="text-muted small" id="quitValCHint">(a + b)</span>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <strong class="fs-6 text-success" id="quitValC">R$ 0,00</strong>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="data_quitacao_modal">Data que pretendo quitar</label>
+                        <input type="date" class="form-control" id="data_quitacao_modal" name="data_quitacao"
+                               value="{{ data_quitacao|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="quitTaxaJuros">Taxa de Juros (% a.m.)</label>
+                        <input type="text" class="form-control" id="quitTaxaJuros" name="taxa_juros_am"
+                               value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="quitTaxaMora">Taxa de Mora (% a.m.)</label>
+                        <input type="text" class="form-control" id="quitTaxaMora" name="taxa_mora_am"
+                               value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}" inputmode="decimal">
+                        <div class="form-text">Cálculo: juros + mora = <span id="quitTaxaSomaLabel">{{ taxa_quitacao_am }}</span>%</div>
+                    </div>
+                    {% if is_sac_emprestimo %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="selic_periodo_pct_modal">
+                            CDI/SELIC período % (opc.)
+                        </label>
+                        <input type="text" class="form-control" id="selic_periodo_pct_modal" name="selic_periodo_pct"
+                               value="{{ selic_periodo_pct }}" placeholder="Auto BCB">
+                        <div class="form-text">Vazio = consulta CDI/SELIC no Banco Central até a data de quitação</div>
+                    </div>
+                    {% endif %}
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="titulo_simulacao">Título (para pesquisar depois)</label>
+                        <input type="text" class="form-control" id="titulo_simulacao" name="titulo_simulacao"
+                               maxlength="200" placeholder="Ex.: Quitação parcial março / proposta cliente">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="salvar_simulacao" value="1"
+                                   id="salvar_simulacao" checked>
+                            <label class="form-check-label" for="salvar_simulacao">
+                                <strong>Salvar simulação</strong> para consultar depois
+                                e gerar o <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}">relatório sintético</a>
+                            </label>
+                        </div>
+                    </div>
+                    <input type="hidden" name="sim_parcial_json" id="sim_parcial_json" value="">
+                </div>
+
+                <div class="border rounded mb-3 overflow-hidden border-success-subtle"
+                     id="quitParcialValorBox">
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle quit-parcial-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:22%;">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                        Valor da quitação parcial
+                                        <div class="fw-normal small opacity-75">conforme parcelas marcadas</div>
+                                    </th>
+                                    <th class="text-center">Parcelas originais</th>
+                                    <th class="text-center">Valor principal</th>
+                                    <th class="text-center">Valor da quitação</th>
+                                    <th class="text-center" id="quitParcialDiffTitulo">Diferença</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="small text-muted" id="quitParcialValorDetalhe">
+                                            Marque as parcelas abaixo para calcular
+                                        </div>
+                                    </td>
+                                    <td class="text-center text-nowrap">
+                                        <div class="fs-5 fw-bold" id="quitParcialValorOriginal">R$ 0,00</div>
+                                    </td>
+                                    <td class="text-center text-nowrap">
+                                        <div class="fs-5 fw-bold text-primary" id="quitParcialValorAmort">R$ 0,00</div>
+                                        <div class="small text-muted">Soma das amortizações marcadas</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="fs-5 fw-bold text-success mb-0" id="quitParcialValorTotal">R$ 0,00</div>
+                                        <div class="small text-muted" id="quitParcialValorAbc">principal + juros</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="fs-5 fw-bold text-success" id="quitParcialValorDiff">R$ 0,00</div>
+                                        <div class="small text-muted" id="quitParcialDiffHint">
+                                            Original − quitação parcial
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong class="small">Parcelas a quitar</strong>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" id="btnQuitSelTodas">Todas</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnQuitLimpar">Limpar</button>
+                    </div>
+                </div>
+                <div class="table-responsive border rounded" style="max-height: 22rem;">
+                    <table class="table table-sm table-hover mb-0 align-middle" id="tabelaQuitacaoParcelas">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width:2rem;"></th>
+                                <th>Nº</th>
+                                <th>Vencimento</th>
+                                <th>Saldo devedor (início)</th>
+                                <th>Parcela</th>
+                                <th>Amortização</th>
+                                <th>Juros</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in abertas %}
+                            <tr class="quit-parcela-row"
+                                data-parcela-id="{{ p.id }}"
+                                data-extrato-parcela="{{ p.valor_parcela|stringformat:'f' }}"
+                                data-extrato-amort="{{ p.amortizacao|stringformat:'f' }}"
+                                data-extrato-juros="{{ p.juros|stringformat:'f' }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input chk-quitacao" name="parcelas"
+                                           value="{{ p.id }}"
+                                           {% if not selecionadas_ids or p.id in selecionadas_ids %}checked{% endif %}>
+                                </td>
+                                <td>{{ p.numero }}</td>
+                                <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
+                                <td class="quit-val-saldo fw-semibold">—</td>
+                                <td class="quit-val-parcela" data-valor="{{ p.valor_parcela|stringformat:'f' }}">R$ {{ p.valor_parcela|moeda_br }}</td>
+                                <td class="quit-val-amort" data-valor="{{ p.amortizacao|stringformat:'f' }}">R$ {{ p.amortizacao|moeda_br }}</td>
+                                <td class="quit-val-juros" data-valor="{{ p.juros|stringformat:'f' }}">R$ {{ p.juros|moeda_br }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="border rounded p-3 mt-3"
+                     id="quitSimParcialBox"
+                     data-metodo="{{ metodo_calculo|default:'price' }}"
+                     data-total-contrato="{{ parcelas|length }}"
+                     data-qtd-abertas="{{ abertas|length }}"
+                     data-taxa-am="{{ taxa_quitacao_am|stringformat:'f' }}"
+                     data-taxa-aa="{{ taxa_quitacao_aa|default:0|stringformat:'f' }}">
+                    <div class="fw-semibold mb-2">
+                        <i class="fas fa-random text-primary"></i> Simulação parcial
+                        <span class="text-muted fw-normal small" id="simParcialSubtitulo">
+                            — conforme parcelas marcadas na tabela
+                        </span>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sim_parcial_modo" id="simParcialMesma"
+                                   value="mesma" checked>
+                            <label class="form-check-label" for="simParcialMesma">
+                                <strong>Mesma quantidade de parcelas</strong>
+                                <div class="small text-muted">
+                                    As marcadas viram 1 parcela (nº da 1ª). A sequência segue igual
+                                    (ex.: 19–23 → parcela 19; restam 20…36 = 17 parcelas). Novo cálculo só reduz o saldo.
+                                </div>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="sim_parcial_modo" id="simParcialDiminui"
+                                   value="diminui">
+                            <label class="form-check-label" for="simParcialDiminui">
+                                <strong>Diminuir a quantidade de parcelas</strong>
+                                <div class="small text-muted">
+                                    Abate as marcadas do prazo restante
+                                    (ex.: 18 abertas − 5 marcadas = 13 parcelas remanescentes).
+                                </div>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="sim_parcial_modo" id="simParcialAmortizar"
+                                   value="amortizar">
+                            <label class="form-check-label" for="simParcialAmortizar">
+                                <strong>Amortizar</strong>
+                                <div class="small text-muted">
+                                    Informe o valor a amortizar. O restante da dívida dilui na
+                                    <strong>mesma quantidade</strong> de parcelas em aberto
+                                    (prazo igual; parcela/saldo recalculados).
+                                </div>
+                            </label>
+                        </div>
+                        <div class="mt-2 ms-4 d-none" id="simParcialAmortizarCampos">
+                            <label class="form-label fw-semibold small mb-1" for="simParcialValorAmortizar">
+                                Valor que será amortizado (R$)
+                            </label>
+                            <div class="input-group input-group-sm" style="max-width: 16rem;">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" class="form-control" id="simParcialValorAmortizar"
+                                       inputmode="decimal" placeholder="0,00"
+                                       autocomplete="off">
+                            </div>
+                            <div class="form-text" id="simParcialAmortizarSaldoHint"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2 small" id="simParcialResumo">
+                        <div class="col-6 col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="text-muted" id="simParcialConsolidaLabel">Marcadas → consolidam em</div>
+                                <div class="fw-bold" id="simParcialConsolida">—</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="text-muted">Parcelas remanescentes</div>
+                                <div class="fw-bold text-primary" id="simParcialNRestante">—</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="text-muted">Novo saldo devedor</div>
+                                <div class="fw-bold" id="simParcialSaldo">—</div>
+                            </div>
+                        </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded p-2 h-100">
+                                    <div class="text-muted" id="simParcialNovaParcelaLabel">
+                                        {% if metodo_calculo == 'sac' %}Amort. constante / 1ª parc. (SAC){% else %}Nova parcela (Price){% endif %}
+                                    </div>
+                                    <div class="fw-bold text-success" id="simParcialNovaParcela">—</div>
+                                </div>
+                            </div>
+                    </div>
+                    <div class="small text-muted mb-2" id="simParcialHint"></div>
+                    <div class="table-responsive border rounded" style="max-height: 14rem;">
+                        <table class="table table-sm table-striped mb-0 align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Saldo início</th>
+                                    <th>Juros</th>
+                                    <th>Amortização</th>
+                                    <th>Parcela</th>
+                                    <th>Saldo final</th>
+                                </tr>
+                            </thead>
+                            <tbody id="simParcialTabelaBody">
+                                <tr>
+                                    <td colspan="6" class="text-muted text-center py-2">
+                                        Marque parcelas para simular o novo fluxo.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 flex-wrap mt-3 pt-3 border-top">
+                    <a href="{% url 'emprestimos:detalhe' emprestimo.pk %}" class="btn btn-outline-secondary">Voltar</a>
+                    <button type="button" class="btn btn-outline-success" id="btnExportarQuitacaoExcel"
+                            title="Exportar parcelas selecionadas para Excel">
+                        <i class="fas fa-file-excel"></i> Exportar Excel
+                    </button>
+                    <button type="submit" class="btn btn-success" id="btnQuitacaoSubmit">
+                        <i class="fas fa-calculator"></i> Calcular quitação
+                    </button>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function parseBrNumber(v) {
+        if (v == null) return NaN;
+        let s = String(v).trim().replace(/\s/g, '');
+        if (s.indexOf(',') >= 0) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        }
+        return parseFloat(s);
+    }
+
+    function fmtBr(n) {
+        if (!isFinite(n)) return '—';
+        return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    /** PGTO Excel: =PGTO(i; n; -pv) — mês cheio */
+    function pmtExcel(i, n, pv) {
+        if (n <= 0) return NaN;
+        if (Math.abs(i) < 1e-12) return pv / n;
+        const f = Math.pow(1 + i, n);
+        return pv * i * f / (f - 1);
+    }
+
+    /** Juros compostos por dias (padrão Sicoob Price) */
+    function jurosPorDias(saldo, i, dias) {
+        if (!(dias > 0) || !(saldo > 0)) return 0;
+        return saldo * (Math.pow(1 + i, dias / 30) - 1);
+    }
+
+    /**
+     * Valor presente das parcelas (uso auxiliar).
+     * Quitação Price no extrato = principal + juros por dias (ver atualizarValoresQuitarPorData).
+     */
+    function valorPresentePrice(somenteMarcadas) {
+        const box = document.getElementById('quitValoresQuitarBox');
+        const taxaJurosEl = document.getElementById('quitTaxaJuros');
+        let taxaAm = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
+        if (!(taxaAm > 0) && box) {
+            taxaAm = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+        }
+        const dataQuit = parseIsoDate((document.getElementById('data_quitacao_modal') || {}).value || '');
+        let vp = 0;
+        let somaParcela = 0;
+        let qtd = 0;
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const chk = tr.querySelector('.chk-quitacao');
+            if (somenteMarcadas !== false && (!chk || !chk.checked)) return;
+            const tds = tr.querySelectorAll('td');
+            const vencTxt = (tds[2] && tds[2].textContent || '').trim();
+            const m = vencTxt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+            if (!m || !dataQuit) return;
+            const venc = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+            const dias = Math.round((venc.getTime() - dataQuit.getTime()) / 86400000);
+            if (dias < 0) return;
+            const elP = tr.querySelector('.quit-val-parcela');
+            let parc = elP ? parseFloat(elP.getAttribute('data-valor')) : NaN;
+            if (!isFinite(parc)) {
+                parc = parseBrNumber(String((elP && elP.textContent) || '').replace(/^R\$\s*/i, ''));
+            }
+            if (!(parc > 0)) return;
+            const i = taxaAm / 100;
+            let termo;
+            if (i > 0 && dias > 0) {
+                termo = parc / Math.pow(1 + i, dias / 30);
+            } else {
+                termo = parc;
+            }
+            vp += Math.round(termo * 100) / 100;
+            somaParcela += parc;
+            qtd += 1;
+        });
+        return {
+            vp: Math.round(vp * 100) / 100,
+            somaParcela: somaParcela,
+            qtd: qtd,
+            taxaAm: taxaAm
+        };
+    }
+
+    function parseIsoDate(s) {
+        if (!s) return null;
+        const p = String(s).split('-');
+        if (p.length !== 3) return null;
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+
+    function diffDias(a, b) {
+        if (!a || !b) return 30;
+        const ms = b.getTime() - a.getTime();
+        return Math.max(0, Math.round(ms / 86400000));
+    }
+    // Modal quitação — selecionar/limpar parcelas
+    const quitChecks = () => document.querySelectorAll('.chk-quitacao');
+    const btnQuitTodas = document.getElementById('btnQuitSelTodas');
+    const btnQuitLimpar = document.getElementById('btnQuitLimpar');
+    const btnQuitSubmit = document.getElementById('btnQuitacaoSubmit');
+    /** Snapshot dos cards do topo vindos da Tabela Price (não muda ao marcar/desmarcar). */
+    let quitResumoCarregado = null;
+    /** Linhas da simulação Price por id de parcela (preenchido ao gerar a tabela). */
+    let priceLinhasPorId = {};
+
+    function somarParcelasQuitacao(somenteMarcadas) {
+        let somaAmort = 0;
+        let somaParcela = 0;
+        let somaJuros = 0;
+        let qtd = 0;
+        let saldoDevedor = NaN;
+        let menorNumero = null;
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const chk = tr.querySelector('.chk-quitacao');
+            if (somenteMarcadas !== false && (!chk || !chk.checked)) return;
+            qtd += 1;
+            const elA = tr.querySelector('.quit-val-amort');
+            const elP = tr.querySelector('.quit-val-parcela');
+            const elJ = tr.querySelector('.quit-val-juros');
+            const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
+            const parc = elP ? parseFloat(elP.getAttribute('data-valor')) : NaN;
+            const juros = elJ ? parseFloat(elJ.getAttribute('data-valor')) : NaN;
+            if (isFinite(amort)) somaAmort += amort;
+            if (isFinite(parc)) somaParcela += parc;
+            if (isFinite(juros)) somaJuros += juros;
+
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            const L = priceLinhasPorId[id] || null;
+            let si = L && isFinite(L.saldoInicio) ? L.saldoInicio : NaN;
+            if (!isFinite(si)) {
+                const elS = tr.querySelector('.quit-val-saldo');
+                const txt = (elS && elS.textContent || '').trim();
+                if (txt && txt !== '—') {
+                    si = parseBrNumber(txt.replace(/^R\$\s*/i, ''));
+                }
+            }
+            if (isFinite(numero) && (menorNumero == null || numero < menorNumero) && isFinite(si)) {
+                menorNumero = numero;
+                saldoDevedor = si;
+            }
+        });
+        return {
+            qtd: qtd,
+            somaAmort: somaAmort,
+            somaParcela: somaParcela,
+            somaJuros: somaJuros,
+            saldoDevedor: saldoDevedor
+        };
+    }
+
+    function exibirCardsTopo(resumo) {
+        const elQ = document.getElementById('quitResumoQtd');
+        const elS = document.getElementById('quitResumoSaldo');
+        const elJuros = document.getElementById('quitResumoJuros');
+        const elT = document.getElementById('quitResumoTotal');
+        if (elQ) {
+            elQ.textContent = resumo.qtd + ' parcela' + (resumo.qtd === 1 ? '' : 's');
+        }
+        if (elS) elS.textContent = 'R$ ' + fmtBr(resumo.somaAmort);
+        if (elJuros) elJuros.textContent = 'R$ ' + fmtBr(resumo.somaJuros);
+        if (elT) elT.textContent = 'R$ ' + fmtBr(resumo.somaParcela);
+    }
+
+    function syncQuit() {
+        if (!btnQuitSubmit) return;
+        const n = document.querySelectorAll('.chk-quitacao:checked').length;
+        btnQuitSubmit.disabled = n === 0;
+        btnQuitSubmit.innerHTML = '<i class="fas fa-calculator"></i> Calcular quitação' + (n ? ' (' + n + ')' : '');
+        atualizarValoresQuitarPorData();
+        atualizarQuitacaoParcialValor();
+        atualizarSimulacaoParcial();
+    }
+
+    function aplicarQuitacaoParcialUI(a, b, original, abcHint, detalheHint, qtd) {
+        const c = a + b;
+        const diff = original - c;
+        const elTotal = document.getElementById('quitParcialValorTotal');
+        const elAbc = document.getElementById('quitParcialValorAbc');
+        const elDet = document.getElementById('quitParcialValorDetalhe');
+        const elOrig = document.getElementById('quitParcialValorOriginal');
+        const elAmort = document.getElementById('quitParcialValorAmort');
+        const elDiff = document.getElementById('quitParcialValorDiff');
+        const elDiffTitulo = document.getElementById('quitParcialDiffTitulo');
+        const elDiffHint = document.getElementById('quitParcialDiffHint');
+        if (elOrig) elOrig.textContent = 'R$ ' + fmtBr(original);
+        if (elAmort) elAmort.textContent = 'R$ ' + fmtBr(a);
+        if (elTotal) elTotal.textContent = 'R$ ' + fmtBr(c);
+        if (elAbc) elAbc.textContent = abcHint || ('a R$ ' + fmtBr(a) + ' + b R$ ' + fmtBr(b));
+        if (elDiff) {
+            elDiff.textContent = 'R$ ' + fmtBr(Math.abs(diff));
+            elDiff.classList.toggle('text-success', diff >= 0);
+            elDiff.classList.toggle('text-danger', diff < 0);
+        }
+        if (elDiffTitulo) {
+            elDiffTitulo.textContent = diff >= 0 ? 'Economia' : 'Prejuízo';
+        }
+        if (elDiffHint) {
+            elDiffHint.textContent = diff >= 0
+                ? 'Original − quitação parcial'
+                : 'Quitação parcial maior que o original';
+        }
+        if (elDet) {
+            if (detalheHint) {
+                elDet.textContent = detalheHint;
+            } else {
+                elDet.textContent = qtd
+                    ? (qtd + ' parcela' + (qtd === 1 ? '' : 's') +
+                        ' marcada' + (qtd === 1 ? '' : 's'))
+                    : 'Marque as parcelas abaixo para calcular';
+            }
+        }
+    }
+
+    let quitParcialPreviewTimer = null;
+
+    function atualizarQuitacaoParcialValor() {
+        const marcadas = somarParcelasQuitacao(true);
+        const boxTaxa = document.getElementById('quitValoresQuitarBox');
+        let dataRef = null;
+        let pctIndice = 192;
+        let previewUrl = '';
+        const metodo = (boxTaxa && boxTaxa.getAttribute('data-metodo')) || 'price';
+        if (boxTaxa) {
+            dataRef = parseIsoDate(boxTaxa.getAttribute('data-ref-juros') || '');
+            pctIndice = parseBrNumber(boxTaxa.getAttribute('data-pct-indice') || '192') || 192;
+            previewUrl = boxTaxa.getAttribute('data-preview-url') || '';
+        }
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const isoQuit = (dataQuitEl && dataQuitEl.value) || '';
+        const dataQuit = parseIsoDate(isoQuit);
+        let dias = 0;
+        if (dataRef && dataQuit) {
+            dias = Math.max(0, diffDias(dataRef, dataQuit));
+        }
+
+        const a = marcadas.somaAmort;
+        const original = marcadas.somaParcela;
+        const qtd = marcadas.qtd || 0;
+
+        // Sem parcelas marcadas: zera a grade parcial (não herda total do contrato)
+        if (qtd <= 0 || !(a > 0)) {
+            if (quitParcialPreviewTimer) clearTimeout(quitParcialPreviewTimer);
+            aplicarQuitacaoParcialUI(
+                0, 0, 0,
+                'principal + juros',
+                'Marque as parcelas abaixo para calcular',
+                0
+            );
+            return;
+        }
+
+        if (metodo === 'sac') {
+            const selicEl = document.getElementById('selic_periodo_pct_modal');
+            const selicManual = selicEl ? parseBrNumber(selicEl.value || '') : NaN;
+            if (isFinite(selicManual) && selicManual > 0 && a > 0) {
+                const b = a * (selicManual / 100);
+                aplicarQuitacaoParcialUI(
+                    a, b, original,
+                    'principal R$ ' + fmtBr(a) + ' + juros R$ ' + fmtBr(b) + ' (CDI/SELIC manual)',
+                    qtd + ' parcela' + (qtd === 1 ? '' : 's') + ' marcada' + (qtd === 1 ? '' : 's') +
+                        ' · CDI/SELIC manual',
+                    qtd
+                );
+                return;
+            }
+            if (previewUrl && boxTaxa && isoQuit && a > 0) {
+                const isoRef = boxTaxa.getAttribute('data-ref-juros') || '';
+                const reqId = String(Date.now()) + '-' + String(qtd) + '-' + String(a);
+                boxTaxa.setAttribute('data-parcial-req', reqId);
+                aplicarQuitacaoParcialUI(
+                    a, 0, original,
+                    'Consultando CDI BCB…',
+                    qtd + ' parcela' + (qtd === 1 ? '' : 's') + ' marcada' + (qtd === 1 ? '' : 's') +
+                        ' · consultando CDI',
+                    qtd
+                );
+                if (quitParcialPreviewTimer) clearTimeout(quitParcialPreviewTimer);
+                quitParcialPreviewTimer = setTimeout(function() {
+                    const taxaJurosEl = document.getElementById('quitTaxaJuros');
+                    const taxaJurosAm = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
+                    const params = new URLSearchParams({
+                        saldo: String(a),
+                        data_inicio: isoRef,
+                        data_fim: isoQuit,
+                        pct_indice: String(pctIndice),
+                        taxa_juros_am: String(taxaJurosAm)
+                    });
+                    fetch(previewUrl + '?' + params.toString(), {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    })
+                        .then(function(r) { return r.json(); })
+                        .then(function(j) {
+                            // Ignora resposta antiga se a seleção mudou
+                            if (boxTaxa.getAttribute('data-parcial-req') !== reqId) return;
+                            const atuais = somarParcelasQuitacao(true);
+                            if ((atuais.qtd || 0) <= 0) {
+                                aplicarQuitacaoParcialUI(0, 0, 0, 'principal + juros',
+                                    'Marque as parcelas abaixo para calcular', 0);
+                                return;
+                            }
+                            if (!j || !j.ok) {
+                                aplicarQuitacaoParcialUI(
+                                    a, 0, original,
+                                    (j && j.erro) ? j.erro : 'Falha ao consultar CDI',
+                                    null,
+                                    qtd
+                                );
+                                return;
+                            }
+                            const juros = parseFloat(j.juros) || 0;
+                            const du = j.dias_uteis || 0;
+                            const taxaAmJ = parseFloat(j.taxa_juros_am) || taxaJurosAm;
+                            let abc = 'principal R$ ' + fmtBr(a) + ' + juros R$ ' + fmtBr(juros) +
+                                ' (CDI × ' + fmtBr(parseFloat(j.pct_indice) || pctIndice) +
+                                '% · ' + du + ' d.ú.';
+                            if (taxaAmJ > 0) {
+                                abc += ' × ' + fmtBr(taxaAmJ) + '% a.m.';
+                            }
+                            abc += ')';
+                            aplicarQuitacaoParcialUI(
+                                a, juros, original,
+                                abc,
+                                qtd + ' parcela' + (qtd === 1 ? '' : 's') + ' marcada' + (qtd === 1 ? '' : 's') +
+                                    ' · juros CDI' + (taxaAmJ > 0 ? ' + taxa a.m.' : '') +
+                                    ' / data de quitação',
+                                qtd
+                            );
+                        })
+                        .catch(function() {
+                            if (boxTaxa.getAttribute('data-parcial-req') !== reqId) return;
+                            aplicarQuitacaoParcialUI(
+                                a, 0, original,
+                                'Erro de rede ao consultar CDI',
+                                null,
+                                qtd
+                            );
+                        });
+                }, 250);
+                return;
+            }
+            aplicarQuitacaoParcialUI(
+                a, 0, original,
+                'Informe a data de quitação (CDI × % índice)',
+                qtd + ' parcela' + (qtd === 1 ? '' : 's') + ' marcada' + (qtd === 1 ? '' : 's'),
+                qtd
+            );
+            return;
+        }
+
+        // Price: principal = soma das amortizações marcadas (+ juros sobre esse valor)
+        const taxaJurosElP = document.getElementById('quitTaxaJuros');
+        let taxaJurosAmP = taxaJurosElP ? (parseBrNumber(taxaJurosElP.value) || 0) : 0;
+        if (!(taxaJurosAmP > 0) && boxTaxa) {
+            taxaJurosAmP = parseBrNumber(boxTaxa.getAttribute('data-taxa-juros-am') || '0') || 0;
+        }
+        const allChkP = document.querySelectorAll('#tabelaQuitacaoParcelas .chk-quitacao');
+        const chkOkP = document.querySelectorAll('#tabelaQuitacaoParcelas .chk-quitacao:checked');
+        const todasP = allChkP.length > 0 && chkOkP.length === allChkP.length;
+        let saldoP = a;
+        // Só usa saldo do extrato quando TODAS as abertas estão marcadas
+        if (todasP && boxTaxa) {
+            const sp = parseBrNumber(boxTaxa.getAttribute('data-saldo-principal') || '');
+            if (sp > 0) saldoP = sp;
+        }
+        const face = original;
+        const jurosP = Math.round(jurosPorDias(saldoP, taxaJurosAmP / 100, dias) * 100) / 100;
+        aplicarQuitacaoParcialUI(
+            saldoP, jurosP, face,
+            'principal R$ ' + fmtBr(saldoP) + ' + juros R$ ' + fmtBr(jurosP) +
+                ' (' + dias + ' d · ' + fmtBr(taxaJurosAmP) + '% a.m.)',
+            qtd + ' parcela' + (qtd === 1 ? '' : 's') +
+                ' marcada' + (qtd === 1 ? '' : 's') + ' · Price',
+            qtd
+        );
+    }
+
+    function coletarMarcadasQuitacaoDetalhe() {
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const chk = tr.querySelector('.chk-quitacao');
+            if (!chk || !chk.checked) return;
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            const elA = tr.querySelector('.quit-val-amort');
+            const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
+            const L = priceLinhasPorId[id] || null;
+            let saldoInicio = L && isFinite(L.saldoInicio) ? L.saldoInicio : NaN;
+            let saldoFim = L && isFinite(L.saldoFim) ? L.saldoFim : NaN;
+            if (!isFinite(saldoInicio)) {
+                const elS = tr.querySelector('.quit-val-saldo');
+                const txt = (elS && elS.textContent || '').trim();
+                if (txt && txt !== '—') {
+                    saldoInicio = parseBrNumber(txt.replace(/^R\$\s*/i, ''));
+                }
+            }
+            rows.push({
+                id: id,
+                numero: numero,
+                amort: isFinite(amort) ? amort : 0,
+                saldoInicio: saldoInicio,
+                saldoFim: saldoFim
+            });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+        return rows;
+    }
+
+    function gravarSimParcialHidden(dados) {
+        const el = document.getElementById('sim_parcial_json');
+        if (!el) return;
+        try {
+            el.value = dados ? JSON.stringify(dados) : '';
+        } catch (e) {
+            el.value = '';
+        }
+    }
+
+    function coletarLinhasSimParcialTabela() {
+        const linhasRestante = [];
+        document.querySelectorAll('#simParcialTabelaBody tr').forEach(function(tr) {
+            const tds = tr.querySelectorAll('td');
+            if (tds.length < 6) return;
+            const num = parseInt((tds[0].textContent || '').trim(), 10);
+            if (!isFinite(num)) return;
+            linhasRestante.push({
+                numero: num,
+                saldo_inicio: parseBrNumber(String(tds[1].textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                juros: parseBrNumber(String(tds[2].textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                amortizacao: parseBrNumber(String(tds[3].textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                parcela: parseBrNumber(String(tds[4].textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                saldo_fim: parseBrNumber(String(tds[5].textContent || '').replace(/^R\$\s*/i, '')) || 0
+            });
+        });
+        return linhasRestante;
+    }
+
+    function saldoPrincipalContrato() {
+        const boxQuit = document.getElementById('quitValoresQuitarBox');
+        if (boxQuit) {
+            const sp = parseBrNumber(boxQuit.getAttribute('data-saldo-principal') || '');
+            if (sp > 0) return sp;
+        }
+        // Fallback: saldo início da 1ª parcela aberta na tabela
+        const tr = document.querySelector('#tabelaQuitacaoParcelas .quit-parcela-row');
+        if (tr) {
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const L = priceLinhasPorId[id] || null;
+            if (L && isFinite(L.saldoInicio) && L.saldoInicio > 0) return L.saldoInicio;
+            const elS = tr.querySelector('.quit-val-saldo');
+            const txt = (elS && elS.textContent || '').trim();
+            if (txt && txt !== '—') {
+                const v = parseBrNumber(txt.replace(/^R\$\s*/i, ''));
+                if (v > 0) return v;
+            }
+        }
+        return 0;
+    }
+
+    function primeiroNumeroAberto() {
+        const tr = document.querySelector('#tabelaQuitacaoParcelas .quit-parcela-row');
+        if (!tr) return 1;
+        const tds = tr.querySelectorAll('td');
+        const n = parseInt((tds[1] && tds[1].textContent) || '', 10);
+        return isFinite(n) ? n : 1;
+    }
+
+    function syncModoSimParcialUI() {
+        const modoEl = document.querySelector('input[name="sim_parcial_modo"]:checked');
+        const modo = (modoEl && modoEl.value) || 'mesma';
+        const campos = document.getElementById('simParcialAmortizarCampos');
+        const sub = document.getElementById('simParcialSubtitulo');
+        const lblConsolida = document.getElementById('simParcialConsolidaLabel');
+        if (campos) campos.classList.toggle('d-none', modo !== 'amortizar');
+        if (sub) {
+            sub.textContent = modo === 'amortizar'
+                ? '— informe o valor a amortizar; prazo mantido'
+                : '— conforme parcelas marcadas na tabela';
+        }
+        if (lblConsolida) {
+            lblConsolida.textContent = modo === 'amortizar'
+                ? 'Valor amortizado'
+                : 'Marcadas → consolidam em';
+        }
+        const hintSaldo = document.getElementById('simParcialAmortizarSaldoHint');
+        if (hintSaldo && modo === 'amortizar') {
+            const saldo = saldoPrincipalContrato();
+            hintSaldo.textContent = saldo > 0
+                ? ('Saldo atual do contrato: R$ ' + fmtBr(saldo) +
+                    ' · restante = saldo − valor amortizado')
+                : 'Informe o valor a amortizar sobre o saldo do contrato.';
+        }
+    }
+
+    function atualizarSimulacaoParcial() {
+        const box = document.getElementById('quitSimParcialBox');
+        const tbody = document.getElementById('simParcialTabelaBody');
+        if (!box || !tbody) return;
+
+        syncModoSimParcialUI();
+
+        const marcadas = coletarMarcadasQuitacaoDetalhe();
+        const modoEl = document.querySelector('input[name="sim_parcial_modo"]:checked');
+        const modo = (modoEl && modoEl.value) || 'mesma';
+        const totalContrato = parseInt(box.getAttribute('data-total-contrato') || '0', 10) || 0;
+        const qtdAbertas = parseInt(box.getAttribute('data-qtd-abertas') || '0', 10) || 0;
+        const taxaAm = parseBrNumber(box.getAttribute('data-taxa-am') || '0') || 0;
+        const taxaAa = parseBrNumber(box.getAttribute('data-taxa-aa') || '0') || 0;
+        const metodo = (box.getAttribute('data-metodo') || 'price');
+        let i = taxaAm / 100;
+        if (!(i > 0) && taxaAa > 0) i = (taxaAa / 100) / 12;
+
+        const elConsolida = document.getElementById('simParcialConsolida');
+        const elN = document.getElementById('simParcialNRestante');
+        const elSaldo = document.getElementById('simParcialSaldo');
+        const elPmt = document.getElementById('simParcialNovaParcela');
+        const elHint = document.getElementById('simParcialHint');
+        const elPmtLabel = document.getElementById('simParcialNovaParcelaLabel');
+        if (elPmtLabel) {
+            elPmtLabel.textContent = metodo === 'sac'
+                ? 'Amort. constante / 1ª parc. (SAC)'
+                : 'Nova parcela (Price)';
+        }
+
+        // ——— Modo amortizar: valor informado; prazo = qtd abertas ———
+        if (modo === 'amortizar') {
+            const inpAmort = document.getElementById('simParcialValorAmortizar');
+            const valorAmort = inpAmort ? (parseBrNumber(inpAmort.value) || 0) : 0;
+            const saldoAtual = saldoPrincipalContrato();
+            const novoSaldo = Math.max(0, Math.round((saldoAtual - valorAmort) * 100) / 100);
+            const nRestante = qtdAbertas;
+            const numInicio = primeiroNumeroAberto();
+
+            if (!(valorAmort > 0)) {
+                if (elConsolida) elConsolida.textContent = '—';
+                if (elN) elN.textContent = nRestante ? (nRestante + ' em aberto') : '—';
+                if (elSaldo) elSaldo.textContent = saldoAtual > 0 ? ('R$ ' + fmtBr(saldoAtual)) : '—';
+                if (elPmt) elPmt.textContent = '—';
+                if (elHint) {
+                    elHint.textContent = 'Informe o valor que será amortizado. ' +
+                        'O restante dilui nas ' + nRestante + ' parcelas em aberto.';
+                }
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
+                    'Informe o valor a amortizar para simular o novo fluxo.</td></tr>';
+                gravarSimParcialHidden(null);
+                return;
+            }
+            if (!(saldoAtual > 0)) {
+                if (elHint) elHint.textContent = 'Saldo do contrato não encontrado no extrato.';
+                gravarSimParcialHidden(null);
+                return;
+            }
+            if (valorAmort > saldoAtual + 0.009) {
+                if (elHint) {
+                    elHint.innerHTML = '<span class="text-danger">Valor a amortizar (R$ ' +
+                        fmtBr(valorAmort) + ') maior que o saldo (R$ ' + fmtBr(saldoAtual) + ').</span>';
+                }
+                if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAmort);
+                if (elSaldo) elSaldo.textContent = 'R$ 0,00';
+                if (elPmt) elPmt.textContent = '—';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
+                    'Ajuste o valor a amortizar.</td></tr>';
+                gravarSimParcialHidden(null);
+                return;
+            }
+
+            const rotuloRem = nRestante
+                ? (nRestante + ' parc. (prazo mantido · ' + numInicio + '…' +
+                    (numInicio + nRestante - 1) + ')')
+                : '—';
+            const hint = 'Amortização de <strong>R$ ' + fmtBr(valorAmort) + '</strong> sobre saldo ' +
+                'R$ ' + fmtBr(saldoAtual) + '. Restante <strong>R$ ' + fmtBr(novoSaldo) +
+                '</strong> diluído em <strong>' + nRestante + '</strong> parcelas em aberto ' +
+                '(' + numInicio + '…' + (numInicio + Math.max(0, nRestante - 1)) + '), ' +
+                'método ' + (metodo === 'sac' ? 'SAC' : 'Price') + '.';
+
+            if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAmort);
+            if (elN) elN.textContent = rotuloRem;
+            if (elSaldo) elSaldo.textContent = 'R$ ' + fmtBr(novoSaldo);
+            if (elHint) elHint.innerHTML = hint;
+
+            const baseSimParcial = {
+                modo: 'amortizar',
+                metodo: metodo,
+                modo_rotulo: 'Amortizar',
+                consolida: 'Amortização R$ ' + fmtBr(valorAmort),
+                valor_amortizado: Math.round(valorAmort * 100) / 100,
+                saldo_antes: Math.round(saldoAtual * 100) / 100,
+                n_restante: nRestante,
+                n_restante_rotulo: rotuloRem,
+                num_inicio: numInicio,
+                num_fim: nRestante ? (numInicio + nRestante - 1) : null,
+                qtd_marcadas: 0,
+                parcelas_marcadas: [],
+                novo_saldo: novoSaldo,
+            };
+
+            if (!(nRestante > 0) || !(novoSaldo > 0) || !(i >= 0)) {
+                if (elPmt) elPmt.textContent = novoSaldo <= 0 ? 'R$ 0,00' : '—';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
+                    (novoSaldo <= 0
+                        ? 'Saldo zerado após a amortização.'
+                        : 'Sem parcelas em aberto para diluir.') +
+                    '</td></tr>';
+                gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
+                    nova_parcela: 0,
+                    amort_constante: 0,
+                    hint: (elHint && elHint.textContent) || '',
+                    linhas: []
+                }));
+                return;
+            }
+
+            const pmt = metodo === 'sac'
+                ? (novoSaldo / nRestante)
+                : pmtExcel(i, nRestante, novoSaldo);
+
+            let saldo = novoSaldo;
+            let html = '';
+            let primeiraParcelaSac = null;
+            const amortFixaSac = metodo === 'sac' ? (novoSaldo / nRestante) : 0;
+            const linhasCalc = [];
+
+            for (let k = 0; k < nRestante; k++) {
+                const num = numInicio + k;
+                const saldoInicio = saldo;
+                const juros = saldoInicio * i;
+                let amort, parcela, saldoFim;
+                if (metodo === 'sac') {
+                    amort = amortFixaSac;
+                    if (k === nRestante - 1 || amort > saldoInicio) amort = saldoInicio;
+                    parcela = amort + juros;
+                    saldoFim = saldoInicio - amort;
+                    if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
+                } else {
+                    amort = pmt - juros;
+                    parcela = pmt;
+                    saldoFim = saldoInicio - amort;
+                    if (k === nRestante - 1 || amort > saldoInicio) {
+                        amort = saldoInicio;
+                        parcela = amort + juros;
+                        saldoFim = 0;
+                    }
+                }
+                if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
+                linhasCalc.push({
+                    numero: num,
+                    saldo_inicio: Math.round(saldoInicio * 100) / 100,
+                    juros: Math.round(juros * 100) / 100,
+                    amortizacao: Math.round(amort * 100) / 100,
+                    parcela: Math.round(parcela * 100) / 100,
+                    saldo_fim: Math.round(saldoFim * 100) / 100
+                });
+                html += '<tr>' +
+                    '<td>' + num + '</td>' +
+                    '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                    '<td>R$ ' + fmtBr(juros) + '</td>' +
+                    '<td>R$ ' + fmtBr(amort) + '</td>' +
+                    '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                    '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                    '</tr>';
+                saldo = saldoFim;
+            }
+            const novaParcelaNum = metodo === 'sac'
+                ? (primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac)
+                : pmt;
+            if (elPmt) {
+                if (metodo === 'sac') {
+                    elPmt.innerHTML = 'Amort. R$ ' + fmtBr(amortFixaSac) +
+                        '<div class="small fw-normal text-muted">1ª parc. R$ ' +
+                        fmtBr(primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac) + '</div>';
+                } else {
+                    elPmt.textContent = 'R$ ' + fmtBr(pmt);
+                }
+            }
+            tbody.innerHTML = html;
+            gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
+                nova_parcela: Math.round(novaParcelaNum * 100) / 100,
+                amort_constante: metodo === 'sac' ? Math.round(amortFixaSac * 100) / 100 : 0,
+                hint: (elHint && elHint.textContent) || '',
+                linhas: linhasCalc
+            }));
+            return;
+        }
+
+        if (!marcadas.length) {
+            if (elConsolida) elConsolida.textContent = '—';
+            if (elN) elN.textContent = '—';
+            if (elSaldo) elSaldo.textContent = '—';
+            if (elPmt) elPmt.textContent = '—';
+            if (elHint) elHint.textContent = 'Marque as parcelas que serão quitadas parcialmente.';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">Marque parcelas para simular o novo fluxo.</td></tr>';
+            gravarSimParcialHidden(null);
+            return;
+        }
+
+        const primeira = marcadas[0];
+        const ultima = marcadas[marcadas.length - 1];
+        const qtdSel = marcadas.length;
+
+        // Novo saldo = saldo final da última marcada (Price); fallback: saldo início − soma amort
+        let novoSaldo = ultima.saldoFim;
+        if (!isFinite(novoSaldo)) {
+            const si = isFinite(primeira.saldoInicio) ? primeira.saldoInicio : 0;
+            const somaAmort = marcadas.reduce(function(s, r) { return s + (r.amort || 0); }, 0);
+            novoSaldo = Math.max(0, si - somaAmort);
+        }
+        if (novoSaldo < 0 && novoSaldo > -0.01) novoSaldo = 0;
+
+        let nRestante = 0;
+        let numInicio = primeira.numero + 1;
+        let hint = '';
+
+        if (modo === 'mesma') {
+            nRestante = Math.max(0, totalContrato - primeira.numero);
+            numInicio = primeira.numero + 1;
+            hint = 'Marcadas ' + marcadas.map(function(r) { return r.numero; }).join(', ') +
+                ' consolidam na parcela <strong>' + primeira.numero + '</strong>. ' +
+                'Sequência mantida: <strong>' + numInicio + '…' + totalContrato + '</strong> (' + nRestante +
+                ' parcelas). Recálculo ' + (metodo === 'sac' ? 'SAC' : 'Price') + ' com o novo saldo.';
+        } else {
+            nRestante = Math.max(0, qtdAbertas - qtdSel);
+            numInicio = primeira.numero;
+            hint = 'Marcadas ' + marcadas.map(function(r) { return r.numero; }).join(', ') +
+                ' (' + qtdSel + ') abatidas do prazo. Restam <strong>' + nRestante +
+                '</strong> parcelas a partir do nº <strong>' + numInicio + '</strong>, com novo saldo.';
+        }
+
+        const numsMarcadas = marcadas.map(function(r) { return r.numero; });
+        const rotuloRem = nRestante
+            ? (qtdSel + ' sel. · restam ' + nRestante +
+                ' (' + numInicio + '…' + (numInicio + nRestante - 1) + ')')
+            : (qtdSel + ' selecionada' + (qtdSel === 1 ? '' : 's'));
+        if (elN) {
+            elN.textContent = rotuloRem;
+        }
+        const baseSimParcial = {
+            modo: modo,
+            metodo: metodo,
+            modo_rotulo: modo === 'diminui'
+                ? 'Diminuir a quantidade de parcelas'
+                : 'Mesma quantidade de parcelas',
+            consolida: 'Parcela ' + primeira.numero + ' (' + qtdSel + ' → 1)',
+            n_restante: nRestante,
+            n_restante_rotulo: rotuloRem,
+            num_inicio: numInicio,
+            num_fim: nRestante ? (numInicio + nRestante - 1) : null,
+            qtd_marcadas: qtdSel,
+            parcelas_marcadas: numsMarcadas,
+            novo_saldo: Math.round(novoSaldo * 100) / 100,
+        };
+        if (elConsolida) {
+            elConsolida.textContent = baseSimParcial.consolida;
+        }
+        if (elSaldo) elSaldo.textContent = 'R$ ' + fmtBr(novoSaldo);
+        if (elHint) elHint.innerHTML = hint;
+
+        if (!(nRestante > 0) || !(novoSaldo > 0) || !(i >= 0)) {
+            if (elPmt) elPmt.textContent = '—';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">Sem parcelas remanescentes ou saldo zerado.</td></tr>';
+            gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
+                nova_parcela: 0,
+                amort_constante: 0,
+                hint: (elHint && elHint.textContent) || '',
+                linhas: []
+            }));
+            return;
+        }
+
+        const pmt = metodo === 'sac'
+            ? (novoSaldo / nRestante)
+            : pmtExcel(i, nRestante, novoSaldo);
+
+        let saldo = novoSaldo;
+        let html = '';
+        let primeiraParcelaSac = null;
+        const amortFixaSac = metodo === 'sac' ? (novoSaldo / nRestante) : 0;
+        const linhasCalc = [];
+
+        for (let k = 0; k < nRestante; k++) {
+            const num = numInicio + k;
+            const saldoInicio = saldo;
+            const juros = saldoInicio * i;
+            let amort, parcela, saldoFim;
+            if (metodo === 'sac') {
+                amort = amortFixaSac;
+                if (k === nRestante - 1 || amort > saldoInicio) amort = saldoInicio;
+                parcela = amort + juros;
+                saldoFim = saldoInicio - amort;
+                if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
+            } else {
+                amort = pmt - juros;
+                parcela = pmt;
+                saldoFim = saldoInicio - amort;
+                if (k === nRestante - 1 || amort > saldoInicio) {
+                    amort = saldoInicio;
+                    parcela = amort + juros;
+                    saldoFim = 0;
+                }
+            }
+            if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
+            linhasCalc.push({
+                numero: num,
+                saldo_inicio: Math.round(saldoInicio * 100) / 100,
+                juros: Math.round(juros * 100) / 100,
+                amortizacao: Math.round(amort * 100) / 100,
+                parcela: Math.round(parcela * 100) / 100,
+                saldo_fim: Math.round(saldoFim * 100) / 100
+            });
+            html += '<tr>' +
+                '<td>' + num + '</td>' +
+                '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                '<td>R$ ' + fmtBr(juros) + '</td>' +
+                '<td>R$ ' + fmtBr(amort) + '</td>' +
+                '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                '</tr>';
+            saldo = saldoFim;
+        }
+        const novaParcelaNum = metodo === 'sac'
+            ? (primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac)
+            : pmt;
+        if (elPmt) {
+            if (metodo === 'sac') {
+                elPmt.innerHTML = 'Amort. R$ ' + fmtBr(amortFixaSac) +
+                    '<div class="small fw-normal text-muted">1ª parc. R$ ' +
+                    fmtBr(primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac) + '</div>';
+            } else {
+                elPmt.textContent = 'R$ ' + fmtBr(pmt);
+            }
+        }
+        tbody.innerHTML = html;
+
+        gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
+            nova_parcela: Math.round(novaParcelaNum * 100) / 100,
+            amort_constante: metodo === 'sac' ? Math.round(amortFixaSac * 100) / 100 : 0,
+            hint: (elHint && elHint.textContent) || '',
+            linhas: linhasCalc
+        }));
+    }
+
+    let quitPreviewTimer = null;
+
+    function aplicarValoresQuitar(a, b, totalParcelasSel, bHint, qtd, opts) {
+        opts = opts || {};
+        const c = (opts.c != null && isFinite(opts.c)) ? opts.c : (a + b);
+        const diff = totalParcelasSel - c;
+        const elA = document.getElementById('quitValA');
+        const elB = document.getElementById('quitValB');
+        const elBDias = document.getElementById('quitValBDias');
+        const elC = document.getElementById('quitValC');
+        const elDiff = document.getElementById('quitValDiff');
+        const elDiffHint = document.getElementById('quitValDiffHint');
+        const elDiffFormula = document.getElementById('quitValDiffFormula');
+        if (elA) elA.textContent = 'R$ ' + fmtBr(a);
+        if (elB) elB.textContent = 'R$ ' + fmtBr(b);
+        if (elBDias) elBDias.textContent = bHint || '';
+        if (elC) elC.textContent = 'R$ ' + fmtBr(c);
+        if (elDiffFormula) {
+            elDiffFormula.textContent =
+                'Contrato (R$ ' + fmtBr(totalParcelasSel) + ') − valor a quitar';
+        }
+        if (elDiff) {
+            elDiff.textContent = 'R$ ' + fmtBr(Math.abs(diff));
+            elDiff.classList.toggle('text-success', diff >= 0);
+            elDiff.classList.toggle('text-danger', diff < 0);
+        }
+        if (elDiffHint) {
+            if (diff >= 0) {
+                elDiffHint.textContent = 'Economia para o cliente (contrato)';
+                elDiffHint.classList.remove('text-danger');
+                elDiffHint.classList.add('text-success');
+            } else {
+                elDiffHint.textContent = 'Prejuízo';
+                elDiffHint.classList.remove('text-success');
+                elDiffHint.classList.add('text-danger');
+            }
+        }
+        const elDiffTitulo = document.getElementById('quitValDiffTitulo');
+        if (elDiffTitulo) {
+            elDiffTitulo.textContent = diff >= 0 ? 'Economia' : 'Prejuízo';
+        }
+    }
+
+    function atualizarValoresQuitarPorData() {
+        // Total do contrato = TODAS as parcelas abertas (não muda ao desmarcar)
+        const contrato = somarParcelasQuitacao(false);
+        const base = contrato;
+        const box = document.getElementById('quitValoresQuitarBox');
+        const metodo = (box && box.getAttribute('data-metodo')) || 'price';
+
+        let taxaAm = 0;
+        let dataRef = null;
+        let pctIndice = 192;
+        let previewUrl = '';
+        if (box) {
+            taxaAm = parseBrNumber(box.getAttribute('data-taxa-am') || '0') || 0;
+            dataRef = parseIsoDate(box.getAttribute('data-ref-juros') || '');
+            pctIndice = parseBrNumber(box.getAttribute('data-pct-indice') || '192') || 192;
+            previewUrl = box.getAttribute('data-preview-url') || '';
+        }
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const isoQuit = (dataQuitEl && dataQuitEl.value) || '';
+        const dataQuit = parseIsoDate(isoQuit);
+        let dias = 0;
+        if (dataRef && dataQuit) {
+            dias = Math.max(0, diffDias(dataRef, dataQuit));
+        }
+
+        // Principal do contrato: extrato (Price) ou soma de todas as amortizações abertas
+        let saldoPrinc = NaN;
+        if (box) {
+            saldoPrinc = parseBrNumber(box.getAttribute('data-saldo-principal') || '');
+        }
+        if (!(saldoPrinc > 0)) {
+            saldoPrinc = (isFinite(base.somaAmort) && base.somaAmort > 0) ? base.somaAmort : 0;
+        }
+        const face = base.somaParcela;
+        const qtdContrato = base.qtd;
+        const a = saldoPrinc;
+        const totalParcelasSel = face;
+
+        if (metodo === 'sac') {
+            const selicEl = document.getElementById('selic_periodo_pct_modal');
+            const selicManual = selicEl ? parseBrNumber(selicEl.value || '') : NaN;
+            if (isFinite(selicManual) && selicManual > 0 && a > 0) {
+                const b = a * (selicManual / 100);
+                aplicarValoresQuitar(
+                    a, b, totalParcelasSel,
+                    'CDI/SELIC manual ' + fmtBr(selicManual) + '% s/ amort. R$ ' + fmtBr(a),
+                    qtdContrato
+                );
+                exibirCardsTopo({
+                    qtd: qtdContrato,
+                    somaAmort: a,
+                    somaParcela: face,
+                    somaJuros: b
+                });
+                return;
+            }
+            if (previewUrl && box && isoQuit && a > 0) {
+                const isoRef = box.getAttribute('data-ref-juros') || '';
+                aplicarValoresQuitar(
+                    a, 0, totalParcelasSel,
+                    'Consultando CDI BCB × ' + fmtBr(pctIndice) + '% até ' +
+                        isoQuit.split('-').reverse().join('/') + '…',
+                    qtdContrato
+                );
+                if (quitPreviewTimer) clearTimeout(quitPreviewTimer);
+                quitPreviewTimer = setTimeout(function() {
+                    const taxaJurosEl = document.getElementById('quitTaxaJuros');
+                    const taxaJurosAm = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
+                    const params = new URLSearchParams({
+                        saldo: String(a),
+                        data_inicio: isoRef,
+                        data_fim: isoQuit,
+                        pct_indice: String(pctIndice),
+                        taxa_juros_am: String(taxaJurosAm)
+                    });
+                    fetch(previewUrl + '?' + params.toString(), {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    })
+                        .then(function(r) { return r.json(); })
+                        .then(function(j) {
+                            if (!j || !j.ok) {
+                                aplicarValoresQuitar(
+                                    a, 0, totalParcelasSel,
+                                    (j && j.erro) ? j.erro : 'Falha ao consultar CDI',
+                                    qtdContrato
+                                );
+                                exibirCardsTopo({
+                                    qtd: qtdContrato,
+                                    somaAmort: a,
+                                    somaParcela: face,
+                                    somaJuros: 0
+                                });
+                                return;
+                            }
+                            const juros = parseFloat(j.juros) || 0;
+                            const taxaAmJ = parseFloat(j.taxa_juros_am) || taxaJurosAm;
+                            let hint = (j.indice || 'CDI') + ' × ' +
+                                fmtBr(parseFloat(j.pct_indice) || pctIndice) + '% · ' +
+                                (j.dias_uteis || 0) + ' dia(s) útil(is)';
+                            if (taxaAmJ > 0) {
+                                hint += ' × taxa ' + fmtBr(taxaAmJ) + '% a.m. (' +
+                                    (j.dias_corridos || 0) + ' d)';
+                            }
+                            hint += ' · ' +
+                                isoRef.split('-').reverse().join('/') + ' → ' +
+                                isoQuit.split('-').reverse().join('/') +
+                                ' s/ amort. R$ ' + fmtBr(a) +
+                                ' = total R$ ' + fmtBr(a + juros);
+                            aplicarValoresQuitar(a, juros, totalParcelasSel, hint, qtdContrato);
+                            exibirCardsTopo({
+                                qtd: qtdContrato,
+                                somaAmort: a,
+                                somaParcela: face,
+                                somaJuros: juros
+                            });
+                        })
+                        .catch(function() {
+                            aplicarValoresQuitar(
+                                a, 0, totalParcelasSel,
+                                'Erro de rede ao consultar CDI',
+                                qtdContrato
+                            );
+                        });
+                }, 250);
+                return;
+            }
+            aplicarValoresQuitar(
+                a, 0, totalParcelasSel,
+                'Informe a data de quitação para o saldo p/ quitação (CDI × % índice)',
+                qtdContrato
+            );
+            exibirCardsTopo({
+                qtd: qtdContrato,
+                somaAmort: a,
+                somaParcela: face,
+                somaJuros: 0
+            });
+            return;
+        }
+
+        // Tabela Price: total do contrato = principal (extrato) + juros até a data
+        const taxaJurosEl = document.getElementById('quitTaxaJuros');
+        let taxaJurosAm = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
+        if (!(taxaJurosAm > 0) && box) {
+            taxaJurosAm = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+        }
+
+        const juros = Math.round(jurosPorDias(saldoPrinc, taxaJurosAm / 100, dias) * 100) / 100;
+        const quit = Math.round((saldoPrinc + juros) * 100) / 100;
+        const isoRef = (box && box.getAttribute('data-ref-juros')) || '';
+        let hint = dias + ' dia(s) · juros ' + fmtBr(taxaJurosAm) + '% a.m.';
+        if (isoRef && isoQuit) {
+            hint += ' · ' + isoRef.split('-').reverse().join('/') +
+                ' → ' + isoQuit.split('-').reverse().join('/');
+        }
+        hint += ' · s/ principal R$ ' + fmtBr(saldoPrinc) +
+            ' · ' + qtdContrato + ' parcela' + (qtdContrato === 1 ? '' : 's') + ' abertas';
+
+        aplicarValoresQuitar(saldoPrinc, juros, face, hint, qtdContrato, { c: quit });
+        exibirCardsTopo({
+            qtd: qtdContrato,
+            somaAmort: saldoPrinc,
+            somaParcela: face,
+            somaJuros: juros,
+            saldoDevedor: saldoPrinc
+        });
+        const hintSaldo = document.getElementById('quitResumoSaldoHint');
+        const hintJuros = document.getElementById('quitResumoJurosHint');
+        if (hintSaldo) {
+            hintSaldo.textContent = 'Total do contrato — fixo ao desmarcar';
+        }
+        if (hintJuros) {
+            hintJuros.textContent = 'Juros do contrato até ' +
+                (isoQuit ? isoQuit.split('-').reverse().join('/') : 'a data');
+        }
+        const elT = document.getElementById('quitResumoTotal');
+        if (elT) elT.title = 'Face de todas as abertas · a quitar = R$ ' + fmtBr(quit);
+
+        // Guarda snapshot do contrato (para referência)
+        quitResumoCarregado = {
+            qtd: qtdContrato,
+            somaAmort: saldoPrinc,
+            somaParcela: face,
+            somaJuros: juros,
+            saldoDevedor: saldoPrinc,
+            valor_quitacao: quit
+        };
+    }
+
+    // alias usado em pontos antigos
+    function atualizarResumoQuitacao() {
+        atualizarValoresQuitarPorData();
+    }
+    quitChecks().forEach(c => c.addEventListener('change', syncQuit));
+    if (btnQuitTodas) btnQuitTodas.addEventListener('click', function() {
+        quitChecks().forEach(c => { c.checked = true; });
+        syncQuit();
+    });
+    if (btnQuitLimpar) btnQuitLimpar.addEventListener('click', function() {
+        quitChecks().forEach(c => { c.checked = false; });
+        syncQuit();
+    });
+    // Snapshot inicial do contrato (todas as abertas — não muda ao desmarcar)
+    if (!quitResumoCarregado) {
+        quitResumoCarregado = somarParcelasQuitacao(false);
+    }
+    atualizarValoresQuitarPorData();
+    syncQuit();
+
+    document.querySelectorAll('input[name="sim_parcial_modo"]').forEach(function(r) {
+        r.addEventListener('change', function() {
+            syncModoSimParcialUI();
+            atualizarSimulacaoParcial();
+        });
+    });
+    const inpValorAmort = document.getElementById('simParcialValorAmortizar');
+    if (inpValorAmort) {
+        inpValorAmort.addEventListener('input', atualizarSimulacaoParcial);
+        inpValorAmort.addEventListener('change', atualizarSimulacaoParcial);
+    }
+    syncModoSimParcialUI();
+
+    const formQuitSalvar = document.getElementById('formQuitacaoModal');
+    if (formQuitSalvar) {
+        formQuitSalvar.addEventListener('submit', function() {
+            if (typeof atualizarSimulacaoParcial === 'function') {
+                atualizarSimulacaoParcial();
+            }
+        });
+    }
+
+    function syncTaxaCalculoQuitacao() {
+        const jEl = document.getElementById('quitTaxaJuros');
+        const mEl = document.getElementById('quitTaxaMora');
+        const label = document.getElementById('quitTaxaSomaLabel');
+        if (!jEl || !mEl) return;
+        const j = parseBrNumber(jEl.value) || 0;
+        const m = parseBrNumber(mEl.value) || 0;
+        const soma = Math.round((j + m) * 10000) / 10000;
+        if (label) label.textContent = String(soma).replace('.', ',');
+        document.querySelectorAll('[data-taxa-am]').forEach(function(box) {
+            box.setAttribute('data-taxa-am', String(soma));
+        });
+    }
+
+    ['quitTaxaJuros', 'quitTaxaMora'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function() {
+            syncTaxaCalculoQuitacao();
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+        el.addEventListener('change', function() {
+            syncTaxaCalculoQuitacao();
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+    });
+
+    const dataQuitModal = document.getElementById('data_quitacao_modal');
+    if (dataQuitModal) {
+        dataQuitModal.addEventListener('change', function() {
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+        dataQuitModal.addEventListener('input', function() {
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+    }
+    const selicModal = document.getElementById('selic_periodo_pct_modal');
+    if (selicModal) {
+        selicModal.addEventListener('change', function() {
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+        selicModal.addEventListener('input', function() {
+            atualizarValoresQuitarPorData();
+            atualizarQuitacaoParcialValor();
+        });
+    }
+
+    const btnExportExcel = document.getElementById('btnExportarQuitacaoExcel');
+    if (btnExportExcel) {
+        btnExportExcel.addEventListener('click', function() {
+            const linhas = [];
+            document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+                const chk = tr.querySelector('.chk-quitacao');
+                if (!chk || !chk.checked) return;
+                const tds = tr.querySelectorAll('td');
+                const elS = tr.querySelector('.quit-val-saldo');
+                const elP = tr.querySelector('.quit-val-parcela');
+                const elA = tr.querySelector('.quit-val-amort');
+                const elJ = tr.querySelector('.quit-val-juros');
+                const saldoTxt = (elS && elS.textContent || '').trim();
+                let saldoInicio = null;
+                if (saldoTxt && saldoTxt !== '—') {
+                    saldoInicio = parseBrNumber(saldoTxt.replace(/^R\$\s*/i, ''));
+                }
+                linhas.push({
+                    numero: (tds[1] && tds[1].textContent || '').trim(),
+                    vencimento: (tds[2] && tds[2].textContent || '').trim(),
+                    saldo_inicio: (saldoInicio != null && isFinite(saldoInicio)) ? saldoInicio : null,
+                    parcela: parseFloat((elP && elP.getAttribute('data-valor')) || '0') || 0,
+                    amortizacao: parseFloat((elA && elA.getAttribute('data-valor')) || '0') || 0,
+                    juros: parseFloat((elJ && elJ.getAttribute('data-valor')) || '0') || 0
+                });
+            });
+            if (!linhas.length) {
+                alert('Selecione ao menos uma parcela para exportar.');
+                return;
+            }
+            const hiddenPrice = document.getElementById('dados_price_json');
+            let origem = 'extrato';
+            try {
+                if (hiddenPrice && hiddenPrice.value) {
+                    const d = JSON.parse(hiddenPrice.value);
+                    if (d && (d.origem === 'price' || d.origem === 'sac')) origem = d.origem;
+                }
+            } catch (e) {}
+            const boxMetodo = document.getElementById('quitValoresQuitarBox');
+            const metodoPage = (boxMetodo && boxMetodo.getAttribute('data-metodo')) || '';
+            if (origem === 'extrato' && metodoPage === 'sac') origem = 'sac';
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "emprestimos:quitacao_excel" emprestimo.pk %}';
+            form.style.display = 'none';
+
+            const csrf = document.querySelector('#formQuitacaoModal [name=csrfmiddlewaretoken]');
+            if (csrf) {
+                const inpCsrf = document.createElement('input');
+                inpCsrf.type = 'hidden';
+                inpCsrf.name = 'csrfmiddlewaretoken';
+                inpCsrf.value = csrf.value;
+                form.appendChild(inpCsrf);
+            }
+
+            const payload = {
+                data_quitacao: (document.getElementById('data_quitacao_modal') || {}).value || '',
+                titulo: (document.getElementById('titulo_simulacao') || {}).value || '',
+                origem: origem,
+                linhas: linhas,
+                totais: {
+                    saldo_principal: 0,
+                    saldo_devedor: 0,
+                    juros_quitacao: 0,
+                    valor_quitar: 0,
+                    total_parcelas: 0,
+                    diferenca: 0,
+                    dias_juros: 0
+                }
+            };
+
+            // Preferir valores do card "Valor da quitação parcial" (parcelas marcadas)
+            const marcadasExp = somarParcelasQuitacao(true);
+            const boxTaxa = document.getElementById('quitValoresQuitarBox');
+            let taxaJurosAmExp = 0;
+            const taxaJurosElExp = document.getElementById('quitTaxaJuros');
+            if (taxaJurosElExp) taxaJurosAmExp = parseBrNumber(taxaJurosElExp.value) || 0;
+            if (!(taxaJurosAmExp > 0) && boxTaxa) {
+                taxaJurosAmExp = parseBrNumber(boxTaxa.getAttribute('data-taxa-juros-am') || '0') || 0;
+            }
+            let dataRef = boxTaxa ? parseIsoDate(boxTaxa.getAttribute('data-ref-juros') || '') : null;
+            const dataQuit = parseIsoDate((document.getElementById('data_quitacao_modal') || {}).value || '');
+            let dias = (dataRef && dataQuit) ? Math.max(0, diffDias(dataRef, dataQuit)) : 0;
+            const aAmort = marcadasExp.somaAmort;
+            const allChkExp = document.querySelectorAll('#tabelaQuitacaoParcelas .chk-quitacao');
+            const chkOkExp = document.querySelectorAll('#tabelaQuitacaoParcelas .chk-quitacao:checked');
+            const todasExp = allChkExp.length > 0 && chkOkExp.length === allChkExp.length;
+            let saldoPrincExp = aAmort;
+            if (todasExp && boxTaxa) {
+                const sp = parseBrNumber(boxTaxa.getAttribute('data-saldo-principal') || '');
+                if (sp > 0) saldoPrincExp = sp;
+            }
+            let bJuros = 0;
+            if (saldoPrincExp > 0 && taxaJurosAmExp > 0 && dias > 0) {
+                bJuros = jurosPorDias(saldoPrincExp, taxaJurosAmExp / 100, dias);
+            }
+            const cQuitar = saldoPrincExp + bJuros;
+            const totalParc = marcadasExp.somaParcela;
+            const diffParc = totalParc - cQuitar;
+
+            payload.totais.saldo_principal = saldoPrincExp;
+            payload.totais.saldo_devedor = saldoPrincExp;
+            payload.totais.juros_quitacao = bJuros;
+            payload.totais.valor_quitar = cQuitar;
+            payload.totais.total_parcelas = totalParc;
+            payload.totais.diferenca = diffParc;
+            payload.totais.dias_juros = dias;
+
+            // Fallback pelos cards da tela se necessário
+            const elOrig = document.getElementById('quitParcialValorOriginal');
+            const elQuit = document.getElementById('quitParcialValorTotal');
+            if (elOrig) {
+                const v = parseBrNumber(String(elOrig.textContent || '').replace(/^R\$\s*/i, ''));
+                if (v > 0) payload.totais.total_parcelas = v;
+            }
+            if (elQuit) {
+                const v = parseBrNumber(String(elQuit.textContent || '').replace(/^R\$\s*/i, ''));
+                if (v > 0) payload.totais.valor_quitar = v;
+            }
+            payload.totais.diferenca = payload.totais.total_parcelas - payload.totais.valor_quitar;
+
+            // Simulação parcial — preferir JSON já gravado no hidden
+            let simParcial = null;
+            const simParcialEl = document.getElementById('sim_parcial_json');
+            if (simParcialEl && simParcialEl.value) {
+                try { simParcial = JSON.parse(simParcialEl.value); } catch (e) { simParcial = null; }
+            }
+            if (!simParcial) {
+                const modoEl = document.querySelector('input[name="sim_parcial_modo"]:checked');
+                simParcial = {
+                    modo: (modoEl && modoEl.value) || 'mesma',
+                    metodo: ((document.getElementById('quitSimParcialBox') || {}).getAttribute('data-metodo')) || 'price',
+                    modo_rotulo: (function() {
+                        const m = (modoEl && modoEl.value) || 'mesma';
+                        if (m === 'diminui') return 'Diminuir a quantidade de parcelas';
+                        if (m === 'amortizar') return 'Amortizar';
+                        return 'Mesma quantidade de parcelas';
+                    })(),
+                    consolida: ((document.getElementById('simParcialConsolida') || {}).textContent || '').trim(),
+                    n_restante_rotulo: ((document.getElementById('simParcialNRestante') || {}).textContent || '').trim(),
+                    novo_saldo: parseBrNumber(String((document.getElementById('simParcialSaldo') || {}).textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                    nova_parcela: parseBrNumber(String((document.getElementById('simParcialNovaParcela') || {}).textContent || '').replace(/^R\$\s*/i, '')) || 0,
+                    hint: ((document.getElementById('simParcialHint') || {}).textContent || '').trim(),
+                    linhas: coletarLinhasSimParcialTabela()
+                };
+                const inpAm = document.getElementById('simParcialValorAmortizar');
+                if (inpAm && (modoEl && modoEl.value) === 'amortizar') {
+                    simParcial.valor_amortizado = parseBrNumber(inpAm.value) || 0;
+                }
+            }
+            payload.sim_parcial = simParcial;
+
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'payload';
+            inp.value = JSON.stringify(payload);
+            form.appendChild(inp);
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        });
+    }
+
+    function aplicarDadosPriceJson(dados) {
+        if (!dados || !dados.linhas) return false;
+        const linhas = dados.linhas;
+        const selecionadas = new Set((dados.selecionadas || []).map(String));
+        Object.keys(linhas).forEach(function(id) {
+            const L = linhas[id] || {};
+            priceLinhasPorId[String(id)] = {
+                n: L.n,
+                amort: Number(L.amort) || 0,
+                juros: Number(L.juros) || 0,
+                parcela: Number(L.parcela) || 0,
+                saldoInicio: Number(L.saldo_inicio) || 0,
+                saldoFim: Number(L.saldo_fim) || 0,
+                dias: L.dias || 30,
+                status: L.status || ''
+            };
+        });
+        const box = document.getElementById('quitOrigemPriceBox');
+        if (box) box.classList.remove('d-none');
+        document.querySelectorAll('.chk-quitacao').forEach(function(c) {
+            if (selecionadas.size) c.checked = selecionadas.has(String(c.value));
+        });
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const id = tr.getAttribute('data-parcela-id');
+            let L = priceLinhasPorId[id];
+            const elS = tr.querySelector('.quit-val-saldo');
+            const elP = tr.querySelector('.quit-val-parcela');
+            const elA = tr.querySelector('.quit-val-amort');
+            const elJ = tr.querySelector('.quit-val-juros');
+
+            // Fallback: se a simulação Price/SAC veio zerada (saldo esgotou antes),
+            // preserva os valores do extrato já renderizados na linha.
+            const extParcela = parseBrNumber(tr.getAttribute('data-extrato-parcela') || '') || 0;
+            const extAmort = parseBrNumber(tr.getAttribute('data-extrato-amort') || '') || 0;
+            const extJuros = parseBrNumber(tr.getAttribute('data-extrato-juros') || '') || 0;
+            const simZerada = !L || (
+                !(Number(L.parcela) > 0.009) &&
+                !(Number(L.amort) > 0.009) &&
+                !(Number(L.juros) > 0.009)
+            );
+            const temExtrato = extParcela > 0.009 || extAmort > 0.009 || extJuros > 0.009;
+            if (simZerada && temExtrato) {
+                L = {
+                    n: L && L.n,
+                    amort: extAmort,
+                    juros: extJuros,
+                    parcela: extParcela > 0 ? extParcela : (extAmort + extJuros),
+                    saldoInicio: (L && Number(L.saldoInicio) > 0) ? Number(L.saldoInicio) : null,
+                    saldoFim: (L && Number(L.saldoFim) > 0) ? Number(L.saldoFim) : 0,
+                    dias: (L && L.dias) || 30,
+                    status: (L && L.status) || 'aberta',
+                    origemExtrato: true
+                };
+                priceLinhasPorId[id] = L;
+            }
+
+            if (L) {
+                if (elS) {
+                    if (L.saldoInicio != null && isFinite(L.saldoInicio) && Number(L.saldoInicio) > 0) {
+                        elS.textContent = 'R$ ' + fmtBr(L.saldoInicio);
+                    } else if (L.origemExtrato) {
+                        elS.textContent = '—';
+                    } else {
+                        elS.textContent = 'R$ ' + fmtBr(L.saldoInicio || 0);
+                    }
+                }
+                if (elP) {
+                    elP.setAttribute('data-valor', String(L.parcela));
+                    elP.textContent = 'R$ ' + fmtBr(L.parcela);
+                }
+                if (elA) {
+                    elA.setAttribute('data-valor', String(L.amort));
+                    elA.textContent = 'R$ ' + fmtBr(L.amort);
+                }
+                if (elJ) {
+                    elJ.setAttribute('data-valor', String(L.juros));
+                    elJ.textContent = 'R$ ' + fmtBr(L.juros);
+                }
+                if (!selecionadas.size || selecionadas.has(id)) tr.classList.add('table-info');
+                else tr.classList.remove('table-info');
+            }
+        });
+        const hintSaldo = document.getElementById('quitResumoSaldoHint');
+        const hintJuros = document.getElementById('quitResumoJurosHint');
+        const rotuloOrigem = (dados.origem === 'sac') ? 'Carregado da simulação SAC' : 'Carregado da Tabela Price';
+        if (hintSaldo) hintSaldo.textContent = 'Total do contrato — fixo ao desmarcar';
+        if (hintJuros) hintJuros.textContent = rotuloOrigem;
+        quitResumoCarregado = somarParcelasQuitacao(false);
+        atualizarValoresQuitarPorData();
+        if (typeof syncQuit === 'function') syncQuit();
+        return true;
+    }
+
+
+    // Carregar valores Price vindos da sessão / POST
+    (function bootPrice() {
+        const bootEl = document.getElementById('dadosPriceJsonBoot');
+        const hidden = document.getElementById('dados_price_json');
+        let dados = null;
+        if (bootEl && bootEl.textContent) {
+            try {
+                const raw = bootEl.textContent.trim();
+                if (raw && raw !== 'null') dados = JSON.parse(raw);
+            } catch (e) {}
+        }
+        if (!dados && hidden && hidden.value) {
+            try { dados = JSON.parse(hidden.value); } catch (e) {}
+        }
+        if (dados && (dados.origem === 'price' || dados.origem === 'sac' || dados.linhas)) {
+            if (hidden) hidden.value = JSON.stringify(dados);
+            aplicarDadosPriceJson(dados);
+        }
+    })();
+
+    const alertaSim = document.querySelector('.emp-sim-box');
+    if (alertaSim) {
+        alertaSim.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+})();
+</script>
+{% endblock %}

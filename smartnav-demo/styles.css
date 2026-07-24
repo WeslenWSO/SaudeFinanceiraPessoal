@@ -1,0 +1,159 @@
+/**
+ * SmartNav - Navbar profissional (styles.css para demo standalone)
+ * Copie para static/css/menu.css no projeto Django
+ */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; }
+
+:root {
+  --smart-nav-height: 56px;
+  --smart-nav-bg: #fff;
+  --smart-nav-border: #e9ecef;
+  --smart-nav-link-color: #0d6efd;
+  --smart-nav-link-hover: #0b5ed7;
+  --smart-nav-dropdown-bg: #fff;
+  --smart-nav-dropdown-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  --smart-nav-dropdown-border: 1px solid #e9ecef;
+}
+
+.app-content-with-nav { padding-top: var(--smart-nav-height); }
+
+.smart-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--smart-nav-height);
+  background: var(--smart-nav-bg);
+  border-bottom: var(--smart-nav-dropdown-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  z-index: 1030;
+}
+
+.smart-nav-inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 1.5rem;
+}
+
+.smart-nav-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--smart-nav-link-color);
+  text-decoration: none;
+  margin-right: 2rem;
+}
+
+.smart-nav-brand:hover { color: var(--smart-nav-link-hover); }
+
+.smart-nav-menu {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.smart-nav-item { margin: 0; position: relative; }
+.smart-nav-spacer { flex: 1; pointer-events: none; }
+
+.smart-nav-trigger {
+  display: flex;
+  align-items: center;
+  height: var(--smart-nav-height);
+  padding: 0 1rem;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.smart-nav-trigger:hover {
+  color: var(--smart-nav-link-color);
+  background: rgba(13, 110, 253, 0.05);
+}
+
+.smart-nav-trigger[aria-expanded="true"] {
+  color: var(--smart-nav-link-color);
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.smart-nav-dropdown {
+  position: absolute;
+  top: 100%; left: 0;
+  min-width: 220px;
+  margin: 0;
+  padding: 0.5rem 0;
+  background: var(--smart-nav-dropdown-bg);
+  border: var(--smart-nav-dropdown-border);
+  border-radius: 0 0 8px 8px;
+  box-shadow: var(--smart-nav-dropdown-shadow);
+  list-style: none;
+  z-index: 1040;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s, visibility 0.15s, transform 0.15s;
+}
+
+.smart-nav-dropdown.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.smart-nav-link {
+  display: block;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: var(--smart-nav-link-color);
+  text-decoration: none;
+}
+
+.smart-nav-link:hover {
+  background: rgba(13, 110, 253, 0.08);
+  color: var(--smart-nav-link-hover);
+}
+
+@media (max-width: 768px) {
+  .smart-nav { height: auto; min-height: var(--smart-nav-height); }
+  .smart-nav-inner { flex-wrap: wrap; padding: 0.5rem 1rem; }
+  .smart-nav-brand { margin-right: auto; }
+  .smart-nav-menu { flex-direction: column; width: 100%; flex-basis: 100%; }
+  .smart-nav-item { border-top: 1px solid var(--smart-nav-border); }
+  .smart-nav-spacer { display: none; }
+  .smart-nav-trigger {
+    justify-content: space-between;
+    width: 100%;
+    height: 48px;
+    text-align: left;
+    padding-left: 0;
+  }
+  .smart-nav-trigger::after {
+    content: "▼";
+    font-size: 0.6rem;
+    transition: transform 0.2s;
+  }
+  .smart-nav-trigger[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .smart-nav-dropdown {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    max-height: 0;
+    overflow: hidden;
+    padding: 0;
+    transition: max-height 0.3s;
+  }
+  .smart-nav-dropdown.is-open {
+    max-height: 500px;
+    padding: 0.5rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid var(--smart-nav-link-color);
+  }
+  .app-content-with-nav { padding-top: 0; }
+}

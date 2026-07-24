@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Relatório de Repasses Fechados{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-alt"></i> Relatório de Repasses Fechados
+                    </h3>
+                    <div class="card-tools">
+                        <button onclick="window.print()" class="btn btn-primary btn-sm">
+                            <i class="fas fa-print"></i> Imprimir
+                        </button>
+                        <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- Cabeçalho da Empresa -->
+                    <div class="row mb-4">
+                        <div class="col-12 text-center">
+                            <h4>{{ empresa.razao }}</h4>
+                            <p class="mb-1">CNPJ: {{ empresa.cnpj }}</p>
+                            {% if periodo_inicio and periodo_fim %}
+                                <p class="mb-1">
+                                    <strong>Período:</strong>
+                                    {{ periodo_inicio|date:"d/m/Y" }} à {{ periodo_fim|date:"d/m/Y" }}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Filtros Aplicados -->
+                    {% if filtros.data_inicio or filtros.data_fim or filtros.convenio or filtros.anestesista %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <strong>Filtros aplicados:</strong>
+                                {% if filtros.data_inicio %}Data início: {{ filtros.data_inicio }}; {% endif %}
+                                {% if filtros.data_fim %}Data fim: {{ filtros.data_fim }}; {% endif %}
+                                {% if filtros.convenio %}Convênios: {{ filtros.convenio|join:", " }}; {% endif %}
+                                {% if filtros.anestesista %}Anestesista: {{ filtros.anestesista }}; {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Repasses por Anestesista -->
+                    {% for anestesista_nome, dados_anestesista in repasses_por_anestesista.items %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-user-md"></i> {{ anestesista_nome }}
+                                <small class="text-muted">({{ dados_anestesista.repasses|length }} repasse{{ dados_anestesista.repasses|length|pluralize }})</small>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% for repasse in dados_anestesista.repasses %}
+                            <!-- Cabeçalho do Faturamento -->
+                            <table class="table table-sm table-bordered mb-2">
+                                <thead>
+                                    <tr class="table-secondary">
+                                        <th>Data</th>
+                                        <th>Nome</th>
+                                        <th>Convênio</th>
+                                        <th>Lote</th>
+                                        <th>Data Fechamento</th>
+                                        
+                                        
+                                        
+                                      
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>{{ repasse.faturamento.data|date:"d/m/Y" }}</td>
+                                        <td><b>{{ repasse.faturamento.nome }}</b></td>
+                                        
+                                        <td><b>{{ repasse.faturamento.convenio }}</b></td>
+                                        <td>{{ repasse.faturamento.lote }}</td>
+                                        <td>{{ repasse.faturamento.data_fechamento|date:"d/m/Y" }}</td>
+                                         <tr aria-colspan="5"><td></td></tr>
+                                        <tr>
+                                        <th>Código Serviço</th>
+                                        <th>Serviço</th>
+                                        <th>Porte</th>
+                                        <th>QT</th>
+                                        <th>Percentual</th>
+                                        <th>Valor Unitário</th>
+                                        <th>Valor Total Item</th>
+                                        </tr>
+                                        {% for item in repasse.faturamento.itens_servico.all %}
+                                           
+                                           {% if forloop.counter < 2  %}
+                                            
+                                           <td>{{ item.codigo_servico }}</td>
+                                           <td>{{ item.servico }}</td>
+                                           <td>{{ item.porte }}</td>
+                                           <td class="text-center">{{ item.qt }}</td>
+                                           <td class="text-right">{{ item.percentual|floatformat:2 }}%</td>
+                                           <td class="text-right">R$ {{ item.valor|floatformat:2 }}</td>
+                                           <td class="text-right">R$ {{ item.total|floatformat:2 }}</td>
+                                           {% else %}
+                                           
+                                            <tr>
+                                            <td>{{ item.codigo_servico }}</td>
+                                            <td>{{ item.servico }}</td>
+                                            <td>{{ item.porte }}</td>
+                                            <td class="text-center">{{ item.qt }}</td>
+                                            <td class="text-right">{{ item.percentual|floatformat:2 }}%</td>
+                                            <td class="text-right">R$ {{ item.valor|floatformat:2 }}</td>
+                                            <td class="text-right">R$ {{ item.total|floatformat:2 }}</td>
+                                            
+                                            {% endif %}
+                                            
+                                           {% empty %}
+                                          <tr>
+                                             <td colspan="7" class="text-center text-muted">Sem itens de serviço</td>
+                                            </tr>
+                                    {% endfor %}
+                                       <tr>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th><th></th>
+                                        <th class="table-secondary">Valor Total</th>
+                                        <th class="table-secondary">Valor Imposto</th>
+                                        <th class="table-secondary">Valor Comissão</th>
+                                        <th class="table-secondary">Valor Líquido</th>
+                                       </tr><th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                        <th></th>
+                                          <td class="text-right">R$ {{ repasse.valor_total|floatformat:2 }}</td>
+                                          <td class="text-right">R$ {{ repasse.valor_imposto|floatformat:2 }}</td>
+                                          <td class="text-right">R$ {{ repasse.valor_comissao|floatformat:2 }}</td>
+                                          <td class="text-right font-weight-bold">R$ {{ repasse.valor_liquido|floatformat:2 }}</td>
+                                        
+
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Itens de Serviço -->
+                            <table class="table table-sm table-bordered mb-4">
+                                <thead>
+                                     <tr class="table-light">
+                                     
+                                        
+                                
+                                       
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                      
+                                        
+                                    
+                                    
+                                        
+                                       
+                                    </tr>
+                                 
+                                </tbody>
+                            </table>
+                            {% endfor %}
+
+                            <!-- Total do Anestesista -->
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="alert alert-primary">
+                                        <strong>Total {{ anestesista_nome }}:</strong>
+                                        Valor Total: R$ {{ dados_anestesista.total_valor_total|floatformat:2 }} |
+                                        Valor Imposto: R$ {{ dados_anestesista.total_valor_imposto|floatformat:2 }} |
+                                        Valor Comissão: R$ {{ dados_anestesista.total_valor_comissao|floatformat:2 }} |
+                                        Valor Líquido: R$ {{ dados_anestesista.total_valor_liquido|floatformat:2 }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>Nenhum repasse encontrado</h4>
+                        <p>Não há repasses fechados que atendam aos filtros aplicados.</p>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Totais Gerais -->
+                    {% if repasses_por_anestesista %}
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-calculator"></i> Totais Gerais
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-success">R$ {{ total_geral|floatformat:2 }}</h4>
+                                        <small class="text-muted">Valor Total</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-warning">R$ {{ total_imposto_geral|floatformat:2 }}</h4>
+                                        <small class="text-muted">Total Impostos</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-info">R$ {{ total_comissao_geral|floatformat:2 }}</h4>
+                                        <small class="text-muted">Total Comissões</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h4 class="text-primary font-weight-bold">R$ {{ total_liquido_geral|floatformat:2 }}</h4>
+                                        <small class="text-muted">Valor Líquido Total</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Rodapé -->
+                    <div class="row mt-4">
+                        <div class="col-12 text-center text-muted">
+                            <small>
+                                Relatório gerado em {{ "now"|date:"d/m/Y H:i:s" }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .card-tools,
+    .btn,
+    .alert {
+        display: none !important;
+    }
+
+    .card {
+        border: 1px solid #dee2e6 !important;
+        margin-bottom: 20px;
+    }
+
+    .table th,
+    .table td {
+        padding: 0.5rem !important;
+        font-size: 12px !important;
+    }
+
+    .card-header {
+        background-color: #f8f9fa !important;
+        border-bottom: 1px solid #dee2e6 !important;
+    }
+
+    .card-header h5 {
+        margin-bottom: 0 !important;
+        font-size: 14px !important;
+    }
+}
+</style>
+{% endblock %}

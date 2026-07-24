@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+          <h3 class="card-title mb-0">Extrato Bancário – Prévia do Arquivo</h3>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'extrato:upload_ofx' %}" class="btn btn-secondary btn-sm"><i class="fas fa-upload"></i> Importar OFX</a>
+            <a href="{% url 'extrato:upload_pdf' %}" class="btn btn-secondary btn-sm"><i class="fas fa-file-pdf"></i> Importar PDF</a>
+            <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list"></i> Lançamentos Importados</a>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if extrato_arquivo %}
+          <p class="text-muted mb-3">
+            <i class="fas fa-file me-1"></i> Arquivo: <strong>{{ extrato_arquivo.arquivo.name }}</strong>
+            | Conta: <strong>{{ extrato_arquivo.conta }}</strong>
+            | Tipo: <strong>{{ extrato_arquivo.get_tipo_display }}</strong>
+          </p>
+          {% endif %}
+
+          <div class="panel mb-4 d-flex flex-wrap gap-4">
+            <div><strong>Total Créditos:</strong> <span class="text-success">R$ {{ total_creditos|floatformat:2 }}</span></div>
+            <div><strong>Total Débitos:</strong> <span class="text-danger">R$ {{ total_debitos|floatformat:2 }}</span></div>
+            <div><strong>Por status:</strong>
+              {% for st, cnt in contagem_status.items %}
+                <span class="badge bg-secondary me-1">{{ st }}: {{ cnt }}</span>
+              {% empty %}
+                —
+              {% endfor %}
+            </div>
+          </div>
+
+          <form method="post" action="{% url 'extrato:confirmar_importacao' extrato_arquivo_id=extrato_arquivo_id %}" class="mb-3">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success" onclick="return confirm('Confirmar importação destes lançamentos?');">
+              <i class="fas fa-check me-1"></i> Confirmar Importação
+            </button>
+          </form>
+
+          {% if lancamentos %}
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Histórico</th>
+                  <th class="text-end">Valor</th>
+                  <th>FITID</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lancamentos %}
+                <tr>
+                  <td>{{ l.data|date:"d/m/Y" }}</td>
+                  <td title="{{ l.historico }}">{{ l.historico|truncatewords:12 }}</td>
+                  <td class="text-end {% if l.valor >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {% if l.valor >= 0 %}+{% endif %}R$ {{ l.valor|floatformat:2 }}
+                  </td>
+                  <td class="font-monospace small">{{ l.fitid|default:"-" }}</td>
+                  <td><span class="badge {% if l.status_importacao == 'P' %}bg-warning{% elif l.status_importacao == 'I' %}bg-success{% else %}bg-secondary{% endif %}">{{ l.get_status_importacao_display }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if page_obj.paginator.num_pages > 1 %}
+          <nav class="mt-3">
+            <ul class="pagination pagination-sm">
+              {% if page_obj.has_previous %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+          {% endif %}
+          {% else %}
+          <p class="text-muted">Nenhum lançamento nesta prévia.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

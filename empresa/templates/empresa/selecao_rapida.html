@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load validar_cnpj %}
+
+{% block conteudo %}
+  <form method="post" id="csrf-form" style="display: none;">{% csrf_token %}</form>
+
+  {% if messages %}
+    {% include 'parcial/_messages.html' %}
+  {% endif %}
+
+  <header class="page-header">
+    <div>
+      <h1><i class="fas fa-building" style="margin-right: 0.5rem;"></i>Seleção de Empresa</h1>
+      <p class="subtitle">Escolha uma empresa para continuar usando o sistema.</p>
+    </div>
+    <div class="actions">
+      <a href="{% url 'empresa:empresa_create' %}" role="button"><i class="fas fa-plus" style="margin-right: 0.35rem;"></i>Nova Empresa</a>
+    </div>
+  </header>
+
+  {% if request.session.empresa_nome %}
+    <div class="alert-modern success">
+      <span class="alert-icon"><i class="fas fa-check-circle"></i></span>
+      <div style="flex: 1;">
+        <strong>Empresa ativa:</strong> {{ request.session.empresa_nome }}
+        <a href="{% url 'empresa:trocar' %}" role="button" class="secondary" style="margin-left: 0.75rem;">
+          <i class="fas fa-exchange-alt" style="margin-right: 0.35rem;"></i>Trocar Empresa
+        </a>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-muted mb-4 small">
+      Selecione uma das empresas abaixo para acessar o sistema.
+    </p>
+  {% endif %}
+
+  <div class="cards-grid selecao-empresa-grid">
+    {% for emp in object_list %}
+      <article class="card-modern card-empresa" {% if request.session.empresa_id == emp.id %}style="border-left: 4px solid var(--app-success);"{% endif %}>
+        <div class="card-empresa-header">
+          {% if emp.status == "Ativa" %}
+            <span class="badge-modern success"><i class="fas fa-check"></i> Ativa</span>
+            <span class="badge-modern success"><i class="fas fa-check"></i> Código Externo: {{ emp.codigo_externo }}</span>
+          {% else %}
+            <span class="badge-modern danger"><i class="fas fa-times"></i> Inativa</span>
+          {% endif %}
+          {% if emp.regime_tributario %}
+            <span class="badge-modern info"><i class="fas fa-balance-scale"></i> {{ emp.get_regime_tributario_display }}</span>
+          {% endif %}
+          {% if request.session.empresa_id == emp.id %}
+            <span class="badge-modern success"><i class="fas fa-star"></i> Selecionada</span>
+          {% endif %}
+        </div>
+        <h2 class="card-title">{{ emp.razao }}</h2>
+        {% if emp.nome_fantasia %}
+          <p class="card-meta"><i class="fas fa-tag"></i> {{ emp.nome_fantasia }}</p>
+        {% endif %}
+        <p class="card-meta"><i class="fas fa-id-card"></i> {{ emp.cnpj|formatar_cnpj }}</p>
+        {% if emp.endereco %}
+          <p class="card-meta"><i class="fas fa-map-marker-alt"></i> {{ emp.endereco|truncatechars:50 }}</p>
+        {% endif %}
+        <div class="card-actions card-actions-inline">
+          {% if emp.status == "Ativa" %}
+            {% if request.session.empresa_id == emp.id %}
+              <button type="button" disabled class="secondary"><i class="fas fa-check" style="margin-right: 0.35rem;"></i>Empresa ativa</button>
+            {% else %}
+              <button type="button" class="btn-selecionar-empresa" data-empresa-id="{{ emp.id }}" onclick="selecionarEmpresa({{ emp.id }})">
+                <i class="fas fa-check" style="margin-right: 0.35rem;"></i>Selecionar
+              </button>
+            {% endif %}
+          {% endif %}
+          <a href="{% url 'empresa:empresa_detail' emp.pk %}" role="button" class="secondary" title="Visualizar"><i class="fas fa-eye"></i></a>
+          <a href="{% url 'empresa:empresa_edit' emp.pk %}" role="button" class="secondary" title="Editar"><i class="fas fa-edit"></i></a>
+          <a href="{% url 'empresa:empresa_toggle_status' emp.pk %}" role="button" class="secondary" title="Alterar status">
+            {% if emp.status == "Ativa" %}<i class="fas fa-toggle-on"></i>{% else %}<i class="fas fa-toggle-off"></i>{% endif %}
+          </a>
+        </div>
+      </article>
+    {% empty %}
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-icon"><i class="fas fa-building"></i></div>
+        <h3>Nenhuma empresa encontrada</h3>
+        <p>Você não tem acesso a nenhuma empresa ou não existem empresas cadastradas.</p>
+        <a href="{% url 'empresa:empresa_create' %}" role="button"><i class="fas fa-plus" style="margin-right: 0.35rem;"></i>Criar primeira empresa</a>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if is_paginated %}
+    <nav aria-label="Paginação" class="pagination-wrap">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}" role="button" class="secondary">← Anterior</a>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <span role="button" class="secondary" aria-current="page" style="font-weight: 600;">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <a href="?page={{ num }}" role="button" class="secondary">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" role="button" class="secondary">Próxima →</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+
+  <script>
+  function selecionarEmpresa(empresaId) {
+    var form = document.getElementById('csrf-form');
+    var token = form ? form.querySelector('[name=csrfmiddlewaretoken]') : null;
+    if (!token) return;
+    var formData = new FormData();
+    formData.append('empresa_id', empresaId);
+    formData.append('csrfmiddlewaretoken', token.value);
+    var btn = event.target.closest('button');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 0.35rem;"></i>Selecionando...';
+    }
+    fetch('{% url "empresa:selecionar_ajax" %}', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-CSRFToken': token.value }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check" style="margin-right: 0.35rem;"></i>Selecionar'; }
+      }
+    })
+    .catch(function() {
+      alert('Erro ao selecionar empresa. Tente novamente.');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check" style="margin-right: 0.35rem;"></i>Selecionar'; }
+    });
+  }
+  </script>
+{% endblock %}

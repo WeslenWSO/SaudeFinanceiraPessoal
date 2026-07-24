@@ -1,0 +1,564 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<style>
+    @page {
+        size: A4 landscape;
+        margin: 8mm 10mm;
+    }
+
+    @media print {
+        #smart-nav,
+        .no-print,
+        footer,
+        #empresaSelectorModal,
+        .modal-backdrop {
+            display: none !important;
+        }
+        html,
+        body {
+            width: 100%;
+            height: auto;
+        }
+        #app-content,
+        main.container {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .rf-relatorio-impressao {
+            max-width: 100%;
+            font-size: 7.5pt;
+            line-height: 1.25;
+        }
+        .rf-relatorio-impressao .rf-empresa-cabecalho .fs-5 {
+            font-size: 11pt !important;
+        }
+        .rf-relatorio-impressao h1,
+        .rf-relatorio-impressao .h2 {
+            font-size: 13pt !important;
+            margin-bottom: 0.15rem !important;
+        }
+        .rf-relatorio-impressao h2,
+        .rf-relatorio-impressao .h5,
+        .rf-relatorio-impressao .h6 {
+            font-size: 10pt !important;
+            margin-bottom: 0.15rem !important;
+        }
+        .rf-relatorio-impressao .small,
+        .rf-relatorio-impressao .text-muted {
+            font-size: 6.5pt !important;
+        }
+        .rf-relatorio-impressao .mb-3,
+        .rf-relatorio-impressao .mb-4 {
+            margin-bottom: 0.35rem !important;
+        }
+        .rf-relatorio-impressao .card {
+            break-inside: avoid-page;
+            box-shadow: none !important;
+            border: 1px solid #ccc !important;
+            margin-bottom: 0.4rem !important;
+        }
+        .rf-relatorio-impressao .card-header,
+        .rf-relatorio-impressao .card-footer {
+            padding: 0.25rem 0.4rem !important;
+            font-size: 6.5pt !important;
+        }
+        .rf-relatorio-impressao .card-body {
+            padding: 0 !important;
+        }
+        .rf-relatorio-impressao .table-responsive {
+            overflow: visible !important;
+            max-width: 100% !important;
+        }
+        .rf-relatorio-impressao table {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            table-layout: fixed;
+            font-size: 6.5pt !important;
+            margin-bottom: 0 !important;
+            border-collapse: collapse;
+        }
+        .rf-relatorio-impressao .table th,
+        .rf-relatorio-impressao .table td {
+            padding: 0.12rem 0.2rem !important;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+        .rf-relatorio-impressao .text-nowrap {
+            white-space: normal !important;
+        }
+        .rf-relatorio-impressao thead {
+            display: table-header-group;
+        }
+        .rf-relatorio-impressao tfoot {
+            display: table-footer-group;
+        }
+        .rf-relatorio-impressao tr {
+            page-break-inside: avoid;
+        }
+        .rf-relatorio-impressao .table-dark th {
+            background: #212529 !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .rf-relatorio-impressao .table-secondary {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .rf-relatorio-impressao a[href]:after {
+            content: none !important;
+        }
+        .rf-relatorio-impressao .badge {
+            font-size: 6pt !important;
+            padding: 0.1em 0.35em !important;
+        }
+    }
+</style>
+
+<div class="rf-relatorio-impressao">
+{% if empresa_razao_social %}
+<div class="rf-empresa-cabecalho border-bottom pb-2 mb-3">
+    <p class="mb-0 text-uppercase small text-muted">Razão social</p>
+    <p class="mb-1 fw-semibold fs-5">{{ empresa_razao_social }}</p>
+    {% if empresa_cnpj_fmt %}
+    <p class="mb-0 small"><span class="text-muted">CNPJ</span> {{ empresa_cnpj_fmt }}</p>
+    {% endif %}
+</div>
+{% endif %}
+<div class="mb-3 d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div>
+        <h1 class="h2 mb-1">{{ titulo }}</h1>
+        <p class="h5 text-primary mb-0">{{ periodo_titulo }}</p>
+        {% if filtro_socio_nome %}
+        <p class="small mb-0"><span class="badge bg-secondary">{% if filtro_socio_ids|length > 1 %}Sócios{% else %}Sócio{% endif %}</span> {{ filtro_socio_nome }}</p>
+        {% endif %}
+        <p class="text-muted small mb-0">Faturamento por <strong>sócio responsável</strong> nas NFSe (data de emissão no período; notas canceladas excluídas). O filtro de sócio(s) restringe NFSe, grade de faturamento e rateio.</p>
+    </div>
+    <button type="button" class="btn btn-outline-secondary btn-sm no-print" onclick="window.print()" title="Imprimir este relatório">
+        <i class="fas fa-print" aria-hidden="true"></i> Imprimir relatório
+    </button>
+</div>
+
+<form method="get" class="card card-body py-3 mb-3 border no-print">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-6 col-lg-3">
+            <label for="rf-di" class="form-label small mb-0">Data inicial</label>
+            <input type="date" name="data_inicio" id="rf-di" class="form-control form-control-sm" value="{{ data_inicio }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <label for="rf-df" class="form-label small mb-0">Data final</label>
+            <input type="date" name="data_fim" id="rf-df" class="form-control form-control-sm" value="{{ data_fim }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-5">
+            <label for="rf-socio" class="form-label small mb-0">Sócio(s)</label>
+            <select name="socio" id="rf-socio" class="form-select form-select-sm" multiple
+                    size="6"
+                    title="Ctrl ou Cmd + clique para selecionar vários">
+                {% for s in socios %}
+                <option value="{{ s.id }}" {% if s.id in filtro_socio_ids %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+            <p class="form-text small mb-0">Nenhuma seleção = <strong>todos</strong> os sócios.</p>
+        </div>
+        <div class="col-12 col-md-6 col-lg-2 d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Pro-labore e dividendo</h2>
+        <p class="small text-muted mb-0"><strong>Saldo</strong> é o mesmo da coluna «Saldo» do resumo consolidado. Informe o <strong>pro-labore</strong> por sócio; o <strong>dividendo</strong> = Saldo − Pro-labore. Use «Aplicar» para recalcular (mantém datas e filtro de sócio(s)).</p>
+    </div>
+    <form method="get" class="m-0">
+        <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
+        <input type="hidden" name="data_fim" value="{{ data_fim }}">
+        {% for sid in filtro_socio_ids %}
+        <input type="hidden" name="socio" value="{{ sid }}">
+        {% endfor %}
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                    <thead class="table-dark text-nowrap">
+                        <tr>
+                            <th>Sócio</th>
+                            <th class="text-end">Saldo <span class="fw-normal small">(consolidado)</span></th>
+                            <th class="text-end" style="min-width: 9rem;">Pro-labore</th>
+                            <th class="text-end">Dividendo <span class="fw-normal small">(Saldo − Pro-labore)</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if tem_grade_prolabore %}
+                            {% for row in grade_prolabore_linhas %}
+                            <tr>
+                                <td>{{ row.socio_nome }}</td>
+                                <td class="text-end fw-semibold {% if row.saldo_negativo %}text-danger{% endif %}">R$ {{ row.saldo_txt }}</td>
+                                <td class="text-end">
+                                    <label class="visually-hidden" for="pl-{{ row.socio_id }}">Pro-labore {{ row.socio_nome }}</label>
+                                    <input type="text" name="{{ row.pl_name }}" id="pl-{{ row.socio_id }}" class="form-control form-control-sm text-end" value="{{ row.pl_value }}" inputmode="decimal" placeholder="0,00" autocomplete="off" title="Valor do pro-labore (ex.: 1.234,56)">
+                                </td>
+                                <td class="text-end fw-semibold {% if row.dividendo_negativo %}text-danger{% endif %}">R$ {{ row.dividendo_txt }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">Nenhuma linha do consolidado para calcular pro-labore.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                    {% if tem_grade_prolabore %}
+                    <tfoot class="table-secondary fw-semibold">
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end">R$ {{ totais_prolabore.saldo_txt }}</td>
+                            <td class="text-end">R$ {{ totais_prolabore.prolabore_txt }}</td>
+                            <td class="text-end {% if totais_prolabore.dividendo_negativo %}text-danger{% endif %}">R$ {{ totais_prolabore.dividendo_txt }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex flex-wrap align-items-center gap-2">
+            <button type="submit" class="btn btn-primary btn-sm no-print">
+                <i class="fas fa-calculator"></i> Aplicar pro-labore e recalcular dividendos
+            </button>
+            <span class="small text-muted no-print">Valores em reais (vírgula ou ponto decimal).</span>
+        </div>
+    </form>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Resumo consolidado por sócio</h2>
+        <p class="small text-muted mb-0">Mesmas datas e filtro de sócio do formulário acima. <strong>Val. recebido</strong> prioriza <strong>rateio de recebimento</strong> no período; demais colunas de CAR usam o sócio da NF quando a parcela tem nota.</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle text-nowrap" style="min-width: 1400px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th title="Sócio (NF ou cadastro)">Sócio</th>
+                        <th class="text-end" title="Faturamento bruto (NF emitida no período)">Fat. bruto</th>
+                        <th class="text-end" title="Faturamento líquido na NF">Fat. líquido (NF)</th>
+                        <th class="text-end" title="Valor recebido com data de recebimento no período">Val. recebido</th>
+                        <th class="text-end" title="Saldo em aberto (face − recebido) de parcelas emitidas no período, pendentes/vencidas">Val. a receber</th>
+                        <th class="text-end" title="Recebido no período com NF emitida antes do período">Rec. compet. ant.</th>
+                        <th class="text-end" title="d + f">Total recebido</th>
+                        <th class="text-end" title="Impostos na NF (PIS, COFINS, ISS, CSLL, IRPJ, IRPJ adic., Simples)">Impostos</th>
+                        <th class="text-end" title="Rateio pagamento, exceto categoria Distribuição de lucro">Desp. rateio</th>
+                        <th class="text-end" title="Soma das baixas com conta de destino tipo Caixa (recebido + juros + tarifas − desconto)">Rec. caixa</th>
+                        <th class="text-end" title="Rateio de contas a pagar com categoria tipo Distribuição de lucro (período pela emissão do título)">Pago sócio (dist.)</th>
+                        <th class="text-end" title="g − h − i − j − l">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_resumo_consolidado %}
+                        {% for row in resumo_consolidado_linhas %}
+                        <tr>
+                            <td>{{ row.socio_nome }}</td>
+                            <td class="text-end">R$ {{ row.b_txt }}</td>
+                            <td class="text-end">R$ {{ row.c_txt }}</td>
+                            <td class="text-end">R$ {{ row.d_txt }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'contasareceber:crlistar' %}?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}&resumo_val_receber=1&socio={% if row.socio_id == 0 %}sem{% else %}{{ row.socio_id }}{% endif %}"
+                                   class="text-primary text-decoration-none text-break d-inline-block"
+                                   title="Contas a receber: emissão no período do resumo, status pendente ou vencido (não pago)">
+                                    R$ {{ row.e_txt }}
+                                </a>
+                            </td>
+                            <td class="text-end">R$ {{ row.f_txt }}</td>
+                            <td class="text-end fw-semibold">R$ {{ row.g_txt }}</td>
+                            <td class="text-end">R$ {{ row.h_txt }}</td>
+                            <td class="text-end">R$ {{ row.i_txt }}</td>
+                            <td class="text-end">R$ {{ row.j_txt }}</td>
+                            <td class="text-end">R$ {{ row.l_txt }}</td>
+                            <td class="text-end fw-semibold {% if row.k_negativo %}text-danger{% endif %}">R$ {{ row.k_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="12" class="text-center text-muted py-4">Nenhum sócio ou movimento para montar o resumo.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_resumo_consolidado %}
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td>Total</td>
+                        <td class="text-end">R$ {{ totais_consolidado.b }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.c }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.d }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.e }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.f }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.g }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.h }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.i }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.j }}</td>
+                        <td class="text-end">R$ {{ totais_consolidado.l }}</td>
+                        <td class="text-end {% if totais_consolidado.k_negativo %}text-danger{% endif %}">R$ {{ totais_consolidado.k }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    <div class="card-footer small text-muted">
+        <strong>Val. recebido (d)</strong>: soma dos <strong>lançamentos de rateio «Recebimento»</strong> com data no período, mais parcelas recebidas no período <em>sem</em> rateio nesse intervalo (usa <code>valor_recebido</code> ou, se status pago/cartão com valor zerado, <code>valor_a_receber</code>).
+        <strong>Val. a receber (e)</strong>: saldo em aberto de parcelas com <strong>emissão</strong> no período (pendente ou vencido). O valor é um link para a lista de contas a receber com o mesmo período, o sócio da linha e esses status (exclui pago).
+        <strong>Saldo (k)</strong> = Total recebido (g) − Impostos (h) − Desp. rateio (i) − Rec. caixa (j) − Pago sócio / dist. lucro (l), conforme solicitado.
+        Em <strong>Pago sócio (dist.)</strong>, o valor soma só distribuição de lucro cuja <strong>emissão do título</strong> cai no período filtrado.
+        <strong>Desp. rateio (i)</strong> soma pagamentos rateados exceto categoria com tipo «Distribuição de lucro».
+        <strong>Rec. caixa (j)</strong>: soma do valor recebido em cada <strong>baixa</strong> cuja conta de destino é tipo «Caixa» (inclui juros/tarifas e desconto na linha da baixa).
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Faturamento</h2>
+        <p class="small text-muted mb-0">Grade por sócio (NFSe com data de emissão no período).</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle" style="min-width: 1100px;">
+                <thead class="table-dark text-nowrap">
+                    <tr>
+                        <th>Sócio</th>
+                        <th class="text-end">Faturamento bruto</th>
+                        <th class="text-end">Faturamento líquido <span class="fw-normal small">(NF)</span></th>
+                        <th class="text-end">Soma impostos</th>
+                        <th class="text-end">PIS apuração</th>
+                        <th class="text-end">COFINS apuração</th>
+                        <th class="text-end">ISS apuração</th>
+                        <th class="text-end">CSLL apuração</th>
+                        <th class="text-end">IRPJ apuração</th>
+                        <th class="text-end">IRPJ adicional</th>
+                        <th class="text-end">Simples Nacional</th>
+                        <th class="text-end">Faturamento líquido <span class="fw-normal small">(após impostos)</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_linhas %}
+                        {% for row in grade_linhas %}
+                        <tr>
+                            <td>{{ row.socio_nome }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.fat_bruto_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.fat_liquido_nf_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.imp_soma_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.pis_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.cofins_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.iss_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.csll_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.irpj_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.irpj_ad_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.simples_txt }}</td>
+                            <td class="text-end text-nowrap fw-semibold">R$ {{ row.fat_liquido_final_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="12" class="text-center text-muted py-4">Nenhuma NFSe no período para esta empresa.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_linhas %}
+                <tfoot class="table-secondary fw-semibold text-nowrap">
+                    <tr>
+                        <td>Total</td>
+                        <td class="text-end">R$ {{ totais_linha.fat_bruto_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.fat_liquido_nf_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.imp_soma_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.pis_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.cofins_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.iss_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.csll_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.irpj_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.irpj_ad_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.simples_txt }}</td>
+                        <td class="text-end">R$ {{ totais_linha.fat_liquido_final_txt }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    <div class="card-footer small text-muted">
+        <strong>Faturamento líquido (NF):</strong> soma do valor líquido das notas.
+        <strong>Soma impostos:</strong> PIS + COFINS + ISS + CSLL + IRPJ + IRPJ adicional + Simples (mesma base do líquido após impostos).
+        <strong>Faturamento líquido (após impostos):</strong> bruto − soma dos impostos.
+        Simples Nacional permanece 0,00 até existir valor por nota no sistema.
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Rateio no período</h2>
+        <p class="small text-muted mb-0">Rateio de <strong>pagamento</strong> (contas a pagar): pelo <strong>período da data de pagamento</strong> do lançamento, exceto categoria «Distribuição de lucro», que só entra se a <strong>data de emissão</strong> do título estiver no período (mesma empresa e filtro de sócio).</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="px-3 py-2 bg-light border-bottom">
+            <h3 class="h6 mb-0 text-danger"><i class="fas fa-arrow-up me-1"></i> Pagamento</h3>
+            <p class="small text-muted mb-0"><strong>Data de pagamento</strong> = data de pagamento do título (CAP), se houver; senão a data do lançamento de rateio. <strong>Data de emissão do título</strong> = emissão do contas a pagar. Valores negativos (contas a pagar rateadas).</p>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                <thead class="table-dark text-nowrap">
+                    <tr>
+                        <th title="Preferência: data de pagamento do título (CAP); senão lançamento de rateio">Data de pagamento</th>
+                        <th title="Conta a pagar — título">Data de emissão do título</th>
+                        <th>Nota</th>
+                        <th class="text-end">Valor título</th>
+                        <th>Descrição</th>
+                        <th>Sócio</th>
+                        <th class="text-end">Valor rateio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_grade_rateio_pg %}
+                        {% for r in grade_rateio_pagamento %}
+                        <tr>
+                            <td class="text-nowrap">{{ r.data_txt }}</td>
+                            <td class="text-nowrap">{{ r.emissao_txt }}</td>
+                            <td class="text-nowrap">{{ r.nota_txt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ r.titulo_valor_txt }}</td>
+                            <td>{{ r.descricao }}</td>
+                            <td>{{ r.socio_nome }}</td>
+                            <td class="text-end text-nowrap {% if r.valor_negativo %}text-danger{% else %}text-success{% endif %}">R$ {{ r.valor_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Nenhum rateio de pagamento neste período.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_grade_rateio_pg %}
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td colspan="6">Total pagamento</td>
+                        <td class="text-end text-nowrap">R$ {{ rateio_pg_total_txt }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    <div class="card-body p-0 border-top">
+        <div class="px-3 py-2 bg-light border-bottom">
+            <h3 class="h6 mb-0 text-success"><i class="fas fa-hand-holding-usd me-1"></i> Contas recebidas</h3>
+            <p class="small text-muted mb-0">Parcelas de <strong>contas a receber</strong> com <strong>data de recebimento</strong> entre as datas do filtro (empresa e sócio(s) como no restante do relatório).</p>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                <thead class="table-dark text-nowrap">
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Emissão</th>
+                        <th>Recebimento</th>
+                        <th>NF</th>
+                        <th>Sócio</th>
+                        <th>Parc.</th>
+                        <th>Doc.</th>
+                        <th class="text-end" title="Soma das baixas no período (± juros/tarifas/desconto); se não houver, valor na parcela ou face do título quando pago/cartão">Valor recebido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_contas_recebidas_periodo %}
+                        {% for row in contas_recebidas_periodo %}
+                        <tr>
+                            <td><a href="{% url 'contasareceber:detalhes' row.id %}" class="text-decoration-none">{{ row.id }}</a></td>
+                            <td>{{ row.cliente }}</td>
+                            <td class="text-nowrap">{{ row.emissao_txt }}</td>
+                            <td class="text-nowrap">{{ row.recebimento_txt }}</td>
+                            <td class="text-nowrap">{{ row.nota_txt }}</td>
+                            <td>{{ row.socio_txt }}</td>
+                            <td class="text-nowrap">{{ row.parcela }}</td>
+                            <td class="small">{{ row.doc }}</td>
+                            <td class="text-end text-nowrap">R$ {{ row.valor_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">Nenhuma conta a receber com recebimento neste período (para os filtros atuais).</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_contas_recebidas_periodo %}
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td colspan="8">Total valor recebido (parcelas listadas)</td>
+                        <td class="text-end text-nowrap">R$ {{ contas_recebidas_total_txt }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    <div class="card-footer small text-muted">
+        <a href="{% url 'regrarateio:lancamentoRateioList' %}">Abrir lançamentos de rateio</a> para ver ID, origem, regra e ações.
+    </div>
+</div>
+
+<div class="mt-4">
+    <h2 class="h5 mb-3">Pagamentos sem rateio gerado</h2>
+    <p class="small text-muted mb-3">Contas a pagar <strong>pagas</strong> no <strong>mesmo período</strong> da grade «Rateio — pagamentos» acima (pagamento do título no intervalo, exceto categoria distribuição de lucro, que usa emissão do título) e que <strong>não têm</strong> lançamento de rateio gravado. Com filtro de sócio(s), só aparecem títulos cuja regra inclui esse(s) sócio(s).</p>
+
+    <div class="card shadow-sm mb-3 border-warning">
+        <div class="card-header py-2 bg-danger bg-opacity-10">
+            <h3 class="h6 mb-0 text-danger">Contas a pagar — sem rateio</h3>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                    <thead class="table-dark text-nowrap">
+                        <tr>
+                            <th>ID</th>
+                            <th>Data emissão</th>
+                            <th>Data pagamento</th>
+                            <th>Fornecedor</th>
+                            <th>Descrição</th>
+                            <th class="text-end">Valor base</th>
+                            <th>Regra no título</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if tem_sem_rateio_pagar %}
+                            {% for row in pagamentos_sem_rateio_pagar %}
+                            <tr>
+                                <td>{{ row.id_titulo }}</td>
+                                <td class="text-nowrap">{{ row.emissao_txt }}</td>
+                                <td class="text-nowrap">{{ row.data_txt }}</td>
+                                <td>{{ row.contraparte }}</td>
+                                <td>{{ row.descricao }}</td>
+                                <td class="text-end text-nowrap">R$ {{ row.valor_txt }}</td>
+                                <td>{{ row.regra }}</td>
+                                <td><span class="text-warning text-dark">{{ row.motivo }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">Nenhuma conta a pagar neste período (paga, sem lançamento de rateio).</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer small text-muted">
+            <strong>Situação:</strong> motivo pelo qual o rateio não foi aplicado. Gerar em <a href="{% url 'regrarateio:lancamentoRateioList' %}">Lançamentos de rateio</a>.
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

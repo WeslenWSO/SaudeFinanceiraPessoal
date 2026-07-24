@@ -1,0 +1,791 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Detalhes do Faturamento{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Detalhes do Faturamento Médico</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}" class="btn btn-info btn-sm">
+                            <i class="fas fa-paperclip"></i> Anexar Documento
+                        </a>
+                        <a href="{% url 'faturamento_medico:editar' faturamento.pk %}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Lote:</dt>
+                                <dd class="col-sm-8">{{ faturamento.lote|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Guia:</dt>
+                                <dd class="col-sm-8">{{ faturamento.guia|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Carteirinha:</dt>
+                                <dd class="col-sm-8">{{ faturamento.carteirinha|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Nome:</dt>
+                                <dd class="col-sm-8">{{ faturamento.nome|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Data Autorização:</dt>
+                                <dd class="col-sm-8">
+                                    {% if faturamento.data_autorizacao %}
+                                        {{ faturamento.data_autorizacao|date:"d/m/Y" }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </dd>
+
+                                <dt class="col-sm-4">Data:</dt>
+                                <dd class="col-sm-8">
+                                    {% if faturamento.data %}
+                                        {{ faturamento.data|date:"d/m/Y" }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Porte:</dt>
+                                <dd class="col-sm-8">{{ faturamento.porte|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">QT:</dt>
+                                <dd class="col-sm-8">{{ faturamento.qt|default:0 }}</dd>
+
+                                <dt class="col-sm-4">Valor:</dt>
+                                <dd class="col-sm-8">R$ {{ faturamento.valor|floatformat:2 }}</dd>
+
+                                <dt class="col-sm-4">Total:</dt>
+                                <dd class="col-sm-8">R$ {{ faturamento.total|floatformat:2 }}</dd>
+
+                                <dt class="col-sm-4">Local:</dt>
+                                <dd class="col-sm-8">{{ faturamento.local|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Médico:</dt>
+                                <dd class="col-sm-8">{{ faturamento.medico|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Anestesista:</dt>
+                                <dd class="col-sm-8">{{ faturamento.anestesista|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-4">Convênio:</dt>
+                                <dd class="col-sm-8">{{ faturamento.convenio|default:"Não informado" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <dl class="row">
+                                <dt class="col-sm-2">Receber Por:</dt>
+                                <dd class="col-sm-10">{{ faturamento.receber_por|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-2">Apartamento ou Enfermaria:</dt>
+                                <dd class="col-sm-10">{{ faturamento.apartamento_enfermaria|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-2">Urgência:</dt>
+                                <dd class="col-sm-10">{{ faturamento.urgencia|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-2">Observação:</dt>
+                                <dd class="col-sm-10">{{ faturamento.observacao|default:"Não informado"|linebreaks }}</dd>
+
+                                <dt class="col-sm-2">Guia Lançada:</dt>
+                                <dd class="col-sm-10">
+                                    {% if faturamento.guia_lancada %}
+                                        <span class="badge badge-success">Sim</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Não</span>
+                                    {% endif %}
+                                </dd>
+
+                                <dt class="col-sm-2">Código Relatório:</dt>
+                                <dd class="col-sm-10">{{ faturamento.codigo_relatorio|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-2">Código do Fechamento:</dt>
+                                <dd class="col-sm-10">{{ faturamento.codigo_fechamento|default:"Não informado" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Data Criação:</dt>
+                                <dd class="col-sm-8">{{ faturamento.data_criacao|date:"d/m/Y H:i" }}</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Última Atualização:</dt>
+                                <dd class="col-sm-8">{{ faturamento.data_atualizacao|date:"d/m/Y H:i" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Itens de Serviço -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-list"></i> Itens de Serviço
+                                        <span class="badge badge-primary">{{ faturamento.itens_servico.count }}</span>
+                                    </h5>
+                                    <div class="card-tools">
+                                        <a href="{% url 'faturamento_medico:adicionar_item_servico' faturamento.pk %}"
+                                           class="btn btn-success btn-sm">
+                                            <i class="fas fa-plus"></i> Adicionar Item
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    {% if faturamento.itens_servico.exists %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Código Serviço</th>
+                                                        <th>Serviço</th>
+                                                        <th>Porte</th>
+                                                        <th>QT</th>
+                                                        <th>Valor</th>
+                                                        <th>Percentual</th>
+                                                        <th>Total</th>
+                                                        <th>Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in faturamento.itens_servico.all %}
+                                                    <tr>
+                                                        <td>{{ item.codigo_servico|default:"-" }}</td>
+                                                        <td>{{ item.servico|default:"-" }}</td>
+                                                        <td>{{ item.porte|default:"-" }}</td>
+                                                        <td>{{ item.qt }}</td>
+                                                        <td>R$ {{ item.valor|floatformat:2 }}</td>
+                                                        <td>{{ item.percentual|floatformat:2 }}</td>
+                                                        <td>R$ {{ item.total|floatformat:2 }}</td>
+                                                        <td>
+                                                            <a href="{% url 'faturamento_medico:editar_item_servico' item.pk %}"
+                                                               class="btn btn-sm btn-warning" title="Editar">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <a href="{% url 'faturamento_medico:excluir_item_servico' item.pk %}"
+                                                               class="btn btn-sm btn-danger" title="Excluir"
+                                                               onclick="return confirm('Tem certeza que deseja excluir este item?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="table-info">
+                                                        <th colspan="4" class="text-right">Total da Guia:</th>
+                                                        <th>R$ {{ faturamento.total|floatformat:2 }}</th>
+                                                        <th colspan="2"></th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-list fa-2x mb-2"></i>
+                                            <p>Nenhum item de serviço cadastrado ainda.</p>
+                                            <a href="{% url 'faturamento_medico:adicionar_item_servico' faturamento.pk %}"
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-plus"></i> Adicionar Primeiro Item
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documentos Anexados -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-paperclip"></i> Documentos Anexados
+                                        <span class="badge badge-primary">{{ faturamento.documentos_anexados.count }}</span>
+                                    </h5>
+                                    <div class="card-tools">
+                                        {% if faturamento.documentos_anexados.exists %}
+                                        <button type="button" class="btn btn-info btn-sm" onclick="abrirAlbumDocumentos()">
+                                            <i class="fas fa-images"></i> Visualizar Álbum
+                                        </button>
+                                        {% endif %}
+                                        <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}"
+                                           class="btn btn-success btn-sm">
+                                            <i class="fas fa-plus"></i> Anexar Documento
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    {% if faturamento.documentos_anexados.exists %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped" id="documentosTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Nome</th>
+                                                        <th>Tipo</th>
+                                                        <th>Tamanho</th>
+                                                        <th>Data Upload</th>
+                                                        <th>Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for documento in faturamento.documentos_anexados.all %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>{{ documento.nome|default:documento.arquivo.name|truncatechars:30 }}</strong>
+                                                            {% if documento.descricao %}
+                                                                <br><small class="text-muted">{{ documento.descricao|truncatechars:50 }}</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge badge-info">{{ documento.get_file_extension|upper }}</span>
+                                                        </td>
+                                                        <td>{{ documento.get_file_size }}</td>
+                                                        <td>{{ documento.data_upload|date:"d/m/Y H:i" }}</td>
+                                                        <td>
+                                                            {% if documento.get_file_extension|lower in 'jpg,jpeg,png,gif,pdf' %}
+                                                            <button type="button" class="btn btn-sm btn-info" title="Visualizar"
+                                                                    onclick="visualizarDocumento('{% url 'faturamento_medico:download_documento' documento.pk %}', '{{ documento.get_file_extension|lower }}', '{{ documento.nome|default:documento.arquivo.name }}')">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                            {% endif %}
+                                                            {% if documento.get_file_extension|lower == 'pdf' %}
+                                                            <button type="button" class="btn btn-sm btn-primary" title="Pré-visualizar no Álbum"
+                                                                    onclick="abrirAlbumNoDocumento('{% url 'faturamento_medico:download_documento' documento.pk %}')">
+                                                                <i class="fas fa-images"></i>
+                                                            </button>
+                                                            {% else %}
+                                                            <a href="{% url 'faturamento_medico:download_documento' documento.pk %}"
+                                                               class="btn btn-sm btn-success" title="Download">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                            {% endif %}
+                                                            <a href="{% url 'faturamento_medico:excluir_documento' documento.pk %}"
+                                                               class="btn btn-sm btn-danger" title="Excluir"
+                                                               onclick="return confirm('Tem certeza que deseja excluir este documento?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-paperclip fa-2x mb-2"></i>
+                                            <p>Nenhum documento anexado ainda.</p>
+                                            <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}"
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-plus"></i> Anexar Primeiro Documento
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Visualizar Documentos Individuais -->
+<div class="modal fade" id="modalVisualizarDocumento" tabindex="-1" role="dialog" aria-labelledby="modalVisualizarDocumentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalVisualizarDocumentoLabel">Visualizar Documento</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="documentoContainer">
+                    <!-- Conteúdo será inserido via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                <a id="btnDownloadDocumento" href="#" class="btn btn-success" target="_blank">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Álbum de Documentos -->
+<div class="modal fade" id="modalAlbumDocumentos" tabindex="-1" role="dialog" aria-labelledby="modalAlbumDocumentosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAlbumDocumentosLabel">
+                    <i class="fas fa-images"></i> Álbum de Documentos
+                    <span class="badge badge-info ml-2" id="contadorAlbum">0/0</span>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <!-- Controles de navegação -->
+                <div class="album-controls d-flex justify-content-between align-items-center p-3 bg-light">
+                    <button type="button" class="btn btn-outline-primary" id="btnAnterior" disabled>
+                        <i class="fas fa-chevron-left"></i> Anterior
+                    </button>
+                    <div class="album-info">
+                        <span id="nomeDocumentoAtual">-</span>
+                        <small class="text-muted ml-2" id="tipoDocumentoAtual">-</small>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" id="btnProximo" disabled>
+                        Próximo <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Container do documento -->
+                <div id="albumContainer" class="album-content" style="min-height: 600px; display: flex; align-items: center; justify-content: center;">
+                    <!-- Conteúdo será inserido via JavaScript -->
+                </div>
+
+                <!-- Miniaturas (opcional) -->
+                <div class="album-thumbnails p-3 bg-light" id="albumThumbnails" style="display: none;">
+                    <div class="d-flex justify-content-center flex-wrap" id="thumbnailsContainer">
+                        <!-- Miniaturas serão inseridas via JavaScript -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="toggleMiniaturas()">
+                    <i class="fas fa-th"></i> Miniaturas
+                </button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+                <a id="btnDownloadAlbum" href="#" class="btn btn-success" target="_blank">
+                    <i class="fas fa-download"></i> Download Atual
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Array global para armazenar os documentos do álbum
+let documentosAlbum = [];
+let indiceAtual = 0;
+
+// Função para visualizar documento individual
+function visualizarDocumento(url, extensao, nome) {
+    const container = document.getElementById('documentoContainer');
+    const downloadBtn = document.getElementById('btnDownloadDocumento');
+
+    // Limpar conteúdo anterior
+    container.innerHTML = '';
+
+    // Configurar botão de download
+    downloadBtn.href = url;
+    downloadBtn.setAttribute('download', nome);
+
+    if (extensao === 'pdf') {
+        // Para PDFs, usar iframe com parâmetro inline
+        const urlInline = url + (url.includes('?') ? '&' : '?') + 'inline=true';
+        container.innerHTML = `
+            <iframe src="${urlInline}" width="100%" height="600px" style="border: none;">
+                Seu navegador não suporta visualização de PDF.
+                <a href="${url}" target="_blank">Clique aqui para baixar o arquivo</a>
+            </iframe>
+        `;
+    } else if (['jpg', 'jpeg', 'png', 'gif'].includes(extensao)) {
+        // Para imagens, usar tag img
+        container.innerHTML = `
+            <img src="${url}" alt="${nome}" class="img-fluid" style="max-height: 600px; max-width: 100%;">
+        `;
+    } else {
+        // Para outros tipos, mostrar mensagem
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-file fa-3x mb-3"></i>
+                <h4>Arquivo não pode ser visualizado</h4>
+                <p>Este tipo de arquivo (${extensao.toUpperCase()}) não pode ser visualizado no navegador.</p>
+                <p>Use o botão Download para baixar o arquivo.</p>
+            </div>
+        `;
+    }
+
+    // Abrir modal
+    if (typeof $ !== 'undefined' && $.fn.modal) {
+        $('#modalVisualizarDocumento').modal('show');
+    } else {
+        const modal = document.getElementById('modalVisualizarDocumento');
+        if (modal) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            document.body.classList.add('modal-open');
+
+            // Adicionar backdrop
+            let backdrop = document.querySelector('.modal-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop show';
+                document.body.appendChild(backdrop);
+            }
+        }
+    }
+}
+
+// Função para abrir o álbum no documento específico
+function abrirAlbumNoDocumento(urlDocumento) {
+    // Primeiro coletar os documentos
+    abrirAlbumDocumentos();
+
+    // Encontrar o índice do documento com a URL especificada
+    let indiceEncontrado = 0;
+    for (let i = 0; i < documentosAlbum.length; i++) {
+        if (documentosAlbum[i].url === urlDocumento) {
+            indiceEncontrado = i;
+            break;
+        }
+    }
+
+    // Mostrar o documento encontrado
+    indiceAtual = indiceEncontrado;
+    mostrarDocumentoAlbum(indiceAtual);
+    atualizarControlesAlbum();
+}
+
+// Função para abrir o álbum de documentos
+function abrirAlbumDocumentos(indiceInicial = 0) {
+    // Coletar todos os documentos da tabela
+    documentosAlbum = [];
+    const linhasDocumentos = document.querySelectorAll('#documentosTable tbody tr');
+
+    console.log('Linhas encontradas:', linhasDocumentos.length);
+
+    linhasDocumentos.forEach((linha, index) => {
+        // Procurar por qualquer link de download na última célula
+        const linkDownload = linha.querySelector('td:last-child a[title="Download"]');
+
+        if (linkDownload) {
+            // Obter informações do documento
+            const nomeElement = linha.querySelector('td:first-child strong');
+            const tipoElement = linha.querySelector('td:nth-child(2) .badge');
+            const extensao = tipoElement ? tipoElement.textContent.toLowerCase().trim().replace(/^\./, '') : '';
+
+            console.log('Documento', index + 1, '- Extensão encontrada:', extensao);
+
+            let url = linkDownload.href;
+            let nome = nomeElement ? nomeElement.textContent.trim() : `Documento ${index + 1}`;
+
+            // Se tem botão de visualizar, usar as informações dele
+            const btnVisualizar = linha.querySelector('td:last-child button[title="Visualizar"]');
+            if (btnVisualizar) {
+                const onclickAttr = btnVisualizar.getAttribute('onclick');
+                if (onclickAttr) {
+                    const match = onclickAttr.match(/visualizarDocumento\('([^']*)',\s*'([^']*)',\s*'([^']*)'\)/);
+                    if (match) {
+                        url = match[1];
+                        nome = match[3];
+                    }
+                }
+            }
+
+            // Lista de extensões suportadas
+            const extensoesSuportadas = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
+
+            // Verificar se a extensão é suportada
+            if (extensoesSuportadas.includes(extensao)) {
+                console.log('Documento adicionado ao álbum:', nome, '- Extensão:', extensao);
+                documentosAlbum.push({
+                    url: url,
+                    extensao: extensao,
+                    nome: nome,
+                    downloadUrl: linkDownload.href,
+                    index: index
+                });
+            } else {
+                console.log('Documento ignorado - extensão não suportada:', extensao);
+            }
+        } else {
+            console.log('Documento', index + 1, '- Link de download não encontrado');
+        }
+    });
+
+    console.log('Total de documentos no álbum:', documentosAlbum.length);
+
+    if (documentosAlbum.length === 0) {
+        alert('Nenhum documento visualizável encontrado.\n\nCertifique-se de que os documentos são do tipo: JPG, PNG, GIF ou PDF.\n\nVerifique o console do navegador (F12) para mais detalhes.');
+        return;
+    }
+
+    // Iniciar com o documento especificado ou o primeiro
+    indiceAtual = Math.min(indiceInicial, documentosAlbum.length - 1);
+    mostrarDocumentoAlbum(indiceAtual);
+
+    // Atualizar controles
+    atualizarControlesAlbum();
+
+    // Abrir modal do álbum
+    if (typeof $ !== 'undefined' && $.fn.modal) {
+        $('#modalAlbumDocumentos').modal('show');
+    } else {
+        const modal = document.getElementById('modalAlbumDocumentos');
+        if (modal) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            document.body.classList.add('modal-open');
+
+            // Adicionar backdrop
+            let backdrop = document.querySelector('.modal-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop show';
+                document.body.appendChild(backdrop);
+            }
+        }
+    }
+}
+
+// Função para mostrar documento no álbum
+function mostrarDocumentoAlbum(indice) {
+    if (indice < 0 || indice >= documentosAlbum.length) return;
+
+    const documento = documentosAlbum[indice];
+    const container = document.getElementById('albumContainer');
+    const nomeElement = document.getElementById('nomeDocumentoAtual');
+    const tipoElement = document.getElementById('tipoDocumentoAtual');
+    const downloadBtn = document.getElementById('btnDownloadAlbum');
+
+    // Limpar conteúdo anterior
+    container.innerHTML = '';
+
+    // Atualizar informações
+    nomeElement.textContent = documento.nome;
+    tipoElement.textContent = documento.extensao.toUpperCase();
+    downloadBtn.href = documento.downloadUrl;
+    downloadBtn.setAttribute('download', documento.nome);
+
+    // Renderizar documento
+    if (documento.extensao === 'pdf') {
+        const urlInline = documento.url + (documento.url.includes('?') ? '&' : '?') + 'inline=true';
+        container.innerHTML = `
+            <iframe src="${urlInline}" width="100%" height="600px" style="border: none;">
+                Seu navegador não suporta visualização de PDF.
+                <a href="${documento.url}" target="_blank">Clique aqui para baixar o arquivo</a>
+            </iframe>
+        `;
+    } else if (['jpg', 'jpeg', 'png', 'gif'].includes(documento.extensao)) {
+        container.innerHTML = `
+            <img src="${documento.url}" alt="${documento.nome}" class="img-fluid" style="max-height: 600px; max-width: 100%; object-fit: contain;">
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-file fa-4x mb-3"></i>
+                <h4>Arquivo não pode ser visualizado</h4>
+                <p>Este tipo de arquivo (${documento.extensao.toUpperCase()}) não pode ser visualizado no navegador.</p>
+                <p>Use o botão Download para baixar o arquivo.</p>
+            </div>
+        `;
+    }
+}
+
+// Função para atualizar controles do álbum
+function atualizarControlesAlbum() {
+    const contador = document.getElementById('contadorAlbum');
+    const btnAnterior = document.getElementById('btnAnterior');
+    const btnProximo = document.getElementById('btnProximo');
+
+    // Atualizar contador
+    contador.textContent = `${indiceAtual + 1}/${documentosAlbum.length}`;
+
+    // Atualizar botões de navegação
+    btnAnterior.disabled = indiceAtual === 0;
+    btnProximo.disabled = indiceAtual === documentosAlbum.length - 1;
+}
+
+// Função para navegar para o documento anterior
+function documentoAnterior() {
+    if (indiceAtual > 0) {
+        indiceAtual--;
+        mostrarDocumentoAlbum(indiceAtual);
+        atualizarControlesAlbum();
+    }
+}
+
+// Função para navegar para o próximo documento
+function documentoProximo() {
+    if (indiceAtual < documentosAlbum.length - 1) {
+        indiceAtual++;
+        mostrarDocumentoAlbum(indiceAtual);
+        atualizarControlesAlbum();
+    }
+}
+
+// Função para alternar visualização de miniaturas
+function toggleMiniaturas() {
+    const container = document.getElementById('albumThumbnails');
+    const isVisible = container.style.display !== 'none';
+
+    if (isVisible) {
+        container.style.display = 'none';
+    } else {
+        // Gerar miniaturas se necessário
+        if (container.querySelectorAll('.thumbnail-item').length === 0) {
+            gerarMiniaturas();
+        }
+        container.style.display = 'block';
+    }
+}
+
+// Função para gerar miniaturas
+function gerarMiniaturas() {
+    const container = document.getElementById('thumbnailsContainer');
+    container.innerHTML = '';
+
+    documentosAlbum.forEach((documento, index) => {
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'thumbnail-item m-1';
+        thumbnail.style.cursor = 'pointer';
+        thumbnail.onclick = () => {
+            indiceAtual = index;
+            mostrarDocumentoAlbum(indiceAtual);
+            atualizarControlesAlbum();
+        };
+
+        if (['jpg', 'jpeg', 'png', 'gif'].includes(documento.extensao)) {
+            thumbnail.innerHTML = `
+                <img src="${documento.url}" alt="${documento.nome}"
+                     style="width: 80px; height: 80px; object-fit: cover; border: 2px solid ${index === indiceAtual ? '#007bff' : '#ddd'};">
+                <br><small class="text-truncate d-block" style="width: 80px;">${documento.nome.substring(0, 10)}...</small>
+            `;
+        } else {
+            thumbnail.innerHTML = `
+                <div style="width: 80px; height: 80px; border: 2px solid ${index === indiceAtual ? '#007bff' : '#ddd'}; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
+                    <i class="fas fa-file fa-2x text-secondary"></i>
+                </div>
+                <br><small class="text-truncate d-block" style="width: 80px;">${documento.nome.substring(0, 10)}...</small>
+            `;
+        }
+
+        container.appendChild(thumbnail);
+    });
+}
+
+// Função para fechar modal do álbum
+function fecharModalAlbum() {
+    const modal = document.getElementById('modalAlbumDocumentos');
+    if (modal) {
+        // Tentar com jQuery primeiro
+        if (typeof $ !== 'undefined' && $.fn.modal) {
+            $('#modalAlbumDocumentos').modal('hide');
+        } else {
+            // Fallback sem jQuery
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        }
+    }
+}
+
+// Adicionar event listeners aos botões
+document.addEventListener('DOMContentLoaded', function() {
+    // Botões de navegação do álbum
+    const btnAnterior = document.getElementById('btnAnterior');
+    const btnProximo = document.getElementById('btnProximo');
+
+    if (btnAnterior) {
+        btnAnterior.addEventListener('click', documentoAnterior);
+    }
+    if (btnProximo) {
+        btnProximo.addEventListener('click', documentoProximo);
+    }
+
+    // Botões de fechar do modal do álbum
+    const btnFecharModal = document.querySelector('#modalAlbumDocumentos .btn-secondary[data-dismiss="modal"]');
+    const btnXModal = document.querySelector('#modalAlbumDocumentos .close');
+
+    if (btnFecharModal) {
+        btnFecharModal.addEventListener('click', fecharModalAlbum);
+    }
+    if (btnXModal) {
+        btnXModal.addEventListener('click', fecharModalAlbum);
+    }
+
+    // Botões de fechar do modal de visualização individual
+    const btnFecharVisualizar = document.querySelector('#modalVisualizarDocumento .btn-secondary[data-dismiss="modal"]');
+    const btnXVisualizar = document.querySelector('#modalVisualizarDocumento .close');
+
+    function fecharModalVisualizar() {
+        const modal = document.getElementById('modalVisualizarDocumento');
+        if (modal) {
+            if (typeof $ !== 'undefined' && $.fn.modal) {
+                $('#modalVisualizarDocumento').modal('hide');
+            } else {
+                modal.classList.remove('show');
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.remove();
+                }
+            }
+        }
+    }
+
+    if (btnFecharVisualizar) {
+        btnFecharVisualizar.addEventListener('click', fecharModalVisualizar);
+    }
+    if (btnXVisualizar) {
+        btnXVisualizar.addEventListener('click', fecharModalVisualizar);
+    }
+
+    // Suporte a navegação por teclado
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('modalAlbumDocumentos');
+        const isModalOpen = modal && (modal.classList.contains('show') ||
+            (typeof $ !== 'undefined' && $('#modalAlbumDocumentos').hasClass('show')));
+
+        if (!isModalOpen) return;
+
+        if (e.key === 'ArrowLeft') {
+            documentoAnterior();
+        } else if (e.key === 'ArrowRight') {
+            documentoProximo();
+        } else if (e.key === 'Escape') {
+            fecharModalAlbum();
+        }
+    });
+});
+</script>
+
+{% endblock %}

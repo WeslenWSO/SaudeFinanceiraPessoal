@@ -1,0 +1,42 @@
+<h1>Download de NFS-e</h1>
+
+{% if error %}
+  <div style="color:red">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{% url 'nfse_rio_branco:iniciar' %}">
+  {% csrf_token %}
+
+  <label>Empresa</label>
+  <select name="company" required>
+    <option value="">-- selecione --</option>
+    {% for c in companies %}
+      <option value="{{ c.id }}">{{ c.nome }} ({{ c.cnpj }})</option>
+    {% endfor %}
+  </select>
+
+  <label>Início</label>
+  <input type="text" name="inicio" placeholder="DD/MM/AAAA" required>
+
+  <label>Fim</label>
+  <input type="text" name="fim" placeholder="DD/MM/AAAA" required>
+
+  <label>Opção</label>
+  <select name="opcao" required>
+    <option value="1">Portal (navegador)</option>
+    <option value="2">WebService Municipal</option>
+    <option value="3">WebService Nacional</option>
+  </select>
+
+  <button type="submit">Iniciar</button>
+</form>
+
+{% if ret is not None %}
+  <hr>
+  <h2>Resultado</h2>
+  <p>Return code: {{ ret }}</p>
+  <h3>STDOUT</h3>
+  <pre style="white-space:pre-wrap">{{ stdout }}</pre>
+  <h3>STDERR</h3>
+  <pre style="white-space:pre-wrap; color:#b00">{{ stderr }}</pre>
+{% endif %}

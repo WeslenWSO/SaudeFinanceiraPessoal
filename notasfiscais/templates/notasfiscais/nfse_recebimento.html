@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mt-4">Registrar Recebimento</h1>
+        <a href="{% url 'notasfiscais:detail'  pk=view.kwargs.pk %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar aos Detalhes
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-dollar-sign"></i> Registro de Recebimento - NFSe {{ nfse.numero_nota }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                            {% include 'parcial/_messages.html' %}
+                        {% endif %}
+
+                        <!-- Informações da NFSe -->
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-info-circle"></i> Informações da NFSe
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Cliente:</strong> {{ nfse.cliente }}</p>
+                                    <p class="mb-1"><strong>Valor Líquido:</strong> R$ {{ nfse.valor_liquido|floatformat:2 }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Data Emissão:</strong> {{ nfse.data_emissao|date:"d/m/Y" }}</p>
+                                    <p class="mb-1"><strong>Status Atual:</strong> 
+                                        {% if nfse.status == 'pendente' %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% elif nfse.status == 'pago' %}
+                                            <span class="badge bg-success">Pago</span>
+                                        {% elif nfse.status == 'cancelado' %}
+                                            <span class="badge bg-danger">Cancelado</span>
+                                        {% elif nfse.status == 'vencido' %}
+                                            <span class="badge bg-secondary">Vencido</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Campos do Formulário -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data_recebimento.id_for_label }}" class="form-label">
+                                    {{ form.data_recebimento.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.data_recebimento }}
+                                {% if form.data_recebimento.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.data_recebimento.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Data em que o valor foi recebido</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.valor_recebido.id_for_label }}" class="form-label">
+                                    {{ form.valor_recebido.label }} <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_recebido }}
+                                </div>
+                                {% if form.valor_recebido.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.valor_recebido.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Valor efetivamente recebido</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.banco.id_for_label }}" class="form-label">
+                                    {{ form.banco.label }}
+                                </label>
+                                {{ form.banco }}
+                                {% if form.banco.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.banco.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Banco onde o valor foi recebido</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">
+                                    {{ form.status.label }}
+                                </label>
+                                {{ form.status }}
+                                {% if form.status.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.status.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Status atualizado automaticamente se o valor for igual ou maior ao líquido</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.status_conciliacao.id_for_label }}" class="form-label">
+                                {{ form.status_conciliacao.label }}
+                            </label>
+                            {{ form.status_conciliacao }}
+                            {% if form.status_conciliacao.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.status_conciliacao.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Status de conciliação bancária</div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Resumo do Recebimento -->
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-calculator"></i> Resumo do Recebimento
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-primary">R$ {{ nfse.valor_liquido|floatformat:2 }}</h5>
+                                            <small class="text-muted">Valor da NFSe</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-success" id="valorRecebido">R$ 0,00</h5>
+                                            <small class="text-muted">Valor Recebido</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-warning" id="valorPendente">R$ {{ nfse.valor_liquido|floatformat:2 }}</h5>
+                                            <small class="text-muted">Valor Pendente</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'notasfiscais:detail'  pk=view.kwargs.pk %}" class="btn btn-outline-secondary me-md-2">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Registrar Recebimento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Ajuda -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-question-circle"></i> Ajuda
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>Como funciona:</h6>
+                    <ol class="small">
+                        <li>Preencha a data do recebimento</li>
+                        <li>Informe o valor recebido</li>
+                        <li>Opcionalmente, informe o banco</li>
+                        <li>O status será atualizado automaticamente</li>
+                    </ol>
+
+                    <hr>
+
+                    <h6>Status automático:</h6>
+                    <ul class="small">
+                        <li><strong>Pago:</strong> Valor recebido ≥ Valor líquido</li>
+                        <li><strong>Pendente:</strong> Valor recebido < Valor líquido</li>
+                    </ul>
+
+                    <div class="alert alert-info mt-3">
+                        <small>
+                            <i class="fas fa-lightbulb"></i>
+                            <strong>Dica:</strong> Você pode registrar recebimentos parciais 
+                            para a mesma NFSe, atualizando o valor recebido.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Histórico de Recebimentos -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Histórico
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if nfse.valor_recebido %}
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Recebido anteriormente</span>
+                            <span class="badge bg-success rounded-pill">
+                                R$ {{ nfse.valor_recebido|floatformat:2 }}
+                            </span>
+                        </div>
+                        {% if nfse.data_recebimento %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Data anterior</span>
+                            <small class="text-muted">{{ nfse.data_recebimento|date:"d/m" }}</small>
+                        </div>
+                        {% endif %}
+                        {% if nfse.banco %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Banco anterior</span>
+                            <small class="text-muted">{{ nfse.banco }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">
+                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                        Primeiro recebimento
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control, .form-select {
+    border-radius: 0.375rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.invalid-feedback {
+    display: block;
+    color: #dc3545;
+    font-size: 0.875em;
+    margin-top: 0.25rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const valorRecebidoInput = document.getElementById('{{ form.valor_recebido.id_for_label }}');
+    const valorRecebidoDisplay = document.getElementById('valorRecebido');
+    const valorPendenteDisplay = document.getElementById('valorPendente');
+    const valorNFSe = {{ nfse.valor_liquido }};
+
+    function atualizarResumo() {
+        const valorRecebido = parseFloat(valorRecebidoInput.value) || 0;
+        const valorPendente = Math.max(0, valorNFSe - valorRecebido);
+
+        valorRecebidoDisplay.textContent = `R$ ${valorRecebido.toFixed(2).replace('.', ',')}`;
+        valorPendenteDisplay.textContent = `R$ ${valorPendente.toFixed(2).replace('.', ',')}`;
+
+        // Atualiza cores baseado no valor
+        if (valorRecebido >= valorNFSe) {
+            valorPendenteDisplay.className = 'text-success';
+        } else {
+            valorPendenteDisplay.className = 'text-warning';
+        }
+    }
+
+    valorRecebidoInput.addEventListener('input', atualizarResumo);
+    
+    // Inicializa o resumo
+    atualizarResumo();
+});
+</script>
+{% endblock %}
+
+
+
+

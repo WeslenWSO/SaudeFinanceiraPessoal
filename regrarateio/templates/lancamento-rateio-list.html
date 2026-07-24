@@ -1,0 +1,637 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+{% block conteudo %}
+
+<div class="container-fluid">
+    <div class="card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h3 class="card-title mb-0">Lançamentos de rateio</h3>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRateioCap"
+                    title="Filtrar por período, escolher contas e gravar o rateio">
+                    <i class="fas fa-calculator"></i> Gerar a partir de contas a pagar
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRateioCar"
+                    title="Período, contas a receber pagas e regra — lançamentos com valor positivo">
+                    <i class="fas fa-calculator"></i> Gerar a partir de contas a receber
+                </button>
+                <a href="{% url 'regrarateio:regraList' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-share-nodes"></i> Regras de rateio
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                Pagamentos (PGTO) ficam com valor negativo; recebimentos com valor positivo.
+                No modal, listam-se todos os títulos <strong>pagos</strong> no período. Só dá para aplicar rateio com <strong>regra no título</strong> e <strong>sócios/% na regra</strong>. Linhas em amarelo mostram o que falta cadastrar.
+            </p>
+
+            {% if cards_socios %}
+            <div class="mb-3">
+                <h6 class="text-muted small text-uppercase mb-2">Resumo por sócio <span class="fw-normal">(conforme filtros abaixo)</span></h6>
+                <p class="small text-muted mb-2">Totais por <strong>sócio em cada lançamento</strong> (não por regra de rateio). Sócios com movimento fora do cadastro da empresa atual aparecem ao final com aviso.</p>
+                <div class="row g-2">
+                    {% for c in cards_socios %}
+                    <div class="col-12 col-sm-6 col-md-4 col-xl-3">
+                        <div class="card h-100 border shadow-sm overflow-visible{% if c.extra %} border-warning{% endif %}">
+                            <div class="card-body py-2 px-3 overflow-visible">
+                                <div class="fw-semibold text-truncate mb-2" title="{{ c.nome }}">{{ c.nome }}{% if c.extra %} <span class="badge bg-warning text-dark">outro cadastro</span>{% endif %}</div>
+                                <div class="small mb-2">
+                                    <div class="text-muted">Valor pago</div>
+                                    <div class="text-danger fw-semibold text-break" title="R$ {{ c.pgto_abs_txt }}">R$ {{ c.pgto_abs_txt }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="get" class="card card-body py-3 mb-3 border">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label for="filtro-di" class="form-label small mb-0">Data inicial</label>
+                        <input type="date" name="data_inicio" id="filtro-di" class="form-control form-control-sm"
+                               value="{{ filtro_data_inicio }}">
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label for="filtro-df" class="form-label small mb-0">Data final</label>
+                        <input type="date" name="data_fim" id="filtro-df" class="form-control form-control-sm"
+                               value="{{ filtro_data_fim }}">
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="filtro-socio" class="form-label small mb-0">Sócio</label>
+                        <select name="socio" id="filtro-socio" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for s in socios %}
+                            <option value="{{ s.id }}" {% if filtro_socio_id == s.id %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label for="filtro-tipo" class="form-label small mb-0">Tipo</label>
+                        <select name="tipo" id="filtro-tipo" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for val, label in tipo_choices %}
+                            <option value="{{ val }}" {% if filtro_tipo == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-3 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-filter"></i> Filtrar
+                        </button>
+                        <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                    </div>
+                </div>
+                <p class="small text-muted mb-0 mt-2">
+                    Período: usa a <strong>data do lançamento</strong> (pagamento/recebimento), exceto contas a pagar com categoria «Distribuição de lucro» e <strong>data de pagamento no título</strong> — aí o período é pela <strong>emissão</strong> do título (se não houver emissão cadastrada, pela data do lançamento).
+                </p>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Origem</th>
+                            <th>ID título</th>
+                            <th>Nota</th>
+                            <th>Cobrança</th>
+                            <th class="text-end" title="Valor do documento (CAP) ou valor da parcela (CAR)">Valor bruto título</th>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Regra</th>
+                            <th>Sócio</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in object_list %}
+                        <tr>
+                            <td>{{ row.id }}</td>
+                            <td>{% if row.conta_pagar_id %}Pagar{% else %}Receber{% endif %}</td>
+                            <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
+                            <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
+                            <td>{% if row.conta_pagar_id %}{{ row.conta_pagar.cobranca }}{% elif row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento }}{% else %}—{% endif %}</td>
+                            <td class="text-end text-nowrap">{% if row.conta_pagar_id %}R$ {{ row.conta_pagar.valorDoc|floatformat:2 }}{% else %}R$ {{ row.conta_receber.valor_a_receber|floatformat:2 }}{% endif %}</td>
+                            <td>{{ row.data_pagamento|date:"d/m/Y"|default:"—" }}</td>
+                            <td>{{ row.get_tipo_display }}</td>
+                            <td>{{ row.descricao|truncatechars:40 }}</td>
+                            <td>{{ row.regra_rateio }}</td>
+                            <td>{{ row.socio }}</td>
+                            <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor }}</td>
+                            <td class="text-end text-nowrap">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% if row.conta_pagar_id %}{% url 'regrarateio:lancamentoRateioEdit' 'cap' row.conta_pagar_id %}{% else %}{% url 'regrarateio:lancamentoRateioEdit' 'car' row.conta_receber_id %}{% endif %}" class="btn btn-outline-primary" title="Editar rateio do título">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'regrarateio:lancamentoRateioDelete' row.pk %}" class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="13" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card bg-light border mt-3 mb-2">
+                <div class="card-body py-2 px-3">
+                    <div class="row align-items-center small g-2">
+                        <div class="col-md-4">
+                            <strong>Total no filtro:</strong> {{ total_qtd }} lançamento{{ total_qtd|pluralize }}
+                        </div>
+                        <div class="col-md-8">
+                            <span class="text-danger me-3" title="Pagamentos (valores negativos)">
+                                Pagamento: <strong>R$ {{ total_pgto_txt }}</strong>
+                            </span>
+                            <span class="text-success me-3" title="Recebimentos (valores positivos)">
+                                Recebimento: <strong>R$ {{ total_recebimento_txt }}</strong>
+                            </span>
+                            <span class="text-dark" title="Soma algébrica de todos os valores">
+                                Soma geral: <strong>R$ {{ total_valor_txt }}</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if is_paginated %}
+            <nav aria-label="Paginação">
+                <ul class="pagination pagination-sm justify-content-center mt-3">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}">Anterior</a></li>
+                    {% endif %}
+                    <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}">Próxima</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: rateio a partir de contas a pagar -->
+<div class="modal fade" id="modalRateioCap" tabindex="-1" aria-labelledby="modalRateioCapLabel" aria-hidden="true"
+     data-candidatas-url="{% url 'regrarateio:contasPagarRateioCandidatas' %}">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRateioCapLabel">Gerar rateio — despesas sem pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="rateio-cap-di" class="form-label">Data inicial</label>
+                        <input type="date" id="rateio-cap-di" name="rateio_cap_di" class="form-control form-control-sm" required
+                               value="{{ filtro_data_inicio }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="rateio-cap-df" class="form-label">Data final</label>
+                        <input type="date" id="rateio-cap-df" name="rateio_cap_df" class="form-control form-control-sm" required
+                               value="{{ filtro_data_fim }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn-buscar-cap-rateio">
+                            <i class="fas fa-search"></i> Buscar contas
+                        </button>
+                    </div>
+                </div>
+                <p class="small text-muted mb-2">Lista despesas sem pagamento com <strong>data de emissão</strong> e <strong>data de vencimento</strong> dentro do período informado.</p>
+                <div id="rateio-cap-msg" class="alert alert-danger py-2 d-none" role="alert"></div>
+                <div id="rateio-cap-loading" class="d-none small text-muted mb-2"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>
+                <form method="post" action="{% url 'regrarateio:gerarRateioCap' %}" id="form-rateio-cap">
+                    {% csrf_token %}
+                    <div class="mb-3 p-2 bg-light rounded border">
+                        <label for="regra-rateio-modal" class="form-label fw-semibold mb-1">Regra de rateio a aplicar</label>
+                        <select name="regra_rateio" id="regra-rateio-modal" class="form-select form-select-sm">
+                            <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
+                            {% for r in regras_rateio_modal %}
+                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="form-text small mb-0 mt-1">
+                            Se o título está <strong>sem regra</strong>, escolha uma regra aqui antes de gravar.
+                            A regra precisa ter sócios e percentuais em <b>Cadastro → Regra do Rateio</b>.
+                        </p>
+                    </div>
+                    <div class="table-responsive border rounded" style="max-height: 380px;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width:2.5rem;">
+                                        <input type="checkbox" id="rateio-cap-check-all" class="form-check-input" title="Marcar todos disponíveis">
+                                    </th>
+                                    <th>ID</th>
+                                    <th>Descrição</th>
+                                    <th>Fornecedor</th>
+                                    <th>Emissão</th>
+                                    <th>Vencimento</th>
+                                    <th>Valor base</th>
+                                    <th>Regra</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rateio-cap-tbody">
+                                <tr id="rateio-cap-empty">
+                                    <td colspan="9" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button type="submit" form="form-rateio-cap" class="btn btn-primary btn-sm" id="btn-aplicar-rateio-cap" disabled>
+                    Aplicar regra e gravar lançamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: rateio a partir de contas a receber -->
+<div class="modal fade" id="modalRateioCar" tabindex="-1" aria-labelledby="modalRateioCarLabel" aria-hidden="true"
+     data-candidatas-url="{% url 'regrarateio:contasReceberRateioCandidatas' %}">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRateioCarLabel">Gerar rateio — contas a receber</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="rateio-car-di" class="form-label">Data inicial</label>
+                        <input type="date" id="rateio-car-di" class="form-control form-control-sm" required
+                               value="{{ filtro_data_inicio }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="rateio-car-df" class="form-label">Data final</label>
+                        <input type="date" id="rateio-car-df" class="form-control form-control-sm" required
+                               value="{{ filtro_data_fim }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn-buscar-car-rateio">
+                            <i class="fas fa-search"></i> Buscar contas
+                        </button>
+                    </div>
+                </div>
+                <p class="small text-muted mb-2">Lista títulos <strong>pagos</strong> no período (recebimento, vencimento ou emissão). Os lançamentos de rateio serão gravados com <strong>valor positivo</strong> (recebimento).</p>
+                <div id="rateio-car-msg" class="alert alert-danger py-2 d-none" role="alert"></div>
+                <div id="rateio-car-loading" class="d-none small text-muted mb-2"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>
+                <form method="post" action="{% url 'regrarateio:gerarRateioCar' %}" id="form-rateio-car">
+                    {% csrf_token %}
+                    <div class="mb-3 p-2 bg-light rounded border">
+                        <label for="regra-rateio-modal-car" class="form-label fw-semibold mb-1">Regra de rateio a aplicar</label>
+                        <select name="regra_rateio" id="regra-rateio-modal-car" class="form-select form-select-sm">
+                            <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
+                            {% for r in regras_rateio_modal %}
+                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="form-text small mb-0 mt-1">
+                            Se o título está <strong>sem regra</strong>, escolha uma regra aqui. A regra precisa ter sócios e percentuais cadastrados.
+                        </p>
+                    </div>
+                    <div class="table-responsive border rounded" style="max-height: 380px;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width:2.5rem;">
+                                        <input type="checkbox" id="rateio-car-check-all" class="form-check-input" title="Marcar todos disponíveis">
+                                    </th>
+                                    <th>ID</th>
+                                    <th>Descrição</th>
+                                    <th>Cliente</th>
+                                    <th>Sócio</th>
+                                    <th>Recebimento</th>
+                                    <th>Valor base</th>
+                                    <th>Regra</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rateio-car-tbody">
+                                <tr id="rateio-car-empty">
+                                    <td colspan="9" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button type="submit" form="form-rateio-car" class="btn btn-primary btn-sm" id="btn-aplicar-rateio-car" disabled>
+                    Aplicar regra e gravar lançamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modalEl = document.getElementById('modalRateioCap');
+    if (!modalEl) return;
+
+    const urlBase = modalEl.getAttribute('data-candidatas-url');
+    const tbody = document.getElementById('rateio-cap-tbody');
+    const msgEl = document.getElementById('rateio-cap-msg');
+    const loadingEl = document.getElementById('rateio-cap-loading');
+    const btnBuscar = document.getElementById('btn-buscar-cap-rateio');
+    const btnAplicar = document.getElementById('btn-aplicar-rateio-cap');
+    const checkAll = document.getElementById('rateio-cap-check-all');
+    const inpDi = document.getElementById('rateio-cap-di');
+    const inpDf = document.getElementById('rateio-cap-df');
+
+    function showMsg(text) {
+        msgEl.textContent = text || '';
+        msgEl.classList.toggle('d-none', !text);
+    }
+
+    function fmtIso(iso) {
+        if (!iso) return '—';
+        const p = iso.split('-');
+        if (p.length !== 3) return iso;
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function updateAplicarState() {
+        const enabled = tbody.querySelectorAll('input.rateio-cap-cb:not(:disabled):checked');
+        btnAplicar.disabled = enabled.length === 0;
+    }
+
+    btnBuscar.addEventListener('click', function () {
+        showMsg('');
+        const di = inpDi.value;
+        const df = inpDf.value;
+        if (!di || !df) {
+            showMsg('Preencha data inicial e data final.');
+            return;
+        }
+        loadingEl.classList.remove('d-none');
+        btnBuscar.disabled = true;
+
+        const fetchUrl = urlBase + '?data_inicio=' + encodeURIComponent(di) + '&data_fim=' + encodeURIComponent(df);
+
+        fetch(fetchUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (_ref) {
+                const ok = _ref.ok, data = _ref.j;
+                loadingEl.classList.add('d-none');
+                btnBuscar.disabled = false;
+                if (!ok && data.erro) {
+                    showMsg(data.erro);
+                    return;
+                }
+                if (data.erro) {
+                    showMsg(data.erro);
+                    return;
+                }
+                const contas = data.contas || [];
+                tbody.innerHTML = '';
+                checkAll.checked = false;
+
+                if (contas.length === 0) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = '<td colspan="9" class="text-center text-muted py-4">Nenhuma despesa <strong>sem pagamento</strong> encontrada com emissão e vencimento no período informado.</td>';
+                    tbody.appendChild(tr);
+                    btnAplicar.disabled = true;
+                    return;
+                }
+
+                contas.forEach(function (c) {
+                    const tr = document.createElement('tr');
+                    const pode = !!c.pode_aplicar;
+                    // Só bloqueia quem já tem rateio gravado. Sem regra no título: pode marcar —
+                    // ao aplicar, é preciso ter regra e itens cadastrados ou nada será gerado.
+                    var desabilitar = !!c.ja_gerado;
+                    if (c.ja_gerado) tr.classList.add('table-secondary');
+                    else if (!pode) tr.classList.add('table-warning');
+                    const disabled = desabilitar ? 'disabled' : '';
+                    let badgeClass = 'bg-success';
+                    if (c.ja_gerado) badgeClass = 'bg-secondary';
+                    else if (!pode) badgeClass = 'bg-warning text-dark';
+                    const rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
+                    const status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
+                    tr.innerHTML =
+                        '<td><input type="checkbox" name="conta_pagar_id" value="' + esc(c.id) + '" class="form-check-input rateio-cap-cb" ' + disabled + '></td>' +
+                        '<td>' + esc(c.id) + '</td>' +
+                        '<td>' + esc(c.descricao) + '</td>' +
+                        '<td>' + esc(c.fornecedor) + '</td>' +
+                        '<td>' + fmtIso(c.dt_emissao) + '</td>' +
+                        '<td>' + fmtIso(c.dt_venc) + '</td>' +
+                        '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        '<td><small>' + esc(c.regra) + '</small></td>' +
+                        '<td>' + status + '</td>';
+                    tbody.appendChild(tr);
+                });
+
+                tbody.querySelectorAll('input.rateio-cap-cb').forEach(function (cb) {
+                    cb.addEventListener('change', updateAplicarState);
+                });
+                updateAplicarState();
+            })
+            .catch(function () {
+                loadingEl.classList.add('d-none');
+                btnBuscar.disabled = false;
+                showMsg('Falha na busca. Tente novamente.');
+            });
+    });
+
+    checkAll.addEventListener('change', function () {
+        tbody.querySelectorAll('input.rateio-cap-cb:not(:disabled)').forEach(function (cb) {
+            cb.checked = checkAll.checked;
+        });
+        updateAplicarState();
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        showMsg('');
+    });
+
+    function preencherDatasPadraoModal() {
+        if (!inpDi || !inpDf) return;
+        if (inpDi.value && inpDf.value) return;
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var first = y + '-' + m + '-01';
+        var lastD = new Date(y, now.getMonth() + 1, 0).getDate();
+        var last = y + '-' + m + '-' + String(lastD).padStart(2, '0');
+        if (!inpDi.value) inpDi.value = first;
+        if (!inpDf.value) inpDf.value = last;
+    }
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        preencherDatasPadraoModal();
+    });
+})();
+</script>
+
+<script>
+(function () {
+    var modalCar = document.getElementById('modalRateioCar');
+    if (!modalCar) return;
+
+    var urlBaseCar = modalCar.getAttribute('data-candidatas-url');
+    var tbodyCar = document.getElementById('rateio-car-tbody');
+    var msgCar = document.getElementById('rateio-car-msg');
+    var loadingCar = document.getElementById('rateio-car-loading');
+    var btnBuscarCar = document.getElementById('btn-buscar-car-rateio');
+    var btnAplicarCar = document.getElementById('btn-aplicar-rateio-car');
+    var checkAllCar = document.getElementById('rateio-car-check-all');
+    var inpDiCar = document.getElementById('rateio-car-di');
+    var inpDfCar = document.getElementById('rateio-car-df');
+
+    function showMsgCar(text) {
+        msgCar.textContent = text || '';
+        msgCar.classList.toggle('d-none', !text);
+    }
+
+    function fmtIso(iso) {
+        if (!iso) return '—';
+        var p = iso.split('-');
+        if (p.length !== 3) return iso;
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function updateAplicarCar() {
+        var enabled = tbodyCar.querySelectorAll('input.rateio-car-cb:not(:disabled):checked');
+        btnAplicarCar.disabled = enabled.length === 0;
+    }
+
+    btnBuscarCar.addEventListener('click', function () {
+        showMsgCar('');
+        var di = inpDiCar.value;
+        var df = inpDfCar.value;
+        if (!di || !df) {
+            showMsgCar('Preencha data inicial e data final.');
+            return;
+        }
+        loadingCar.classList.remove('d-none');
+        btnBuscarCar.disabled = true;
+
+        var fetchUrl = urlBaseCar + '?data_inicio=' + encodeURIComponent(di) + '&data_fim=' + encodeURIComponent(df);
+
+        fetch(fetchUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (_ref) {
+                var ok = _ref.ok, data = _ref.j;
+                loadingCar.classList.add('d-none');
+                btnBuscarCar.disabled = false;
+                if (!ok && data.erro) {
+                    showMsgCar(data.erro);
+                    return;
+                }
+                if (data.erro) {
+                    showMsgCar(data.erro);
+                    return;
+                }
+                var contas = data.contas || [];
+                tbodyCar.innerHTML = '';
+                checkAllCar.checked = false;
+
+                if (contas.length === 0) {
+                    var tr0 = document.createElement('tr');
+                    tr0.innerHTML = '<td colspan="9" class="text-center text-muted py-4">Nenhuma conta a receber <strong>paga</strong> no período para esta empresa. Ajuste as datas ou verifique a empresa da sessão.</td>';
+                    tbodyCar.appendChild(tr0);
+                    btnAplicarCar.disabled = true;
+                    return;
+                }
+
+                contas.forEach(function (c) {
+                    var tr = document.createElement('tr');
+                    var pode = !!c.pode_aplicar;
+                    var desabilitar = !!c.ja_gerado;
+                    if (c.ja_gerado) tr.classList.add('table-secondary');
+                    else if (!pode) tr.classList.add('table-warning');
+                    var disabled = desabilitar ? 'disabled' : '';
+                    var badgeClass = 'bg-success';
+                    if (c.ja_gerado) badgeClass = 'bg-secondary';
+                    else if (!pode) badgeClass = 'bg-warning text-dark';
+                    var rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
+                    var status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
+                    var socTxt = c.socio_txt != null && c.socio_txt !== '' ? c.socio_txt : '—';
+                    tr.innerHTML =
+                        '<td><input type="checkbox" name="conta_receber_id" value="' + esc(c.id) + '" class="form-check-input rateio-car-cb" ' + disabled + '></td>' +
+                        '<td>' + esc(c.id) + '</td>' +
+                        '<td>' + esc(c.descricao) + '</td>' +
+                        '<td>' + esc(c.cliente) + '</td>' +
+                        '<td><small class="text-break">' + esc(socTxt) + '</small></td>' +
+                        '<td>' + fmtIso(c.dt_pag) + '</td>' +
+                        '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        '<td><small>' + esc(c.regra) + '</small></td>' +
+                        '<td>' + status + '</td>';
+                    tbodyCar.appendChild(tr);
+                });
+
+                tbodyCar.querySelectorAll('input.rateio-car-cb').forEach(function (cb) {
+                    cb.addEventListener('change', updateAplicarCar);
+                });
+                updateAplicarCar();
+            })
+            .catch(function () {
+                loadingCar.classList.add('d-none');
+                btnBuscarCar.disabled = false;
+                showMsgCar('Falha na busca. Tente novamente.');
+            });
+    });
+
+    checkAllCar.addEventListener('change', function () {
+        tbodyCar.querySelectorAll('input.rateio-car-cb:not(:disabled)').forEach(function (cb) {
+            cb.checked = checkAllCar.checked;
+        });
+        updateAplicarCar();
+    });
+
+    modalCar.addEventListener('hidden.bs.modal', function () {
+        showMsgCar('');
+    });
+
+    function preencherDatasPadraoModalCar() {
+        if (!inpDiCar || !inpDfCar) return;
+        if (inpDiCar.value && inpDfCar.value) return;
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var first = y + '-' + m + '-01';
+        var lastD = new Date(y, now.getMonth() + 1, 0).getDate();
+        var last = y + '-' + m + '-' + String(lastD).padStart(2, '0');
+        if (!inpDiCar.value) inpDiCar.value = first;
+        if (!inpDfCar.value) inpDfCar.value = last;
+    }
+
+    modalCar.addEventListener('shown.bs.modal', function () {
+        preencherDatasPadraoModalCar();
+    });
+})();
+</script>
+
+{% endblock %}

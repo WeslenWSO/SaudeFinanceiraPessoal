@@ -1,0 +1,56 @@
+<h1>Status dos Downloads de NFS-e</h1>
+
+{% if jobs %}
+<table border="1">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Empresa</th>
+            <th>Início</th>
+            <th>Fim</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th>Parâmetros</th>
+            <th>Credenciais</th>
+            <th>Log</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr>
+            <td>{{ job.id }}</td>
+            <td>{{ job.company.nome }} ({{ job.company.cnpj }})</td>
+            <td>{{ job.inicio|date:"d/m/Y" }}</td>
+            <td>{{ job.fim|date:"d/m/Y" }}</td>
+            <td>{{ job.get_status_display }}</td>
+            <td>{{ job.criado_em|date:"d/m/Y H:i:s" }}</td>
+            <td>
+                Empresa: {{ job.company.id }}<br>
+                Início: {{ job.inicio|date:"d/m/Y" }}<br>
+                Fim: {{ job.fim|date:"d/m/Y" }}
+            </td>
+            <td>
+                {% if job.company.cred %}
+                Usuário: {{ job.company.cred.usuario }}<br>
+                IM: {{ job.company.cred.im }}<br>
+                WS Homologação: {{ job.company.cred.ws_homologa|yesno:"Sim,Não" }}
+                {% else %}
+                Credenciais não configuradas
+                {% endif %}
+            </td>
+            <td>
+                {% if job.log %}
+                <pre style="max-width: 300px; white-space: pre-wrap;">{{ job.log }}</pre>
+                {% else %}
+                Sem log
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhum job de download encontrado.</p>
+{% endif %}
+
+<p><a href="{% url 'nfse_rio_branco:start' %}">Iniciar novo download</a></p>

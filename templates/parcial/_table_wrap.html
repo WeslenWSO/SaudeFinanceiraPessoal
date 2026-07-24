@@ -1,0 +1,13 @@
+{% comment %}
+  Envolve tabela em .table-wrap para scroll horizontal.
+  Uso: {% include 'parcial/_table_wrap.html' %} com block table_content contendo <table>...</table>
+  Ou usar diretamente: <div class="table-wrap"><table>...</table></div>
+  Empty state: use classe .empty-state dentro do painel quando object_list vazio.
+{% endcomment %}
+<div class="table-wrap">
+  {% block table_content %}
+    <table>
+      {% block table_inner %}{% endblock %}
+    </table>
+  {% endblock %}
+</div>

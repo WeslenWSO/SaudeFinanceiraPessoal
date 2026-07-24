@@ -1,0 +1,60 @@
+<form id="bulk-form" method="post" action="{% url 'notasfiscais:nfse_aplicar_discriminacao_bulk' %}">
+  {% csrf_token %}
+
+  <div class="mb-2">
+    <button type="button" id="btn-aplicar" class="btn btn-primary">
+      Aplicar nas selecionadas
+    </button>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="check-all"></th>
+        <th>Número</th>
+        <!-- demais colunas -->
+      </tr>
+    </thead>
+    <tbody>
+      {% for nf in object_list %}
+      <tr data-id="{{ nf.id }}">
+        <td><input type="checkbox" class="chk-nf" value="{{ nf.id }}"></td>
+        <td>{{ nf.numero }}</td>
+        <!-- ... -->
+        <td>{{ nf.discriminacao }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+
+<script>
+document.getElementById('check-all').addEventListener('change', function() {
+  document.querySelectorAll('.chk-nf').forEach(ch => ch.checked = this.checked);
+});
+
+document.getElementById('btn-aplicar').addEventListener('click', async function() {
+  const ids = Array.from(document.querySelectorAll('.chk-nf:checked')).map(i => i.value);
+  if (!ids.length) { alert('Selecione pelo menos uma nota.'); return; }
+
+  const form = document.getElementById('bulk-form');
+  const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+  const body = new URLSearchParams();
+  ids.forEach(id => body.append('ids[]', id));
+
+  const resp = await fetch(form.action, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest'},
+    body
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    alert(`Atualizadas: ${data.atualizados}`);
+    // opcional: recarregar página para refletir mudanças
+    location.reload();
+  } else {
+    alert('Falha ao aplicar.');
+  }
+});
+</script>

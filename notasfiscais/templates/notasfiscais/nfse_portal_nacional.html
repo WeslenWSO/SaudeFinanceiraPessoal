@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="mb-3">
+    {% include 'parcial/_messages.html' %}
+  </div>
+
+  <h1 class="h3 mb-3">Importar NFSe — Portal Nacional</h1>
+
+  {% if not request.session.empresa_id %}
+  <div class="alert alert-warning">
+    <strong>Selecione uma empresa</strong> antes de importar.
+    <a href="{% url 'empresa:lista' %}" class="alert-link">Ir para empresas</a>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    <strong>Empresa:</strong> {{ request.session.empresa_nome }}
+    {% if request.session.empresa_id %}
+    — <a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}">Configuração de integração</a>
+    (IBGE do município, série/número padrão da DPS, CNPJ/CPF e pastas)
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if request.session.empresa_id and not nfse_portal_ibge_ok %}
+  <div class="alert alert-warning">
+    Cadastre o <strong>código IBGE do município (7 dígitos)</strong> na empresa para habilitar o download por DPS nesta tela.
+  </div>
+  {% endif %}
+
+  <div class="alert alert-secondary small mb-4">
+    <strong>API SEFIN:</strong> cada consulta usa o identificador da DPS (IBGE + CNPJ/CPF + <strong>série</strong> + <strong>número</strong>).
+    Pode informar um intervalo «do número ao número» com a <strong>mesma série</strong> (até 100 por envio; várias requisições em sequência).
+    Para outras massas, use <a href="{% url 'notasfiscais:import' %}" class="alert-link">Importar XML</a>, o <a href="{% url 'notasfiscais:portal_extensao_import' %}" class="alert-link">Portal (extensão)</a> ou <code>python manage.py sync_adn_until</code> (ADN/NSU).
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Passo a passo</div>
+    <div class="card-body small">
+      <ol class="mb-0">
+        <li>Cadastro da empresa: <strong>IBGE (7 dígitos)</strong>, CNPJ/CPF, opcionalmente <strong>série DPS padrão</strong> e <strong>próximo número</strong> (para ir avançando uma DPS por vez).</li>
+        <li>Certificado <strong>e-CNPJ / e-CPF A1 (PFX)</strong> e URL SEFIN no cadastro ou <code>NFSE_NACIONAL_*</code> no servidor.</li>
+        <li>
+          Informe <strong>série</strong> e <strong>número</strong> da DPS (ou deixe vazios para usar o cadastro). Opcionalmente preencha <strong>«Até número»</strong>
+          para o mesmo lote baixar um intervalo (máx. 100), sempre com a mesma série. Cada número é uma chamada à SEFIN (XML e PDF).
+          Com número automático do cadastro, após sucesso o «próximo número» avança (+1 ou até o fim do intervalo +1).
+        </li>
+        <li><strong>Período</strong> (datas): só restringe a <strong>importação</strong> depois do download, conforme data no XML — não descobre notas no intervalo.</li>
+        <li>Vários XMLs avulsos: <a href="{% url 'notasfiscais:import' %}">Importar XML</a>. Documentação: <a href="https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/" target="_blank" rel="noopener">gov.br/nfse</a> (inclui material sobre ADN/NSU).</li>
+      </ol>
+    </div>
+  </div>
+
+  {% if not nfse_nacional_configurado %}
+  <div class="alert alert-warning">
+    O certificado PFX <strong>não está disponível</strong> para esta empresa (upload/caminho em branco ou arquivo inexistente) nem em <code>NFSE_NACIONAL_PFX_PATH</code> no servidor.
+    Enquanto isso, use <a href="{% url 'notasfiscais:import' %}">Importar XML</a> com o arquivo baixado manualmente do portal.
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm" style="max-width: 48rem;">
+    <div class="card-header fw-semibold">Consultar e importar</div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.data_periodo_inicio.id_for_label }}">{{ form.data_periodo_inicio.label }}</label>
+            {{ form.data_periodo_inicio }}
+            {% if form.data_periodo_inicio.help_text %}<div class="form-text">{{ form.data_periodo_inicio.help_text }}</div>{% endif %}
+            {% for e in form.data_periodo_inicio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.data_periodo_fim.id_for_label }}">{{ form.data_periodo_fim.label }}</label>
+            {{ form.data_periodo_fim }}
+            {% if form.data_periodo_fim.help_text %}<div class="form-text">{{ form.data_periodo_fim.help_text }}</div>{% endif %}
+            {% for e in form.data_periodo_fim.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <fieldset class="border rounded p-3 mb-3">
+          <legend class="float-none w-auto px-2 fs-6 text-muted">DPS (opcional — senão usa o cadastro da empresa)</legend>
+          <div class="alert alert-warning small py-2 mb-3" role="region" aria-label="Dica identificador DPS">
+            Se aparecer <strong>E2404</strong>, confira no DANFSE <strong>Série da DPS</strong> + <strong>Número da DPS</strong>.
+            A tela pré-preenche com o cadastro da empresa, com a <strong>última NFSe importada</strong> (série = série DPS no XML nacional) ou, se ainda vazio, série <strong>80000</strong> — só consulte o que a SEFin realmente emitiu.
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.serie_dps.id_for_label }}">{{ form.serie_dps.label }}</label>
+              {{ form.serie_dps }}
+              {% if form.serie_dps.help_text %}<div class="form-text">{{ form.serie_dps.help_text }}</div>{% endif %}
+              {% for e in form.serie_dps.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.numero_dps.id_for_label }}">{{ form.numero_dps.label }}</label>
+              {{ form.numero_dps }}
+              {% if form.numero_dps.help_text %}<div class="form-text">{{ form.numero_dps.help_text }}</div>{% endif %}
+              {% for e in form.numero_dps.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.numero_dps_ate.id_for_label }}">{{ form.numero_dps_ate.label }}</label>
+              {{ form.numero_dps_ate }}
+              {% if form.numero_dps_ate.help_text %}<div class="form-text">{{ form.numero_dps_ate.help_text }}</div>{% endif %}
+              {% for e in form.numero_dps_ate.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <p class="small text-muted mb-0 mt-2">
+            O <strong>IBGE do município</strong> e o <strong>CNPJ ou CPF</strong> da DPS vêm apenas do cadastro da empresa.
+            O sistema tenta baixar <strong>XML</strong> e <strong>PDF</strong> (PDF conforme rotas da SEFIN).
+          </p>
+        </fieldset>
+
+        <div class="form-check mb-3">
+          {{ form.importar_canceladas }}
+          <label class="form-check-label" for="{{ form.importar_canceladas.id_for_label }}">{{ form.importar_canceladas.label }}</label>
+        </div>
+        <button type="submit" class="btn btn-primary" {% if not request.session.empresa_id or not nfse_nacional_configurado or not nfse_portal_ibge_ok %}disabled{% endif %}>
+          Baixar do Portal Nacional e importar
+        </button>
+        <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary ms-1">Voltar à lista</a>
+        <a href="{% url 'notasfiscais:import' %}" class="btn btn-outline-secondary ms-1">Importar XML</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+<footer class="border-top bg-white py-3 mt-4">
+  <div class="container">
+    {% if request.session.empresa_id == 16 or request.session.empresa_id == "16" %}
+    <div class="d-flex flex-wrap align-items-center justify-content-center gap-3 gap-md-4 mb-3 footer-links-uteis">
+      <span class="text-muted small text-uppercase fw-semibold me-1">Links úteis</span>
+      <a href="https://ris.medcloud.co/calendar" target="_blank" rel="noopener noreferrer" class="footer-link-util text-decoration-none">
+        <i class="fas fa-calendar-check me-1"></i>Medcloud RIS
+      </a>
+      <a href="https://app.contaazul.com/" target="_blank" rel="noopener noreferrer" class="footer-link-util text-decoration-none">
+        <i class="fas fa-cloud me-1"></i>Conta Azul
+      </a>
+      <a href="https://minhaconta2.cielo.com.br/site/login" target="_blank" rel="noopener noreferrer" class="footer-link-util text-decoration-none">
+        <i class="fas fa-credit-card me-1"></i>Cielo
+      </a>
+      <a href="https://conta.stone.com.br/login" target="_blank" rel="noopener noreferrer" class="footer-link-util text-decoration-none">
+        <i class="fas fa-gem me-1"></i>Stone
+      </a>
+    </div>
+    {% endif %}
+    <div class="d-flex justify-content-between align-items-center flex-wrap">
+      <small class="text-muted">Copyright © Saude Financeira 2024</small>
+      <small><a href="#" class="text-muted">Privacidade</a> · <a href="#" class="text-muted">Termos</a></small>
+    </div>
+  </div>
+</footer>
+<style>
+.footer-link-util {
+  color: #4b5563;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.footer-link-util:hover {
+  color: #2563eb;
+}
+.footer-link-util i {
+  opacity: 0.85;
+}
+</style>

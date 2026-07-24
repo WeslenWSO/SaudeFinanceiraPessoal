@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+{% block conteudo %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">{{ title }}</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            {{ form.csv_file.label_tag }}
+                            {{ form.csv_file }}
+                            {% if form.csv_file.errors %}
+                                <div class="text-danger">{{ form.csv_file.errors.0 }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                O arquivo deve estar no formato CSV com delimitador ponto e vírgula (;).
+                                Certifique-se de que as colunas correspondam ao mapeamento da máquina selecionada.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.maquinha.label_tag }}
+                            {{ form.maquinha }}
+                            {% if form.maquinha.errors %}
+                                <div class="text-danger">{{ form.maquinha.errors.0 }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                {{ form.maquinha.help_text }}
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> Novo Fluxo de Importação</h6>
+                            <p class="mb-0">Após selecionar o arquivo, você verá uma prévia dos dados antes de confirmar a importação.</p>
+                        </div>
+
+                        <div class="mb-3" id="mapeamento-padrao">
+                            <h5>Mapeamento de Campos Esperados:</h5>
+                            <ul class="list-unstyled mb-0">
+                                <li><strong>EMPRESA:</strong> Empresa logada automaticamente</li>
+                                <li><strong>DATA DE PAGAMENTO:</strong> Data do pagamento (DD/MM/YYYY)</li>
+                                <li><strong>FORMA DE PAGAMENTO:</strong> Forma de Pagamento</li>
+                                <li><strong>BANDEIRA:</strong> Bandeira do cartão</li>
+                                <li><strong>VALOR BRUTO:</strong> Valor parcela bruto (R$ 1.234,56)</li>
+                                <li><strong>TAXA DE MAQUININHA:</strong> Desconto parcela (% ou valor)</li>
+                                <li><strong>VALOR LÍQUIDO:</strong> Valor parcela líquido (R$ 1.234,56)</li>
+                                <li><strong>MAQUININHA:</strong> Máquina (SIPAG, CIELO, etc.)</li>
+                                <li><strong>N° AUTORIZAÇÃO:</strong> Número da autorização</li>
+                                <li><strong>DATA DA VENDA:</strong> Data da transação (DD/MM/YYYY)</li>
+                                <li><strong>NSU/DOC:</strong> Número da autorização (igual ao N° Autorização)</li>
+                                <li><strong>PARCELAS:</strong> Número da parcela atual</li>
+                                <li><strong>TOTAL PARCELAS:</strong> Total de parcelas</li>
+                                <li><strong>CONCILIADO:</strong> Sim/Não (ou 1/0, true/false)</li>
+                                <li><strong>IDENTIFICAÇÃO EXTRATO:</strong> Identificação do extrato</li>
+                                <li><strong>NOTA FISCAL:</strong> Número da nota fiscal</li>
+                                <li><strong>RAZÃO:</strong> Razão social</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3 d-none" id="mapeamento-stone">
+                            <h5>Mapeamento Stone (CSV de recebimentos):</h5>
+                            <ul class="list-unstyled mb-0">
+                                <li><strong>DATA DE VENCIMENTO</strong> → Data de Pagamento</li>
+                                <li><strong>DATA DA VENDA</strong> → Data da Venda</li>
+                                <li><strong>PRODUTO</strong> → Forma de Pagamento (Crédito/Débito)</li>
+                                <li><strong>BANDEIRA</strong> → Bandeira</li>
+                                <li><strong>VALOR BRUTO / VALOR LÍQUIDO</strong> → Valores</li>
+                                <li><strong>DESCONTO DE MDR</strong> (+ antecipação) → Taxa de Maquinha</li>
+                                <li><strong>STONE ID</strong> → N° Autorização / NSU</li>
+                                <li><strong>N° DA PARCELA / QTD DE PARCELAS</strong> → Parcelas</li>
+                                <li><strong>DOCUMENTO</strong> → Razão (CNPJ)</li>
+                                <li><strong>STONECODE</strong> → Conta Bancária</li>
+                                <li><strong>Máquina</strong> → STONE (fixado)</li>
+                            </ul>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-eye"></i> Visualizar Dados e Importar
+                        </button>
+                        <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-secondary btn-lg ms-2">
+                            <i class="fas fa-arrow-left"></i> Voltar para Lista
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var sel = document.getElementById('id_maquinha') || document.querySelector('[name="maquinha"]');
+    var padrao = document.getElementById('mapeamento-padrao');
+    var stone = document.getElementById('mapeamento-stone');
+    if (!sel || !padrao || !stone) return;
+    function sync() {
+        var isStone = (sel.value || '').toUpperCase() === 'STONE';
+        padrao.classList.toggle('d-none', isStone);
+        stone.classList.toggle('d-none', !isStone);
+    }
+    sel.addEventListener('change', sync);
+    sync();
+})();
+</script>
+{% endblock %}

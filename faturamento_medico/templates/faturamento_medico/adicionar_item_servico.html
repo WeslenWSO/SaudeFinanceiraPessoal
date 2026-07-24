@@ -1,0 +1,370 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Adicionar Item de Serviço{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Adicionar Item de Serviço</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:detalhes' faturamento.pk %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Faturamento:</strong> {{ faturamento }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.cabecalho.id_for_label }}">Selecionar Cabeçalho *</label>
+                                    {{ form.cabecalho }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.preco_apartamento.id_for_label }}">Preço Apartamento</label>
+                                    {{ form.preco_apartamento }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.preco_enfermaria.id_for_label }}">Preço Enfermaria</label>
+                                    {{ form.preco_enfermaria }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.codigo_servico.id_for_label }}">Código Serviço</label>
+                                    {{ form.codigo_servico }}
+                                    <datalist id="servicos-list"></datalist>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.porte.id_for_label }}">Porte</label>
+                                    {{ form.porte }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.servico.id_for_label }}">Serviço *</label>
+                                    {{ form.servico }}
+                                    <datalist id="servicos-descricao-list"></datalist>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.modalidade.id_for_label }}">Modalidade</label>
+                                    {{ form.modalidade }}
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check mb-3">
+                                    {{ form.com_contraste }}
+                                    <label class="form-check-label" for="{{ form.com_contraste.id_for_label }}">
+                                        Com Contraste
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="{{ form.qt.id_for_label }}">Quantidade *</label>
+                                    {{ form.qt }}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="{{ form.valor.id_for_label }}">Valor Unitário *</label>
+                                    {{ form.valor }}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="{{ form.percentual.id_for_label }}">Percentual *</label>
+                                    {{ form.percentual }}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Total Calculado</label>
+                                    <input type="text" class="form-control" id="total_calculado" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Adicionar Item
+                        </button>
+                        <a href="{% url 'faturamento_medico:detalhes' faturamento.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cabecalhoSelect = document.getElementById('{{ form.cabecalho.id_for_label }}');
+    const codigoServicoInput = document.getElementById('{{ form.codigo_servico.id_for_label }}');
+    const servicoInput = document.getElementById('{{ form.servico.id_for_label }}');
+    const porteInput = document.getElementById('{{ form.porte.id_for_label }}');
+    const precoApartamentoInput = document.getElementById('{{ form.preco_apartamento.id_for_label }}');
+    const precoEnfermariaInput = document.getElementById('{{ form.preco_enfermaria.id_for_label }}');
+    const valorInput = document.getElementById('{{ form.valor.id_for_label }}');
+    const qtInput = document.getElementById('{{ form.qt.id_for_label }}');
+    const percentualInput = document.getElementById('{{ form.percentual.id_for_label }}');
+
+    const totalInput = document.getElementById('total_calculado');
+    const servicosList = document.getElementById('servicos-list');
+    const servicosDescricaoList = document.getElementById('servicos-descricao-list');
+
+    // Quando cabeçalho for selecionado, limpar preços
+    cabecalhoSelect.addEventListener('change', function() {
+        precoApartamentoInput.value = '';
+        precoEnfermariaInput.value = '';
+    });
+
+    // Autocomplete para código serviço
+    let timeout;
+    codigoServicoInput.addEventListener('input', function() {
+        const query = this.value;
+        clearTimeout(timeout);
+        if (query.length >= 3) {
+            timeout = setTimeout(() => {
+                fetch(`{% url "faturamento_medico:buscar_servicos" %}?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            servicosList.innerHTML = '';
+                            data.servicos.forEach(servico => {
+                                const option = document.createElement('option');
+                                option.value = servico.codigo;
+                                option.setAttribute('data-servico', servico.servico);
+                                option.setAttribute('data-porte', servico.porte);
+                                servicosList.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(error => console.error('Erro:', error));
+            }, 300);
+        } else {
+            servicosList.innerHTML = '';
+        }
+    });
+
+    // Autocomplete para descrição do serviço
+    servicoInput.addEventListener('input', function() {
+        const query = this.value;
+        clearTimeout(timeout);
+        if (query.length >= 3) {
+            timeout = setTimeout(() => {
+                fetch(`{% url "faturamento_medico:buscar_servicos_por_descricao" %}?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            servicosDescricaoList.innerHTML = '';
+                            data.servicos.forEach(servico => {
+                                const option = document.createElement('option');
+                                option.value = servico.servico;
+                                option.setAttribute('data-codigo', servico.codigo);
+                                option.setAttribute('data-porte', servico.porte);
+                                servicosDescricaoList.appendChild(option);
+                            });
+                        }
+                    })
+                    .catch(error => console.error('Erro:', error));
+            }, 300);
+        } else {
+            servicosDescricaoList.innerHTML = '';
+        }
+    });
+
+    // Quando código serviço for selecionado ou alterado
+    codigoServicoInput.addEventListener('change', function() {
+        const codigo = this.value;
+        if (codigo) {
+            // Buscar dados do serviço
+            fetch(`{% url "faturamento_medico:buscar_servicos" %}?q=${encodeURIComponent(codigo)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.servicos.length > 0) {
+                        const servico = data.servicos.find(s => s.codigo === codigo);
+                        if (servico) {
+                            servicoInput.value = servico.servico;
+                            porteInput.value = servico.porte;
+                        }
+                    }
+                })
+                .catch(error => console.error('Erro:', error));
+
+            // Buscar preços se cabeçalho estiver selecionado
+            const cabecalhoId = cabecalhoSelect.value;
+            if (cabecalhoId) {
+                fetch(`{% url "faturamento_medico:buscar_precos_servico" 0 "codigo" %}`.replace('0', cabecalhoId).replace('codigo', codigo))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            precoApartamentoInput.value = data.preco_apartamento || '0.00';
+                            precoEnfermariaInput.value = data.preco_enfermaria || '0.00';
+                            // Selecionar preço baseado no tipo de acomodação
+                            const apartamentoEnfermaria = '{{ faturamento.apartamento_enfermaria }}';
+                            const preco = apartamentoEnfermaria === 'Apartamento' ? data.preco_apartamento : data.preco_enfermaria;
+                            valorInput.value = preco || '0.00';
+                            qtInput.value = '1';
+                            calcularTotal();
+                        } else {
+                            // Se não encontrou, zerar preços
+                            precoApartamentoInput.value = '0.00';
+                            precoEnfermariaInput.value = '0.00';
+                            valorInput.value = '0.00';
+                            qtInput.value = '1';
+                            totalInput.value = '0.00';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        precoApartamentoInput.value = '0.00';
+                        precoEnfermariaInput.value = '0.00';
+                        valorInput.value = '0.00';
+                        qtInput.value = '1';
+                        totalInput.value = '0.00';
+                    });
+            }
+        } else {
+            servicoInput.value = '';
+            porteInput.value = '';
+            precoApartamentoInput.value = '0.00';
+            precoEnfermariaInput.value = '0.00';
+            valorInput.value = '0.00';
+            qtInput.value = '1';
+            totalInput.value = '0.00';
+        }
+    });
+
+    // Quando descrição do serviço for selecionada ou alterada
+    servicoInput.addEventListener('change', function() {
+        const servico = this.value;
+        if (servico) {
+            // Buscar dados do serviço pela descrição
+            fetch(`{% url "faturamento_medico:buscar_servicos_por_descricao" %}?q=${encodeURIComponent(servico)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.servicos.length > 0) {
+                        const servicoEncontrado = data.servicos.find(s => s.servico === servico);
+                        if (servicoEncontrado) {
+                            codigoServicoInput.value = servicoEncontrado.codigo;
+                            porteInput.value = servicoEncontrado.porte;
+                        }
+                    }
+                })
+                .catch(error => console.error('Erro:', error));
+
+            // Buscar preços se cabeçalho estiver selecionado
+            const cabecalhoId = cabecalhoSelect.value;
+            if (cabecalhoId) {
+                // Primeiro buscar o código do serviço pela descrição
+                fetch(`{% url "faturamento_medico:buscar_servicos_por_descricao" %}?q=${encodeURIComponent(servico)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.servicos.length > 0) {
+                            const servicoEncontrado = data.servicos.find(s => s.servico === servico);
+                            if (servicoEncontrado) {
+                                const codigo = servicoEncontrado.codigo;
+                                fetch(`{% url "faturamento_medico:buscar_precos_servico" 0 "codigo" %}`.replace('0', cabecalhoId).replace('codigo', codigo))
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            precoApartamentoInput.value = data.preco_apartamento || '0.00';
+                                            precoEnfermariaInput.value = data.preco_enfermaria || '0.00';
+                                            // Selecionar preço baseado no tipo de acomodação
+                                            const apartamentoEnfermaria = '{{ faturamento.apartamento_enfermaria }}';
+                                            const preco = apartamentoEnfermaria === 'Apartamento' ? data.preco_apartamento : data.preco_enfermaria;
+                                            valorInput.value = preco || '0.00';
+                                            qtInput.value = '1';
+                                            calcularTotal();
+                                        } else {
+                                            // Se não encontrou, zerar preços
+                                            precoApartamentoInput.value = '0.00';
+                                            precoEnfermariaInput.value = '0.00';
+                                            valorInput.value = '0.00';
+                                            qtInput.value = '1';
+                                            totalInput.value = '0.00';
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Erro:', error);
+                                        precoApartamentoInput.value = '0.00';
+                                        precoEnfermariaInput.value = '0.00';
+                                        valorInput.value = '0.00';
+                                        qtInput.value = '1';
+                                        totalInput.value = '0.00';
+                                    });
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Erro:', error));
+            }
+        } else {
+            codigoServicoInput.value = '';
+            porteInput.value = '';
+            precoApartamentoInput.value = '0.00';
+            precoEnfermariaInput.value = '0.00';
+            valorInput.value = '0.00';
+            qtInput.value = '1';
+            totalInput.value = '0.00';
+        }
+    });
+
+    function calcularTotal() {
+        const qt = parseFloat(qtInput.value) || 0;
+        const valor = parseFloat(valorInput.value) || 0;
+        const percentual = parseFloat(percentualInput.value) || 1.00;
+        const total = qt * valor * percentual;
+        totalInput.value = total.toFixed(2);
+    }
+
+    qtInput.addEventListener('input', calcularTotal);
+    valorInput.addEventListener('input', calcularTotal);
+    percentualInput.addEventListener('input', calcularTotal);
+});
+</script>
+
+{% endblock %}

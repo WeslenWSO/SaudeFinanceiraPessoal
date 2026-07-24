@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+      <a href="{% url 'servicos_medicos:tabela_create' %}" role="button" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+          <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+          <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+        </svg>
+        Nova Tabela de Preço</a>
+      {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+<div class="card mb-4">
+   <div class="card-header"> {{ descricao }}   </div>
+    <div class="card-body">
+      <form method="get" class="mb-3" id="filtro-tabela-preco">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label for="cabecalho_id" class="form-label">Selecionar Cabeçalho:</label>
+            <select name="cabecalho_id" id="cabecalho_id" class="form-select" onchange="this.form.submit()">
+              <option value="">Todos os Cabeçalhos</option>
+              {% for cabecalho in cabecalhos %}
+                <option value="{{ cabecalho.id }}" {% if cabecalho.id|stringformat:"s" == cabecalho_selecionado %}selected{% endif %}>{{ cabecalho }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="per_page" class="form-label">Itens por página:</label>
+            <select name="per_page" id="per_page" class="form-select" onchange="this.form.submit()">
+              {% for opt in paginate_options %}
+              <option value="{{ opt }}" {% if per_page == opt|stringformat:"s" %}selected{% endif %}>{{ opt }} por página</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </form>
+
+     <div class="dataTable-wrapper dataTable-loading no-footer sortable searchable fixed-columns">
+
+<div class="datatable-container">
+
+<table id="datatablesSimple" class="dataTable-table table table-bordered table-hover">
+   <thead>
+     <tr>
+       <th>ID</th>
+       <th>Empresa</th>
+       <th>Convênio</th>
+       <th>Cabeçalho</th>
+       <th>Serviço</th>
+       <th>Preço Apartamento</th>
+       <th>Preço Enfermaria</th>
+       <th>Edi.</th>
+     </tr>
+   </thead>
+
+  <tbody>
+
+    {% for tabela in object_list %}
+
+     <tr>
+      <td>
+        {{ tabela.id }}
+            </td>
+      <td>
+        {{ tabela.empresa }}
+      </td>
+      <td>
+        {{ tabela.convenio }}
+      </td>
+      <td>
+        {{ tabela.cabecalho|default:"Sem Cabeçalho" }}
+      </td>
+      <td>
+        {{ tabela.codigo_servico }}
+      </td>
+      <td>
+        {{ tabela.preco_apartamento }}
+      </td>
+      <td>
+        {{ tabela.preco_enfermaria }}
+      </td>
+
+        <td>
+
+               <a href="{% url 'servicos_medicos:tabela_update' tabela.id %}" class="btn btn-primary">
+                <i class="fa-solid fa-pen-to-square"></i>
+               </a>
+
+        </td>
+
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="8" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
+    </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+     </div>
+
+      {% if page_obj %}
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <div class="text-muted small">
+          Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }}
+          de {{ page_obj.paginator.count }} registro(s)
+          — página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Paginação tabela de preços">
+          <ul class="pagination mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_previous %}?page=1{% if cabecalho_selecionado %}&cabecalho_id={{ cabecalho_selecionado }}{% endif %}&per_page={{ per_page }}{% else %}#{% endif %}">«</a>
+            </li>
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if cabecalho_selecionado %}&cabecalho_id={{ cabecalho_selecionado }}{% endif %}&per_page={{ per_page }}{% else %}#{% endif %}">Anterior</a>
+            </li>
+            {% for num in page_obj.paginator.page_range %}
+              {% if num == page_obj.number %}
+              <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+              {% elif num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if cabecalho_selecionado %}&cabecalho_id={{ cabecalho_selecionado }}{% endif %}&per_page={{ per_page }}">{{ num }}</a>
+              </li>
+              {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if cabecalho_selecionado %}&cabecalho_id={{ cabecalho_selecionado }}{% endif %}&per_page={{ per_page }}{% else %}#{% endif %}">Próxima</a>
+            </li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.paginator.num_pages }}{% if cabecalho_selecionado %}&cabecalho_id={{ cabecalho_selecionado }}{% endif %}&per_page={{ per_page }}{% else %}#{% endif %}">»</a>
+            </li>
+          </ul>
+        </nav>
+        {% endif %}
+      </div>
+      {% endif %}
+
+   </div>
+</div>
+</div>
+
+{%endblock%}

@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Excluir Conta a Receber</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Atenção!</h5>
+                        <p>Você está prestes a excluir permanentemente a seguinte conta a receber:</p>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th>Cliente:</th>
+                                    <td>{{ conta.cliente }}</td>
+                                </tr>
+                                <tr>
+                                    <th>CPF/CNPJ:</th>
+                                    <td>{{ conta.cnpj_cpf|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Valor a Receber:</th>
+                                    <td>R$ {{ conta.valor_a_receber|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Data de Vencimento:</th>
+                                    <td>{{ conta.data_vencimento|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge {% if conta.status == 'pago' %}badge-success{% elif conta.status == 'pendente' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                            {{ conta.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% if conta.nota %}
+                                <tr>
+                                    <th>Nota Fiscal:</th>
+                                    <td>{{ conta.nota.numero_nota }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> Informações sobre a exclusão:</h6>
+                                <ul class="mb-0">
+                                    <li>Serão removidas todas as baixas relacionadas</li>
+                                    <li>Serão removidos todos os movimentos do extrato relacionados</li>
+                                    <li>Relatórios de cartão associados serão desvinculados</li>
+                                    <li>Esta ação não pode ser desfeita</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <form method="post">
+                                {% csrf_token %}
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'contasareceber:detalhes' conta.pk %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> Voltar
+                                    </a>
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('Tem certeza que deseja excluir esta conta a receber? Esta ação não pode ser desfeita.')">
+                                        <i class="fas fa-trash"></i> Confirmar Exclusão
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

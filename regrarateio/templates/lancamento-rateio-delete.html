@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+{% block conteudo %}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">{{ titulo }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <p class="mb-0">{{ descricao }}</p>
+                    </div>
+                    <table class="table table-bordered table-sm">
+                        <tr><th>Tipo</th><td>{{ lancamento.get_tipo_display }}</td></tr>
+                        <tr><th>Sócio</th><td>{{ lancamento.socio }}</td></tr>
+                        <tr><th>Valor</th><td>{{ lancamento.valor }}</td></tr>
+                        <tr><th>Data</th><td>{{ lancamento.data_pagamento|date:"d/m/Y"|default:"—" }}</td></tr>
+                    </table>
+                    <form method="post" class="d-flex gap-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Confirmar exclusão
+                        </button>
+                        <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Cancelar
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

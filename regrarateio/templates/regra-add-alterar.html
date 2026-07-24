@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+   
+{%endblock%}
+
+	 {%block conteudo%}
+	 
+	 
+	   <p> {{contadorId}}</p>
+	   <form method="post" novalidate class="card">
+		{%csrf_token %}
+		{% if messages %}
+		   {% include 'parcial/_messages.html' %}
+		{% endif %}
+		{% comment %} <h2>{% if formapgto %} Alteracao {%else %} Criar {%endif%} Cobranca</h2> {% endcomment %}
+
+	   {% for field in form %}
+		   {% if field.name == 'completed' %}
+			   <p>
+				   {{ field.label_tag }}
+				   {{ field }}
+			   </p>
+			   {% if field.errors %}
+				   <small class="error">{{ field.errors|striptags  }}</small> 
+			   {% endif %}
+		   {% else %}
+			   {{ field.label_tag }} 
+			   {{ field }}
+			   {% if field.errors %}
+				   <small class="error">{{ field.errors|striptags  }}</small> 
+			   {% endif %}
+		   {% endif %}
+	   {% endfor %}
+	  
+       {% if regraI.count > 1 %}
+	   
+	   {% for field in formI %}
+	   {% if field.name == 'completed' %}
+		   <p>
+			   {{ field.label_tag }}
+			   {{ field }}
+		   </p>
+		   {% if field.errors %}
+			   <small class="error">{{ field.errors|striptags  }}</small> 
+		   {% endif %}
+	   {% else %}
+		   {{ field.label_tag }} 
+		   {{ field }}
+		   {% if field.errors %}
+			   <small class="error">{{ field.errors|striptags  }}</small> 
+		   {% endif %}
+	   {% endif %}
+   {% endfor %}
+   {% else %}
+      
+   {% for field in formI %}
+	   {% if field.name == 'completed' %}
+		   <p>
+			   {{ field.label_tag }}
+			   {{ field }}
+		   </p>
+		   {% if field.errors %}
+			   <small class="error">{{ field.errors|striptags  }}</small> 
+		   {% endif %}
+	   {% else %}
+		   {{ field.label_tag }} 
+		   {{ field }}
+		   {% if field.errors %}
+			   <small class="error">{{ field.errors|striptags  }}</small> 
+		   {% endif %}
+	   {% endif %}
+   {% endfor %}
+   
+
+
+   {% endif %}
+
+
+
+
+
+	     
+	   
+	   <div class="form-buttons">
+	    <input type="submit" value="{% if acao %}{{ acao }}{% else %}Salvar{% endif %}" class="btn btn-primary"/>
+	    <a href="{%url 'regrarateio:regraList'%}" class="btn btn-secondary">Cancelar</a>
+	   </div>
+	   
+   
+   </form>
+
+
+
+
+{%endblock%}

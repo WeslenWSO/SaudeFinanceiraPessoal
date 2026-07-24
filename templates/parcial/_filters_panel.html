@@ -1,0 +1,14 @@
+{% comment %}
+  Painel de filtros colapsável (usa <details>, sem JS).
+  Uso: incluir e preencher block filters_content com o form e .filters-grid.
+  Exemplo no template: {% include 'parcial/_filters_panel.html' %} e definir block filters_content no pai;
+  ou usar diretamente a estrutura abaixo no template.
+{% endcomment %}
+<section class="panel panel-tight">
+  <details open>
+    <summary><i class="fas fa-filter"></i> Filtros e Pesquisa</summary>
+    {% block filters_content %}
+      {# O template que estende ou inclui deve fornecer o form com .filters-grid e botões Filtrar/Limpar #}
+    {% endblock %}
+  </details>
+</section>

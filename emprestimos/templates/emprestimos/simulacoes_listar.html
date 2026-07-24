@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0">{{ title }}</h3>
+            <small class="text-muted">Marque as simulações e gere o relatório sintético</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-success btn-sm" id="btnRelatorioSintetico"
+                    title="Excel com as simulações marcadas (ou todas, se nenhuma estiver marcada)">
+                <i class="fas fa-file-excel"></i> Relatório sintético
+                <span class="badge bg-light text-success ms-1" id="badgeSelSim">0</span>
+            </button>
+            <a href="{% url 'emprestimos:listar' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Contratos
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+    <form method="get" class="card mb-3">
+        <div class="card-body py-2">
+            <div class="input-group">
+                <input type="search" name="q" value="{{ q }}" class="form-control"
+                       placeholder="Contrato, cliente, título, parcelas…">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Pesquisar</button>
+                {% if q %}
+                <a href="{% url 'emprestimos:simulacoes' %}" class="btn btn-outline-secondary">Limpar</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <div class="card border-success-subtle">
+        <div class="card-header bg-success text-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <strong><i class="fas fa-table"></i> Simulações</strong>
+                <span class="small ms-2 opacity-75">Selecione as linhas para o relatório</span>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-light" id="btnSelTodasSim">Selecionar todas</button>
+                <button type="button" class="btn btn-outline-light" id="btnLimparSelSim">Limpar</button>
+            </div>
+        </div>
+        <div class="card-body table-responsive p-0">
+            <table class="table table-sm table-striped table-hover align-middle mb-0" id="tabelaSimulacoes">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center" style="width:2.5rem;" rowspan="2">
+                            <input type="checkbox" class="form-check-input" id="chkTodasSim"
+                                   title="Marcar/desmarcar todas">
+                        </th>
+                        <th rowspan="2">Banco</th>
+                        <th rowspan="2">Contrato</th>
+                        <th class="text-end" rowspan="2">Valor contrato</th>
+                        <th rowspan="2">Cliente</th>
+                        <th class="text-center border-start" colspan="4">Quitação parcial</th>
+                        <th class="text-end" rowspan="2">Novo saldo</th>
+                        <th class="text-end" rowspan="2">Nova parcela</th>
+                        <th class="text-end" rowspan="2" title="Valor da parcela no extrato do contrato">
+                            Valor da parcela
+                        </th>
+                        <th class="text-center border-start border-primary-subtle bg-primary-subtle" colspan="4">
+                            Quitação total
+                        </th>
+                        <th rowspan="2">Data quitação</th>
+                        <th rowspan="2">Método</th>
+                        <th rowspan="2"></th>
+                    </tr>
+                    <tr>
+                        <th class="text-end border-start small">Valor principal</th>
+                        <th class="text-end small">Valor do juros</th>
+                        <th class="text-end small">Valor da quitação</th>
+                        <th class="text-end small">Valor da diferença</th>
+                        <th class="text-end border-start small bg-primary-subtle">Valor principal</th>
+                        <th class="text-end small bg-primary-subtle">Valor do juros</th>
+                        <th class="text-end small bg-primary-subtle">Valor da quitação</th>
+                        <th class="text-end small bg-primary-subtle">Valor da diferença</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in simulacoes %}
+                    <tr class="sim-row" data-sim-id="{{ s.pk }}">
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input chk-sim-relatorio"
+                                   value="{{ s.pk }}" title="Incluir no relatório">
+                        </td>
+                        <td>{{ s.emprestimo.banco.nome|default:"—" }}</td>
+                        <td>
+                            <a href="{% url 'emprestimos:detalhe' s.emprestimo_id %}">{{ s.emprestimo.numero_contrato }}</a>
+                            {% if s.qtd_parcelas %}
+                            <small class="text-muted d-block">{{ s.qtd_parcelas }} parc. ({{ s.parcelas_numeros }})</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            R$ {{ s.emprestimo.valor_contrato|moeda_br }}
+                        </td>
+                        <td>
+                            <span class="text-truncate d-inline-block" style="max-width:10rem;" title="{{ s.emprestimo.cliente }}">
+                                {{ s.emprestimo.cliente|default:"—" }}
+                            </span>
+                            {% if s.titulo %}
+                            <small class="text-muted d-block text-truncate" style="max-width:10rem;" title="{{ s.titulo }}">{{ s.titulo }}</small>
+                            {% endif %}
+                            {% if s.sim_parcial %}
+                            <small class="text-muted d-block" title="{{ s.remanescentes_rotulo }}">
+                                {{ s.remanescentes_rotulo }}
+                            </small>
+                            {% endif %}
+                        </td>
+                        {# Quitação parcial (parcelas marcadas na simulação) #}
+                        <td class="text-end border-start">R$ {{ s.total_amortizacao|moeda_br }}</td>
+                        <td class="text-end text-danger">R$ {{ s.juros_quitacao|moeda_br }}</td>
+                        <td class="text-end fw-semibold text-success">R$ {{ s.valor_quitacao|moeda_br }}</td>
+                        <td class="text-end fw-bold {% if s.diferenca >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ s.diferenca|moeda_br }}
+                        </td>
+                        <td class="text-end">
+                            {% if s.novo_saldo_devedor %}
+                            R$ {{ s.novo_saldo_devedor|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end text-success">
+                            {% if s.nova_parcela %}
+                            R$ {{ s.nova_parcela|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end" title="Parcela do extrato do contrato">
+                            {% if s.valor_parcela_extrato %}
+                            R$ {{ s.valor_parcela_extrato|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        {# Quitação total do contrato #}
+                        <td class="text-end border-start bg-primary-subtle bg-opacity-25">
+                            {% if s.principal_contrato %}
+                            R$ {{ s.principal_contrato|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end text-danger bg-primary-subtle bg-opacity-25">
+                            {% if s.juros_contrato %}
+                            R$ {{ s.juros_contrato|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end fw-semibold text-success bg-primary-subtle bg-opacity-25">
+                            {% if s.quitacao_contrato %}
+                            R$ {{ s.quitacao_contrato|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end fw-bold bg-primary-subtle bg-opacity-25 {% if s.diferenca_contrato >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if s.principal_contrato or s.quitacao_contrato %}
+                            R$ {{ s.diferenca_contrato|moeda_br }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ s.data_quitacao|date:"d/m/Y" }}</td>
+                        <td>
+                            <span class="badge {% if s.metodo == 'sac' %}bg-info text-dark{% else %}bg-primary{% endif %}">
+                                {{ s.indicador_rotulo|default:s.metodo|default:"—" }}
+                            </span>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'emprestimos:detalhe' s.emprestimo_id %}" class="btn btn-sm btn-outline-primary" title="Ver contrato">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <form method="post" action="{% url 'emprestimos:simulacao_excluir' s.pk %}" class="d-inline"
+                                  onsubmit="return confirm('Excluir esta simulação?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="19" class="text-center text-muted py-4">
+                            Nenhuma simulação salva.
+                            {% if q %}Tente outra pesquisa.{% else %}Calcule uma quitação no contrato e marque <em>Salvar simulação</em>.{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if simulacoes %}
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td></td>
+                        <td colspan="4" class="text-end">TOTAL</td>
+                        <td class="text-end border-start">R$ {{ tot_principal|moeda_br }}</td>
+                        <td class="text-end text-danger">R$ {{ tot_juros|moeda_br }}</td>
+                        <td class="text-end text-success">R$ {{ tot_quitacao|moeda_br }}</td>
+                        <td class="text-end {% if tot_diferenca >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ tot_diferenca|moeda_br }}
+                        </td>
+                        <td colspan="3"></td>
+                        <td class="text-end border-start">R$ {{ tot_principal_contrato|moeda_br }}</td>
+                        <td class="text-end text-danger">R$ {{ tot_juros_contrato|moeda_br }}</td>
+                        <td class="text-end text-success">R$ {{ tot_quitacao_contrato|moeda_br }}</td>
+                        <td class="text-end {% if tot_diferenca_contrato >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ tot_diferenca_contrato|moeda_br }}
+                        </td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const checks = function() {
+        return Array.from(document.querySelectorAll('.chk-sim-relatorio'));
+    };
+    const badge = document.getElementById('badgeSelSim');
+    const chkTodas = document.getElementById('chkTodasSim');
+    const urlBase = '{% url "emprestimos:simulacoes_relatorio_sintetico" %}';
+
+    function atualizarBadge() {
+        const n = checks().filter(function(c) { return c.checked; }).length;
+        if (badge) badge.textContent = String(n);
+        if (chkTodas) {
+            const todos = checks();
+            chkTodas.checked = todos.length > 0 && todos.every(function(c) { return c.checked; });
+            chkTodas.indeterminate = n > 0 && n < todos.length;
+        }
+    }
+
+    checks().forEach(function(c) {
+        c.addEventListener('change', atualizarBadge);
+    });
+    if (chkTodas) {
+        chkTodas.addEventListener('change', function() {
+            checks().forEach(function(c) { c.checked = chkTodas.checked; });
+            atualizarBadge();
+        });
+    }
+    const btnTodas = document.getElementById('btnSelTodasSim');
+    if (btnTodas) {
+        btnTodas.addEventListener('click', function() {
+            checks().forEach(function(c) { c.checked = true; });
+            atualizarBadge();
+        });
+    }
+    const btnLimpar = document.getElementById('btnLimparSelSim');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', function() {
+            checks().forEach(function(c) { c.checked = false; });
+            atualizarBadge();
+        });
+    }
+
+    const btnRel = document.getElementById('btnRelatorioSintetico');
+    if (btnRel) {
+        btnRel.addEventListener('click', function() {
+            const ids = checks().filter(function(c) { return c.checked; }).map(function(c) { return c.value; });
+            const params = new URLSearchParams();
+            if (ids.length) {
+                params.set('ids', ids.join(','));
+            } else {
+                params.set('todas', '1');
+            }
+            window.location.href = urlBase + '?' + params.toString();
+        });
+    }
+    atualizarBadge();
+})();
+</script>
+{% endblock %}

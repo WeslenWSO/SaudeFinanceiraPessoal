@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_%}
+   {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container py-3">
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h4 class="card-title mb-0">{{ descricao|default:"Fornecedor" }}</h4>
+    </div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="socios_json" id="socios_json" value="{{ socios_json_initial|default:'[]'|escape }}">
+
+        {% if messages %}
+          {% include 'parcial/_messages.html' %}
+        {% endif %}
+
+        <p class="text-muted small mb-3">
+          Informe o CNPJ e use <strong>Buscar na API</strong> para preencher dados da Receita (BrasilAPI).
+          Sócios são opcionais e são gravados a partir do retorno da busca ou podem ficar vazios.
+          <span class="d-block mt-1">CNPJ, CEP e telefone são gravados <strong>só com números</strong>; na lista aparecem formatados.</span>
+        </p>
+
+        {% for field in form %}
+          {% if field.name == 'cnpj' %}
+            <div class="row mb-3 align-items-end">
+              <div class="col-md-8">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                <button type="button" class="btn btn-outline-primary w-100" id="btn-buscar-cnpj-api">
+                  <i class="fas fa-search"></i> Buscar na API
+                </button>
+              </div>
+            </div>
+          {% else %}
+            <div class="mb-3">
+              <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        <div class="card border mt-4">
+          <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <strong><i class="fas fa-users me-1"></i>Sócios do fornecedor</strong>
+            <span class="badge bg-secondary" id="badge-qtd-socios">0</span>
+          </div>
+          <div class="card-body py-2">
+            <p id="socios-fornecedor-vazio" class="text-muted small mb-0">
+              Nenhum sócio. Use <strong>Buscar na API</strong> (com CNPJ) para trazer o QSA, ou salve sem sócios.
+            </p>
+            <ul id="lista-socios-fornecedor" class="list-group list-group-flush mt-2"></ul>
+          </div>
+        </div>
+
+        <div class="form-buttons mt-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Salvar</button>
+          <a href="{% url 'fornecedor:fornList' %}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var urlBuscarCnpj = "{% url 'empresa:buscar_cnpj_ajax' %}";
+
+  function soDigitos(s) {
+    return String(s || "").replace(/\D/g, "");
+  }
+
+  function dataBrParaIso(br) {
+    if (!br || typeof br !== "string") return "";
+    var t = br.trim();
+    var m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) return m[3] + "-" + m[2] + "-" + m[1];
+    if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+    return "";
+  }
+
+  function setv(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.value = val != null ? val : "";
+  }
+
+  function escapeHtml(t) {
+    var d = document.createElement("div");
+    d.textContent = t != null ? String(t) : "";
+    return d.innerHTML;
+  }
+
+  function renderListaSocios() {
+    var ul = document.getElementById("lista-socios-fornecedor");
+    var empty = document.getElementById("socios-fornecedor-vazio");
+    var badge = document.getElementById("badge-qtd-socios");
+    var sj = document.getElementById("socios_json");
+    if (!ul || !sj) return;
+    var arr = [];
+    try {
+      arr = JSON.parse(sj.value || "[]");
+    } catch (e) {
+      arr = [];
+    }
+    if (!Array.isArray(arr)) arr = [];
+    ul.innerHTML = "";
+    if (badge) badge.textContent = String(arr.length);
+    if (!arr.length) {
+      if (empty) empty.style.display = "block";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    arr.forEach(function (s) {
+      var nome = (s && (s.nome || s.socio)) || "";
+      var tipo = (s && (s.tipo || s.qualificacao)) || "";
+      var li = document.createElement("li");
+      li.className = "list-group-item px-2 py-2 small";
+      li.innerHTML =
+        "<strong>" +
+        escapeHtml(nome) +
+        "</strong>" +
+        (tipo ? ' <span class="text-muted">— ' + escapeHtml(tipo) + "</span>" : "");
+      ul.appendChild(li);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    renderListaSocios();
+  });
+
+  var btn = document.getElementById("btn-buscar-cnpj-api");
+  if (!btn) return;
+
+  btn.addEventListener("click", function () {
+    var inp = document.getElementById("id_cnpj");
+    var d = soDigitos(inp && inp.value);
+    if (d.length !== 14) {
+      alert("Informe um CNPJ válido com 14 dígitos.");
+      return;
+    }
+    btn.disabled = true;
+    var prev = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando...';
+
+    fetch(urlBuscarCnpj + "?cnpj=" + encodeURIComponent(d), {
+      method: "GET",
+      headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    })
+      .then(function (r) {
+        return r.json().then(function (data) {
+          if (!r.ok) throw { data: data };
+          return data;
+        });
+      })
+      .then(function (data) {
+        if (!data.success || !data.empresa) {
+          alert(data.message || "Não foi possível buscar o CNPJ.");
+          return;
+        }
+        var e = data.empresa;
+        var det = e.detalhes || {};
+
+        setv("id_razao", e.razao || "");
+        setv("id_nome_fantasia", e.nome_fantasia || "");
+        setv("id_telefone", soDigitos(e.telefone || "").slice(0, 11));
+
+        setv("id_atividades_cnae", (det.atividades || []).join("\n"));
+        setv("id_natureza_juridica", det.natureza_juridica || "");
+        setv("id_porte", det.porte || "");
+        setv("id_data_abertura", dataBrParaIso(det.data_abertura || ""));
+        setv("id_situacao_cadastral", det.situacao_cadastral || "");
+        setv("id_data_situacao_cadastral", dataBrParaIso(det.data_situacao_cadastral || ""));
+        setv("id_cidade_uf", det.cidade_uf || "");
+        setv("id_cep", soDigitos(det.cep || "").slice(0, 8));
+        setv("id_logradouro", det.logradouro || "");
+        setv("id_numero", det.numero || "");
+        setv("id_complemento", det.complemento || "");
+        setv("id_bairro", det.bairro || "");
+        setv("id_endereco_eletronico", det.email || "");
+
+        var soc = (e.socios || []).map(function (s) {
+          return {
+            nome: s.socio || s.nome || "",
+            tipo: s.tipo || s.qualificacao || "Sócio",
+          };
+        });
+        var sj = document.getElementById("socios_json");
+        if (sj) sj.value = JSON.stringify(soc);
+        renderListaSocios();
+
+      })
+      .catch(function (err) {
+        var msg = err.data && err.data.message ? err.data.message : "Erro ao consultar CNPJ.";
+        alert(msg);
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = prev;
+      });
+  });
+})();
+</script>
+{% endblock %}

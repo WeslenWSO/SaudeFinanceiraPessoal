@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+
+{% block conteudo %}
+
+<h1>Extrato / Movimentos</h1>
+
+<!-- Informações do Período -->
+{% if object_list %}
+<div class="period-info" style="background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div>
+      <strong>Período:</strong> {{ periodo_texto }}
+      <span style="color: #666; margin-left: 10px;">| {{ object_list|length }} movimento{{ object_list|length|pluralize }}</span>
+    </div>
+    <div style="font-size: 16px; font-weight: bold; color: #1976d2;">
+      Saldo Atual: R$ {{ saldo_atual|floatformat:2 }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="filters-container" style="margin-bottom: 20px;">
+  <form method="get" class="filters" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <div class="period-filter" style="margin-bottom: 15px;">
+      <label style="font-weight: bold; margin-right: 10px;">Período:</label>
+      <select name="periodo" id="periodo-select" onchange="if (this.value !== 'personalizado') { this.form.submit(); } toggleDateFields();" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        <option value="mes_atual" {% if periodo == "mes_atual" %}selected{% endif %}>Mês Atual</option>
+        <option value="mes_anterior" {% if periodo == "mes_anterior" %}selected{% endif %}>Mês Anterior</option>
+        <option value="personalizado" {% if periodo == "personalizado" %}selected{% endif %}>Personalizado</option>
+      </select>
+    </div>
+
+    <div id="date-fields" style="display: flex; gap: 10px; align-items: center;">
+      <label style="font-weight: bold;">Datas:</label>
+      <input type="date" name="data_inicio" value="{{ filtros.data_inicio }}" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+      <span>até</span>
+      <input type="date" name="data_fim" value="{{ filtros.data_fim }}" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+
+    <select name="situacao" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+      <option value="">Todas Situações</option>
+      <option value="recebido" {% if filtros.situacao == "recebido" %}selected{% endif %}>Recebido</option>
+      <option value="pago" {% if filtros.situacao == "pago" %}selected{% endif %}>Pago</option>
+      <option value="estornado" {% if filtros.situacao == "estornado" %}selected{% endif %}>Estornado</option>
+      <option value="cancelado" {% if filtros.situacao == "cancelado" %}selected{% endif %}>Cancelado</option>
+    </select>
+
+    <select name="conta_banco" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+      <option value="">Todas Contas</option>
+      {% for conta in contas_bancarias %}
+      <option value="{{ conta.id }}" {% if filtros.conta_banco == conta.id|stringformat:"s" %}selected{% endif %}>{{ conta }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="status" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+      <option value="">Todos Status</option>
+      <option value="conciliado" {% if filtros.status == "conciliado" %}selected{% endif %}>Conciliado</option>
+      <option value="pendente" {% if filtros.status == "pendente" %}selected{% endif %}>Pendente</option>
+    </select>
+
+    {% if categorias %}
+    <select name="categoria" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+      <option value="">Todas Categorias</option>
+      {% for cat in categorias %}
+      <option value="{{ cat.id }}" {% if filtros.categoria == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.nome }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <button type="submit" style="padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Filtrar</button>
+  </form>
+</div>
+
+<div class="extrato-container" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+
+  <div class="table-responsive">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead style="background: #f8f9fa;">
+        <tr>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Tipo</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Data</th>
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Descrição</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Valor</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Saldo</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Situação</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Status</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Origem</th>
+          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movimento in object_list %}
+        <tr style="border-bottom: 1px solid #f1f3f4; {% if forloop.counter0|divisibleby:2 %}background: #fafbfc;{% endif %}">
+          <td style="padding: 12px;">
+            {% if movimento.tipo == 'movimento_registrado' %}
+              <span style="background: #d1ecf1; color: #0c5460; padding: 2px 6px; border-radius: 4px; font-size: 11px;">MOVIMENTO</span>
+            {% elif movimento.tipo == 'conta_receber' %}
+              <span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 4px; font-size: 11px;">A RECEBER</span>
+            {% elif movimento.tipo == 'conta_pagar' %}
+              <span style="background: #f8d7da; color: #721c24; padding: 2px 6px; border-radius: 4px; font-size: 11px;">A PAGAR</span>
+            {% endif %}
+          </td>
+          <td style="padding: 12px; font-weight: 500;">{{ movimento.data|date:"d/m/Y" }}</td>
+          <td style="padding: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ movimento.descricao }}">{{ movimento.descricao }}</td>
+          <td style="padding: 12px; text-align: right; font-weight: 500; {% if movimento.valor >= 0 %}color: #28a745;{% else %}color: #dc3545;{% endif %}">
+            {% if movimento.valor >= 0 %}+{% endif %}R$ {{ movimento.valor|floatformat:2 }}
+          </td>
+          <td style="padding: 12px; text-align: right; font-weight: 500; color: #007bff;">
+            R$ {{ movimento.saldo|floatformat:2 }}
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
+              {% if movimento.situacao == 'recebido' %}background: #d4edda; color: #155724;
+              {% elif movimento.situacao == 'pago' %}background: #d1ecf1; color: #0c5460;
+              {% elif movimento.situacao == 'estornado' %}background: #fff3cd; color: #856404;
+              {% elif movimento.situacao == 'cancelado' %}background: #f8d7da; color: #721c24;
+              {% else %}background: #e2e3e5; color: #383d41;{% endif %}">
+              {{ movimento.get_situacao_display|default:movimento.situacao|title }}
+            </span>
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            {% if movimento.conciliado %}
+              <span style="background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">✓ Conciliado</span>
+            {% else %}
+              <span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">⏳ Pendente</span>
+            {% endif %}
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background: #e9ecef; color: #495057;">{{ movimento.origem|title }}</span>
+          </td>
+          <td style="padding: 12px; text-align: center;">
+            <div style="display: flex; gap: 5px; justify-content: center;">
+              {% if movimento.tipo == 'movimento_registrado' %}
+                <button type="button" class="btn btn-sm btn-outline-info" title="Detalhes"
+                        data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                        onclick="carregarDetalhes('movimento', {{ movimento.objeto.id }})">
+                  <i class="fas fa-eye"></i>
+                </button>
+              {% elif movimento.tipo == 'conta_receber' %}
+                <button type="button" class="btn btn-sm btn-outline-info" title="Detalhes"
+                        data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                        onclick="carregarDetalhes('conta', {{ movimento.objeto.id }})">
+                  <i class="fas fa-eye"></i>
+                </button>
+              {% elif movimento.tipo == 'conta_pagar' %}
+                <button type="button" class="btn btn-sm btn-outline-warning" title="Detalhes"
+                        onclick="alert('Detalhes de conta a pagar em desenvolvimento')">
+                  <i class="fas fa-eye"></i>
+                </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="padding: 40px; text-align: center; color: #666; font-style: italic;">
+            Nenhum movimento encontrado para o período selecionado.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if object_list %}
+  <div class="extrato-footer" style="padding: 15px; background: #f8f9fa; border-top: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="font-size: 14px; color: #666;">
+        <strong>Entradas:</strong> R$ {{ total_entradas|floatformat:2 }} |
+        <strong>Saídas:</strong> R$ {{ total_saidas|floatformat:2 }}
+      </div>
+    </div>
+    <div style="font-size: 14px; color: #666;">
+      {{ object_list|length }} movimento{{ object_list|length|pluralize }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Navegação por meses -->
+  {% if pode_navegar_anterior %}
+  <div style="padding: 15px; background: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;">
+    <a href="?periodo=mes_anterior" style="padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+      <i class="fas fa-arrow-left me-2"></i>Mês Anterior
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal para Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesLabel">
+                    <i class="fas fa-info-circle me-2"></i>Detalhes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleDateFields() {
+    const periodo = document.getElementById('periodo-select').value;
+    const dateFields = document.getElementById('date-fields');
+    if (periodo === 'personalizado') {
+        dateFields.style.display = 'flex';
+    } else {
+        dateFields.style.display = 'none';
+    }
+}
+
+// Inicializar no carregamento
+document.addEventListener('DOMContentLoaded', function() {
+    toggleDateFields();
+});
+
+// Função para carregar detalhes no modal
+window.carregarDetalhes = function(tipo, id) {
+    const modalBody = document.getElementById('modalDetalhesBody');
+    modalBody.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Carregando detalhes...</p>
+        </div>
+    `;
+
+    // Fazer requisição AJAX
+    fetch(`/extrato/detalhes/${tipo}/${id}/`)
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // Se não é JSON, provavelmente é HTML (login page ou erro)
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                // Verificar se é página de login
+                return response.text().then(text => {
+                    if (text.includes('<html') || text.includes('<HTML')) {
+                        // Redirecionar para login
+                        window.location.href = '/accounts/login/';
+                        throw new Error('Sessão expirada. Redirecionando para login...');
+                    } else {
+                        throw new Error('Resposta inesperada do servidor');
+                    }
+                });
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.error}
+                    </div>
+                `;
+            } else {
+                modalBody.innerHTML = data.html;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro ao carregar detalhes: ${error.message}
+                </div>
+            `;
+        });
+};
+</script>
+
+<p>
+  <a href="{% url 'extrato:transferir' %}">Nova Transferência</a>
+</p>
+
+{% endblock %}

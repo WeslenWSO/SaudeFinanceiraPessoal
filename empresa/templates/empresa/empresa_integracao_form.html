@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+   {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+
+{% if messages %}
+<div class="container-xl px-4 mt-3">
+  {% include 'parcial/_messages.html' %}
+</div>
+{% endif %}
+{% if form.non_field_errors %}
+<div class="container-xl px-4 mt-2">
+  <div class="alert alert-danger shadow-sm" role="alert">
+    {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<header class="page-header page-header-compact page-header-light border-bottom bg-white mb-4">
+    <div class="container-xl px-4">
+        <div class="page-header-content">
+            <div class="row align-items-center justify-content-between pt-3">
+                <div class="col-auto mb-3">
+                    <h1 class="page-header-title">
+                        <div class="page-header-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-settings"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        </div>
+                        {{ descricao }}
+                    </h1>
+                    <p class="small text-muted mb-0">{{ empresa.cnpj }} — {{ empresa.razao }}</p>
+                </div>
+                <div class="col-auto mb-3">
+                    <a href="{% url 'empresa:empresa_edit' empresa.pk %}" class="btn btn-outline-secondary btn-sm">Dados da empresa</a>
+                    <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary btn-sm">Lista de empresas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container-xl px-4 mt-4 pb-5">
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" id="id_cnpj" value="{{ empresa.cnpj }}" autocomplete="off">
+
+        <div class="card border-secondary mb-4 bg-light">
+            <div class="card-body py-3">
+                <h6 class="text-secondary mb-3"><i class="fas fa-file-signature me-1"></i> NFS-e nacional (SEFIN)</h6>
+                <p class="small text-muted mb-3">
+                    Padrão do servidor (variáveis de ambiente):
+                    <code>NFSE_NACIONAL_BASE_URL</code>,
+                    <code>NFSE_NACIONAL_PFX_PATH</code>,
+                    <code>NFSE_NACIONAL_PFX_PASSWORD</code>
+                    (útil quando não há certificado por empresa aqui).
+                    Os campos abaixo, quando preenchidos, <strong>substituem</strong> o padrão para esta empresa.
+                </p>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_nacional_base_url.id_for_label }}">{{ form.nfse_nacional_base_url.label }}</label>
+                    {{ form.nfse_nacional_base_url }}
+                    {% if form.nfse_nacional_base_url.errors %}<div class="text-danger small">{{ form.nfse_nacional_base_url.errors.0 }}</div>{% endif %}
+                    <small class="text-muted">Produção: <code>https://sefin.nfse.gov.br</code> · Homologação: <code>https://sefin.producaorestrita.nfse.gov.br</code></small>
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_nacional_pfx_arquivo.id_for_label }}">{{ form.nfse_nacional_pfx_arquivo.label }}</label>
+                    {{ form.nfse_nacional_pfx_arquivo }}
+                    {% if form.nfse_nacional_pfx_arquivo.errors %}<div class="text-danger small">{{ form.nfse_nacional_pfx_arquivo.errors.0 }}</div>{% endif %}
+                    {% if empresa.pk and empresa.nfse_nacional_pfx_arquivo %}
+                    <p class="small text-muted mb-0 mt-1">Arquivo no servidor: <code>{{ empresa.nfse_nacional_pfx_arquivo.name }}</code> — envie outro para substituir.</p>
+                    {% endif %}
+                    <small class="text-muted d-block mt-1">O arquivo é salvo em <code>media/empresa/certificados/</code> neste servidor.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_nacional_pfx_senha.id_for_label }}">{{ form.nfse_nacional_pfx_senha.label }}</label>
+                    {{ form.nfse_nacional_pfx_senha }}
+                    {% if form.nfse_nacional_pfx_senha.errors %}<div class="text-danger small">{{ form.nfse_nacional_pfx_senha.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block">{{ form.nfse_nacional_pfx_senha.help_text }}</small>
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_nacional_thumbprint_sha1.id_for_label }}">{{ form.nfse_nacional_thumbprint_sha1.label }}</label>
+                    <div class="d-flex flex-wrap gap-2 align-items-start">
+                        {{ form.nfse_nacional_thumbprint_sha1 }}
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-buscar-cert-windows" title="Somente no servidor Windows">
+                            <i class="fas fa-certificate"></i> Buscar certificado (Windows)
+                        </button>
+                    </div>
+                    {% if form.nfse_nacional_thumbprint_sha1.errors %}<div class="text-danger small">{{ form.nfse_nacional_thumbprint_sha1.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_nacional_codigo_ibge_municipio.id_for_label }}">{{ form.nfse_nacional_codigo_ibge_municipio.label }}</label>
+                    {{ form.nfse_nacional_codigo_ibge_municipio }}
+                    {% if form.nfse_nacional_codigo_ibge_municipio.errors %}<div class="text-danger small">{{ form.nfse_nacional_codigo_ibge_municipio.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block mt-1">Obrigatório para <strong>Importar NFSe — Portal Nacional</strong> (7 dígitos; não é digitado naquela tela).</small>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="small mb-1" for="{{ form.nfse_nacional_dps_serie_padrao.id_for_label }}">{{ form.nfse_nacional_dps_serie_padrao.label }}</label>
+                        {{ form.nfse_nacional_dps_serie_padrao }}
+                        {% if form.nfse_nacional_dps_serie_padrao.errors %}<div class="text-danger small">{{ form.nfse_nacional_dps_serie_padrao.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small mb-1" for="{{ form.nfse_nacional_dps_proximo_numero.id_for_label }}">{{ form.nfse_nacional_dps_proximo_numero.label }}</label>
+                        {{ form.nfse_nacional_dps_proximo_numero }}
+                        {% if form.nfse_nacional_dps_proximo_numero.errors %}<div class="text-danger small">{{ form.nfse_nacional_dps_proximo_numero.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_adn_ultimo_nsu.id_for_label }}">{{ form.nfse_adn_ultimo_nsu.label }}</label>
+                    {{ form.nfse_adn_ultimo_nsu }}
+                    {% if form.nfse_adn_ultimo_nsu.errors %}<div class="text-danger small">{{ form.nfse_adn_ultimo_nsu.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block mt-1">
+                        Usado na sincronização ADN (download em massa por NSU). Em branco inicia do NSU 0; após sincronizar, este valor é atualizado automaticamente.
+                        {% if empresa.nfse_adn_data_ultima_sincronizacao %}
+                        Última sincronização: <strong>{{ empresa.nfse_adn_data_ultima_sincronizacao|date:"d/m/Y H:i" }}</strong>.
+                        {% endif %}
+                    </small>
+                </div>
+                <div class="mb-3 pt-2 border-top">
+                    <h6 class="small text-secondary mb-2">Portal nacional — login no site</h6>
+                    <p class="small text-muted mb-2">
+                        Mesmo usuário e senha de
+                        <a href="https://www.nfse.gov.br/EmissorNacional/Login" target="_blank" rel="noopener noreferrer">https://www.nfse.gov.br/EmissorNacional/Login</a>
+                        (acesso com usuário/senha, certificado ou Gov.br). Serve de referência para quem opera o navegador ou extensão de download.
+                        São independentes do certificado digital usado na API SEFIN acima.
+                    </p>
+                    <div class="mb-2">
+                        <label class="small mb-1" for="{{ form.nfse_portal_nacional_login.id_for_label }}">{{ form.nfse_portal_nacional_login.label }}</label>
+                        {{ form.nfse_portal_nacional_login }}
+                        {% if form.nfse_portal_nacional_login.errors %}<div class="text-danger small">{{ form.nfse_portal_nacional_login.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="mb-0">
+                        <label class="small mb-1" for="{{ form.nfse_portal_nacional_senha.id_for_label }}">{{ form.nfse_portal_nacional_senha.label }}</label>
+                        {{ form.nfse_portal_nacional_senha }}
+                        {% if form.nfse_portal_nacional_senha.errors %}<div class="text-danger small">{{ form.nfse_portal_nacional_senha.errors.0 }}</div>{% endif %}
+                        <small class="text-muted d-block">{{ form.nfse_portal_nacional_senha.help_text }}</small>
+                        {% if empresa.nfse_portal_nacional_senha_cifrada %}
+                        <p class="small text-success mb-0 mt-1">Senha do portal já está gravada (cifrada). Informe de novo apenas para alterar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if empresa.nfse_nacional_cert_validade %}
+                <p class="small mb-0"><strong>Validade gravada:</strong> {{ empresa.nfse_nacional_cert_validade|date:"d/m/Y" }}</p>
+                {% else %}
+                <p class="small text-muted mb-0">Nenhuma validade gravada ainda (envie o .pfx com a senha correta e salve).</p>
+                {% endif %}
+                <pre id="nfse-cert-busca-saida" class="small mt-2 mb-0 p-2 bg-white border rounded d-none" style="white-space: pre-wrap; max-height: 14rem; overflow: auto;"></pre>
+            </div>
+        </div>
+
+        <div class="card border mb-4">
+            <div class="card-header small">Cópia em disco dos XML NFSe importados</div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Após importar com sucesso (upload ou portal nacional), o sistema grava uma cópia do arquivo em
+                    <code>{pasta raiz}/{código externo}-{razão social}/{MMYYYY}/nome.xml</code>
+                    ou, se marcou nota cancelada,
+                    <code>.../{MMYYYY}/Cancelada/nome.xml</code>.
+                    Prestador: pasta abaixo + tomador (cadastro <strong>Cliente</strong> com código externo).
+                    Tomador: segunda pasta + prestador (cadastro <strong>Fornecedor</strong> com código externo).
+                    Vazio aqui usa <code>NFSE_XML_COPIA_PRESTADOR</code> / <code>NFSE_XML_COPIA_TOMADOR</code> no servidor.
+                </p>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.nfse_xml_pasta_prestador.id_for_label }}">{{ form.nfse_xml_pasta_prestador.label }}</label>
+                    {{ form.nfse_xml_pasta_prestador }}
+                    {% if form.nfse_xml_pasta_prestador.errors %}<div class="text-danger small">{{ form.nfse_xml_pasta_prestador.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="mb-0">
+                    <label class="small mb-1" for="{{ form.nfse_xml_pasta_tomador.id_for_label }}">{{ form.nfse_xml_pasta_tomador.label }}</label>
+                    {{ form.nfse_xml_pasta_tomador }}
+                    {% if form.nfse_xml_pasta_tomador.errors %}<div class="text-danger small">{{ form.nfse_xml_pasta_tomador.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-secondary mb-4 bg-light">
+            <div class="card-body py-3">
+                <h6 class="text-secondary mb-3"><i class="fas fa-university me-1"></i> API Sicoob — extrato automático</h6>
+                <p class="small text-muted mb-3">
+                    O Sicoob documenta OAuth 2.0 <strong>client credentials</strong> (Client ID + certificado <strong>mTLS</strong> no token; sem usuário/senha do cooperado no POST).
+                    No servidor o padrão é <code>SICOOB_TOKEN_GRANT=client_credentials</code>; use <code>SICOOB_TOKEN_GRANT=password</code> só em fluxo legado com chave/senha.
+                    <strong>Client Secret</strong> só se o portal exigir (muitos apps PF não têm).
+                    <strong>mTLS:</strong> arquivo <code>.pfx</code> ou par <code>.pem</code> acessível pelo Python (marque abaixo para reutilizar o PFX da NFS-e ou use <code>SICOOB_MTLS_*</code> no ambiente).
+                    Campos vazios aqui usam variáveis do servidor (<code>SICOOB_CLIENT_ID</code>, etc.).
+                </p>
+                <div class="form-check mb-3">
+                    {{ form.sicoob_mtls_usar_pfx_nfse }}
+                    <label class="form-check-label small" for="{{ form.sicoob_mtls_usar_pfx_nfse.id_for_label }}">{{ form.sicoob_mtls_usar_pfx_nfse.label }}</label>
+                    {% if form.sicoob_mtls_usar_pfx_nfse.errors %}<div class="text-danger small">{{ form.sicoob_mtls_usar_pfx_nfse.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block ms-4">{{ form.sicoob_mtls_usar_pfx_nfse.help_text }}</small>
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.sicoob_client_id.id_for_label }}">{{ form.sicoob_client_id.label }}</label>
+                    {{ form.sicoob_client_id }}
+                    {% if form.sicoob_client_id.errors %}<div class="text-danger small">{{ form.sicoob_client_id.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.sicoob_client_secret.id_for_label }}">{{ form.sicoob_client_secret.label }}</label>
+                    {{ form.sicoob_client_secret }}
+                    {% if form.sicoob_client_secret.errors %}<div class="text-danger small">{{ form.sicoob_client_secret.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block">{{ form.sicoob_client_secret.help_text }}</small>
+                    {% if empresa.sicoob_client_secret_cifrada %}
+                    <p class="small text-success mb-0"><i class="fas fa-check-circle me-1"></i>Client Secret já gravado (deixe em branco para manter).</p>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.sicoob_chave_acesso.id_for_label }}">{{ form.sicoob_chave_acesso.label }}</label>
+                    {{ form.sicoob_chave_acesso }}
+                    {% if form.sicoob_chave_acesso.errors %}<div class="text-danger small">{{ form.sicoob_chave_acesso.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="small mb-1" for="{{ form.sicoob_senha.id_for_label }}">{{ form.sicoob_senha.label }}</label>
+                    {{ form.sicoob_senha }}
+                    {% if form.sicoob_senha.errors %}<div class="text-danger small">{{ form.sicoob_senha.errors.0 }}</div>{% endif %}
+                    <small class="text-muted d-block">{{ form.sicoob_senha.help_text }}</small>
+                </div>
+                {% if empresa.sicoob_senha_cifrada %}
+                <p class="small text-success mb-0"><i class="fas fa-check-circle me-1"></i>Senha Sicoob já gravada (deixe em branco para manter).</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Salvar configuração</button>
+        <a href="{% url 'empresa:empresa_edit' empresa.pk %}" class="btn btn-outline-secondary">Dados da empresa</a>
+        <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary">Lista</a>
+    </form>
+</div>
+
+<script>
+(function() {
+  var urlCertWindowsCnpj = "{% url 'empresa:certificados_windows_por_cnpj' %}";
+  var inputCnpj = document.getElementById("id_cnpj");
+  var btnCertWin = document.getElementById("btn-buscar-cert-windows");
+  var outCert = document.getElementById("nfse-cert-busca-saida");
+  var inputThumb = document.getElementById("id_nfse_nacional_thumbprint_sha1");
+
+  function limparCnpj(str) {
+    if (!str) return "";
+    return String(str).replace(/\D/g, "");
+  }
+
+  if (btnCertWin && outCert) {
+    btnCertWin.addEventListener("click", function() {
+      var cnpjLimpo = limparCnpj(inputCnpj ? inputCnpj.value : "");
+      if (cnpjLimpo.length !== 14) {
+        alert("CNPJ da empresa inválido para buscar certificados no Windows.");
+        return;
+      }
+      outCert.classList.remove("d-none");
+      outCert.textContent = "Consultando certificados no servidor…";
+      var u = urlCertWindowsCnpj + "?cnpj=" + encodeURIComponent(cnpjLimpo);
+      fetch(u, { credentials: "same-origin", headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) {
+            outCert.textContent = data.message || "Erro.";
+            return;
+          }
+          if (data.aviso) {
+            outCert.textContent = data.aviso;
+            return;
+          }
+          var lines = ["Encontrados: " + (data.certificados || []).length, ""];
+          (data.certificados || []).forEach(function(c, i) {
+            lines.push("--- #" + (i + 1) + " ---");
+            lines.push("Repositório: " + (c.repositorio || ""));
+            lines.push("Subject: " + (c.subject || ""));
+            lines.push("Validade (texto): " + (c.validade_fim || ""));
+            lines.push("Thumbprint SHA1: " + (c.thumbprint_sha1 || ""));
+            lines.push("");
+          });
+          outCert.textContent = lines.join("\n");
+          var first = (data.certificados || [])[0];
+          if (first && first.thumbprint_sha1 && inputThumb && !inputThumb.value) {
+            inputThumb.value = first.thumbprint_sha1;
+          }
+        })
+        .catch(function(e) { outCert.textContent = "Falha: " + e; });
+    });
+  }
+})();
+</script>
+{% endblock %}

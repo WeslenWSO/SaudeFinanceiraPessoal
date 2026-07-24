@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+<script>
+function changePageSize(size) {
+    const url = new URL(window.location);
+    url.searchParams.set('page_size', size);
+    url.searchParams.delete('page'); // Reset to first page when changing size
+    window.location = url;
+}
+</script>
+{%endblock%}
+{% comment %} {%block sid_Bar%}
+{% include 'parcial/_MenuSideNav.html' %}
+{%endblock%} {% endcomment %}
+
+
+ 
+{%block conteudo%}
+
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm rounded-3 border-0">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3 rounded-top">
+                    <h4 class="card-title mb-0 fw-semibold">Regras de Imposto</h4>
+                    <a href="{% url 'regraimposto:regraCreate' %}" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus me-2"></i>Nova Regra de Imposto
+                    </a>
+                </div>
+                <div class="card-body p-4">
+                    {% if messages %}
+                        {% include 'parcial/_messages.html' %}
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label for="page_size" class="mb-0 text-muted small">Itens por página:</label>
+                        <select id="page_size" class="form-select form-select-sm w-auto" onchange="changePageSize(this.value)">
+                            {% for size in page_sizes %}
+                                <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle mb-0" id="tab-regras-imposto">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th style="min-width: 3rem;">ID</th>
+                                    <th>Descrição da Regra</th>
+                                    <th class="text-end">PIS (%)</th>
+                                    <th class="text-end">COFINS (%)</th>
+                                    <th class="text-end">CSLL (%)</th>
+                                    <th class="text-end">IRPJ (%)</th>
+                                    <th class="text-end">Percentual Cálc. (%)</th>
+                                    <th class="text-end" style="min-width: 6rem;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for regra in page_obj %}
+                                <tr>
+                                    <td>{{ regra.id }}</td>
+                                    <td>{{ regra.DescricaoRegraImposto }}</td>
+                                    <td class="text-end">{{ regra.aliquota_pis }}%</td>
+                                    <td class="text-end">{{ regra.aliquota_cofins }}%</td>
+                                    <td class="text-end">{{ regra.aliquota_csll }}%</td>
+                                    <td class="text-end">{{ regra.aliquota_irpj }}%</td>
+                                    <td class="text-end">{{ regra.percentual_calculo }}%</td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'regraimposto:regraUpdate' pk=regra.id %}" class="btn btn-outline-warning" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'regraimposto:regraDelete' pk=regra.id %}" class="btn btn-outline-danger" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">Nenhuma regra de imposto cadastrada.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="Paginação" class="mt-4">
+                        <ul class="pagination justify-content-center pagination-sm mb-0">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}" aria-label="Anterior">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">&laquo;</span>
+                                </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item"><a class="page-link" href="?page={{ num }}&page_size={{ page_size }}">{{ num }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}" aria-label="Próxima">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">&raquo;</span>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{%endblock%}

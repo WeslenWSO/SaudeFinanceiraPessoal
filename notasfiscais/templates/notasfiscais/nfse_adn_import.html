@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="mb-3">
+    {% include 'parcial/_messages.html' %}
+  </div>
+
+  <h1 class="h3 mb-3">Sincronizar NFSe via ADN (NSU)</h1>
+
+  {% if not request.session.empresa_id %}
+  <div class="alert alert-warning">
+    <strong>Selecione uma empresa</strong> antes de sincronizar.
+    <a href="{% url 'empresa:lista' %}" class="alert-link">Ir para empresas</a>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    <strong>Empresa:</strong> {{ request.session.empresa_nome }}
+    {% if empresa %}
+    — NSU atual no cadastro: <code>{{ adn_nsu_atual|default:0 }}</code>
+    {% if adn_ultima_sync %}
+    — última sincronização: <strong>{{ adn_ultima_sync|date:"d/m/Y H:i" }}</strong>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Como funciona</div>
+    <div class="card-body small">
+      <ol class="mb-0">
+        <li>O ADN distribui documentos por <strong>NSU</strong> para o CNPJ/CPF do certificado da empresa.</li>
+        <li>O sistema parte do <strong>último NSU</strong> salvo no cadastro da empresa (campo em Empresa).</li>
+        <li>Cada execução baixa um lote, tenta importar os XMLs e atualizar o NSU para continuar na próxima rodada.</li>
+        <li>O período informado filtra as notas pelo conteúdo do XML (competência/emissão), evitando importar fora do intervalo.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="card shadow-sm" style="max-width: 52rem;">
+    <div class="card-header fw-semibold">Executar sincronização ADN</div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.data_periodo_inicio.id_for_label }}">{{ form.data_periodo_inicio.label }}</label>
+            {{ form.data_periodo_inicio }}
+            {% for e in form.data_periodo_inicio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.data_periodo_fim.id_for_label }}">{{ form.data_periodo_fim.label }}</label>
+            {{ form.data_periodo_fim }}
+            {% for e in form.data_periodo_fim.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.max_documentos.id_for_label }}">{{ form.max_documentos.label }}</label>
+          {{ form.max_documentos }}
+          {% if form.max_documentos.help_text %}<div class="form-text">{{ form.max_documentos.help_text }}</div>{% endif %}
+          {% for e in form.max_documentos.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="form-check mb-3">
+          {{ form.consultar_ultimo_nsu_primeiro }}
+          <label class="form-check-label" for="{{ form.consultar_ultimo_nsu_primeiro.id_for_label }}">{{ form.consultar_ultimo_nsu_primeiro.label }}</label>
+          {% if form.consultar_ultimo_nsu_primeiro.help_text %}<div class="form-text">{{ form.consultar_ultimo_nsu_primeiro.help_text }}</div>{% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary" {% if not request.session.empresa_id %}disabled{% endif %}>
+          Sincronizar ADN agora
+        </button>
+        <a href="{% url 'notasfiscais:list' %}" class="btn btn-outline-secondary ms-1">Voltar à lista</a>
+        <a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}" class="btn btn-outline-secondary ms-1">Configuração de integração</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

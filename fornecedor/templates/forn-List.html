@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load validar_cnpj %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+ {%endblock%}
+
+
+
+ 
+{%block conteudo%}
+      <a href="{% url 'fornecedor:forn-create' %}" role="button" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+          <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+          <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+        </svg>        
+        Novo Fornecedor</a> 
+      {% if messages %}
+      {% include 'parcial/_messages.html' %}
+   {% endif %}
+
+
+<div class="card mb-4"> 
+  <div class="card-header"> {{ descricao }}   </div>
+   <div class="card-body">
+     <div class="table-responsive">
+       <table id="datatablesSimple" class="table table-striped">
+   <thead>
+    <tr>
+      <th>ID</th>
+      <th>razao</th>
+      <th>cnpj</th>
+      <th>telefone</th>
+      <th>CEP</th>
+      <th>Sócios</th>
+      <th>Edi.</th>
+      <th>Exc.</th>
+    </tr>
+  </thead>
+
+  <tbody>
+
+
+    {% for forn in object_list %}
+
+     <tr>
+      <td> <a class="nav-link"> </a>
+        {{ forn.id }}
+            </td>
+      <td>
+        {{ forn.razao }}
+      </td>
+      <td>
+        {{ forn.cnpj|formatar_cnpj_cpf }}
+      </td>
+      <td>
+        {% if forn.telefone %}{{ forn.telefone|formatar_telefone_tela }}{% else %}—{% endif %}
+      </td>
+      <td>
+        {% if forn.cep %}{{ forn.cep|formatar_cep }}{% else %}—{% endif %}
+      </td>
+      <td class="small text-muted" title="Quantidade cadastrada — abra Editar para ver a lista">
+        {% if forn.socios_count %}{{ forn.socios_count }}{% else %}—{% endif %}
+      </td>
+        <td>
+         
+               <a href="{% url 'fornecedor:forn-update' forn.id %}" class="btn btn-primary"> 
+                <i class="fa-solid fa-pen-to-square"></i>
+               </a>
+         
+        </td>
+
+          <td>
+            <form method="post" action="{% url 'fornecedor:forn-delete' forn.id %}" class="d-inline"
+                  onsubmit="return confirm('Excluir este fornecedor? Esta ação não pode ser desfeita.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger" title="Excluir">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+        </td>
+
+    </tr>
+    {% endfor %}
+
+  </tbody>
+</table>
+     </div>
+   </div>
+</div>
+{% comment %} <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% comment %} </body>
+</html> {% endcomment %}
+   <!-- Ícone do Bootstrap -->
+  {% comment %} <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.js"></script> {% endcomment %}
+
+
+{%endblock%}

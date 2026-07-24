@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Cadastrar Conta a Pagar</h3>
+                    <div>
+                        <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-secondary">Voltar</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fornecedor" class="form-label">Fornecedor *</label>
+                                    <select name="fornecedor" class="form-control" required>
+                                        <option value="">Selecione um fornecedor...</option>
+                                        {% for fornecedor in fornecedores %}
+                                        <option value="{{ fornecedor.id }}">{{ fornecedor.razao }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="categoria" class="form-label">Categoria</label>
+                                    <select name="categoria" class="form-control">
+                                        <option value="">Selecione uma categoria...</option>
+                                        {% for categoria in categorias %}
+                                        <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="descricao" class="form-label">Descrição *</label>
+                                    <input type="text" name="descricao" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="valor" class="form-label">Valor *</label>
+                                    <input type="text" name="valor" class="form-control" placeholder="0,00" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="data_emissao" class="form-label">Data de Emissão</label>
+                                    <input type="date" name="data_emissao" class="form-control" value="{{ hoje }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="data_vencimento" class="form-label">Data de Vencimento *</label>
+                                    <input type="date" name="data_vencimento" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="forma_pagamento" class="form-label">Cobrança</label>
+                                    <select name="forma_pagamento" class="form-control">
+                                        <option value="">Selecione uma cobrança...</option>
+                                        {% for forma in formas_pagamento %}
+                                        <option value="{{ forma.id }}">{{ forma.descricao }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="parcela" class="form-label">Parcela</label>
+                                    <input type="text" name="parcela" class="form-control" value="1" placeholder="1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="numdoc" class="form-label">Número do Documento</label>
+                                    <input type="text" name="numdoc" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="rateio" class="form-label">Regra de rateio</label>
+                                    <select name="rateio" id="rateio" class="form-control">
+                                        <option value="">Nenhuma (sem rateio neste título)</option>
+                                        {% for r in regras_rateio %}
+                                        <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text">Opcional. Necessária para gerar lançamentos de rateio a partir deste título (menu Relatórios).</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Salvar Conta a Pagar</button>
+                                <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Formatar valor como moeda brasileira
+document.querySelector('input[name="valor"]').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value) {
+        value = (parseInt(value) / 100).toFixed(2);
+        e.target.value = value.replace('.', ',');
+    }
+});
+
+// Validar datas
+document.querySelector('form').addEventListener('submit', function(e) {
+    const dataEmissao = document.querySelector('input[name="data_emissao"]').value;
+    const dataVencimento = document.querySelector('input[name="data_vencimento"]').value;
+
+    if (dataEmissao && dataVencimento && dataEmissao > dataVencimento) {
+        alert('A data de emissão não pode ser posterior à data de vencimento.');
+        e.preventDefault();
+        return false;
+    }
+});
+</script>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

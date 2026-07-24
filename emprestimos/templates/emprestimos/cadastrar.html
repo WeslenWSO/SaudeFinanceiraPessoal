@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="mb-3">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'emprestimos:listar' %}">Empréstimos</a>
+                </li>
+                <li class="breadcrumb-item active">Cadastrar</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h3 class="mb-0">{{ title }}</h3>
+            <a href="{% url 'emprestimos:listar' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        Cadastre aqui os dados do contrato. As parcelas podem ser geradas depois na tela de detalhe
+        (Price/SAC) ou importadas via PDF.
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">
+                <i class="fas fa-file-contract"></i> Contrato
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.numero_contrato.id_for_label }}">
+                            Número do contrato
+                        </label>
+                        {{ form.numero_contrato }}
+                        {% if form.numero_contrato.errors %}
+                        <div class="text-danger small">{{ form.numero_contrato.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.banco.id_for_label }}">Banco</label>
+                        {{ form.banco }}
+                        {% if form.banco.errors %}
+                        <div class="text-danger small">{{ form.banco.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.cliente.id_for_label }}">Cliente</label>
+                        {{ form.cliente }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.cooperativa.id_for_label }}">Cooperativa</label>
+                        {{ form.cooperativa }}
+                        <div class="form-text">Opcional — extratos Sicoob</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="{{ form.modalidade.id_for_label }}">Modalidade</label>
+                        {{ form.modalidade }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="{{ form.indicador.id_for_label }}">
+                            Indicador de cálculo
+                        </label>
+                        {{ form.indicador }}
+                        {% if form.indicador.errors %}
+                        <div class="text-danger small">{{ form.indicador.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Ex.: 15-Tabela Price, 3-Sac Decrescente</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">
+                <i class="fas fa-dollar-sign"></i> Valores e datas
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.valor_contrato.id_for_label }}">
+                            Valor do contrato
+                        </label>
+                        {{ form.valor_contrato }}
+                        {% if form.valor_contrato.errors %}
+                        <div class="text-danger small">{{ form.valor_contrato.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.data_operacao.id_for_label }}">
+                            Data da operação
+                        </label>
+                        {{ form.data_operacao }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.data_vencimento.id_for_label }}">
+                            Data de vencimento
+                        </label>
+                        {{ form.data_vencimento }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.prazo_dias.id_for_label }}">
+                            Prazo (dias)
+                        </label>
+                        {{ form.prazo_dias }}
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <p class="text-muted small mb-2">
+                    Custos adicionais (opcional — comum em contratos Bradesco)
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label" for="{{ form.valor_tributos.id_for_label }}">Tributos</label>
+                        {{ form.valor_tributos }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="{{ form.valor_tarifas.id_for_label }}">Tarifas</label>
+                        {{ form.valor_tarifas }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="{{ form.valor_registros.id_for_label }}">Registros</label>
+                        {{ form.valor_registros }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.valor_servicos_terceiros.id_for_label }}">
+                            Serviços terceiros
+                        </label>
+                        {{ form.valor_servicos_terceiros }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.saldo_devedor_atualizado.id_for_label }}">
+                            Saldo devedor atualizado
+                        </label>
+                        {{ form.saldo_devedor_atualizado }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.data_extrato.id_for_label }}">Data do extrato</label>
+                        {{ form.data_extrato }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">
+                <i class="fas fa-percent"></i> Taxas e índices
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.taxa_juros_am.id_for_label }}">
+                            Taxa juros (% a.m.)
+                        </label>
+                        {{ form.taxa_juros_am }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.taxa_mora_am.id_for_label }}">
+                            Taxa mora (% a.m.)
+                        </label>
+                        {{ form.taxa_mora_am }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.taxa_juros_aa.id_for_label }}">
+                            Taxa juros (% a.a.)
+                        </label>
+                        {{ form.taxa_juros_aa }}
+                        <div class="form-text">Usado em contratos SAC com taxa anual</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="{{ form.taxa_multa_am.id_for_label }}">
+                            Taxa multa (% a.m.)
+                        </label>
+                        {{ form.taxa_multa_am }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.indice_correcao.id_for_label }}">
+                            Índice de correção
+                        </label>
+                        {{ form.indice_correcao }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.pct_correcao_am.id_for_label }}">
+                            % de correção (a.m.)
+                        </label>
+                        {{ form.pct_correcao_am }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.indice_correcao_atraso.id_for_label }}">
+                            Índice correção atraso
+                        </label>
+                        {{ form.indice_correcao_atraso }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.pct_correcao_atraso_am.id_for_label }}">
+                            % correção atraso (a.m.)
+                        </label>
+                        {{ form.pct_correcao_atraso_am }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Salvar
+            </button>
+            <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

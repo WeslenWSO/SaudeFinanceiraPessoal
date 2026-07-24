@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+   {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Transferência baseada em Extrato Bancário</h4>
+                </div>
+                <div class="card-body">
+
+                    {% if messages %}
+                        {% include 'parcial/_messages.html' %}
+                    {% endif %}
+
+                    {% if lancamento %}
+                    <!-- Dados do Lançamento do Extrato -->
+                    <div class="alert alert-info">
+                        <h5>Dados do Extrato Bancário</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Data:</strong> {{ lancamento.data|date:"d/m/Y" }}</p>
+                                <p><strong>Conta de Origem:</strong> {{ lancamento.conta }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Valor:</strong> R$ {{ lancamento.valor|floatformat:2 }}</p>
+                                <p><strong>Histórico:</strong> {{ lancamento.historico|truncatechars:50 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.conta_destino.id_for_label }}" class="form-label">
+                                {{ form.conta_destino.label }}
+                            </label>
+                            {{ form.conta_destino }}
+                            {% if form.conta_destino.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.conta_destino.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-exchange-alt"></i> Realizar Transferência
+                            </button>
+                            <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Voltar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Editar Conta a Receber</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="cliente" class="form-label">Cliente</label>
+                                <input type="text" class="form-control" id="cliente" name="cliente" value="{{ conta.cliente }}" list="clientes">
+                                <datalist id="clientes">
+                                    {% for cliente in clientes %}
+                                    <option value="{{ cliente.razao }}">
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="cnpj_cpf" class="form-label">CNPJ/CPF</label>
+                                <input type="text" class="form-control" id="cnpj_cpf" name="cnpj_cpf" value="{{ conta.cnpj_cpf }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="valor" class="form-label">Valor</label>
+                                <input type="text" class="form-control" id="valor" name="valor" value="{{ conta.valor_a_receber|default:0|floatformat:'2' }}" required>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <label for="data_emissao" class="form-label">Data de Emissão</label>
+                                <input type="date" class="form-control" id="data_emissao" name="data_emissao" value="{{ conta.data_emissao|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="data_vencimento" class="form-label">Data de Vencimento</label>
+                                <input type="date" class="form-control" id="data_vencimento" name="data_vencimento" value="{{ conta.data_vencimento|date:'Y-m-d' }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="nota" class="form-label">Número da Nota</label>
+                                <input type="text" class="form-control" id="nota" name="nota" value="{% if conta.nota %}{{ conta.nota.numero_nota }}{% endif %}">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="doc" class="form-label">Documento</label>
+                                <input type="text" class="form-control" id="doc" name="doc" value="{{ conta.doc }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="autorizacao" class="form-label">Autorização</label>
+                                <input type="text" class="form-control" id="autorizacao" name="autorizacao" value="{{ conta.autorizacao }}">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="forma_pagamento" class="form-label">Cobrança</label>
+                                <select class="form-select" id="forma_pagamento" name="forma_pagamento">
+                                    <option value="">Selecione...</option>
+                                    {% for forma in formas_pagamento %}
+                                    <option value="{{ forma.id }}" {% if conta.forma_pagamento and conta.forma_pagamento.id == forma.id %}selected{% endif %}>{{ forma.descricao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="conta_bancaria" class="form-label">Conta Bancária</label>
+                                <select class="form-control" id="conta_bancaria" name="conta_bancaria">
+                                    <option value="">Selecione...</option>
+                                    {% for conta_banco in contas_bancarias %}
+                                    <option value="{{ conta_banco.id }}" {% if conta_banco_selecionado_id and conta_banco_selecionado_id == conta_banco.id %}selected{% endif %}>{{ conta_banco.banco.nome }} - {{ conta_banco.agencia }}/{{ conta_banco.conta }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="socio" class="form-label">Sócio</label>
+                                <select class="form-select" id="socio" name="socio">
+                                    <option value="">Selecione...</option>
+                                    {% for socio in socios %}
+                                    <option value="{{ socio.id }}" {% if conta.socio and conta.socio.id == socio.id %}selected{% elif not conta.socio and conta.nota and conta.nota.socio and conta.nota.socio.id == socio.id %}selected{% endif %}>{{ socio.socio }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="categoria" class="form-label">Categoria</label>
+                                <select class="form-select" id="categoria" name="categoria">
+                                    <option value="">Selecione...</option>
+                                    {% for categoria in categorias %}
+                                    <option value="{{ categoria.id }}" {% if conta.categoria and conta.categoria.id == categoria.id %}selected{% endif %}>{{ categoria.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                                <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

@@ -1,0 +1,18 @@
+{% comment %}
+  Barra de ações (acima de tabela ou seção).
+  Uso: {% include 'parcial/_toolbar.html' %} e definir block toolbar_left / toolbar_right no template pai,
+  ou passar conteúdo inline (não suportado por include). Melhor: o template que usa escreve diretamente:
+  <div class="toolbar">
+    <div class="toolbar-left">...</div>
+    <div class="toolbar-right">...</div>
+  </div>
+  Este partial serve como documentação e estrutura vazia opcional.
+{% endcomment %}
+<div class="toolbar">
+  <div class="toolbar-left">
+    {% block toolbar_left %}{% endblock %}
+  </div>
+  <div class="toolbar-right">
+    {% block toolbar_right %}{% endblock %}
+  </div>
+</div>

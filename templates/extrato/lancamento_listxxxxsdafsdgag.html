@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+   {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Lançamentos do Extrato - {{ periodo_texto }}</h2>
+        <div>
+            <a href="{% url 'extrato:lancamento_new' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Novo Lançamento
+            </a>
+            <a href="{% url 'extrato:upload_ofx' %}" class="btn btn-success">
+                <i class="fas fa-upload"></i> Importar OFX
+            </a>
+            <a href="{% url 'extrato:exportar_conciliacao' %}" class="btn btn-warning {% if not tem_lancamentos_nao_conciliados %}disabled{% endif %}">
+                <i class="fas fa-file-export"></i> EXPORTAR_CONCILIACAO
+            </a>
+
+
+        </div>
+    </div>
+
+    {% if messages %}
+        {% include 'parcial/_messages.html' %}
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Filtros</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" id="filtro-form">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="contas" class="form-label">Contas</label>
+                        <select name="contas" id="contas" class="form-select" multiple>
+                            {% for conta in contas %}
+                                <option value="{{ conta.id }}" {% if conta.id|stringformat:"s" in contas_selecionadas %}selected{% endif %}>
+                                    {{ conta }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="conciliado" class="form-label">Status</label>
+                        <select name="conciliado" id="conciliado" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="1" {% if request.GET.conciliado == "1" %}selected{% endif %}>Conciliados</option>
+                            <option value="0" {% if request.GET.conciliado == "0" %}selected{% endif %}>Não Conciliados</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="periodo" class="form-label">Período</label>
+                        <select name="periodo" id="periodo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for p in periodos %}
+                                <option value="{{ p.value }}" {% if p.value == periodo_selecionado %}selected{% endif %}>
+                                    {{ p.label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="data-inicio-container" style="display: none;">
+                        <label for="data_inicio" class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" id="data_inicio" class="form-control" value="{{ data_inicio }}">
+                    </div>
+                    <div class="col-md-2" id="data-fim-container" style="display: none;">
+                        <label for="data_fim" class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ data_fim }}">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary">Filtrar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ações de Conciliação -->
+    <div class="mb-3">
+        <form method="post" action="{% url 'extrato:conciliar' %}">
+            {% csrf_token %}
+            <div class="d-flex gap-2">
+                {% comment %} <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Conciliar Selecionados
+                </button> {% endcomment %}
+                <button type="submit" formaction="{% url 'extrato:desconciliar' %}" class="btn btn-warning">
+                    <i class="fas fa-undo"></i> Desconciliar Selecionados
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabela de Lançamentos -->
+    <div class="card">
+        <div class="card-header">
+            <h5>Lançamentos ({{ total_lancamentos }})</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'extrato:conciliar' %}">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="select-all"></th>
+                                <th>Data</th>
+                                <th>Conta</th>
+                                <th style="min-width: 250px;">Histórico</th>
+                                <th>Valor</th>
+                                <th>Saldo</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lancamento in page_obj %}
+                                <tr>
+                                    <td><input type="checkbox" name="lancamentos" value="{{ lancamento.pk }}"></td>
+                                    <td>{{ lancamento.data|date:"d/m/Y" }}</td>
+                                    <td>{{ lancamento.conta.descricao }} / {{ lancamento.conta.conta }}</td>
+                                    <td>{{ lancamento.historico|truncatechars:100 }}</td>
+                                    <td class="{% if lancamento.valor < 0 %}text-danger{% else %}text-success{% endif %}">
+                                        R$ {{ lancamento.valor|floatformat:2 }}
+                                    </td>
+                                    <td>R$ {{ lancamento.saldo_calculado|floatformat:2 }}</td>
+                                    <td>
+                                        {% if lancamento.conciliado %}
+                                            <span class="badge bg-success">Conciliado</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'extrato:lancamento_edit' lancamento.pk %}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'extrato:lancamento_delete' lancamento.pk %}" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                        {% if lancamento.conciliado %}
+                                        <a href="#" class="btn btn-sm btn-secondary" onclick="verDetalhes('lancamento', {{ lancamento.pk }})">
+                                            <i class="fas fa-eye"></i> Ver Detalhes
+                                        </a>
+                                        {% endif %}
+                                        {% if not lancamento.conciliado %}
+                                        <a href="{% url 'extrato:transferir' %}?lancamento_id={{ lancamento.pk }}" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-exchange-alt"></i> Transferir
+                                        </a>
+                                        {% endif %}
+                                        {% if lancamento.conciliado and lancamento.tem_relatorios_cartao %}
+                                        <a href="{% url 'extrato:lancamento_relatorios' lancamento.pk %}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-credit-card"></i> Relatórios
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> Conciliar Selecionados
+                    </button>
+                    <button type="submit" formaction="{% url 'extrato:desconciliar' %}" class="btn btn-warning">
+                        <i class="fas fa-undo"></i> Desconciliar Selecionados
+                    </button>
+                </div>
+            </form>
+
+            <!-- Paginação -->
+            {% if is_paginated %}
+                <nav aria-label="Paginação">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">&laquo; Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">Anterior</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ paginator.num_pages }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">Última &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes -->
+    <div class="modal fade" id="detalhesModal" tabindex="-1" aria-labelledby="detalhesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="detalhesModalLabel">Detalhes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="detalhesModalBody">
+                    <!-- Conteúdo será carregado via AJAX -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar/ocultar campos de data quando período personalizado é selecionado
+        document.getElementById('periodo').addEventListener('change', function() {
+            const dataInicioContainer = document.getElementById('data-inicio-container');
+            const dataFimContainer = document.getElementById('data-fim-container');
+            if (this.value === 'custom') {
+                dataInicioContainer.style.display = 'block';
+                dataFimContainer.style.display = 'block';
+            } else {
+                dataInicioContainer.style.display = 'none';
+                dataFimContainer.style.display = 'none';
+            }
+        });
+
+        // Verificar no carregamento da página
+        document.addEventListener('DOMContentLoaded', function() {
+            const periodo = document.getElementById('periodo');
+            if (periodo.value === 'custom') {
+                document.getElementById('data-inicio-container').style.display = 'block';
+                document.getElementById('data-fim-container').style.display = 'block';
+            }
+
+            // Select all checkbox
+            const selectAll = document.getElementById('select-all');
+            if (selectAll) {
+                selectAll.addEventListener('change', function() {
+                    const checkboxes = document.querySelectorAll('input[name="lancamentos"]');
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                });
+            }
+        });
+
+        // Função para ver detalhes
+        function verDetalhes(tipo, id) {
+            fetch(`/extrato/detalhes/${tipo}/${id}/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Erro: ' + data.error);
+                    } else {
+                        document.getElementById('detalhesModalBody').innerHTML = data.html;
+                        const modal = new bootstrap.Modal(document.getElementById('detalhesModal'));
+                        modal.show();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao carregar detalhes');
+                });
+        }
+    </script>
+
+{%endblock%}

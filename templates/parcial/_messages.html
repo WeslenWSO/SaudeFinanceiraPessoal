@@ -1,0 +1,32 @@
+{% if messages %}
+<div class="mb-3" role="region" aria-label="Mensagens do sistema">
+  {% for message in messages %}
+    {% if 'error' in message.tags %}
+      <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <div class="mb-0" style="white-space: pre-wrap;">{{ message }}</div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+      </div>
+    {% elif 'success' in message.tags %}
+      <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+      </div>
+    {% elif 'warning' in message.tags %}
+      <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+      </div>
+    {% elif 'debug' in message.tags %}
+      <div class="alert alert-secondary alert-dismissible fade show shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+      </div>
+    {% else %}
+      <div class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}

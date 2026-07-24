@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
+    <Nfse>
+        <InfNfse LinkAutenticacao="https://nota.riobranco.ac.gov.br/#/notas-autenticar-qr-code/11275004785">
+            <Numero>406</Numero>
+            <Serie>A</Serie>
+            <Tipo>1</Tipo>
+            <DataEmissao>2024-01-15T10:30:00</DataEmissao>
+            <ValorServicos>1000.00</ValorServicos>
+            <ValorDeducoes>0.00</ValorDeducoes>
+            <ValorPis>0.00</ValorPis>
+            <ValorCofins>0.00</ValorCofins>
+            <ValorInss>0.00</ValorInss>
+            <ValorIr>0.00</ValorIr>
+            <ValorCsll>0.00</ValorCsll>
+            <OutrasRetencoes>0.00</OutrasRetencoes>
+            <ValorIss>50.00</ValorIss>
+            <Aliquota>5.00</Aliquota>
+            <DescontoIncondicionado>0.00</DescontoIncondicionado>
+            <DescontoCondicionado>0.00</DescontoCondicionado>
+            <ValorLiquidoNfse>950.00</ValorLiquidoNfse>
+            <IssRetido>2</IssRetido>
+            <ResponsavelRetencao>2</ResponsavelRetencao>
+            <ItemListaServico>0107</ItemListaServico>
+            <CodigoCnae>6201500</CodigoCnae>
+            <CodigoTributacaoMunicipio>620150000</CodigoTributacaoMunicipio>
+            <Discriminacao>Serviços de desenvolvimento de software</Discriminacao>
+            <CodigoMunicipio>1200401</CodigoMunicipio>
+            <PrestadorServico>
+                <IdentificacaoPrestador>
+                    <Cnpj>12345678000123</Cnpj>
+                    <InscricaoMunicipal>123456</InscricaoMunicipal>
+                </IdentificacaoPrestador>
+                <RazaoSocial>Empresa Prestadora LTDA</RazaoSocial>
+                <Endereco>
+                    <Endereco>Rua do Prestador, 456</Endereco>
+                    <Numero>456</Numero>
+                    <Complemento>Andar 2</Complemento>
+                    <Bairro>Centro</Bairro>
+                    <CodigoMunicipio>1200401</CodigoMunicipio>
+                    <Uf>AC</Uf>
+                    <Cep>69900000</Cep>
+                </Endereco>
+            </PrestadorServico>
+            <TomadorServico>
+                <IdentificacaoTomador>
+                    <CpfCnpj>
+                        <Cnpj>98765432000198</Cnpj>
+                    </CpfCnpj>
+                    <InscricaoMunicipal>654321</InscricaoMunicipal>
+                </IdentificacaoTomador>
+                <RazaoSocial>Empresa Cliente LTDA</RazaoSocial>
+                <Endereco>
+                    <Endereco>Rua das Flores, 123</Endereco>
+                    <Numero>123</Numero>
+                    <Complemento>Sala 1</Complemento>
+                    <Bairro>Centro</Bairro>
+                    <CodigoMunicipio>1200401</CodigoMunicipio>
+                    <Uf>AC</Uf>
+                    <Cep>69900000</Cep>
+                </Endereco>
+                <Contato>
+                    <Telefone>68912345678</Telefone>
+                    <Email>contato@empresacliente.com.br</Email>
+                </Contato>
+            </TomadorServico>
+        </InfNfse>
+    </Nfse>
+</CompNfse>
+
+
+
+

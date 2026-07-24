@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title mb-0">Excluir Conta Bancária</h3>
+        </div>
+        <div class="card-body">
+          <p>Tem certeza que deseja excluir a conta <strong>{{ conta }}</strong>?</p>
+          <p class="text-muted small">Esta ação não pode ser desfeita. Lançamentos e arquivos vinculados podem ser afetados.</p>
+          <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Excluir</button>
+            <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

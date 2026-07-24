@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title mb-0">{% if object %}Editar Conta Bancária{% else %}Nova Conta Bancária{% endif %}</h3>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+            {% for field in form %}
+            <div class="mb-3">
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.errors %}<small class="text-danger">{{ field.errors|striptags }}</small>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="form-buttons d-flex gap-2">
+              <button type="submit" class="btn btn-primary">Salvar</button>
+              <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,115 @@
+<dialog id="empresaSelectorModal">
+  <article>
+    <header>
+      <h3><i class="fas fa-building"></i> Selecionar Empresa</h3>
+      <button type="button" data-close aria-label="Fechar">&times;</button>
+    </header>
+    <div id="empresaLoading" style="display: none; text-align: center; padding: 1rem;">
+      <p>Carregando empresas...</p>
+    </div>
+    <div id="empresaList"></div>
+    <div id="empresaError" style="display: none;" role="alert">
+      <p><i class="fas fa-exclamation-triangle"></i> <span id="empresaErrorMessage"></span></p>
+    </div>
+    <footer>
+      <a href="{% url 'empresa:lista' %}" role="button" class="secondary"><i class="fas fa-list"></i> Ver Todas</a>
+      <button type="button" data-close>Cancelar</button>
+    </footer>
+  </article>
+</dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var dialog = document.getElementById('empresaSelectorModal');
+  if (!dialog) return;
+
+  function openModal() {
+    dialog.showModal();
+    carregarEmpresas();
+  }
+  function closeModal() {
+    dialog.close();
+  }
+
+  dialog.querySelectorAll('[data-close]').forEach(function(btn) {
+    btn.addEventListener('click', closeModal);
+  });
+  dialog.addEventListener('cancel', closeModal);
+
+  function carregarEmpresas() {
+    var loading = document.getElementById('empresaLoading');
+    var empresaList = document.getElementById('empresaList');
+    var empresaError = document.getElementById('empresaError');
+    loading.style.display = 'block';
+    empresaList.innerHTML = '';
+    empresaError.style.display = 'none';
+
+    fetch('{% url "empresa:atual" %}')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) return fetch('{% url "empresa:lista" %}');
+        return Promise.reject('Empresa já selecionada');
+      })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var empresas = doc.querySelectorAll('article, .card');
+        if (empresas.length === 0) {
+          empresaList.innerHTML = '<p>Nenhuma empresa disponível.</p>';
+        } else {
+          empresas.forEach(function(el) {
+            empresaList.appendChild(el.cloneNode(true));
+          });
+        }
+      })
+      .catch(function(err) {
+        if (err === 'Empresa já selecionada') {
+          empresaList.innerHTML = '<p>Empresa já selecionada.</p>';
+        } else {
+          empresaError.style.display = 'block';
+          var msg = document.getElementById('empresaErrorMessage');
+          if (msg) msg.textContent = 'Erro ao carregar empresas. Tente novamente.';
+        }
+      })
+      .finally(function() {
+        loading.style.display = 'none';
+      });
+  }
+
+  function selecionarEmpresa(empresaId) {
+    var formData = new FormData();
+    formData.append('empresa_id', empresaId);
+    var token = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!token) return;
+    var headers = { 'X-CSRFToken': token.value };
+    fetch('{% url "empresa:selecionar_ajax" %}', {
+      method: 'POST',
+      body: formData,
+      headers: headers
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        dialog.close();
+        setTimeout(function() { window.location.reload(); }, 500);
+      } else {
+        alert(data.message || 'Erro ao selecionar.');
+      }
+    })
+    .catch(function() {
+      alert('Erro ao selecionar empresa. Tente novamente.');
+    });
+  }
+
+  document.querySelectorAll('[data-open-empresa-modal]').forEach(function(btn) {
+    btn.addEventListener('click', openModal);
+  });
+  dialog.addEventListener('click', function(e) {
+    if (e.target.classList.contains('btn-selecionar-empresa')) {
+      var id = e.target.dataset.empresaId;
+      if (id) selecionarEmpresa(id);
+    }
+  });
+});
+</script>

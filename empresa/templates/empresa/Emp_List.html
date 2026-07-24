@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load validar_cnpj %}
+
+{% block conteudo %}
+{% csrf_token %}
+<div class="page">
+  {% if messages %}
+    {% include 'parcial/_messages.html' %}
+  {% endif %}
+
+  <div class="page-head" style="align-items: center;">
+    {% include 'parcial/_page_head.html' with title="Empresas" subtitle="Gerencie as empresas vinculadas ao seu usuário." %}
+    <div class="btn-group">
+      <a href="{% url 'empresa:empresa_create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Novo</a>
+    </div>
+  </div>
+
+  <section class="panel panel-tight">
+    <form method="get" id="formFiltrosEmpresa">
+      <div class="filters-grid filters-grid-empresa" style="align-items: center;">
+        <div class="col-6">
+          <input type="search" name="q" placeholder="Pesquisar por nome ou CNPJ..." value="{{ termo }}" aria-label="Pesquisar" style="width: 100%; margin: 0;">
+        </div>
+        <div class="col-3">
+          <button type="submit" class="btn btn-primary" style="margin: 0;"><i class="fas fa-search"></i> Pesquisar</button>
+        </div>
+        <div class="col-3" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <label for="per_page_empresa" style="margin: 0; white-space: nowrap;">Por página</label>
+          <select id="per_page_empresa" name="per_page" onchange="document.getElementById('formFiltrosEmpresa').submit()" style="margin: 0; flex: 1; min-width: 0;">
+            <option value="10" {% if per_page == "10" %}selected{% endif %}>10 por página</option>
+            <option value="25" {% if per_page == "25" %}selected{% endif %}>25 por página</option>
+            <option value="50" {% if per_page == "50" %}selected{% endif %}>50 por página</option>
+          </select>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  {% if not request.session.empresa_id %}
+  <div class="alert-modern warning">
+    <span class="alert-icon"><i class="fas fa-exclamation-triangle"></i></span>
+    <div>
+      <strong>Nenhuma empresa selecionada.</strong> Selecione uma empresa na tabela para continuar.
+      <a href="{% url 'empresa:trocar' %}">Trocar empresa</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel" style="padding: 0; overflow: hidden;">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Empresa</th>
+            <th>CNPJ</th>
+            <th>Status</th>
+            <th style="text-align: right;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emp in object_list %}
+          <tr>
+            <td>{{ emp.id }}</td>
+            <td>{{ emp.razao }}</td>
+            <td>{{ emp.cnpj|formatar_cnpj }}</td>
+            <td>
+              {% if emp.status == "Ativa" %}
+                <span class="badge badge-success">Ativa</span>
+              {% else %}
+                <span class="badge badge-danger">Inativa</span>
+              {% endif %}
+            </td>
+            <td class="td-acoes-empresa">
+              <div class="empresa-list-actions">
+                {% if emp.status == "Ativa" %}
+                  {% if request.session.empresa_id == emp.id %}
+                    <span class="badge badge-success"><i class="fas fa-check"></i> Ativa</span>
+                  {% else %}
+                    <button type="button" class="btn btn-primary btn-sm btn-selecionar-empresa" data-empresa-id="{{ emp.id }}" onclick="selecionarEmpresa({{ emp.id }})" title="Selecionar empresa">
+                      <i class="fas fa-check"></i> Selecionar
+                    </button>
+                  {% endif %}
+                {% endif %}
+                <a href="{% url 'empresa:empresa_detail' emp.pk %}" class="btn btn-muted btn-sm btn-icon" title="Visualizar" aria-label="Visualizar"><i class="fas fa-eye"></i></a>
+                <a href="{% url 'empresa:empresa_edit' emp.pk %}" class="btn btn-muted btn-sm btn-icon" title="Editar dados da empresa" aria-label="Editar dados"><i class="fas fa-pen"></i></a>
+                <a href="{% url 'empresa:empresa_integracao' emp.pk %}" class="btn btn-muted btn-sm btn-icon" title="NFS-e, XML e Sicoob" aria-label="Integração"><i class="fas fa-plug"></i></a>
+                <a href="{% url 'empresa:empresa_toggle_status' emp.pk %}" class="btn btn-muted btn-sm btn-icon" title="Ativar/Inativar" aria-label="Status">
+                  {% if emp.status == "Ativa" %}<i class="fas fa-toggle-on"></i>{% else %}<i class="fas fa-toggle-off"></i>{% endif %}
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5">
+              <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-building"></i></div>
+                <h3>Nenhuma empresa encontrada</h3>
+                <p>Cadastre a primeira empresa para começar.</p>
+                <a href="{% url 'empresa:empresa_create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Cadastrar primeira empresa</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+    <footer class="toolbar" style="margin: 0; padding: 1rem 1.25rem; border-top: 1px solid var(--app-sidebar-border);">
+      <div class="toolbar-left">
+        <span class="text-muted small">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+      </div>
+      <div class="toolbar-right">
+        {% if page_obj.has_previous %}
+          <a href="?q={{ termo }}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}" class="btn btn-secondary btn-sm">Anterior</a>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+            <span class="btn btn-muted btn-sm" aria-current="page">{{ num }}</span>
+          {% else %}
+            <a href="?q={{ termo }}&per_page={{ per_page }}&page={{ num }}" class="btn btn-secondary btn-sm">{{ num }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+          <a href="?q={{ termo }}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}" class="btn btn-secondary btn-sm">Próxima</a>
+        {% endif %}
+      </div>
+    </footer>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function selecionarEmpresa(empresaId) {
+  var formData = new FormData();
+  formData.append('empresa_id', empresaId);
+  formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+  var btn = event.target.closest('button');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Selecionando...';
+  }
+  fetch('{% url "empresa:selecionar_ajax" %}', {
+    method: 'POST',
+    body: formData,
+    headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) { window.location.reload(); }
+    else {
+      alert(data.message || 'Erro ao selecionar empresa.');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Selecionar'; }
+    }
+  })
+  .catch(function() {
+    alert('Erro ao selecionar empresa. Tente novamente.');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Selecionar'; }
+  });
+}
+</script>
+{% endblock %}

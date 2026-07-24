@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+{%block nav_%}
+ {% include 'parcial/_nav.html' %}
+ {%endblock%}
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Tabela Principal - Regras de Rateio -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Regras de Rateio</h3>
+                    <a href="{% url 'regrarateio:regra-create' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Cadastrar
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Código</th>
+                                    <th>Descrição</th>
+                                    <th>Rateio</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for regra in object_list %}
+                                <tr class="regra-row" data-regra-id="{{ regra.id }}" style="cursor: pointer;">
+                                    <td>{{ regra.id }}</td>
+                                    <td>{{ regra.codigo|default:"—" }}</td>
+                                    <td>{{ regra.nomedaregra }}</td>
+                                    <td>
+                                        <span class="badge {% if regra.rateio == 'S' %}badge-success{% else %}badge-secondary{% endif %}">
+                                            {% if regra.rateio == 'S' %}SIM{% else %}NÃO{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'regrarateio:regra-update' regra.id %}" class="btn btn-outline-primary btn-sm" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'regrarateio:regra-delete' regra.id %}" class="btn btn-outline-danger btn-sm" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Secundária - Itens de Rateio -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="card-title">Itens de Rateio</h3>
+                        <small class="text-muted">Clique em uma regra para ver os detalhes</small>
+                    </div>
+                    <button id="btn-cadastrar-item" class="btn btn-success btn-sm" style="display: none;">
+                        <i class="fas fa-plus"></i> Cadastrar Item
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="itens-container">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-mouse-pointer fa-2x mb-3"></i>
+                            <p>Clique em uma regra de rateio para visualizar os itens</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const regraRows = document.querySelectorAll('.regra-row');
+    const itensContainer = document.getElementById('itens-container');
+
+    let selectedRegraId = null;
+
+    regraRows.forEach(row => {
+        // Evento de clique
+        row.addEventListener('click', function() {
+            const regraId = this.getAttribute('data-regra-id');
+            selectedRegraId = regraId;
+            carregarItensRateio(regraId);
+
+            // Verificar se a regra tem rateio = 'S' para mostrar o botão
+            const rateioCell = this.querySelector('td:nth-child(4) .badge');
+            const isRateioSim = rateioCell && rateioCell.textContent.trim() === 'SIM';
+            const btnCadastrar = document.getElementById('btn-cadastrar-item');
+            if (isRateioSim) {
+                btnCadastrar.style.display = 'block';
+                btnCadastrar.onclick = function() {
+                    window.location.href = `/regrarateio/regraI/create/?regra=${regraId}`;
+                };
+            } else {
+                btnCadastrar.style.display = 'none';
+            }
+        });
+
+        // Evento de hover
+        row.addEventListener('mouseenter', function() {
+            const regraId = this.getAttribute('data-regra-id');
+            carregarItensRateio(regraId);
+        });
+    });
+
+    function carregarItensRateio(regraId) {
+        // Fazer requisição AJAX para obter os itens
+        fetch(`/regrarateio/regraIList/${regraId}/`)
+            .then(response => response.text())
+            .then(html => {
+                // Extrair apenas a tabela do HTML retornado
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const table = doc.querySelector('table');
+
+                if (table) {
+                    itensContainer.innerHTML = `
+                        <div class="table-responsive">
+                            ${table.outerHTML}
+                        </div>
+                    `;
+
+                    // Executar scripts do HTML inserido
+                    const scripts = doc.querySelectorAll('script');
+                    scripts.forEach(script => {
+                        if (script.textContent) {
+                            try {
+                                eval(script.textContent);
+                            } catch (e) {
+                                console.error('Erro ao executar script:', e);
+                            }
+                        }
+                    });
+                } else {
+                    itensContainer.innerHTML = `
+                        <div class="text-center text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-3"></i>
+                            <p>Nenhum item de rateio encontrado</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar itens:', error);
+                itensContainer.innerHTML = `
+                    <div class="text-center text-danger">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                        <p>Erro ao carregar itens de rateio</p>
+                    </div>
+                `;
+            });
+    }
+});
+</script>
+
+{%endblock%}

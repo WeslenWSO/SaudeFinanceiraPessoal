@@ -1,0 +1,490 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Fechamento de Repasse para Anestesista{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        Fechamento de Repasse para Anestesista
+                        {% if mostrar_fechados %}
+                            <small class="text-muted">(Repasses Fechados)</small>
+                        {% else %}
+                            <small class="text-muted">(Repasses Pendentes)</small>
+                        {% endif %}
+                    </h3>
+                    <div class="card-tools">
+                        {% if mostrar_fechados %}
+                            <a href="{% url 'faturamento_medico:exportar_excel_fechados' %}?{{ request.GET.urlencode }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-file-excel"></i> Exportar Excel
+                            </a>
+                            <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-clock"></i> Ver Pendentes
+                            </a>
+                            <a href="{% url 'faturamento_medico:imprimir_repasses_fechados' %}?{{ request.GET.urlencode }}" class="btn btn-info btn-sm" target="_blank">
+                                <i class="fas fa-print"></i> Imprimir Relatório
+                            </a>
+                        {% else %}
+                            <a href="{% url 'faturamento_medico:fechamento_repasse' %}?mostrar_fechados=true" class="btn btn-success btn-sm">
+                                <i class="fas fa-check-circle"></i> Ver Fechados
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card-body">
+                    <form method="GET" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <label>Data Início</label>
+                                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label>Data Fim</label>
+                                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label>Convênios</label>
+                                <select name="convenio" class="form-control" multiple>
+                                    <option value="">Todos os Convênios</option>
+                                    {% for convenio in convenios_disponiveis %}
+                                        <option value="{{ convenio.nome }}" {% if convenio.nome in filtros.convenio %}selected{% endif %}>{{ convenio.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label>Anestesista</label>
+                                <input type="text" name="anestesista" class="form-control" placeholder="Nome do anestesista" value="{{ filtros.anestesista }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label>Data de Fechamento</label>
+                                <input type="date" name="data_fechamento" class="form-control" value="{{ filtros.data_fechamento }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label>&nbsp;</label>
+                                <div>
+                                    <button type="submit" class="btn btn-secondary">Filtrar</button>
+                                    <a href="{% url 'faturamento_medico:fechamento_repasse' %}{% if mostrar_fechados %}?mostrar_fechados=true{% endif %}" class="btn btn-outline-secondary">Limpar</a>
+                                    <input type="hidden" name="mostrar_fechados" value="{% if mostrar_fechados %}true{% endif %}">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Estatísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info"><i class="fas fa-list"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">
+                                        {% if mostrar_fechados %}Total de Repasses Fechados{% else %}Total de Repasses Pendentes{% endif %}
+                                    </span>
+                                    <span class="info-box-number">{{ total_faturamentos }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-success"><i class="fas fa-dollar-sign"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Valor Total</span>
+                                    <span class="info-box-number">R$ {{ valor_total|floatformat:2 }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if faturamentos %}
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <!-- Seção de Cálculos de Imposto e Comissão -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-calculator"></i> Cálculos de Imposto e Comissão
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="percentual_imposto">Percentual de Imposto (%)</label>
+                                            <input type="number" step="0.01" min="0" max="100" class="form-control" id="percentual_imposto" name="percentual_imposto" value="0.00">
+                                            <small class="form-text text-muted">Ex: 10.00 para 10%</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="percentual_comissao">Percentual de Comissão (%)</label>
+                                            <input type="number" step="0.01" min="0" max="100" class="form-control" id="percentual_comissao" name="percentual_comissao" value="0.00">
+                                            <small class="form-text text-muted">Ex: 15.00 para 15%</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>Valor Total Selecionado</label>
+                                            <input type="text" class="form-control" id="valor_total_selecionado" readonly value="R$ 0,00">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>&nbsp;</label>
+                                            <div>
+                                                <button type="button" class="btn btn-info" id="btn-calcular">
+                                                    <i class="fas fa-calculator"></i> Calcular Valores
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Resultados dos Cálculos -->
+                                <div class="row" id="resultados-calculo" style="display: none;">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>Valor do Imposto</label>
+                                            <input type="text" class="form-control bg-light" id="valor_imposto" readonly>
+                                            <small class="form-text text-muted">Valor Total × Percentual Imposto</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>Base para Comissão</label>
+                                            <input type="text" class="form-control bg-light" id="base_comissao" readonly>
+                                            <small class="form-text text-muted">Valor Total - Valor Imposto</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>Valor da Comissão</label>
+                                            <input type="text" class="form-control bg-success text-white" id="valor_comissao" readonly>
+                                            <small class="form-text text-muted">Base Comissão × Percentual Comissão</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label>&nbsp;</label>
+                                            <div>
+                                                <button type="button" class="btn btn-warning" id="btn-aplicar-comissao">
+                                                    <i class="fas fa-coins"></i> Aplicar Comissão
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check"></i> Realizar Fechamento dos Selecionados
+                                </button>
+                                <small class="text-muted ml-2">Selecione os faturamentos que deseja fechar</small>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de Faturamentos -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="select-all">
+                                        </th>
+                                        <th>Guia</th>
+                                        <th>Data</th>
+                                        <th>Nome</th>
+                                        <th>Anestesista</th>
+                                        <th>Data de Fechamento</th>
+                                        <th>Código Fechamento</th>
+                                        <th>Nota</th>
+                                        <th>Relatório</th>
+                                        <th>Convênio</th>
+                                        <th>Cód. Serviço</th>
+                                        <th>Serviço</th>
+                                        <th>QT</th>
+                                        <th>%</th>
+                                        <th>Valor Unit.</th>
+                                        <th>Valor Total Item</th>
+                                        <th>Valor Imposto</th>
+                                        <th>Valor Comissão</th>
+                                        <th>Valor Líquido</th>
+                                        <th>Lote</th>
+                                        {% if mostrar_fechados %}
+                                        <th>Ações</th>
+                                        {% endif %}
+                                        <th>Porte</th>
+                                        <th>Local</th>
+                                        <th>Receber Por</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for faturamento in faturamentos %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="faturamentos_selecionados" value="{{ faturamento.id }}" class="faturamento-checkbox">
+                                        </td>
+                                        <td>{{ faturamento.guia|default:"-" }}</td>
+                                        <td>{{ faturamento.data|date:"d/m/Y" }}</td>
+                                        <td>{{ faturamento.nome|default:"-" }}</td>
+                                        <td>{{ faturamento.anestesista|default:"-" }}</td>
+                                        <td>
+                                            {% if faturamento.data_fechamento %}
+                                                {{ faturamento.data_fechamento|date:"d/m/Y" }}
+                                            {% else %}
+                                                <span class="text-muted">Não fechado</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ faturamento.codigo_fechamento|default:"-" }}</td>
+                                        <td>{{ faturamento.nota_fiscal|default:"-" }}</td>
+                                        <td>{{ faturamento.codigo_relatorio|default:"-" }}</td>
+                                        <td>{{ faturamento.convenio|default:"-" }}</td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                {{ item.codigo_servico }}<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                {{ item.servico }}<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                {{ item.qt }}<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                {{ item.percentual|floatformat:2 }}%<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                R$ {{ item.valor|floatformat:2 }}<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                R$ {{ item.total|floatformat:2 }}<br>
+                                            {% empty %}
+                                                R$ {{ faturamento.total|floatformat:2 }}
+                                            {% endfor %}
+                                        </td>
+                                        <td>R$ {{ faturamento.valor_imposto|floatformat:2 }}</td>
+                                        <td>R$ {{ faturamento.valor_comissao|floatformat:2 }}</td>
+                                        <td>R$ {{ faturamento.get_valor_liquido|floatformat:2 }}</td>
+                                        <td>{{ faturamento.lote|default:"-" }}</td>
+                                        {% if mostrar_fechados %}
+                                        <td>
+                                            <a href="{% url 'faturamento_medico:reabrir_fechamento' faturamento.pk %}"
+                                               class="btn btn-warning btn-sm"
+                                               title="Reabrir Fechamento"
+                                               onclick="return confirm('Tem certeza que deseja reabrir o fechamento deste repasse?')">
+                                                <i class="fas fa-undo"></i> Reabrir
+                                            </a>
+                                        </td>
+                                        {% endif %}
+                                        <td>
+                                            {% for item in faturamento.itens_servico.all %}
+                                                {{ item.porte }}<br>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ faturamento.local|default:"-" }}</td>
+                                        <td>{{ faturamento.receber_por|default:"-" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>Nenhum repasse encontrado</h4>
+                        <p>
+                            {% if mostrar_fechados %}
+                                Não há repasses fechados que atendam aos filtros aplicados.
+                            {% else %}
+                                Não há repasses pendentes que atendam aos filtros aplicados.
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    {% if mostrar_fechados %}
+                    <div class="mt-3">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Nota:</strong> Você pode reabrir um fechamento clicando no botão "Reabrir" na coluna Ações.
+                            Isso permitirá que o repasse seja fechado novamente se necessário.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Checkbox "Selecionar todos"
+    const selectAllCheckbox = document.getElementById('select-all');
+    const faturamentoCheckboxes = document.querySelectorAll('.faturamento-checkbox');
+
+    selectAllCheckbox.addEventListener('change', function() {
+        faturamentoCheckboxes.forEach(checkbox => {
+            checkbox.checked = selectAllCheckbox.checked;
+        });
+        atualizarValorTotal();
+    });
+
+    // Atualizar checkbox "Selecionar todos" quando checkboxes individuais mudam
+    faturamentoCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
+            selectAllCheckbox.checked = checkedBoxes.length === faturamentoCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < faturamentoCheckboxes.length;
+            atualizarValorTotal();
+        });
+    });
+
+    // Função para atualizar o valor total dos faturamentos selecionados
+    function atualizarValorTotal() {
+        const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
+        let total = 0;
+
+        checkedBoxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            // A coluna Valor Total Item é a 17ª coluna (ajustada após mudanças)
+            const valorTotalCell = row.querySelector('td:nth-child(17)'); // Coluna Valor Total Item
+            if (valorTotalCell) {
+                // Para múltiplos valores na célula, somar todos
+                const valores = valorTotalCell.textContent.split('<br>');
+                valores.forEach(valorText => {
+                    const valor = parseFloat(valorText.trim().replace('R$ ', '').replace(',', '.')) || 0;
+                    total += valor;
+                });
+            }
+        });
+
+        console.log('Total calculado:', total);
+        document.getElementById('valor_total_selecionado').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+    }
+
+    // Botão Calcular Valores
+    document.getElementById('btn-calcular').addEventListener('click', function() {
+        const percentualImposto = parseFloat(document.getElementById('percentual_imposto').value) || 0;
+        const percentualComissao = parseFloat(document.getElementById('percentual_comissao').value) || 0;
+        const valorTotalText = document.getElementById('valor_total_selecionado').value;
+        const valorTotal = parseFloat(valorTotalText.replace('R$ ', '').replace(',', '.')) || 0;
+
+        console.log('Valor total selecionado:', valorTotalText, 'Convertido para:', valorTotal);
+
+        const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
+        console.log('Número de checkboxes selecionados:', checkedBoxes.length);
+
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos um faturamento para calcular.');
+            return;
+        }
+
+        if (valorTotal === 0) {
+            alert('O valor total selecionado é zero. Verifique se os faturamentos têm valores válidos.');
+            return;
+        }
+
+        // Cálculos com precisão decimal
+        const valorImposto = Math.round((valorTotal * percentualImposto / 100) * 100) / 100;
+        const baseComissao = Math.round((valorTotal - valorImposto) * 100) / 100;
+        const valorComissao = Math.round((baseComissao * percentualComissao / 100) * 100) / 100;
+
+        // Atualizar campos
+        document.getElementById('valor_imposto').value = 'R$ ' + valorImposto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('base_comissao').value = 'R$ ' + baseComissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('valor_comissao').value = 'R$ ' + valorComissao.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        // Mostrar resultados
+        document.getElementById('resultados-calculo').style.display = 'block';
+    });
+
+    // Botão Aplicar Comissão
+    document.getElementById('btn-aplicar-comissao').addEventListener('click', function() {
+        const percentualImposto = parseFloat(document.getElementById('percentual_imposto').value) || 0;
+        const percentualComissao = parseFloat(document.getElementById('percentual_comissao').value) || 0;
+        const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
+
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos um faturamento para aplicar a comissão.');
+            return;
+        }
+
+        if (confirm(`Aplicar ${percentualComissao}% de comissão e ${percentualImposto}% de imposto aos ${checkedBoxes.length} faturamentos selecionados?`)) {
+            // Coletar IDs dos faturamentos selecionados
+            const faturamentoIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+            // Enviar requisição AJAX para aplicar comissão
+            const formData = new FormData();
+            formData.append('aplicar_comissao', '1');
+            formData.append('percentual_imposto', percentualImposto);
+            formData.append('percentual_comissao', percentualComissao);
+            faturamentoIds.forEach(id => {
+                formData.append('faturamentos_selecionados', id);
+            });
+
+            fetch('{% url "faturamento_medico:fechamento_repasse" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Erro: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao aplicar comissão.');
+            });
+        }
+    });
+
+    // Inicializar valor total
+    atualizarValorTotal();
+});
+</script>
+{% endblock %}

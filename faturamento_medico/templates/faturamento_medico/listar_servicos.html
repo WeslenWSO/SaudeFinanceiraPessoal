@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Serviços Disponíveis{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Serviços Disponíveis</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:criar_servico' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Novo Serviço
+                        </a>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card-body">
+                    <form method="GET" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>Categoria</label>
+                                <input type="text" name="categoria" class="form-control" value="{{ filtros.categoria }}" placeholder="Filtrar por categoria">
+                            </div>
+                            <div class="col-md-3">
+                                <label>Status</label>
+                                <select name="ativo" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="1" {% if filtros.ativo == '1' %}selected{% endif %}>Ativos</option>
+                                    <option value="0" {% if filtros.ativo == '0' %}selected{% endif %}>Inativos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label>&nbsp;</label>
+                                <div>
+                                    <button type="submit" class="btn btn-secondary">Filtrar</button>
+                                    <a href="{% url 'faturamento_medico:listar_servicos' %}" class="btn btn-outline-secondary">Limpar</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Tabela de Serviços -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Descrição</th>
+                                    <th>Porte</th>
+                                    <th>Valor Base</th>
+                                    <th>Categoria</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servico in servicos %}
+                                <tr>
+                                    <td><strong>{{ servico.codigo }}</strong></td>
+                                    <td>{{ servico.descricao }}</td>
+                                    <td>{{ servico.porte|default:"-" }}</td>
+                                    <td>{{ servico.get_valor_formatado }}</td>
+                                    <td>{{ servico.categoria|default:"-" }}</td>
+                                    <td>
+                                        {% if servico.ativo %}
+                                            <span class="badge badge-success">Ativo</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'faturamento_medico:editar_servico' servico.pk %}"
+                                           class="btn btn-sm btn-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'faturamento_medico:excluir_servico' servico.pk %}"
+                                           class="btn btn-sm btn-danger" title="Excluir"
+                                           onclick="return confirm('Tem certeza que deseja excluir este serviço?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center">Nenhum serviço encontrado.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

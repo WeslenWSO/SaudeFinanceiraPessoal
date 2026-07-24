@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<article class="card-modern" style="text-align: center; padding: 2rem;">
+  <p style="font-size: 3rem; color: var(--app-success); margin-bottom: 0.5rem;"><i class="fas fa-check-circle"></i></p>
+  <h1 style="margin: 0 0 0.5rem;">Empresa cadastrada com sucesso!</h1>
+  <p class="text-muted mb-4">A nova empresa foi criada e vinculada ao seu usuário.</p>
+  <p>
+    <a href="{% url 'empresa:lista' %}" role="button">Ver lista de empresas</a>
+    <a href="{% url 'empresa:empresa_create' %}" role="button" class="secondary">Cadastrar outra empresa</a>
+  </p>
+</article>
+{% endblock %}

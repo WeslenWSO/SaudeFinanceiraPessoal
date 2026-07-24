@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">Nova baixa — escolher conta a receber</h3>
+                    <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-list"></i> Lista de contas
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Fluxo</strong>
+                        <ol class="mb-0 mt-2">
+                            <li><strong>Uma</strong> conta a receber nesta tela.</li>
+                            <li>Na próxima tela você seleciona <strong>vários</strong> lançamentos do extrato bancário e confere os valores.</li>
+                            <li>Se ainda houver diferença, você pode: aplicar <strong>desconto, juros ou tarifa</strong>; escolher <strong>mais lançamentos</strong> do extrato; ou <strong>gerar conta a receber</strong> da diferença (novo título/parcela).</li>
+                        </ol>
+                    </div>
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.conta.id_for_label }}" class="form-label">{{ form.conta.label }}</label>
+                            <div class="border rounded p-2 bg-light">
+                                {{ form.conta }}
+                            </div>
+                            {% if form.conta.help_text %}
+                                <div class="form-text">{{ form.conta.help_text }}</div>
+                            {% endif %}
+                            {% if form.conta.errors %}
+                                <div class="text-danger small">{{ form.conta.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-arrow-right"></i> Continuar para baixa com extrato
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block foot %}
+{% include 'parcial/_footer.html' %}
+{% endblock %}

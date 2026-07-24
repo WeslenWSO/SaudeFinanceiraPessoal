@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Baixas de Contas a Receber</h3>
+                    <a href="{% url 'contasareceber:baixar_multiplas' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Nova Baixa
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Filtros -->
+                    <form method="get" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="data_inicio" class="form-label">Data Início</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="data_fim" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="conta_banco" class="form-label">Conta Bancária</label>
+                                <select class="form-control" id="conta_banco" name="conta_banco">
+                                    <option value="">Todas</option>
+                                    <!-- Opções de contas bancárias aqui -->
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-outline-primary me-2">Filtrar</button>
+                                <a href="{% url 'contasareceber:listar_baixas' %}" class="btn btn-outline-secondary">Limpar</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Estatísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total Recebido</h5>
+                                    <h3>R$ {{ total_recebido|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h5 class="card-title">Descontos</h5>
+                                    <h3>R$ {{ total_descontos|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <h5 class="card-title">Juros</h5>
+                                    <h3>R$ {{ total_juros|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body">
+                                    <h5 class="card-title">Tarifas</h5>
+                                    <h3>R$ {{ total_tarifas|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de baixas -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Conta a Receber</th>
+                                    <th>Valor Recebido</th>
+                                    <th>Desconto</th>
+                                    <th>Juros</th>
+                                    <th>Tarifas</th>
+                                    <th>Conta Bancária</th>
+                                    <th>Tipo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for baixa in baixas %}
+                                <tr>
+                                    <td>{{ baixa.data_recebimento|date:'d/m/Y' }}</td>
+                                    <td>
+                                        <strong>{{ baixa.conta_a_receber }}</strong><br>
+                                        <small class="text-muted">{{ baixa.conta_a_receber.cliente }}</small>
+                                    </td>
+                                    <td class="text-success">R$ {{ baixa.get_valor_credito_extrato|floatformat:2 }}</td>
+                                    <td class="text-info">R$ {{ baixa.desconto|floatformat:2 }}</td>
+                                    <td class="text-warning">R$ {{ baixa.juros|floatformat:2 }}</td>
+                                    <td class="text-danger">R$ {{ baixa.tarifas|floatformat:2 }}</td>
+                                    <td>
+                                        {% if baixa.conta_banco %}
+                                            {{ baixa.conta_banco.banco.nome }} - {{ baixa.conta_banco.agencia }}/{{ baixa.conta_banco.conta }}
+                                        {% else %}
+                                            <span class="text-muted">Não informado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if baixa.tipo_baixa == 'total' %}bg-success{% else %}bg-warning{% endif %}">
+                                            {{ baixa.get_tipo_baixa_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" onclick="verDetalhes({{ baixa.id }})">
+                                            <i class="fas fa-eye"></i> Detalhes
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">
+                                        Nenhuma baixa encontrada.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para detalhes da baixa -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Baixa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <!-- Conteúdo será carregado via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verDetalhes(baixaId) {
+    // Implementar carregamento de detalhes via AJAX
+    alert('Funcionalidade de detalhes em desenvolvimento. Baixa ID: ' + baixaId);
+}
+</script>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

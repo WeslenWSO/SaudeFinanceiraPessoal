@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+   {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+
+
+{% block conteudo %}
+
+{% if messages %}
+<div class="container-xl px-4 mt-3">
+  {% include 'parcial/_messages.html' %}
+</div>
+{% endif %}
+{% if form.non_field_errors %}
+<div class="container-xl px-4 mt-2">
+  <div class="alert alert-danger shadow-sm" role="alert">
+    {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<header class="page-header page-header-compact page-header-light border-bottom bg-white mb-4">
+    <div class="container-xl px-4">
+        <div class="page-header-content">
+            <div class="row align-items-center justify-content-between pt-3">
+                <div class="col-auto mb-3">
+                    <h1 class="page-header-title">
+                        <div class="page-header-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-building"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><rect x="9" y="22" width="6" height="0"></rect><circle cx="9" cy="10" r="2"></circle><path d="m21 12-1 1-1-1"></path><path d="m21 16-1 1-1-1"></path><path d="m3 12 1 1 1-1"></path><path d="m3 16 1 1 1-1"></path></svg>
+                        </div>
+                        {{ descricao }}
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container-xl px-4 mt-4">
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="socios_json" id="socios_json" value="{{ socios_json_initial|default:'[]'|escape }}">
+        <div class="row">
+            <div class="col-xl-8">
+                <div class="card mb-4">
+                    <div class="card-header">Dados da Empresa</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.cnpj.id_for_label }}">{{ form.cnpj.label }}</label>
+                            <div class="d-flex gap-2 align-items-start flex-wrap">
+                                <div class="flex-grow-1" style="min-width: 180px;">
+                                    {{ form.cnpj }}
+                                </div>
+                                <button type="button" id="btn-buscar-cnpj" class="btn btn-outline-primary" title="Buscar dados do CNPJ na Receita Federal">
+                                    <i class="fas fa-search"></i> Buscar CNPJ
+                                </button>
+                            </div>
+                            <small class="text-muted d-block mt-1">Digite com ou sem formatação (00.000.000/0000-00). Clique em Buscar ou saia do campo para preencher automaticamente.</small>
+                            {% if form.cnpj.errors %}
+                                <div class="text-danger small">{{ form.cnpj.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div id="sociosBox" class="mb-3" style="display: none;">
+                            <label class="small mb-1">Sócios (serão salvos com a empresa)</label>
+                            <ul id="sociosList" class="list-group list-group-flush small"></ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.razao.id_for_label }}">{{ form.razao.label }}</label>
+                            {{ form.razao }}
+                            {% if form.razao.errors %}
+                                <div class="text-danger small">{{ form.razao.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.nome_fantasia.id_for_label }}">{{ form.nome_fantasia.label }}</label>
+                            {{ form.nome_fantasia }}
+                            {% if form.nome_fantasia.errors %}
+                                <div class="text-danger small">{{ form.nome_fantasia.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.codigo_externo.id_for_label }}">{{ form.codigo_externo.label }}</label>
+                            {{ form.codigo_externo }}
+                            {% if form.codigo_externo.help_text %}
+                                <small class="text-muted d-block mt-1">{{ form.codigo_externo.help_text }}</small>
+                            {% endif %}
+                            {% if form.codigo_externo.errors %}
+                                <div class="text-danger small">{{ form.codigo_externo.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="text-danger small">{{ form.status.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.usa_base_calculo_reduzido }}
+                                <label class="form-check-label small mb-1" for="{{ form.usa_base_calculo_reduzido.id_for_label }}">
+                                    {{ form.usa_base_calculo_reduzido.label }}
+                                </label>
+                            </div>
+                            {% if form.usa_base_calculo_reduzido.errors %}
+                                <div class="text-danger small">{{ form.usa_base_calculo_reduzido.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.utiliza_iss_fixo }}
+                                <label class="form-check-label small mb-1" for="{{ form.utiliza_iss_fixo.id_for_label }}">
+                                    {{ form.utiliza_iss_fixo.label }}
+                                </label>
+                            </div>
+                            {% if form.utiliza_iss_fixo.errors %}
+                                <div class="text-danger small">{{ form.utiliza_iss_fixo.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+
+                       <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.regime_tributario.id_for_label }}">{{ form.regime_tributario.label }}</label>
+                            {{ form.regime_tributario }}
+                            {% if form.regime_tributario.errors %}
+                                <div class="text-danger small">{{ form.regime_tributario.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small mb-1" for="{{ form.tipo_apuracao.id_for_label }}">{{ form.tipo_apuracao.label }}</label>
+                            {{ form.tipo_apuracao }}
+                            {% if form.tipo_apuracao.errors %}
+                                <div class="text-danger small">{{ form.tipo_apuracao.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        {% if form.instance.pk %}
+                        <div class="alert alert-light border mb-3 small">
+                            Certificado NFS-e (SEFIN), pastas de cópia dos XML, login no portal nacional e API Sicoob estão em
+                            <a href="{% url 'empresa:empresa_integracao' form.instance.pk %}"><strong>Configuração de integração</strong></a>.
+                        </div>
+                        {% endif %}
+
+                        <button class="btn btn-primary" type="submit">Salvar</button>
+                        <a href="{% url 'empresa:lista' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+(function() {
+  var urlBuscarCnpj = "{% url 'empresa:buscar_cnpj_ajax' %}";
+  var inputCnpj = document.getElementById("id_cnpj");
+  var inputRazao = document.getElementById("id_razao");
+  var inputNomeFantasia = document.getElementById("id_nome_fantasia");
+  var btnBuscar = document.getElementById("btn-buscar-cnpj");
+  var sociosBox = document.getElementById("sociosBox");
+  var sociosList = document.getElementById("sociosList");
+  var csrfToken = document.querySelector("[name=csrfmiddlewaretoken]") && document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+  function limparCnpj(str) {
+    if (!str) return "";
+    return String(str).replace(/\D/g, "");
+  }
+
+  function preencherFormulario(empresa) {
+    if (empresa.cnpj && inputCnpj) inputCnpj.value = empresa.cnpj;
+    if (empresa.razao && inputRazao) inputRazao.value = empresa.razao;
+    if (inputNomeFantasia) inputNomeFantasia.value = empresa.nome_fantasia || "";
+    var socios = empresa.socios || [];
+    var sociosJsonEl = document.getElementById("socios_json");
+    if (sociosJsonEl) sociosJsonEl.value = JSON.stringify(socios);
+    if (sociosBox && sociosList && socios.length > 0) {
+      sociosList.innerHTML = socios.map(function(s) {
+        var nome = s.socio || s.nome || "";
+        var tipo = s.tipo || s.qualificacao || "";
+        var sufixo = tipo ? " – " + tipo : "";
+        return "<li class=\"list-group-item\">" + nome + sufixo + "</li>";
+      }).join("");
+      sociosBox.style.display = "block";
+    } else if (sociosBox && sociosList) {
+      sociosList.innerHTML = "";
+      sociosBox.style.display = "none";
+    }
+  }
+
+  function buscarCnpj() {
+    var cnpjRaw = inputCnpj ? inputCnpj.value : "";
+    var cnpjLimpo = limparCnpj(cnpjRaw);
+    if (cnpjLimpo.length !== 14) {
+      alert("Informe um CNPJ válido com 14 dígitos.");
+      return;
+    }
+    if (btnBuscar) {
+      btnBuscar.disabled = true;
+      btnBuscar.innerHTML = "<i class=\"fas fa-spinner fa-spin\"></i> Buscando...";
+    }
+    var url = urlBuscarCnpj + "?cnpj=" + encodeURIComponent(cnpjLimpo);
+    fetch(url, {
+      method: "GET",
+      headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" }
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(data) { throw { status: r.status, data: data }; });
+      return r.json();
+    })
+    .then(function(data) {
+      if (data.success && data.empresa) {
+        preencherFormulario(data.empresa);
+        document.getElementById("socios_json").value = JSON.stringify(data.empresa.socios || []);
+        if (data.empresa.ja_cadastrada) {
+          alert("Esta empresa já está cadastrada no sistema. Os dados foram preenchidos.");
+        }
+      } else {
+        alert(data.message || "Não foi possível buscar o CNPJ.");
+      }
+    })
+    .catch(function(err) {
+      var msg;
+      if (err.data && err.data.message) {
+        msg = err.data.message;
+      } else if (err.status === 400) {
+        msg = "CNPJ inválido.";
+      } else if (err.status === 404) {
+        msg = "CNPJ não encontrado.";
+      } else {
+        msg = "Erro ao consultar CNPJ. Tente novamente.";
+      }
+      alert(msg);
+    })
+    .finally(function() {
+      if (btnBuscar) {
+        btnBuscar.disabled = false;
+        btnBuscar.innerHTML = "<i class=\"fas fa-search\"></i> Buscar CNPJ";
+      }
+    });
+  }
+
+  if (inputCnpj) {
+    inputCnpj.addEventListener("blur", function() {
+      if (limparCnpj(this.value).length === 14) buscarCnpj();
+    });
+  }
+  if (btnBuscar) btnBuscar.addEventListener("click", buscarCnpj);
+})();
+</script>
+
+{% endblock %}

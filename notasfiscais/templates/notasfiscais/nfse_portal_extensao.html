@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="mb-3">
+    {% include 'parcial/_messages.html' %}
+  </div>
+
+  <h1 class="h3 mb-3">Importar NFSe baixadas no Portal Nacional (extensão do navegador)</h1>
+
+  {% if not request.session.empresa_id %}
+  <div class="alert alert-warning">
+    <strong>Selecione uma empresa</strong> antes de continuar.
+    <a href="{% url 'empresa:lista' %}" class="alert-link">Ir para empresas</a>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    <strong>Empresa:</strong> {{ request.session.empresa_nome }}
+  </div>
+  {% endif %}
+
+  <div class="alert alert-secondary small mb-3">
+    <strong>Extensão «Baixar NFSe» com automação Selenium?</strong>
+    Se marcar <strong>perfil em disco</strong>, o botão abre Chrome ou Edge com uma <strong>pasta de perfil dedicada</strong> — pode instalar a extensão <em>uma vez</em> nesse perfil.
+    Sem essa opção, usa-se um <strong>perfil temporário</strong> (sem extensões já instaladas no seu Chrome de uso diário). No Chrome manual: a extensão atua <strong>nas páginas do portal já logado</strong> (ex.: Notas emitidas). <strong>Quebra-cabeça</strong> → alfinete para fixar o ícone.
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Passo a passo — «Baixar NFSe» (Chrome Web Store)</div>
+    <div class="card-body small">
+      <p class="mb-2">
+        Instale pela loja:
+        <a href="{{ nfse_baixar_webstore_url }}" target="_blank" rel="noopener noreferrer">Baixar NFSe — nota fiscal de serviço eletrônica</a>.
+      </p>
+      <ol class="mb-0">
+        <li>
+          Ajuste abaixo o <strong>período</strong> — ele deve ser o mesmo que você usar na lista de NFSe e o mesmo intervalo que você informar na extensão em <strong>Notas emitidas</strong>.
+        </li>
+        <li>
+          Abra o <a href="{{ portal_nfse_url }}" target="_blank" rel="noopener noreferrer">Emissor Nacional / Login</a> no <strong>Chrome ou Edge</strong>, faça login e vá a <strong>Notas emitidas</strong>. Use o ícone da extensão na barra (a extensão <strong>não</strong> preenche o login por si).
+        </li>
+        <li>
+          Na extensão, informe o período (use <strong>Copiar período</strong> para colar datas no formato dia/mês/ano, se a extensão aceitar texto).
+          Escolha o formato de download <strong>XML + PDF</strong> e inicie o download dos arquivos para uma pasta temporária.
+        </li>
+        <li>
+          Use o <strong>Selenium</strong> nesta página ou a opção <strong>Importar XML da pasta do mês</strong> para gravar cópias e importar — sem anexar ficheiros no navegador.
+        </li>
+      </ol>
+      <p class="mb-0 mt-2 text-muted">
+        Estrutura das cópias (prestador): pasta base do cadastro → subpasta <code>codigo_externo-razão do tomador</code> → <code>MMYYYY</code> (competência/emissão no XML), conforme o cadastro de empresa (campo pasta cópias XML NFSe prestador) ou a configuração global.
+      </p>
+    </div>
+  </div>
+
+  {% if empresa %}
+  {% if not portal_site_login_cadastrado or not portal_site_senha_gravada %}
+  <div class="alert alert-warning small mb-3">
+    Cadastre o <strong>login</strong> e a <strong>senha do portal</strong> em <strong>Configuração de integração</strong> (Portal nacional — site); use as mesmas credenciais ao abrir
+    <a href="{{ portal_nfse_url }}" target="_blank" rel="noopener noreferrer">Emissor Nacional / Login</a>.
+  </div>
+  {% endif %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Pastas de gravação (cadastro da empresa)</div>
+    <div class="card-body small">
+      <p class="mb-1"><strong>Prestador (emitidas):</strong> <code>{{ pasta_xml_prestador|default:"(não configurada — cópias de emitidas podem ser ignoradas)" }}</code></p>
+      <p class="mb-0"><strong>Tomador (recebidas):</strong> <code>{{ pasta_xml_tomador|default:"(não configurada)" }}</code></p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-3" id="periodo-filtro-portal" style="max-width: 52rem;">
+    <div class="card-header fw-semibold">Período do filtro (Selenium e importação da pasta)</div>
+    <div class="card-body">
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.data_inicio.id_for_label }}">{{ form.data_inicio.label }}</label>
+          {{ form.data_inicio }}
+          {% for e in form.data_inicio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.data_fim.id_for_label }}">{{ form.data_fim.label }}</label>
+          {{ form.data_fim }}
+          {% for e in form.data_fim.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+      <p class="form-text small text-muted mb-3">
+        Use <strong>um único mês civil</strong> (ex.: 01/04/2026 a 30/04/2026). Na automação Selenium, os downloads gravam na pasta prestador em
+        <code>…/{código externo}-{razão}/MMAAAA/</code> (ex.: <code>188-OLIVEIRA &amp; SILVA…/042026</code>), conforme o cadastro da empresa; as pastas são criadas se não existirem.
+      </p>
+      <p class="small text-muted mb-0">
+        <a href="{% url 'notasfiscais:list' %}">Voltar à lista</a>
+        {% if request.session.empresa_id %}
+        · <a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}">Pastas XML e integração</a>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3" style="max-width: 52rem;">
+    <div class="card-header fw-semibold">Portal neste Chrome e Selenium</div>
+    <div class="card-body">
+      <div class="alert alert-warning small mb-3" role="status">
+        <strong>Porque parece que «não continua»:</strong> ao trabalhar no portal noutra guia,
+        por segurança o navegador <strong>não deixa</strong> o Saude Financeira controlar o login nem a extensão ali.
+        Depois dos downloads gravados na <strong>pasta do mês</strong> do cadastro (prestador), pode
+        <a href="#importar-pasta-mes" class="alert-link">importar diretamente dessa pasta</a> sem anexar ficheiros.
+        Defina o <a href="#periodo-filtro-portal" class="alert-link">período do filtro</a> no cartão acima (mesmo mês civil).
+      </div>
+      <p class="small text-muted mb-2">
+        Depois do login, vá a <strong>Notas emitidas</strong> e use o ícone da extensão na barra (quebra-cabeça → alfinete, se precisar).
+        O botão <strong>Selenium</strong> abre Chrome ou Edge controlado pelo sistema; em seguida o comando importa os XML da pasta do mês.
+        Também pode usar <strong>Importar XML da pasta do mês</strong> no cartão seguinte.
+      </p>
+      {% if portal_selenium_via_http and request.session.empresa_id %}
+      {% if not portal_selenium_carregavel_ok %}
+      <div class="alert alert-danger small mb-3" role="alert" style="white-space: pre-wrap;">{{ portal_selenium_carregavel_erro }}</div>
+      {% endif %}
+      <p class="small text-muted mb-2">
+        <strong>Selenium:</strong> usa o <strong>Chrome ou Edge instalado</strong> no PC (<code>pip install selenium</code>). Sem perfil em disco, cada execução usa uma pasta temporária (sem extensões herdadas).
+        Com perfil em disco, defina <code>NFSE_PORTAL_PLAYWRIGHT["persistent_context"]=True</code> e <code>browser_channel</code> (<code>chrome</code> ou <code>msedge</code>) em <code>settings.py</code>, ou marque a opção abaixo. Opcional: <code>after_login_emitidas_url</code>.
+      </p>
+      <form method="post" action="{% url 'notasfiscais:portal_extensao_selenium' %}" id="formSeleniumPortal" class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        {% csrf_token %}
+        <input type="hidden" name="data_inicio" id="sel_data_inicio" value="{{ portal_pw_data_inicio_iso|default:'' }}">
+        <input type="hidden" name="data_fim" id="sel_data_fim" value="{{ portal_pw_data_fim_iso|default:'' }}">
+        <div class="form-check me-2">
+          <input class="form-check-input" type="checkbox" name="selenium_perfil" value="1" id="sel_perfil">
+          <label class="form-check-label small" for="sel_perfil">Chrome/Edge com perfil em disco (extensões) — pasta dedicada; feche outras janelas que usem o mesmo perfil</label>
+        </div>
+        <div class="form-check me-2">
+          <input class="form-check-input" type="checkbox" name="selenium_pausa" value="1" id="sel_pausa">
+          <label class="form-check-label small" for="sel_pausa">Pausar no fim (Enter no terminal para fechar o Chrome e iniciar a importação dos XML)</label>
+        </div>
+        <button type="submit" class="btn btn-primary" id="btnSeleniumPortal" {% if not portal_site_login_cadastrado or not portal_site_senha_gravada or not portal_selenium_carregavel_ok %}disabled title="{% if not portal_selenium_carregavel_ok %}Selenium não carrega neste Python — veja o alerta acima{% elif not portal_site_login_cadastrado or not portal_site_senha_gravada %}Cadastre login e senha do portal em Configuração de integração{% endif %}"{% endif %}>
+          <i class="fas fa-robot"></i> Executar login e passos (Selenium)
+        </button>
+      </form>
+      {% elif not portal_selenium_via_http %}
+      <p class="small text-warning mb-2">Automação via botão desativada no servidor (NFSE_PORTAL_PLAYWRIGHT_HTTP). Use o comando <code>manage.py nfse_portal_emitidas_automacao</code> no seu PC.</p>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" class="btn btn-outline-secondary btn-sm js-copiar-periodo-nfse" id="btnCopiarPeriodo">
+          <i class="fas fa-clipboard"></i> Copiar período (dd/mm/aaaa)
+        </button>
+        <span class="text-muted small" id="periodoLegivel"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3" id="importar-pasta-mes" style="max-width: 52rem;">
+    <div class="card-header fw-semibold">Importar XML já na pasta do mês (downloads Selenium / extensão)</div>
+    <div class="card-body">
+      <p class="small text-muted mb-3">
+        Se a empresa tem <strong>pasta cópias XML (prestador)</strong> configurada, os ficheiros ficam em
+        <code>…/código-razão/MMAAAA</code> (o mesmo mês civil das datas no cartão «Período do filtro» acima).
+        Os <code>.xml</code> na <strong>raiz</strong> desta pasta importam-se como notas normais; os que estiverem só em
+        <code>Cancelada/</code> importam-se <strong>automaticamente como canceladas</strong> (valores zerados), sem opção extra.
+      </p>
+      {% if request.session.empresa_id %}
+      <form method="post" action="{% url 'notasfiscais:portal_extensao_importar_pasta_mes' %}" id="formImportarPastaMes" class="d-flex flex-wrap gap-3 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="data_inicio" id="pasta_in_data_inicio" value="">
+        <input type="hidden" name="data_fim" id="pasta_in_data_fim" value="">
+        <button type="submit" class="btn btn-success" id="btnImportarPastaMes">
+          <i class="fas fa-folder-open"></i> Importar XML da pasta do mês
+        </button>
+      </form>
+      {% else %}
+      <p class="text-muted small mb-0">Selecione uma empresa para usar esta opção.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function fmtBR(iso) {
+    if (!iso || iso.length < 10) return '';
+    var p = iso.slice(0, 10).split('-');
+    if (p.length !== 3) return iso;
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function atualizarLegivel() {
+    var di = document.getElementById('{{ form.data_inicio.id_for_label }}');
+    var df = document.getElementById('{{ form.data_fim.id_for_label }}');
+    var leg = document.getElementById('periodoLegivel');
+    if (!di || !df || !leg) return;
+    var a = fmtBR(di.value);
+    var b = fmtBR(df.value);
+    leg.textContent = (a && b) ? (a + ' a ' + b) : '';
+    var podeCopiar = !!(di.value && df.value);
+    document.querySelectorAll('.js-copiar-periodo-nfse').forEach(function (b) {
+      b.disabled = !podeCopiar;
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var di = document.getElementById('{{ form.data_inicio.id_for_label }}');
+    var df = document.getElementById('{{ form.data_fim.id_for_label }}');
+    if (di) di.addEventListener('change', atualizarLegivel);
+    if (df) df.addEventListener('change', atualizarLegivel);
+    if (di) di.addEventListener('input', atualizarLegivel);
+    if (df) df.addEventListener('input', atualizarLegivel);
+    atualizarLegivel();
+    function syncSeleniumHiddenDates() {
+      var diEl = document.getElementById('{{ form.data_inicio.id_for_label }}');
+      var dfEl = document.getElementById('{{ form.data_fim.id_for_label }}');
+      var hdi = document.getElementById('sel_data_inicio');
+      var hdf = document.getElementById('sel_data_fim');
+      if (!diEl || !dfEl || !hdi || !hdf) return;
+      if (diEl.value) hdi.value = diEl.value;
+      if (dfEl.value) hdf.value = dfEl.value;
+    }
+    syncSeleniumHiddenDates();
+    var diVis = document.getElementById('{{ form.data_inicio.id_for_label }}');
+    var dfVis = document.getElementById('{{ form.data_fim.id_for_label }}');
+    if (diVis) diVis.addEventListener('change', syncSeleniumHiddenDates);
+    if (dfVis) dfVis.addEventListener('change', syncSeleniumHiddenDates);
+    if (diVis) diVis.addEventListener('input', syncSeleniumHiddenDates);
+    if (dfVis) dfVis.addEventListener('input', syncSeleniumHiddenDates);
+    function syncPastaMesHiddenDates() {
+      var diEl = document.getElementById('{{ form.data_inicio.id_for_label }}');
+      var dfEl = document.getElementById('{{ form.data_fim.id_for_label }}');
+      var hdi = document.getElementById('pasta_in_data_inicio');
+      var hdf = document.getElementById('pasta_in_data_fim');
+      if (!diEl || !dfEl || !hdi || !hdf) return;
+      if (diEl.value) hdi.value = diEl.value;
+      if (dfEl.value) hdf.value = dfEl.value;
+    }
+    syncPastaMesHiddenDates();
+    if (diVis) diVis.addEventListener('change', syncPastaMesHiddenDates);
+    if (dfVis) dfVis.addEventListener('change', syncPastaMesHiddenDates);
+    if (diVis) diVis.addEventListener('input', syncPastaMesHiddenDates);
+    if (dfVis) dfVis.addEventListener('input', syncPastaMesHiddenDates);
+
+    var fsel = document.getElementById('formSeleniumPortal');
+    if (fsel) {
+      fsel.addEventListener('submit', function (e) {
+        syncSeleniumHiddenDates();
+        var hdi = document.getElementById('sel_data_inicio');
+        var hdf = document.getElementById('sel_data_fim');
+        if (!hdi || !hdf) return;
+        if (!hdi.value || !hdf.value) {
+          e.preventDefault();
+          alert('Preencha data inicial e final no cartão «Período do filtro» antes de executar o Selenium.');
+          return false;
+        }
+      });
+    }
+    var fpasta = document.getElementById('formImportarPastaMes');
+    if (fpasta) {
+      fpasta.addEventListener('submit', function (e) {
+        syncPastaMesHiddenDates();
+        var hdi = document.getElementById('pasta_in_data_inicio');
+        var hdf = document.getElementById('pasta_in_data_fim');
+        if (!hdi || !hdf) return;
+        if (!hdi.value || !hdf.value) {
+          e.preventDefault();
+          alert('Preencha data inicial e final em «Período do filtro» (mesmo mês) antes de importar da pasta.');
+          return false;
+        }
+      });
+    }
+    function copiarPeriodoParaExtensao() {
+      var di = document.getElementById('{{ form.data_inicio.id_for_label }}');
+      var df = document.getElementById('{{ form.data_fim.id_for_label }}');
+      var t = fmtBR(di && di.value) + ' a ' + fmtBR(df && df.value);
+      if (!(di && df && di.value && df.value)) {
+        alert('Preencha primeiro a data inicial e final em «Período do filtro».');
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(function () { alert('Período copiado: ' + t); }, function () { prompt('Copie manualmente:', t); });
+      } else {
+        prompt('Copie manualmente:', t);
+      }
+    }
+    document.querySelectorAll('.js-copiar-periodo-nfse').forEach(function (btn) {
+      btn.addEventListener('click', copiarPeriodoParaExtensao);
+    });
+  });
+})();
+</script>
+{% endblock %}

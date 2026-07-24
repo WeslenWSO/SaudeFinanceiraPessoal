@@ -1,0 +1,905 @@
+{% extends "base.html" %}
+{% load static %}
+{% load validar_cnpj %}
+
+{% block conteudo %}
+<div class="container-fluid">
+  {% if messages %}
+    {% include 'parcial/_messages.html' %}
+  {% endif %}
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h3 class="card-title mb-0">Lançamentos importados</h3>
+            <p class="text-muted small mb-0">Extrato lançado nas contas</p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-secondary btn-sm" title="Contas Bancárias"><i class="fas fa-university"></i> Contas Bancárias</a>
+            <a href="{% url 'extrato:lancamento_new' %}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Novo Lançamento</a>
+            <a href="{% url 'extrato:upload_ofx' %}" class="btn btn-success btn-sm"><i class="fas fa-upload"></i> Importar OFX</a>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-sicoob-abrir-importacao" {% if not contas_sicoob %}disabled title="Cadastre uma conta Sicoob (banco 756/306) e o campo Nº conta API no cadastro da conta bancária."{% endif %}>
+              <i class="fas fa-cloud-download-alt"></i> Importar extrato (API Sicoob)
+            </button>
+            <a href="{% url 'regraConciliacao:regraList' %}" class="btn btn-info btn-sm"><i class="fas fa-cogs"></i> Regras de Conciliação</a>
+            <button type="submit" form="formConciliarPost" formaction="{% url 'extrato:conciliar_automatico' %}" class="btn btn-success btn-sm" onclick="return confirm('Tem certeza que deseja executar a conciliação automática?');" title="Executar conciliação automática (selecione contas abaixo)"><i class="fas fa-robot"></i> Conciliar Automático</button>
+            <a href="{% url 'extrato:exportar_conciliacao' %}" class="btn btn-warning btn-sm {% if not tem_lancamentos_nao_conciliados %}disabled{% endif %}"><i class="fas fa-file-export"></i> Exportar Conciliação</a>
+          </div>
+        </div>
+        <div class="card-body">
+
+          {% if object_list %}
+          <div class="panel mb-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div>
+                <strong>Período:</strong>
+                {% if periodo_selecionado %}{% for p in periodos %}{% if p.value == periodo_selecionado %}{{ p.label }}{% endif %}{% endfor %}{% else %}Todos os períodos{% endif %}
+                <span class="text-muted ms-2">| {{ total_lancamentos }} lançamento{{ total_lancamentos|pluralize }}</span>
+              </div>
+              <div class="d-flex flex-wrap gap-3 align-items-center justify-content-end">
+                <div class="small">
+                  <strong>Entradas</strong> <span class="text-success" title="Soma dos valores positivos">R$ {{ soma_entradas|floatformat:2 }}</span>
+                </div>
+                <div class="small">
+                  <strong>Retiradas</strong> <span class="text-danger" title="Soma dos valores negativos (exibida em positivo)">R$ {{ soma_retiradas_abs|floatformat:2 }}</span>
+                </div>
+                <div class="small fw-bold border-start ps-3 ms-1">
+                  <strong>Total movimentação</strong>
+                  <span class="{% if total_movimentacao < 0 %}text-danger{% else %}text-success{% endif %}" title="Entradas − Retiradas (no período filtrado)">R$ {{ total_movimentacao|floatformat:2 }}</span>
+                </div>
+                <div class="fw-bold text-primary border-start ps-3 ms-1">
+                  Saldo Atual: R$ {% for l in object_list reversed %}{% if forloop.last %}{{ l.saldo_calculado|floatformat:2 }}{% endif %}{% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <section class="panel panel-tight mb-4">
+            <details open>
+              <summary><i class="fas fa-filter"></i> Filtros e Pesquisa</summary>
+              <form method="get" class="filtros-form">
+                <div class="filtros-grid">
+                  <div><label for="data_inicio">Data Inicial</label><input type="date" id="data_inicio" name="data_inicio" value="{{ request.GET.data_inicio }}"></div>
+                  <div><label for="data_fim">Data Final</label><input type="date" id="data_fim" name="data_fim" value="{{ request.GET.data_fim }}"></div>
+                  <div><label for="conciliado">Conciliado?</label><select id="conciliado" name="conciliado"><option value="">Todos</option><option value="1" {% if request.GET.conciliado == "1" %}selected{% endif %}>Sim</option><option value="0" {% if request.GET.conciliado == "0" %}selected{% endif %}>Não</option></select></div>
+                  <div><label for="valor_de">Valor (De R$)</label><input type="number" id="valor_de" name="valor_de" value="{{ request.GET.valor_de }}" step="0.01" placeholder="0,00"></div>
+                  <div><label for="valor_ate">Valor (Até R$)</label><input type="number" id="valor_ate" name="valor_ate" value="{{ request.GET.valor_ate }}" step="0.01" placeholder="0,00"></div>
+                  <div><label for="historico">Histórico</label><input type="text" id="historico" name="historico" value="{{ request.GET.historico }}" placeholder="Buscar no histórico..."></div>
+                  <div class="btn-group-filtros"><button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filtrar</button><a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary"><i class="fas fa-times"></i> Limpar</a></div>
+                </div>
+                {% if empresas %}<input type="hidden" name="empresa" value="{{ empresas.0.id }}">{% else %}
+                <div class="mt-3"><label class="d-block mb-1">Empresa</label><select name="empresa" style="max-width: 280px;"><option value="">Empresa…</option>{% for e in empresas %}<option value="{{e.id}}" {% if request.GET.empresa == e.id|stringformat:"s" %}selected{% endif %}>{{e}}</option>{% endfor %}</select></div>{% endif %}
+                <div id="secao-contas-bancarias" class="account-filter mt-3 pt-3" style="border-top: 1px solid var(--app-sidebar-border); scroll-margin-top: 1rem;">
+                  <label class="d-block mb-2 fw-bold">Contas Bancárias</label>
+                  <div class="account-cards d-flex flex-wrap gap-2" style="max-height: 200px; overflow-y: auto;">
+                    {% for c in contas %}
+                    <div class="account-card border rounded p-2" style="width: 200px;">
+                      <div class="d-flex align-items-center gap-2">
+                        <input type="checkbox" name="contas" value="{{c.id}}" id="conta_{{c.id}}" {% if c.id|stringformat:"s" in contas_selecionadas %}checked{% endif %} class="form-check-input">
+                        {% if c.banco.logo %}<img src="{{c.banco.logo.url}}" alt="{{c.banco.nome}}" style="width: 40px; height: 40px; object-fit: contain;">{% else %}<div class="d-flex align-items-center justify-content-center rounded bg-light" style="width: 40px; height: 40px; font-size: 12px; font-weight: bold;">{{c.banco.nome|slice:":2"}}</div>{% endif %}
+                        <div class="flex-grow-1 small">
+                          <div class="fw-bold">{{c.banco.nome}}</div>
+                          <div class="text-muted">
+                            {% if c.agencia and c.conta %}Ag: {{c.agencia}} | Cc: {{c.conta}}{% else %}Ag/Conta não informado{% endif %}
+                          </div>
+                          <div class="text-muted" style="font-size: 0.78rem;">{{ c.descricao|default:"Sem descrição" }}</div>
+                          {% if c.ultimo_lancamento_data %}<div class="text-muted" style="font-size: 0.75rem;">Saldo: R$ {{ c.saldo_atual|floatformat:2 }}</div>{% endif %}
+                        </div>
+                      </div>
+                    </div>
+                    {% empty %}<p class="text-muted fst-italic mb-0">Nenhuma conta bancária encontrada.</p>{% endfor %}
+                  </div>
+                  <div class="mt-2"><button type="button" id="select-all-accounts" class="btn btn-muted btn-sm">Selecionar Todas</button> <button type="button" id="clear-all-accounts" class="btn btn-muted btn-sm">Limpar Seleção</button></div>
+                </div>
+              </form>
+            </details>
+          </section>
+
+          <section class="panel panel-tight mb-4 border border-primary border-opacity-25 rounded" id="sicoob-api-import" style="scroll-margin-top: 5rem;">
+            <details>
+              <summary class="fw-semibold"><i class="fas fa-cloud-download-alt text-primary"></i> Importar extrato pela API Sicoob</summary>
+              <p class="small text-muted mb-2 mt-2">
+                Consulta o extrato no ambiente Sicoob (escopo <code>cco_extrato</code>) e grava os lançamentos.
+                <strong>Cadastro na tela:</strong> menu <strong>Empresa</strong> → lista → <strong>Editar</strong> a empresa → seção <strong>«API Sicoob — extrato automático»</strong> (Client ID, chave de acesso e senha). <strong>Ou no servidor:</strong> <code>SICOOB_CLIENT_ID</code> e, para PJ, <code>SICOOB_CHAVE_ACESSO</code> + <code>SICOOB_SENHA</code> (ou <code>SICOOB_USERNAME</code> + <code>SICOOB_PASSWORD</code> para PF).
+                No cadastro da conta bancária, preencha <strong>Sicoob — Nº conta API (extrato)</strong> (número usado em <code>numeroContaCorrente</code>).
+              </p>
+              {% if contas_sicoob %}
+              <form method="post" action="{% url 'extrato:importar_sicoob' %}" class="row g-2 align-items-end flex-wrap">
+                {% csrf_token %}
+                <div class="col-12 col-md-4">
+                  <label for="sicoob_conta_id" class="form-label small mb-0">Conta Sicoob</label>
+                  <select name="conta_id" id="sicoob_conta_id" class="form-select form-select-sm" required>
+                    {% for c in contas_sicoob %}
+                    <option value="{{ c.id }}">{{ c.banco.nome }} — {% if c.agencia and c.conta %}Ag {{ c.agencia }} Cc {{ c.conta }}{% else %}{{ c.descricao|default:"conta" }}{% endif %}{% if c.sicoob_numero_conta_corrente_api %} (API: {{ c.sicoob_numero_conta_corrente_api }}){% endif %}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label for="sicoob_mes" class="form-label small mb-0">Mês</label>
+                  <input type="number" name="mes" id="sicoob_mes" class="form-control form-control-sm" min="1" max="12" value="{% now "n" %}" required>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label for="sicoob_ano" class="form-label small mb-0">Ano</label>
+                  <input type="number" name="ano" id="sicoob_ano" class="form-control form-control-sm" min="2000" max="2100" value="{% now "Y" %}" required>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label for="sicoob_dia_ini" class="form-label small mb-0">Dia inicial <span class="text-muted">(opc.)</span></label>
+                  <input type="number" name="dia_inicial" id="sicoob_dia_ini" class="form-control form-control-sm" min="1" max="31" placeholder="1">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label for="sicoob_dia_fim" class="form-label small mb-0">Dia final <span class="text-muted">(opc.)</span></label>
+                  <input type="number" name="dia_final" id="sicoob_dia_fim" class="form-control form-control-sm" min="1" max="31" placeholder="31">
+                </div>
+                <div class="col-12 col-md-auto">
+                  <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-download"></i> Baixar e importar</button>
+                </div>
+              </form>
+              {% else %}
+              <p class="small text-warning mb-0">Nenhuma conta Sicoob ativa encontrada. Cadastre uma conta com banco Sicoob (756/306) em <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a> e informe o <strong>Nº conta API</strong> no cadastro.</p>
+              {% endif %}
+            </details>
+          </section>
+
+          <div class="extrato-container panel p-0" style="overflow: hidden;">
+  <form id="formConciliarPost" method="post" action="{% url 'extrato:conciliar' %}">
+    {% csrf_token %}
+    <div class="table-responsive">
+      <table class="table table-striped" style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; width: 40px;">
+              <input type="checkbox" id="select-all" style="margin: 0;">
+            </th>
+            {% comment %} <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">FITID</th> {% endcomment %}
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Data</th>
+
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Documento</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Histórico</th>
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Origem</th>
+            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Valor</th>
+            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Saldo</th>
+            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Status</th>
+            
+            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in object_list %}
+          <tr style="border-bottom: 1px solid #f1f3f4; {% if forloop.counter0|divisibleby:2 %}background: #fafbfc;{% endif %}">
+            <td style="padding: 12px;">
+              <input type="checkbox" name="lancamentos" value="{{ l.id }}" class="lancamento-checkbox" style="margin: 0;">
+            </td>
+            {% comment %} <td style="padding: 12px; font-family: monospace; font-size: 12px; color: #666;">{{ l.fitid|default:"-" }}</td> {% endcomment %}
+            <td style="padding: 12px; font-weight: 500;">{{ l.data|date:"d/m/Y" }}</td>
+          
+            <td style="padding: 12px;">{{ l.documento|default:"-" }}</td>
+            <td style="padding: 12px; max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ l.historico }}">{{ l.historico|historico_com_links_cnpj }}</td>
+            <td style="padding: 12px;">{{ l.conta.conta }}</td>
+            <td style="padding: 12px; text-align: right; font-weight: 500; {% if l.valor >= 0 %}color: #28a745;{% else %}color: #dc3545;{% endif %}">
+              {% if l.valor >= 0 %}+{% endif %}R$ {{ l.valor|floatformat:2 }}
+            </td>
+            <td style="padding: 12px; text-align: right; font-weight: 500; color: #007bff;">
+              R$ {{ l.saldo_calculado|floatformat:2 }}
+            </td>
+            <td style="padding: 12px; text-align: center;">
+              {% if l.conciliado %}
+                <span style="background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">✓ Conciliado</span>
+              {% else %}
+                <span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">⏳ Pendente</span>
+              {% endif %}
+            </td>
+            
+           
+            <td style="padding: 12px; text-align: center;">
+              <div style="display: flex; gap: 5px; justify-content: center;">
+                <button type="button" class="btn btn-sm btn-outline-info" title="Detalhes"
+                        data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                        onclick="carregarDetalhes('lancamento', {{ l.id }})">
+                  <i class="fas fa-eye"></i>
+                </button>
+                {% if not l.conciliado %}
+                <a href="{% url 'extrato:lancamento_edit' l.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-warning" title="Editar">
+                  <i class="fas fa-edit"></i>
+                </a>
+                {% endif %}
+                {% if not l.conciliado %}
+                <button type="button" class="btn btn-sm btn-outline-primary transfer-btn" title="Transferir" onclick="transferirLancamento({{ l.id }})">
+                  <i class="fas fa-exchange-alt"></i>
+                </button>
+                {% endif %}
+
+
+                 
+              {% if not l.conciliado and l.valor < 0 %}
+                <button type="button" class="btn btn-sm btn-outline-danger conciliar-despesa-btn" title="Conciliar Despesa"
+                        data-bs-toggle="modal" data-bs-target="#modalConciliarDespesa"
+
+                        onclick="prepararModalConciliarDespesa({{ l.id }}, '{{ l.historico|escapejs }}', {{ l.valor|floatformat:'2' }},  '{{ l.data|date:'d/m/Y'|escapejs }}',
+  '{{ l.data|date:'Y-m-d'|escapejs }}' )">
+                  <i class="fas fa-money-bill-wave"></i>
+                </button>
+              {% endif %}
+            
+                
+              {% if not l.conciliado %}
+                <button type="button" class="btn btn-sm btn-outline-success conciliar-multiplo-btn" title="Conciliar Múltiplo"
+                        onclick="conciliarMultiploComFiltros({{ l.id }})">
+                  <i class="fas fa-link"></i>
+                </button>
+              {% endif %}
+            
+
+
+
+
+                {% if l.conciliado and l.tem_relatorios_cartao %}
+                <a href="{% url 'extrato:lancamento_relatorios' l.id %}" class="btn btn-sm btn-outline-success" title="Ver Relatórios Conciliados">
+                  <i class="fas fa-file-invoice-dollar"></i>
+                </a>
+                {% endif %}
+                {% if not l.conciliado %}
+                <button type="button" class="btn btn-sm btn-outline-danger" title="Excluir" onclick="if(confirm('Tem certeza que deseja excluir este lançamento?')) window.location.href='{% url 'extrato:lancamento_delete' l.id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}';">
+                  <i class="fas fa-trash"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="11" style="padding: 40px; text-align: center; color: #666; font-style: italic;">
+              Nenhum lançamento encontrado para o período selecionado.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if object_list %}
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button type="submit" formaction="{% url 'extrato:conciliar_automatico' %}" class="btn btn-info btn-sm" onclick="return confirm('Tem certeza que deseja executar a conciliação automática baseada nas regras?');"><i class="fas fa-robot"></i> Conciliar Automático</button>
+        <button type="submit" formaction="{% url 'extrato:desconciliar' %}" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja desconciliar os lançamentos selecionados?');"><i class="fas fa-times-circle"></i> Desconciliar Selecionados</button>
+      </div>
+      <small class="text-muted">{{ total_lancamentos }} lançamento{{ total_lancamentos|pluralize }}</small>
+    </div>
+    {% endif %}
+  </form>
+
+  <!-- Paginação -->
+  {% if is_paginated %}
+  <div class="pagination-container" style="padding: 15px; background: #f8f9fa; border-top: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <label for="paginate-select" style="font-weight: bold; margin: 0;">Itens por página:</label>
+      <select id="paginate-select" onchange="changePaginateBy(this.value)" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+        <option value="25" {% if paginate_by == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if paginate_by == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if paginate_by == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if paginate_by == 200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+    <div class="pagination" style="display: flex; gap: 5px;">
+      {% if page_obj.has_previous %}
+        <a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">Primeira</a>
+        <a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">&laquo; Anterior</a>
+      {% endif %}
+
+      <span style="padding: 8px 12px; background: #e9ecef; border-radius: 4px;">
+        Página {{ page_obj.number }} de {{ paginator.num_pages }}
+      </span>
+
+      {% if page_obj.has_next %}
+        <a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" style="padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">Próximo &raquo;</a>
+      {% endif %}
+
+      {% if page_obj.has_next %}
+        <a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" style="padding: 8px 12px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">Última</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+          </div>
+        </div>
+      </div>
+  </div>
+</div>
+
+<!-- Modal para Conciliar Despesa -->
+<div class="modal fade" id="modalConciliarDespesa" tabindex="-1" aria-labelledby="modalConciliarDespesaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConciliarDespesaLabel">
+                    <i class="fas fa-money-bill-wave me-2"></i>Conciliar Despesa
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="formConciliarDespesa" method="post" action="{% url 'extrato:conciliar_despesa' %}">
+                {% csrf_token %}
+                <input type="hidden" id="lancamentoId" name="lancamento_id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Lançamento selecionado:</strong><br>
+                                <span id="lancamentoInfo"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="categoriaDespesa" class="form-label">Categoria *</label>
+                                <input type="text" class="form-control" id="categoriaDespesa" name="categoria_nome" placeholder="Digite o nome da categoria..." required autocomplete="off">
+                                <input type="hidden" id="categoriaId" name="categoria_id">
+                                <div id="resultadosCategoriaModal" class="mt-1" style="display: none; max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: white; z-index: 1000;"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="formaPagamentoDespesa" class="form-label">Forma de Pagamento *</label>
+                                <select class="form-select" id="formaPagamentoDespesa" name="forma_pagamento_id" required>
+                                    <option value="">Selecione uma forma de pagamento...</option>
+                                    {% for forma in formas_pagamento %}
+                                    <option value="{{ forma.id }}">{{ forma.descricao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="numeroNotaDespesa" class="form-label">Número da Nota</label>
+                                <input type="text" class="form-control" id="numeroNotaDespesa" name="numero_nota" value ="0" placeholder="Número da nota fiscal">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dataEmissaoDespesa" class="form-label">Data de Emissão</label>
+                                <input type="date" class="form-control" id="dataEmissaoDespesa" name="data_emissao" ">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="fornecedorDespesa" class="form-label">Fornecedor</label>
+                                <select class="form-select" id="fornecedorDespesa" name="fornecedor_id">
+                                    <option value="">Selecione um fornecedor (opcional)...</option>
+                                    {% for fornecedor in fornecedores %}
+                                    <option value="{{ fornecedor.id }}">{{ fornecedor.razao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Informações da conciliação:</strong><br>
+                        • Será criada uma conta a pagar com os dados informados<br>
+                        • O lançamento será marcado como conciliado<br>
+                        • Será criado um movimento no extrato vinculado à conta a pagar
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success" id="btnConciliarDespesa">
+                        <i class="fas fa-check me-2"></i>Conciliar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal consulta CNPJ (histórico do extrato) -->
+<div class="modal fade" id="modalCnpjExtrato" tabindex="-1" aria-labelledby="modalCnpjExtratoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalCnpjExtratoLabel"><i class="fas fa-building me-2"></i>Consulta CNPJ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body" id="modalCnpjExtratoBody">
+        <div class="text-center py-3">
+          <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>
+          <p class="mt-2 mb-0">Buscando os dados da empresa...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesLabel">
+                    <i class="fas fa-info-circle me-2"></i>Detalhes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var urlBuscarCnpjExtrato = "{% url 'empresa:buscar_cnpj_ajax' %}";
+var urlFornecedorCreate = "{% url 'fornecedor:forn-create' %}";
+var urlFornecedorEditTpl = "{% url 'fornecedor:forn-update' 999999 %}";
+
+function formatarCnpjDigitos(d) {
+  var x = String(d || "").replace(/\D/g, "");
+  if (x.length !== 14) return d || "";
+  return x.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+}
+
+function escapeHtmlExtrato(s) {
+  if (s == null || s === undefined) return "";
+  var d = document.createElement("div");
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function linhaDetalheCnpjModal(label, valor) {
+  var v = valor != null && String(valor).trim() !== "" ? String(valor) : "—";
+  return (
+    '<p class="mb-2 small"><strong>' +
+    escapeHtmlExtrato(label) +
+    ":</strong> " +
+    escapeHtmlExtrato(v) +
+    "</p>"
+  );
+}
+
+document.body.addEventListener("click", function (e) {
+  var link = e.target.closest(".extrato-cnpj-link");
+  if (!link) return;
+  e.preventDefault();
+  var digitos = (link.getAttribute("data-cnpj-digits") || "").replace(/\D/g, "");
+  if (digitos.length !== 14) return;
+
+  var body = document.getElementById("modalCnpjExtratoBody");
+  var modalEl = document.getElementById("modalCnpjExtrato");
+  if (!body || !modalEl || typeof bootstrap === "undefined") return;
+
+  body.innerHTML =
+    '<div class="text-center py-3">' +
+    '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div>' +
+    '<p class="mt-2 mb-0">Buscando os dados da empresa...</p>' +
+    "</div>";
+
+  var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modal.show();
+
+  var url =
+    urlBuscarCnpjExtrato +
+    "?cnpj=" +
+    encodeURIComponent(digitos) +
+    "&verificar_fornecedor_local=1";
+  fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+    credentials: "same-origin",
+  })
+    .then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw { status: r.status, data: data };
+        return data;
+      });
+    })
+    .then(function (data) {
+      if (!data.success || !data.empresa) {
+        body.innerHTML =
+          '<div class="alert alert-warning mb-0">' +
+          escapeHtmlExtrato(data.message || "Não foi possível obter os dados.") +
+          "</div>";
+        return;
+      }
+      var emp = data.empresa;
+      var socios = emp.socios || [];
+      var lista =
+        socios.length === 0
+          ? "<p class=\"text-muted mb-0\">Nenhum sócio listado na consulta.</p>"
+          : "<ul class=\"list-group list-group-flush\">" +
+            socios
+              .map(function (s) {
+                var nome = escapeHtmlExtrato(s.socio || s.nome || "");
+                var tipo = s.tipo || s.qualificacao || "";
+                var extra = tipo ? " <span class=\"text-muted\">— " + escapeHtmlExtrato(tipo) + "</span>" : "";
+                return "<li class=\"list-group-item px-0\">" + nome + extra + "</li>";
+              })
+              .join("") +
+            "</ul>";
+      var headerAlerts = "";
+      if (data.economia_api) {
+        headerAlerts +=
+          '<div class="alert alert-light border small py-2 mb-2"><i class="fas fa-leaf text-success me-1"></i>Consulta à API pública não foi necessária (dados locais).</div>';
+      }
+      if (emp.fornecedor_cadastrado) {
+        headerAlerts +=
+          '<div class="alert alert-success small mb-2"><i class="fas fa-truck me-1"></i>Já cadastrado como fornecedor nesta empresa.</div>';
+        if (emp.fornecedor_id) {
+          headerAlerts +=
+            '<p class="small mb-2"><a class="btn btn-outline-secondary btn-sm" href="' +
+            urlFornecedorEditTpl.replace("999999", String(emp.fornecedor_id)) +
+            '"><i class="fas fa-external-link-alt me-1"></i>Abrir cadastro do fornecedor</a></p>';
+        }
+      } else if (emp.ja_cadastrada) {
+        headerAlerts +=
+          '<div class="alert alert-info small mb-2"><i class="fas fa-info-circle me-1"></i>Esta empresa já está cadastrada no sistema.</div>';
+      }
+      var podeCad = emp.pode_cadastrar_fornecedor === true;
+      var btnCadForn = "";
+      if (podeCad) {
+        var qs = new URLSearchParams();
+        qs.set("cnpj", String(emp.cnpj || digitos).replace(/\D/g, ""));
+        qs.set("razao", emp.razao || "");
+        if (emp.telefone) qs.set("telefone", emp.telefone);
+        btnCadForn =
+          '<div class="mt-3 pt-2 border-top">' +
+          '<a href="' +
+          urlFornecedorCreate +
+          "?" +
+          qs.toString() +
+          '" class="btn btn-primary"><i class="fas fa-truck me-1"></i>Cadastrar fornecedor</a>' +
+          '<p class="text-muted small mt-2 mb-0">Disponível após consulta à Receita. Abre o cadastro com CNPJ, razão social e telefone quando disponível na consulta.</p>' +
+          "</div>";
+      }
+      var det = emp.detalhes || {};
+      var atividades = det.atividades || [];
+      var ativHtml;
+      if (atividades.length) {
+        ativHtml =
+          '<ol class="small ps-3 mb-3">' +
+          atividades
+            .map(function (a) {
+              return '<li class="mb-1">' + escapeHtmlExtrato(a) + "</li>";
+            })
+            .join("") +
+          "</ol>";
+      } else {
+        ativHtml = '<p class="text-muted small mb-3">—</p>';
+      }
+      body.innerHTML =
+        headerAlerts +
+        "<p class=\"mb-1\"><strong>CNPJ:</strong> " +
+        escapeHtmlExtrato(formatarCnpjDigitos(emp.cnpj || digitos)) +
+        "</p>" +
+        "<p class=\"mb-1\"><strong>Razão social:</strong> " +
+        escapeHtmlExtrato(emp.razao || "—") +
+        "</p>" +
+        "<p class=\"mb-3\"><strong>Nome fantasia:</strong> " +
+        escapeHtmlExtrato(emp.nome_fantasia || "—") +
+        "</p>" +
+        "<p class=\"mb-3\"><strong>Telefone:</strong> " +
+        (function () {
+          var t = String(emp.telefone || "").trim();
+          if (!t) t = String((emp.detalhes || {}).telefone || "").trim();
+          return escapeHtmlExtrato(t || "—");
+        })() +
+        "</p>" +
+        '<hr class="my-2">' +
+        '<p class="fw-bold mb-2">Atividades (CNAE)</p>' +
+        ativHtml +
+        linhaDetalheCnpjModal("Natureza jurídica", det.natureza_juridica) +
+        linhaDetalheCnpjModal("Porte", det.porte) +
+        linhaDetalheCnpjModal("Data de abertura", det.data_abertura) +
+        linhaDetalheCnpjModal("Situação cadastral", det.situacao_cadastral) +
+        linhaDetalheCnpjModal("Data da situação cadastral", det.data_situacao_cadastral) +
+        linhaDetalheCnpjModal("Cidade — UF", det.cidade_uf) +
+        '<hr class="my-2">' +
+        '<p class="fw-bold mb-1">Sócios</p>' +
+        lista +
+        btnCadForn;
+    })
+    .catch(function (err) {
+      var msg =
+        err.data && err.data.message
+          ? err.data.message
+          : err.status === 404
+          ? "CNPJ não encontrado."
+          : "Erro ao consultar. Tente novamente.";
+      body.innerHTML =
+        '<div class="alert alert-danger mb-0">' + escapeHtmlExtrato(msg) + "</div>";
+    });
+});
+
+function changePaginateBy(value) {
+    const url = new URL(window.location);
+    url.searchParams.set('paginate_by', value);
+    url.searchParams.delete('page'); // Reset to first page when changing items per page
+    window.location = url;
+}
+
+function toggleCustomDates() {
+    const periodoSelect = document.getElementById('periodo-select');
+    const customDatesDiv = document.getElementById('custom-dates');
+    if (periodoSelect.value === 'custom') {
+        customDatesDiv.style.display = 'block';
+    } else {
+        customDatesDiv.style.display = 'none';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleCustomDates();
+});
+
+document.getElementById('select-all').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.lancamento-checkbox');
+    checkboxes.forEach(cb => cb.checked = this.checked);
+});
+
+// Account selection functionality
+document.getElementById('select-all-accounts').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('input[name="contas"]');
+    checkboxes.forEach(cb => cb.checked = true);
+});
+
+document.getElementById('clear-all-accounts').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('input[name="contas"]');
+    checkboxes.forEach(cb => cb.checked = false);
+});
+
+// Auto-submit form when account checkboxes change
+document.querySelectorAll('input[name="contas"]').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        // Optional: auto-submit on change, or let user click filter button
+        // document.querySelector('form.filters').submit();
+    });
+});
+
+// Função para preparar modal de conciliação de despesa
+function prepararModalConciliarDespesa(lancamentoId, historico, valor, dataLancamento, dataLancamentoISO) {
+    console.log({lancamentoId, historico, valor, dataLancamento, dataLancamentoISO});
+    // Preencher informações do lançamento
+    document.getElementById('lancamentoId').value = lancamentoId;
+    document.getElementById('lancamentoInfo').innerHTML = `
+        <strong>Histórico:</strong> ${historico}<br>
+        <strong>Valor:</strong> R$ ${Math.abs(valor).toFixed(2)}<br>
+        <strong>Data:</strong> ${dataLancamentoISO || "Sem data"}
+    `;
+
+     // Preenche o input do tipo date (aceita apenas formato yyyy-mm-dd)
+    document.getElementById('dataEmissaoDespesa').value = dataLancamentoISO;
+
+    // Preservar filtros atuais no action do form
+    const form = document.getElementById('formConciliarDespesa');
+    const currentUrl = new URL(window.location);
+    const queryParams = currentUrl.searchParams.toString();
+    const baseAction = '{% url "extrato:conciliar_despesa" %}';
+    form.action = queryParams ? `${baseAction}?${queryParams}` : baseAction;
+}
+
+// Função para redirecionar para conciliar múltiplo preservando filtros
+function conciliarMultiploComFiltros(lancamentoId) {
+    const currentUrl = new URL(window.location);
+    const queryParams = currentUrl.searchParams.toString();
+    const baseUrl = '{% url "extrato:conciliar_multiplo" 0 %}'.replace('0', lancamentoId);
+    const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+    window.location.href = url;
+}
+
+// Função para transferir lançamento
+function transferirLancamento(lancamentoId) {
+    const currentUrl = new URL(window.location);
+    const queryParams = currentUrl.searchParams.toString();
+    const baseUrl = '{% url "extrato:transferir" %}';
+    const url = queryParams ? `${baseUrl}?lancamento_id=${lancamentoId}&${queryParams}` : `${baseUrl}?lancamento_id=${lancamentoId}`;
+    window.location.href = url;
+}
+
+// Event listener para quando o modal de conciliar despesa é mostrado
+document.getElementById('modalConciliarDespesa').addEventListener('shown.bs.modal', function() {
+    inicializarBuscaCategoriaDespesa();
+});
+
+// Função para implementar busca dinâmica de categoria no modal de despesa
+function inicializarBuscaCategoriaDespesa() {
+    const categoriaInput = document.getElementById('categoriaDespesa');
+    const resultadosDiv = document.getElementById('resultadosCategoriaModal');
+    let timeoutId;
+    let categoriaSelecionada = null;
+
+    // Função para buscar categorias
+    function buscarCategorias(termo) {
+        if (termo.length < 3) return;
+
+        fetch('/contasareceber/buscar_categorias/?q=' + encodeURIComponent(termo))
+            .then(response => response.json())
+            .then(data => {
+                mostrarResultados(data.categorias);
+            })
+            .catch(error => {
+                console.error('Erro na busca:', error);
+                resultadosDiv.innerHTML = '<div class="alert alert-danger">Erro ao buscar categorias.</div>';
+                resultadosDiv.style.display = 'block';
+            });
+    }
+
+    // Função para mostrar resultados
+    function mostrarResultados(categorias) {
+        if (categorias.length === 0) {
+            resultadosDiv.innerHTML = '<div class="alert alert-info">Nenhuma categoria encontrada.</div>';
+            resultadosDiv.style.display = 'block';
+            return;
+        }
+
+        let html = '<div class="list-group">';
+        categorias.forEach(categoria => {
+            html += `
+                <button type="button" class="list-group-item list-group-item-action categoria-item-despesa"
+                        data-id="${categoria.id}" data-nome="${categoria.nome_completo}">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${categoria.nome_completo}</h6>
+                        <small class="text-muted">${categoria.tipo_display}</small>
+                    </div>
+                    <small class="text-muted">${categoria.grupo || 'Sem grupo'}</small>
+                </button>
+            `;
+        });
+        html += '</div>';
+        resultadosDiv.innerHTML = html;
+        resultadosDiv.style.display = 'block';
+
+        // Adicionar event listeners para seleção
+        document.querySelectorAll('.categoria-item-despesa').forEach(item => {
+            item.addEventListener('click', function() {
+                // Remover seleção anterior
+                document.querySelectorAll('.categoria-item-despesa').forEach(el => el.classList.remove('active'));
+                // Selecionar este item
+                this.classList.add('active');
+                categoriaSelecionada = {
+                    id: this.dataset.id,
+                    nome: this.dataset.nome
+                };
+                categoriaInput.value = this.dataset.nome;
+                document.getElementById('categoriaId').value = this.dataset.id;
+                resultadosDiv.style.display = 'none';
+            });
+        });
+    }
+
+    // Event listener para input de categoria
+    categoriaInput.addEventListener('input', function() {
+        const termo = this.value.trim();
+        clearTimeout(timeoutId);
+
+        if (termo.length >= 3) {
+            timeoutId = setTimeout(() => buscarCategorias(termo), 300);
+        } else {
+            resultadosDiv.style.display = 'none';
+            categoriaSelecionada = null;
+            document.getElementById('categoriaId').value = '';
+        }
+    });
+
+    // Event listener para quando o campo perde o foco
+    categoriaInput.addEventListener('blur', function() {
+        // Pequeno delay para permitir clique nos resultados
+        setTimeout(() => {
+            if (!categoriaSelecionada) {
+                categoriaInput.value = '';
+                document.getElementById('categoriaId').value = '';
+            }
+        }, 150);
+    });
+
+    // Event listener para quando o campo ganha foco
+    categoriaInput.addEventListener('focus', function() {
+        if (this.value.trim().length >= 3) {
+            buscarCategorias(this.value.trim());
+        }
+    });
+}
+
+// Função para carregar detalhes no modal
+window.carregarDetalhes = function(tipo, id) {
+    const modalBody = document.getElementById('modalDetalhesBody');
+    modalBody.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Carregando detalhes...</p>
+        </div>
+    `;
+
+    // Fazer requisição AJAX
+    fetch(`/extrato/detalhes/${tipo}/${id}/`)
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // Se não é JSON, provavelmente é HTML (login page ou erro)
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                // Verificar se é página de login
+                return response.text().then(text => {
+                    if (text.includes('<html') || text.includes('<HTML')) {
+                        // Redirecionar para login
+                        window.location.href = '/accounts/login/';
+                        throw new Error('Sessão expirada. Redirecionando para login...');
+                    } else {
+                        throw new Error('Resposta inesperada do servidor');
+                    }
+                });
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.error}
+                    </div>
+                `;
+            } else {
+                modalBody.innerHTML = data.html;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro ao carregar detalhes: ${error.message}
+                </div>
+            `;
+        });
+};
+
+(function () {
+  var btn = document.getElementById('btn-sicoob-abrir-importacao');
+  var panel = document.getElementById('sicoob-api-import');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', function () {
+    if (btn.disabled) return;
+    var det = panel.querySelector('details');
+    if (det) det.open = true;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(function () {
+      var el = panel.querySelector('#sicoob_conta_id, #sicoob_mes, button[type="submit"]');
+      if (el) el.focus();
+    }, 350);
+  });
+})();
+</script>
+
+
+<p>
+  <a href="{% url 'extrato:upload_ofx' %}">Importar OFX</a> |
+  <a href="{% url 'extrato:upload_pdf' %}">Importar PDF</a> |
+  <a href="{% url 'extrato:lancamento_new' %}">Lançamento manual</a> |
+  
+</p>
+
+{% endblock %}

@@ -1,0 +1,1135 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Baixar Conta a Receber</h3>
+                    <small class="text-muted">{{ conta }}</small>
+                    <p class="mb-0 mt-2 small">
+                        Nesta tela: use <strong>juros, desconto e tarifas</strong> para equalizar o título ao pendente; com extrato, em “Como tratar a diferença?” pode <strong>gerar parcela da diferença</strong> (novo título).
+                    </p>
+                </div>
+                <div class="card-body">
+                    <!-- Informações da Conta -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">Informações da Conta</h6>
+                                    <p class="mb-1"><strong>Cliente:</strong> {{ conta.cliente }}</p>
+                                    <p class="mb-1"><strong>Valor Original:</strong> R$ {{ conta.valor_a_receber|floatformat:2 }}</p>
+                                    <p class="mb-1"><strong>Saldo nominal pendente:</strong> R$ {{ conta.get_saldo_nominal_pendente|floatformat:2 }}</p>
+                                    <p class="mb-1"><strong>Total líquido a receber:</strong> <span class="text-primary fw-bold">R$ {{ conta.get_valor_liquido_restante|floatformat:2 }}</span></p>
+                                    <p class="mb-1"><strong>Data Vencimento:</strong> {{ conta.data_vencimento|date:"d/m/Y" }}</p>
+                                    <p class="mb-1"><strong>Status:</strong>
+                                        <span class="badge {% if conta.status == 'pago' %}bg-success{% elif conta.status == 'pendente' %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ conta.get_status_display }}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Resumo do Recebimento</h6>
+                                    <p class="mb-1"><strong>Já Recebido:</strong> R$ {{ conta.valor_recebido|default:0|floatformat:2 }}</p>
+                                    <p class="mb-1"><strong>Descontos:</strong> R$ {{ conta.desconto|default:0|floatformat:2 }}</p>
+                                    <p class="mb-1"><strong>Juros:</strong> R$ {{ conta.juros|default:0|floatformat:2 }}</p>
+                                    <p class="mb-1"><strong>Tarifas:</strong> R$ {{ conta.tarifas|default:0|floatformat:2 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if conta.status == 'pago' %}
+                        <!-- Conta já paga - mostrar mensagem e opção de estorno -->
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Conta já baixada!</strong> Esta conta foi totalmente paga em {{ conta.data_recebimento|date:"d/m/Y" }}.
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <a href="{% url 'contasareceber:estornar' conta.pk %}" class="btn btn-warning btn-lg">
+                                    <i class="fas fa-undo me-2"></i>Estornar Pagamento
+                                </a>
+                                <a href="{% url 'contasareceber:detalhes' conta.pk %}" class="btn btn-secondary btn-lg ms-2">
+                                    <i class="fas fa-arrow-left me-2"></i>Voltar aos Detalhes
+                                </a>
+                                <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-outline-secondary btn-lg ms-2">
+                                    <i class="fas fa-list me-2"></i>Ver Todas as Contas
+                                </a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <!-- Formulário de baixa para contas não pagas -->
+                            <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" id="valor-saldo-nominal-data" value="{{ js_saldo_nominal }}">
+                            <input type="hidden" id="valor-parcela-face-data" value="{{ js_valor_parcela }}">
+                            <input type="hidden" id="valor-ja-recebido-conta-data" value="{{ js_valor_recebido_conta }}">
+                            <input type="hidden" name="data_inicio" id="data_inicio_hidden" value="{{ data_inicio }}">
+                            <input type="hidden" name="data_fim" id="data_fim_hidden" value="{{ data_fim }}">
+
+                            <!-- Exibir mensagens de erro gerais -->
+                            {% if messages %}
+                                {% for message in messages %}
+                                    {% if message.tags == 'error' %}
+                                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>Erro!</strong> {{ message }}
+                                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.data_recebimento.id_for_label }}" class="form-label">{{ form.data_recebimento.label }}</label>
+                                    <input type="date" class="form-control" id="{{ form.data_recebimento.id_for_label }}" name="{{ form.data_recebimento.name }}" value="{{ form.data_recebimento.value|default:hoje|date:'Y-m-d' }}" required>
+                                    {% if form.data_recebimento.errors %}
+                                        <div class="text-danger">{{ form.data_recebimento.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.valor_recebido.id_for_label }}" class="form-label">{{ form.valor_recebido.label }}</label>
+                                    {{ form.valor_recebido }}
+                                    {% if form.valor_recebido.help_text %}
+                                    <div class="form-text">{{ form.valor_recebido.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.valor_recebido.errors %}
+                                        <div class="text-danger">{{ form.valor_recebido.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <label for="{{ form.desconto.id_for_label }}" class="form-label">{{ form.desconto.label }}</label>
+                                    {{ form.desconto }}
+                                    {% if form.desconto.errors %}
+                                        <div class="text-danger">{{ form.desconto.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="{{ form.juros.id_for_label }}" class="form-label">{{ form.juros.label }}</label>
+                                    {{ form.juros }}
+                                    {% if form.juros.errors %}
+                                        <div class="text-danger">{{ form.juros.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="{{ form.tarifas.id_for_label }}" class="form-label">{{ form.tarifas.label }}</label>
+                                    {{ form.tarifas }}
+                                    {% if form.tarifas.errors %}
+                                    <div class="text-danger">{{ form.tarifas.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <p class="form-text border-start border-3 ps-2 mt-2 mb-0 small" style="border-color: var(--bs-primary) !important;">
+                                <strong>Total líquido:</strong> se o título já estiver recebido (pago/cartão) <strong>= valor recebido</strong>;
+                                se ainda não, <strong>= valor a receber − tarifa − desconto + juros</strong> (na baixa, use o <em>saldo pendente (nominal)</em> no lugar do valor a receber da parcela).
+                                <strong>Quitação nesta baixa:</strong> saldo nominal <strong>−</strong> tarifa <strong>−</strong> desconto <strong>+</strong> juros <strong>=</strong> valor recebido.
+                                Ex.: 350 <strong>−</strong> 100 <strong>−</strong> 0 <strong>+</strong> 0 <strong>=</strong> 250 (em geral o líquido do extrato).
+                            </p>
+
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label for="{{ form.conta_banco.id_for_label }}" class="form-label">{{ form.conta_banco.label }}</label>
+                                    {{ form.conta_banco }}
+                                    {% if form.conta_banco.errors %}
+                                        <div class="text-danger">{{ form.conta_banco.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.tipo_baixa.id_for_label }}" class="form-label">{{ form.tipo_baixa.label }}</label>
+                                    {{ form.tipo_baixa }}
+                                    {% if form.tipo_baixa.errors %}
+                                        <div class="text-danger">{{ form.tipo_baixa.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Filtros de período para busca no extrato -->
+                            <div class="row mt-3" id="periodo-container">
+                                <div class="col-md-6">
+                                    <label for="data_inicio" class="form-label">Data Início (Extrato)</label>
+                                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
+                                    <div class="form-text">Data inicial para buscar lançamentos no extrato</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="data_fim" class="form-label">Data Fim (Extrato)</label>
+                                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim }}">
+                                    <div class="form-text">Data final para buscar lançamentos no extrato</div>
+                                </div>
+                            </div>
+
+                            <!-- Lançamentos do Extrato para Conciliação (ocultos, usados no modal) -->
+                            <div class="row mt-3" id="lancamentos-container" style="display: none;">
+                                <div class="col-12">
+                                    <div class="card bg-light">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-list"></i> Lançamentos do Extrato Disponíveis para Conciliação
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="lancamentos-loading" class="text-center">
+                                                <div class="spinner-border spinner-border-sm" role="status">
+                                                    <span class="visually-hidden">Carregando...</span>
+                                                </div>
+                                                Carregando lançamentos...
+                                            </div>
+                                            <div id="lancamentos-list" style="display: none;">
+                                                {{ form.lancamentos_extrato_ids }}
+                                                {{ form.resolucao_diferenca_extrato }}
+                                                {% if form.lancamentos_extrato_ids.errors %}
+                                                    <div class="text-danger">{{ form.lancamentos_extrato_ids.errors }}</div>
+                                                {% endif %}
+                                                {% if form.resolucao_diferenca_extrato.errors %}
+                                                    <div class="text-danger">{{ form.resolucao_diferenca_extrato.errors }}</div>
+                                                {% endif %}
+                                                <div id="valor-total-selecionado" class="mt-2 alert alert-info" style="display: none;">
+                                                    <strong>Valor Total Selecionado:</strong> R$ <span id="valor-total">0,00</span>
+                                                </div>
+                                            </div>
+                                            <div id="lancamentos-empty" style="display: none;">
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    Nenhum lançamento encontrado para conciliação neste período.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Div de Conferência de Valores -->
+                            <div class="row mt-3" id="conferencia-container" style="display: none;">
+                                <div class="col-12">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-balance-scale"></i> Conferência de Valores
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <h6 class="card-title text-primary">Valor da Conta</h6>
+                                                            <p class="mb-1 small text-muted mb-0">Saldo nominal = valor da parcela − já recebido.</p>
+                                                            <p class="mb-1"><strong>Saldo pendente (nominal):</strong> R$ <span id="valor-saldo-nominal">{{ conta.get_saldo_nominal_pendente|floatformat:2 }}</span></p>
+                                                            <p class="mb-1"><strong>Valor recebido (formulário):</strong> R$ <span id="valor-recebido-form">0,00</span></p>
+                                                            <p class="mb-1"><strong>Desconto:</strong> R$ <span id="desconto-form">0,00</span></p>
+                                                            <p class="mb-1"><strong>Juros:</strong> R$ <span id="juros-form">0,00</span></p>
+                                                            <p class="mb-1"><strong>Tarifas:</strong> R$ <span id="tarifas-form">0,00</span></p>
+                                                            <hr>
+                                                            <p class="mb-1 small text-muted mb-0">Total líquido: se recebido = valor recebido; se não = saldo nominal − tarifa − desconto + juros (= valor recebido ao quitar nesta baixa).</p>
+                                                            <p class="mb-1"><strong>Total líquido:</strong> R$ <span id="total-liquido-form" class="text-primary fw-bold">0,00</span></p>
+                                                            <p class="mb-0"><strong>Dif. título (líquido − valor recebido):</strong> R$ <span id="diferenca-titulo-liquido" class="fw-bold">0,00</span></p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <h6 class="card-title text-success">Valor do Extrato</h6>
+                                                            <p class="mb-1"><strong>Lançamentos Selecionados:</strong> <span id="qtd-lancamentos">0</span></p>
+                                                            <p class="mb-1"><strong>Valor Total Extrato:</strong> R$ <span id="valor-total-extrato">0,00</span></p>
+                                                            <hr>
+                                                            <p class="mb-1 small text-muted mb-0">Líquido do título × extrato (saldo nominal − tarifa − desconto + juros; ajustes passam a contar nesta diferença)</p>
+                                                            <p class="mb-1"><strong>Diferença (líquido título × extrato):</strong> R$ <span id="diferenca-pendente-extrato" class="fw-bold">0,00</span></p>
+                                                            <p class="mb-1 small text-muted mb-0">Extrato × líquido banco (valor recebido + juros − desconto; tarifa não reduz o crédito do extrato)</p>
+                                                            <p class="mb-0"><strong>Conciliação (extrato − líquido banco):</strong> R$ <span id="diferenca-conciliacao" class="fw-bold">0,00</span></p>
+                                                            <div id="status-conferencia" class="mt-2">
+                                                                <span class="badge bg-secondary">Aguardando seleção</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Lançamentos Selecionados -->
+                                            <div class="row mt-3" id="lancamentos-selecionados" style="display: none;">
+                                                <div class="col-12">
+                                                    <h6>Lançamentos Selecionados:</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-striped">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Data</th>
+                                                                    <th>Valor</th>
+                                                                    <th>Histórico</th>
+                                                                    <th>Ação</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="tabela-lancamentos-selecionados">
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Sugestões de Ajuste -->
+                                            <div class="row mt-3" id="sugestoes-ajuste" style="display: none;">
+                                                <div class="col-12">
+                                                    <div class="alert alert-warning">
+                                                        <h6><i class="fas fa-lightbulb"></i> Sugestões para equalizar valores:</h6>
+                                                        <div id="sugestoes-conteudo"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Opções quando há diferença extrato × líquido da baixa -->
+                                            <div class="row mt-3 d-none" id="opcoes-diferenca-extrato">
+                                                <div class="col-12">
+                                                    <div class="card border-warning">
+                                                        <div class="card-header bg-warning bg-opacity-25">
+                                                            <strong>Diferença entre extrato e líquido banco — escolha o tratamento</strong>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <p class="small text-muted mb-3">
+                                                                Quando o total do extrato não coincide com o <strong>líquido banco</strong> (valor recebido + juros − desconto), use um dos botões abaixo antes de confirmar.
+                                                                Ajuste o <strong>valor recebido</strong> ao líquido do extrato; use <strong>juros, desconto ou tarifas</strong> para alinhar o <strong>total líquido do título</strong> ao valor recebido.
+                                                            </p>
+                                                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                                                <button type="button" class="btn btn-primary" id="btn-resolucao-juros-desconto" title="Ajusta o valor recebido para o líquido bater com o extrato (mantém juros e desconto; tarifa só no título)">
+                                                                    <i class="fas fa-sliders-h me-1"></i> Aplicar ajuste (igualar ao extrato)
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-primary" id="btn-resolucao-nova-conta" title="Parcela 1 = valor recebido; próxima parcela = saldo">
+                                                                    <i class="fas fa-file-invoice-dollar me-1"></i> Gerar contas a receber da diferença (parcelas)
+                                                                </button>
+                                                            </div>
+                                                            <p class="small mb-2"><strong>Ou:</strong></p>
+                                                            <div class="form-check mb-0">
+                                                                <input class="form-check-input" type="radio" name="radio_resolucao_extrato" id="res_outro_extrato" value="outro_extrato">
+                                                                <label class="form-check-label" for="res_outro_extrato">
+                                                                    <strong>Selecionar outros lançamentos do extrato</strong> até a soma coincidir com o líquido banco (valor recebido + juros − desconto).
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <label for="{{ form.descricao.id_for_label }}" class="form-label">{{ form.descricao.label }}</label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.help_text %}
+                                    <div class="form-text">{{ form.descricao.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger">{{ form.descricao.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <label for="{{ form.observacao.id_for_label }}" class="form-label">{{ form.observacao.label }}</label>
+                                    {{ form.observacao }}
+                                    {% if form.observacao.errors %}
+                                        <div class="text-danger">{{ form.observacao.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <button type="button" class="btn btn-success btn-lg" id="btn-confirmar-recebimento" onclick="confirmarRecebimento()">
+                                        <i class="fas fa-check me-2"></i>Confirmar Recebimento
+                                    </button>
+                                    <a href="{% url 'contasareceber:detalhes' conta.pk %}" class="btn btn-secondary btn-lg ms-2">
+                                        <i class="fas fa-arrow-left me-2"></i>Voltar aos Detalhes
+                                    </a>
+                                    <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-outline-secondary btn-lg ms-2">
+                                        <i class="fas fa-list me-2"></i>Ver Todas as Contas
+                                    </a>
+                                </div>
+                            </div>
+                        </form>
+                    {% endif %}
+
+                    <!-- Modal para seleção de lançamentos -->
+                    <div class="modal fade" id="lancamentosModal" tabindex="-1" role="dialog">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Selecionar Lançamentos para Conciliação</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label for="modal_data_inicio" class="form-label">Data Início</label>
+                                            <input type="date" class="form-control" id="modal_data_inicio" value="{{ data_inicio }}">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="modal_data_fim" class="form-label">Data Fim</label>
+                                            <input type="date" class="form-control" id="modal_data_fim" value="{{ data_fim }}">
+                                        </div>
+                                    </div>
+                                    <div id="lancamentos-table-container">
+                                        <table class="table table-striped" id="lancamentos-table">
+                                            <thead>
+                                                <tr>
+                                                    <th><input type="checkbox" id="select-all"></th>
+                                                    <th>Data</th>
+                                                    <th>Valor</th>
+                                                    <th>Histórico</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="lancamentos-tbody">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-3">
+                                        <button id="prev-page" class="btn btn-secondary" disabled>Anterior</button>
+                                        <span id="page-info">Página 1 de 1</span>
+                                        <button id="next-page" class="btn btn-secondary" disabled>Próxima</button>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-primary" id="selecionar-lancamentos">Selecionar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal para seleção de conta bancária para baixa direta -->
+                    {% if mostrar_modal_contas %}
+                    <div class="modal fade" id="contasModal" tabindex="-1" role="dialog" data-bs-backdrop="static">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Selecionar Conta para Baixa Direta</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Você selecionou uma conta que requer lançamentos do extrato, mas não selecionou nenhum. Escolha uma conta que permita baixa direta:</p>
+                                    <div class="list-group">
+                                        {% for conta_banco in contas_para_baixa_direta %}
+                                        <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                                onclick="selecionarContaParaBaixa({{ conta_banco.id }}, '{{ conta_banco }}')">
+                                            <div>
+                                                <strong>{{ conta_banco.banco }}</strong><br>
+                                                <small class="text-muted">{{ conta_banco.get_tipo_display }} - {{ conta_banco.descricao }}</small>
+                                            </div>
+                                            <span class="badge bg-primary">{{ conta_banco.get_tipo_display }}</span>
+                                        </button>
+                                        {% empty %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Nenhuma conta bancária disponível para baixa direta.
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const contaBancoField = document.getElementById('{{ form.conta_banco.id_for_label }}');
+    const lancamentosField = document.querySelector('[name="lancamentos_extrato_ids"]');
+    const resolucaoHidden = document.querySelector('[name="resolucao_diferenca_extrato"]');
+    const valorTotalSpan = document.getElementById('valor-total');
+    const valorTotalAlert = document.getElementById('valor-total-selecionado');
+    let currentContaBancoId = null;
+    let currentPage = 1;
+
+    const btnResJuros = document.getElementById('btn-resolucao-juros-desconto');
+    const btnResNova = document.getElementById('btn-resolucao-nova-conta');
+    const resOutroExtrato = document.getElementById('res_outro_extrato');
+
+    function marcarBotoesResolucao(escolha) {
+        if (!btnResJuros || !btnResNova) return;
+        if (escolha === 'juros_desconto') {
+            btnResJuros.classList.add('btn-primary');
+            btnResJuros.classList.remove('btn-outline-primary');
+            btnResNova.classList.add('btn-outline-primary');
+            btnResNova.classList.remove('btn-primary');
+        } else if (escolha === 'nova_conta') {
+            btnResNova.classList.add('btn-primary');
+            btnResNova.classList.remove('btn-outline-primary');
+            btnResJuros.classList.add('btn-outline-primary');
+            btnResJuros.classList.remove('btn-primary');
+        } else {
+            btnResJuros.classList.add('btn-outline-primary');
+            btnResJuros.classList.remove('btn-primary');
+            btnResNova.classList.add('btn-outline-primary');
+            btnResNova.classList.remove('btn-primary');
+        }
+    }
+
+    function setResolucaoExtrato(val) {
+        if (resolucaoHidden) resolucaoHidden.value = val;
+        if (resOutroExtrato) resOutroExtrato.checked = val === 'outro_extrato';
+        marcarBotoesResolucao(val === 'outro_extrato' ? '' : val);
+    }
+
+    if (btnResJuros) {
+        btnResJuros.addEventListener('click', function () {
+            setResolucaoExtrato('juros_desconto');
+        });
+    }
+    if (btnResNova) {
+        btnResNova.addEventListener('click', function () {
+            setResolucaoExtrato('nova_conta');
+        });
+    }
+    if (resOutroExtrato) {
+        resOutroExtrato.addEventListener('change', function () {
+            if (this.checked && resolucaoHidden) {
+                resolucaoHidden.value = 'outro_extrato';
+                marcarBotoesResolucao('');
+            }
+        });
+    }
+
+    // Função para carregar lançamentos no modal
+    function carregarLancamentos(contaBancoId) {
+        if (!contaBancoId) {
+            return;
+        }
+        currentContaBancoId = contaBancoId;
+        currentPage = 1;
+        loadLancamentos(contaBancoId, currentPage);
+    }
+
+    // Função para carregar lançamentos via AJAX
+    function loadLancamentos(contaBancoId, page) {
+        const dataInicio = document.getElementById('modal_data_inicio').value;
+        const dataFim = document.getElementById('modal_data_fim').value;
+        let url = '{% url "contasareceber:buscar_lancamentos_extrato" %}?conta_banco_id=' + contaBancoId + '&page=' + page + '&limit=20';
+
+        if (dataInicio) {
+            url += '&data_inicio=' + dataInicio;
+        }
+        if (dataFim) {
+            url += '&data_fim=' + dataFim;
+        }
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.lancamentos && data.lancamentos.length > 0) {
+                populateTable(data.lancamentos);
+                updatePagination(data.total, page, 20);
+            } else {
+                document.getElementById('lancamentos-tbody').innerHTML = '<tr><td colspan="4" class="text-center">Nenhum lançamento encontrado</td></tr>';
+                updatePagination(0, 1, 20);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar lançamentos:', error);
+            document.getElementById('lancamentos-tbody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar lançamentos</td></tr>';
+        });
+    }
+
+    // Função para popular a tabela (não exibir lançamentos já conciliados)
+    function populateTable(lancamentos) {
+        const abertos = (lancamentos || []).filter(function (l) {
+            return !l.conciliado;
+        });
+        if (!abertos.length) {
+            document.getElementById('lancamentos-tbody').innerHTML =
+                '<tr><td colspan="4" class="text-center">Nenhum lançamento não conciliado encontrado para esta conta/período.</td></tr>';
+            document.getElementById('select-all').checked = false;
+            return;
+        }
+        let html = '';
+        abertos.forEach(function (lancamento) {
+            html += `<tr>
+                <td><input type="checkbox" class="lancamento-checkbox" value="${lancamento.id}"></td>
+                <td>${lancamento.data}</td>
+                <td>R$ ${lancamento.valor.toFixed(2).replace('.', ',')}</td>
+                <td>${lancamento.historico}</td>
+            </tr>`;
+        });
+        document.getElementById('lancamentos-tbody').innerHTML = html;
+        document.getElementById('select-all').checked = false;
+    }
+
+    // Função para atualizar paginação
+    function updatePagination(total, page, limit) {
+        const totalPages = Math.ceil(total / limit);
+        document.getElementById('page-info').textContent = `Página ${page} de ${totalPages}`;
+        document.getElementById('prev-page').disabled = page <= 1;
+        document.getElementById('next-page').disabled = page >= totalPages;
+    }
+
+    // Função para calcular valor total selecionado
+    function calcularValorTotalSelecionado() {
+        // Atualizar valores do formulário na conferência
+        const valorRecebidoField = document.getElementById('{{ form.valor_recebido.id_for_label }}');
+        const descontoField = document.getElementById('{{ form.desconto.id_for_label }}');
+        const jurosField = document.getElementById('{{ form.juros.id_for_label }}');
+        const tarifasField = document.getElementById('{{ form.tarifas.id_for_label }}');
+
+        if (valorRecebidoField && descontoField && jurosField && tarifasField) {
+            const valorRecebido = parseFloat(valorRecebidoField.value.replace(',', '.')) || 0;
+            const desconto = parseFloat(descontoField.value.replace(',', '.')) || 0;
+            const juros = parseFloat(jurosField.value.replace(',', '.')) || 0;
+            const tarifas = parseFloat(tarifasField.value.replace(',', '.')) || 0;
+
+            const saldoNominal = getSaldoNominalPendente();
+            const totalLiquido = saldoNominal - tarifas - desconto + juros;
+
+            // Atualizar spans na conferência
+            const valorRecebidoSpan = document.getElementById('valor-recebido-form');
+            const descontoSpan = document.getElementById('desconto-form');
+            const jurosSpan = document.getElementById('juros-form');
+            const tarifasSpan = document.getElementById('tarifas-form');
+            const totalLiquidoSpan = document.getElementById('total-liquido-form');
+            const diffTituloSpan = document.getElementById('diferenca-titulo-liquido');
+
+            if (valorRecebidoSpan) valorRecebidoSpan.textContent = valorRecebido.toFixed(2).replace('.', ',');
+            if (descontoSpan) descontoSpan.textContent = desconto.toFixed(2).replace('.', ',');
+            if (jurosSpan) jurosSpan.textContent = juros.toFixed(2).replace('.', ',');
+            if (tarifasSpan) tarifasSpan.textContent = tarifas.toFixed(2).replace('.', ',');
+            if (totalLiquidoSpan) totalLiquidoSpan.textContent = totalLiquido.toFixed(2).replace('.', ',');
+            const diffTitulo = totalLiquido - valorRecebido;
+            if (diffTituloSpan) {
+                diffTituloSpan.textContent = Math.abs(diffTitulo).toFixed(2).replace('.', ',');
+                diffTituloSpan.className = 'fw-bold ' + (Math.abs(diffTitulo) <= 0.01 ? 'text-success' : 'text-warning');
+            }
+
+            // Atualizar conferência se houver lançamentos selecionados
+            if (window.selectedLancamentos) {
+                atualizarConferenciaValores(window.selectedLancamentos);
+            }
+        }
+    }
+
+    // Event listener para mudança no campo conta_banco
+    contaBancoField.addEventListener('change', function() {
+        const contaBancoId = this.value;
+        if (contaBancoId) {
+            const selectedOption = this.options[this.selectedIndex];
+            const optionText = selectedOption ? selectedOption.text.toLowerCase() : '';
+            // Só mostrar modal para contas correntes e poupança
+            if (optionText.startsWith('conta corrente') || optionText.startsWith('poupança')) {
+                $('#lancamentosModal').modal('show');
+                carregarLancamentos(contaBancoId);
+            }
+        }
+    });
+
+    // Event listeners para mudança nas datas no modal
+    document.getElementById('modal_data_inicio').addEventListener('change', function() {
+        if (currentContaBancoId) {
+            loadLancamentos(currentContaBancoId, 1);
+        }
+    });
+
+    document.getElementById('modal_data_fim').addEventListener('change', function() {
+        if (currentContaBancoId) {
+            loadLancamentos(currentContaBancoId, 1);
+        }
+    });
+
+    // Event listener para select all
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.lancamento-checkbox:not(:disabled)');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+
+    // Event listener para paginação
+    document.getElementById('prev-page').addEventListener('click', function() {
+        if (currentPage > 1) {
+            currentPage--;
+            loadLancamentos(currentContaBancoId, currentPage);
+        }
+    });
+
+    document.getElementById('next-page').addEventListener('click', function() {
+        currentPage++;
+        loadLancamentos(currentContaBancoId, currentPage);
+    });
+
+    // Event listener para selecionar lançamentos
+    document.getElementById('selecionar-lancamentos').addEventListener('click', function() {
+        const selected = Array.from(document.querySelectorAll('.lancamento-checkbox:checked')).map(cb => cb.value);
+
+        if (selected.length === 0) {
+            alert('Selecione pelo menos um lançamento.');
+            return;
+        }
+
+        // Verificar se o campo lancamentosField existe
+        if (lancamentosField) {
+            lancamentosField.value = selected.join(',');
+        } else {
+            alert('Erro: Campo de lançamentos não encontrado. Recarregue a página.');
+            return;
+        }
+
+        calcularValorTotalSelecionado();
+        atualizarLancamentosSelecionados(selected);
+        $('#lancamentosModal').modal('hide');
+    });
+
+    // Removido event listener para campo hidden
+
+    // Event listeners para atualizar valores da conferência quando campos do formulário mudam
+    document.getElementById('{{ form.valor_recebido.id_for_label }}').addEventListener('input', calcularValorTotalSelecionado);
+    document.getElementById('{{ form.desconto.id_for_label }}').addEventListener('input', calcularValorTotalSelecionado);
+    document.getElementById('{{ form.juros.id_for_label }}').addEventListener('input', calcularValorTotalSelecionado);
+    document.getElementById('{{ form.tarifas.id_for_label }}').addEventListener('input', calcularValorTotalSelecionado);
+
+    // Função para atualizar a tabela de lançamentos selecionados
+    function atualizarLancamentosSelecionados(selectedIds) {
+        const tabelaBody = document.getElementById('tabela-lancamentos-selecionados');
+        const lancamentosSelecionadosDiv = document.getElementById('lancamentos-selecionados');
+        const conferenciaContainer = document.getElementById('conferencia-container');
+
+        if (!selectedIds || selectedIds.length === 0) {
+            if (lancamentosSelecionadosDiv) lancamentosSelecionadosDiv.style.display = 'none';
+            if (conferenciaContainer) conferenciaContainer.style.display = 'none';
+            return;
+        }
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+
+        // Buscar dados dos lançamentos selecionados via AJAX
+        fetch('{% url "contasareceber:buscar_lancamentos_selecionados" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken ? csrfToken.value : '',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ lancamentos_ids: selectedIds })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.lancamentos && data.lancamentos.length > 0) {
+                // Armazenar lançamentos selecionados globalmente
+                window.selectedLancamentos = data.lancamentos;
+
+                // Popular tabela
+                let html = '';
+                data.lancamentos.forEach(lancamento => {
+                    html += `
+                        <tr>
+                            <td>${lancamento.data}</td>
+                            <td>R$ ${lancamento.valor.toFixed(2).replace('.', ',')}</td>
+                            <td>${lancamento.historico}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerLancamento(${lancamento.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                if (tabelaBody) {
+                    tabelaBody.innerHTML = html;
+                }
+
+                // Mostrar seções
+                if (lancamentosSelecionadosDiv) {
+                    lancamentosSelecionadosDiv.style.display = 'block';
+                }
+                if (conferenciaContainer) {
+                    conferenciaContainer.style.display = 'block';
+                }
+
+                // Atualizar valores na conferência
+                atualizarConferenciaValores(data.lancamentos);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar lançamentos selecionados:', error);
+            alert('Erro ao carregar lançamentos selecionados.');
+        });
+    }
+
+    function getSaldoNominalPendente() {
+        const el = document.getElementById('valor-saldo-nominal-data');
+        if (el && el.value !== undefined && el.value !== '') {
+            const v = parseFloat(String(el.value).replace(',', '.'));
+            if (!isNaN(v)) return v;
+        }
+        const faceEl = document.getElementById('valor-parcela-face-data');
+        const jaEl = document.getElementById('valor-ja-recebido-conta-data');
+        const face = faceEl ? (parseFloat(String(faceEl.value).replace(',', '.')) || 0) : 0;
+        const ja = jaEl ? (parseFloat(String(jaEl.value).replace(',', '.')) || 0) : 0;
+        return Math.max(0, face - ja);
+    }
+
+    /** HTML5 type="number" exige ponto decimal; type="text" pode usar vírgula (pt-BR). */
+    function definirValorMonetarioNoInput(inputEl, numero) {
+        if (!inputEl) return;
+        const n = Number(numero);
+        if (Number.isNaN(n)) return;
+        if (inputEl.type === 'number') {
+            inputEl.setAttribute('step', '0.01');
+            inputEl.value = n.toFixed(2);
+        } else {
+            inputEl.value = n.toFixed(2).replace('.', ',');
+        }
+    }
+
+    // Função para atualizar valores na conferência
+    function atualizarConferenciaValores(lancamentos) {
+        const lista = lancamentos || [];
+        const valorTotalExtrato = lista.reduce((sum, l) => sum + Number(l.valor), 0);
+        const qtdLancamentos = lista.length;
+
+        const valorRecebidoField = document.getElementById('{{ form.valor_recebido.id_for_label }}');
+        const descontoField = document.getElementById('{{ form.desconto.id_for_label }}');
+        const jurosField = document.getElementById('{{ form.juros.id_for_label }}');
+        const tarifasField = document.getElementById('{{ form.tarifas.id_for_label }}');
+
+        const desconto = descontoField ? (parseFloat(String(descontoField.value).replace(',', '.')) || 0) : 0;
+        const juros = jurosField ? (parseFloat(String(jurosField.value).replace(',', '.')) || 0) : 0;
+        const tarifas = tarifasField ? (parseFloat(String(tarifasField.value).replace(',', '.')) || 0) : 0;
+        let valorRecebido = valorRecebidoField
+            ? (parseFloat(String(valorRecebidoField.value).replace(',', '.')) || 0)
+            : 0;
+        if (qtdLancamentos > 0 && valorRecebidoField) {
+            const vrExtrato = valorTotalExtrato - juros + desconto;
+            definirValorMonetarioNoInput(valorRecebidoField, vrExtrato);
+            valorRecebidoField.setAttribute('readonly', 'readonly');
+            valorRecebidoField.classList.add('bg-light');
+            valorRecebido = vrExtrato;
+        } else if (valorRecebidoField) {
+            valorRecebidoField.removeAttribute('readonly');
+            valorRecebidoField.classList.remove('bg-light');
+            valorRecebido = parseFloat(String(valorRecebidoField.value).replace(',', '.')) || 0;
+        }
+        const saldoNominal = getSaldoNominalPendente();
+        const totalLiquido = saldoNominal - tarifas - desconto + juros;
+        const liquidoBanco = valorRecebido + juros - desconto;
+
+        // Líquido do título (não só o nominal): tarifa/desconto/juros explicam diferença ao extrato
+        const diffPendenteExtrato = totalLiquido - valorTotalExtrato;
+        const diffConciliacao = valorTotalExtrato - liquidoBanco;
+        const diffTituloLiquidoRecebido = totalLiquido - valorRecebido;
+
+        const valorRecebidoSpan = document.getElementById('valor-recebido-form');
+        const descontoSpan = document.getElementById('desconto-form');
+        const jurosSpan = document.getElementById('juros-form');
+        const tarifasSpan = document.getElementById('tarifas-form');
+        const totalLiquidoSpan = document.getElementById('total-liquido-form');
+        if (valorRecebidoSpan) valorRecebidoSpan.textContent = valorRecebido.toFixed(2).replace('.', ',');
+        if (descontoSpan) descontoSpan.textContent = desconto.toFixed(2).replace('.', ',');
+        if (jurosSpan) jurosSpan.textContent = juros.toFixed(2).replace('.', ',');
+        if (tarifasSpan) tarifasSpan.textContent = tarifas.toFixed(2).replace('.', ',');
+        if (totalLiquidoSpan) totalLiquidoSpan.textContent = totalLiquido.toFixed(2).replace('.', ',');
+        const diffTituloEl = document.getElementById('diferenca-titulo-liquido');
+        if (diffTituloEl) {
+            diffTituloEl.textContent = Math.abs(diffTituloLiquidoRecebido).toFixed(2).replace('.', ',');
+            diffTituloEl.className = 'fw-bold ' + (Math.abs(diffTituloLiquidoRecebido) <= 0.01 ? 'text-success' : 'text-warning');
+        }
+
+        document.getElementById('qtd-lancamentos').textContent = qtdLancamentos;
+        document.getElementById('valor-total-extrato').textContent = valorTotalExtrato.toFixed(2).replace('.', ',');
+
+        const spanPendExt = document.getElementById('diferenca-pendente-extrato');
+        const spanConc = document.getElementById('diferenca-conciliacao');
+        if (spanPendExt) {
+            spanPendExt.textContent = Math.abs(diffPendenteExtrato).toFixed(2).replace('.', ',');
+            if (Math.abs(diffPendenteExtrato) <= 0.01) {
+                spanPendExt.className = 'fw-bold text-success';
+            } else if (diffPendenteExtrato > 0) {
+                spanPendExt.className = 'fw-bold text-warning';
+            } else {
+                spanPendExt.className = 'fw-bold text-info';
+            }
+        }
+        if (spanConc) {
+            spanConc.textContent = Math.abs(diffConciliacao).toFixed(2).replace('.', ',');
+            if (Math.abs(diffConciliacao) <= 0.01) {
+                spanConc.className = 'fw-bold text-success';
+            } else if (diffConciliacao > 0) {
+                spanConc.className = 'fw-bold text-warning';
+            } else {
+                spanConc.className = 'fw-bold text-danger';
+            }
+        }
+
+        const statusBadge = document.getElementById('status-conferencia');
+        const opcoesDiff = document.getElementById('opcoes-diferenca-extrato');
+        const precisaOpcoesConc = Math.abs(diffConciliacao) > 0.01;
+        const precisaOpcoesTitulo = Math.abs(diffTituloLiquidoRecebido) > 0.01;
+        const precisaOpcoesNominal = Math.abs(diffPendenteExtrato) > 0.01;
+        const precisaOpcoes = precisaOpcoesConc || precisaOpcoesTitulo || precisaOpcoesNominal;
+
+        if (statusBadge) {
+            if (Math.abs(diffPendenteExtrato) <= 0.01) {
+                statusBadge.innerHTML = '<span class="badge bg-success">Extrato alinhado ao líquido do título</span>';
+            } else if (diffPendenteExtrato > 0) {
+                statusBadge.innerHTML = '<span class="badge bg-warning">Extrato abaixo do líquido do título — selecione mais lançamentos ou ajuste tarifa/desconto/juros</span>';
+            } else {
+                statusBadge.innerHTML = '<span class="badge bg-info">Extrato acima do líquido do título</span>';
+            }
+        }
+
+        if (!precisaOpcoes) {
+            if (resolucaoHidden) resolucaoHidden.value = 'igual';
+            if (resOutroExtrato) resOutroExtrato.checked = false;
+            marcarBotoesResolucao('juros_desconto');
+        }
+        if (opcoesDiff) {
+            opcoesDiff.classList.toggle('d-none', !precisaOpcoes);
+        }
+
+        if (precisaOpcoes && resolucaoHidden) {
+            const cur = (resolucaoHidden.value || '').trim();
+            if (!cur || cur === 'igual') {
+                resolucaoHidden.value = 'juros_desconto';
+                marcarBotoesResolucao('juros_desconto');
+            }
+        }
+
+        const sugestoesDiv = document.getElementById('sugestoes-ajuste');
+        const sugestoesConteudo = document.getElementById('sugestoes-conteudo');
+        const precisaSugestao = precisaOpcoes;
+
+        if (precisaSugestao) {
+            let sugestoes = '<ul class="mb-0">';
+            if (Math.abs(diffPendenteExtrato) > 0.01) {
+                if (diffPendenteExtrato > 0) {
+                    sugestoes += `<li>Falta <strong>R$ ${Math.abs(diffPendenteExtrato).toFixed(2).replace('.', ',')}</strong> no extrato em relação ao <strong>líquido do título</strong> (nominal − tarifa − desconto + juros). <strong>Selecione mais lançamentos</strong> no modal ou ajuste <strong>tarifa, desconto ou juros</strong> até esta diferença zerar.</li>`;
+                } else {
+                    sugestoes += `<li>O extrato supera o líquido do título em <strong>R$ ${Math.abs(diffPendenteExtrato).toFixed(2).replace('.', ',')}</strong>. Confira os lançamentos ou ajuste tarifa/desconto/juros.</li>`;
+                }
+            }
+            if (precisaOpcoesTitulo) {
+                if (diffTituloLiquidoRecebido > 0) {
+                    sugestoes += `<li><strong>Título:</strong> total líquido maior que o valor recebido — aumente o valor recebido ou reduza desconto/tarifa ou aumente juros.</li>`;
+                } else {
+                    sugestoes += `<li><strong>Título:</strong> total líquido menor que o valor recebido — reduza o valor recebido ou ajuste desconto, tarifa ou juros.</li>`;
+                }
+            }
+            if (precisaOpcoesConc) {
+                if (diffConciliacao > 0) {
+                    sugestoes += `<li><strong>Conciliação:</strong> extrato acima do líquido banco (valor recebido + juros − desconto) — confira valor recebido/desconto/juros ou use a opção de ajuste.</li>`;
+                } else {
+                    sugestoes += `<li><strong>Conciliação:</strong> líquido banco acima do extrato — confira os lançamentos ou use a opção de ajuste.</li>`;
+                }
+            }
+            sugestoes += '</ul>';
+            sugestoesConteudo.innerHTML = sugestoes;
+            sugestoesDiv.style.display = 'block';
+        } else {
+            sugestoesDiv.style.display = 'none';
+        }
+    }
+
+    // Função para remover lançamento da seleção
+    window.removerLancamento = function(lancamentoId) {
+        const lancamentosField = document.querySelector('[name="lancamentos_extrato_ids"]');
+        if (!lancamentosField) {
+            return;
+        }
+
+        const currentValue = lancamentosField.value;
+        const selected = currentValue ? currentValue.split(',').filter(id => id.trim() !== '') : [];
+        const newSelected = selected.filter(id => id != lancamentoId.toString());
+
+        lancamentosField.value = newSelected.join(',');
+
+        // Atualizar selectedLancamentos
+        if (window.selectedLancamentos) {
+            window.selectedLancamentos = window.selectedLancamentos.filter(l => l.id != lancamentoId);
+        }
+
+        calcularValorTotalSelecionado();
+        atualizarLancamentosSelecionados(newSelected);
+    };
+
+    // Função para confirmar o recebimento
+    window.confirmarRecebimento = function() {
+        const contaBancoField = document.getElementById('{{ form.conta_banco.id_for_label }}');
+        const selectedIds = lancamentosField.value ? lancamentosField.value.split(',').map(id => id.trim()).filter(id => id) : [];
+        const valorRecebido = parseFloat(document.getElementById('{{ form.valor_recebido.id_for_label }}').value.replace(',', '.')) || 0;
+
+        // Verificar se a conta bancária requer lançamentos do extrato
+        let requerLancamentos = false;
+        if (contaBancoField.value) {
+            const selectedOption = contaBancoField.options[contaBancoField.selectedIndex];
+            const optionText = selectedOption ? selectedOption.text.toLowerCase() : '';
+            // Requer lançamentos apenas para contas correntes e poupança
+            requerLancamentos = optionText.startsWith('conta corrente') || optionText.startsWith('poupança');
+        }
+
+        // Validação: se conta bancária foi selecionada e requer lançamentos, deve haver lançamentos selecionados
+        if (contaBancoField.value && requerLancamentos && selectedIds.length === 0) {
+            // Em vez de alert, mostrar modal de seleção de conta
+            $('#contasModal').modal('show');
+            return;
+        }
+
+        // Validação: valor recebido deve ser maior que zero
+        if (valorRecebido <= 0) {
+            alert('O valor recebido deve ser maior que zero.');
+            return;
+        }
+
+        // Criar mensagem de confirmação
+        let mensagemConfirmacao = `Confirma o recebimento de R$ ${valorRecebido.toFixed(2).replace('.', ',')}?`;
+
+        if (selectedIds.length > 0) {
+            mensagemConfirmacao += `\n\nLançamentos selecionados: ${selectedIds.length}`;
+            const vr = parseFloat(String(document.getElementById('{{ form.valor_recebido.id_for_label }}').value).replace(',', '.')) || 0;
+            const descontoF = parseFloat(String(document.getElementById('{{ form.desconto.id_for_label }}').value).replace(',', '.')) || 0;
+            const jurosF = parseFloat(String(document.getElementById('{{ form.juros.id_for_label }}').value).replace(',', '.')) || 0;
+            const tarifasF = parseFloat(String(document.getElementById('{{ form.tarifas.id_for_label }}').value).replace(',', '.')) || 0;
+            let totExt = 0;
+            if (window.selectedLancamentos && window.selectedLancamentos.length) {
+                totExt = window.selectedLancamentos.reduce((s, l) => s + l.valor, 0);
+            }
+            const liquidoBancoConf = vr + jurosF - descontoF;
+            const diffConc = totExt - liquidoBancoConf;
+            const saldoNom = getSaldoNominalPendente();
+            const totalLiq = saldoNom - tarifasF - descontoF + jurosF;
+            const diffPendExt = totalLiq - totExt;
+            const diffTitulo = totalLiq - vr;
+            if (Math.abs(diffPendExt) > 0.01) {
+                mensagemConfirmacao += `\n\nAtenção: líquido do título R$ ${totalLiq.toFixed(2).replace('.', ',')} vs total do extrato R$ ${totExt.toFixed(2).replace('.', ',')} (diferença R$ ${Math.abs(diffPendExt).toFixed(2).replace('.', ',')}).`;
+            }
+            if (Math.abs(diffTitulo) > 0.01) {
+                mensagemConfirmacao += `\n\nTotal líquido (saldo − tarifa − desconto + juros) R$ ${totalLiq.toFixed(2).replace('.', ',')} difere do valor recebido R$ ${vr.toFixed(2).replace('.', ',')}. Ajuste os campos ou confirme se está correto.`;
+            }
+            if (Math.abs(diffConc) > 0.01) {
+                const r = resolucaoHidden ? resolucaoHidden.value.trim() : '';
+                if (!r || r === 'igual') {
+                    alert('Há diferença entre o total do extrato e o líquido banco (valor recebido + juros − desconto). Use um dos botões de tratamento da diferença ou marque "Selecionar outros lançamentos do extrato".');
+                    return;
+                }
+            } else if (resolucaoHidden) {
+                resolucaoHidden.value = 'igual';
+            }
+        } else if (resolucaoHidden) {
+            resolucaoHidden.value = 'igual';
+        }
+
+        // Mostrar confirmação
+        if (confirm(mensagemConfirmacao)) {
+            document.querySelector('form').submit();
+        }
+    };
+
+    // Função para selecionar conta bancária para baixa direta
+    window.selecionarContaParaBaixa = function(contaId, contaNome) {
+        const valorRecebido = parseFloat(document.getElementById('{{ form.valor_recebido.id_for_label }}').value.replace(',', '.')) || 0;
+
+        // Validação: valor recebido deve ser maior que zero
+        if (valorRecebido <= 0) {
+            alert('O valor recebido deve ser maior que zero.');
+            $('#contasModal').modal('hide');
+            return;
+        }
+
+        // Validação: contaId deve ser válido
+        if (!contaId || contaId <= 0) {
+            alert('Conta bancária inválida selecionada.');
+            $('#contasModal').modal('hide');
+            return;
+        }
+
+        // Criar mensagem de confirmação
+        const mensagemConfirmacao = `Confirma a baixa direta de R$ ${valorRecebido.toFixed(2).replace('.', ',')} na conta ${contaNome}?\n\nEsta operação irá registrar o movimento no extrato sem necessidade de conciliação com lançamentos bancários.`;
+
+        // Mostrar confirmação
+        if (confirm(mensagemConfirmacao)) {
+            try {
+                // Atualizar o campo conta_banco
+                const contaBancoField = document.getElementById('{{ form.conta_banco.id_for_label }}');
+                if (contaBancoField) {
+                    contaBancoField.value = contaId;
+                    console.log(`Conta bancária atualizada para ID: ${contaId}`);
+                } else {
+                    alert('Erro: Campo de conta bancária não encontrado.');
+                    $('#contasModal').modal('hide');
+                    return;
+                }
+
+                // Limpar lançamentos selecionados
+                const lancamentosField = document.querySelector('[name="lancamentos_extrato_ids"]');
+                if (lancamentosField) {
+                    lancamentosField.value = '';
+                    console.log('Lançamentos selecionados limpos');
+                }
+                if (resolucaoHidden) {
+                    resolucaoHidden.value = 'igual';
+                }
+
+                // Fechar modal
+                $('#contasModal').modal('hide');
+
+                // Pequeno delay para garantir que o modal fechou
+                setTimeout(function() {
+                    // Submeter o formulário
+                    const form = document.querySelector('form');
+                    if (form) {
+                        console.log('Submetendo formulário...');
+                        form.submit();
+                    } else {
+                        alert('Erro: Formulário não encontrado.');
+                    }
+                }, 300);
+
+            } catch (error) {
+                console.error('Erro ao processar seleção de conta:', error);
+                alert('Erro ao processar seleção de conta. Verifique o console para mais detalhes.');
+                $('#contasModal').modal('hide');
+            }
+        }
+    };
+
+    // Mostrar modal de contas automaticamente se necessário
+    {% if mostrar_modal_contas %}
+    $(document).ready(function() {
+        $('#contasModal').modal('show');
+    });
+    {% endif %}
+
+});
+</script>
+{%endblock%}
+
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

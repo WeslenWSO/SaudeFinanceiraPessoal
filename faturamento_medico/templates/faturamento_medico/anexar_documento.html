@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Anexar Documento{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Anexar Documento</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:detalhes' faturamento.pk %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Faturamento:</strong> {{ faturamento }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.arquivo.id_for_label }}">Arquivo *</label>
+                                    {{ form.arquivo }}
+                                    <small class="form-text text-muted">
+                                        Tipos aceitos: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG, GIF
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.nome.id_for_label }}">Nome do Documento</label>
+                                    {{ form.nome }}
+                                    <small class="form-text text-muted">
+                                        Nome descritivo (opcional, será usado o nome do arquivo se não informado)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.descricao.id_for_label }}">Descrição</label>
+                                    {{ form.descricao }}
+                                    <small class="form-text text-muted">
+                                        Descrição opcional do documento
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Anexar Documento
+                        </button>
+                        <a href="{% url 'faturamento_medico:detalhes' faturamento.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

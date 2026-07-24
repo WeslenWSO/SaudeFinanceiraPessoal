@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Importar Notas Fiscais de Entrada</h3>
+                    <div>
+                        <a href="{% url 'notafiscalentrada:listar' %}" class="btn btn-secondary">Voltar</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> Instruções</h5>
+                        <ul>
+                            <li>Selecione um ou mais arquivos XML de notas fiscais de entrada</li>
+                            <li>Suporta NFe (Nota Fiscal Eletrônica) e NFS-e (Nota Fiscal de Serviços)</li>
+                            <li>Serão importadas notas de tomador e notas de comércio</li>
+                            <li>Fornecedores serão criados automaticamente se não existirem</li>
+                            <li>Notas já importadas ou canceladas serão ignoradas</li>
+                        </ul>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="xml_files" class="form-label">Arquivos XML</label>
+                            <input type="file" class="form-control" id="xml_files" name="xml_files" multiple accept=".xml" required>
+                            <div class="form-text">Selecione um ou mais arquivos XML (.xml)</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Importar XMLs
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Validação dos arquivos selecionados
+document.querySelector('form').addEventListener('submit', function(e) {
+    const files = document.getElementById('xml_files').files;
+
+    if (files.length === 0) {
+        alert('Selecione pelo menos um arquivo XML.');
+        e.preventDefault();
+        return false;
+    }
+
+    // Verificar extensão dos arquivos
+    for (let file of files) {
+        if (!file.name.toLowerCase().endsWith('.xml')) {
+            alert(`O arquivo "${file.name}" não é um arquivo XML válido.`);
+            e.preventDefault();
+            return false;
+        }
+    }
+});
+</script>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

@@ -1,0 +1,1517 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+    
+{%endblock%}
+{%block conteudo%}
+<style>
+.link-discriminacao-nf {
+    position: relative;
+    display: inline-block;
+    color: #0d6efd;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: help;
+    font-weight: 600;
+}
+.link-discriminacao-nf:hover,
+.link-discriminacao-nf:focus {
+    color: #0a58ca;
+}
+.discriminacao-nf-popover {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.15rem);
+    z-index: 1060;
+    min-width: 18rem;
+    max-width: min(40rem, 90vw);
+    padding: 0.75rem 0.9rem;
+    background: #1f2937;
+    color: #f9fafb;
+    border-radius: 0.45rem;
+    box-shadow: 0 0.4rem 1rem rgba(0,0,0,.22);
+    font-weight: 400;
+    text-decoration: none;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.4;
+}
+/* Ponte invisível para o mouse não cair no gap e fechar o popover */
+.discriminacao-nf-popover::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -0.35rem;
+    height: 0.35rem;
+}
+.discriminacao-nf-popover strong {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.8rem;
+    color: #93c5fd;
+}
+.discriminacao-nf-texto {
+    display: block;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: visible;
+    max-height: none;
+}
+.link-discriminacao-nf:hover .discriminacao-nf-popover,
+.link-discriminacao-nf:focus .discriminacao-nf-popover,
+.link-discriminacao-nf:focus-within .discriminacao-nf-popover {
+    display: block;
+}
+.table-responsive {
+    overflow: visible;
+}
+.card .table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Contas a Receber</h3>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{% url 'contasareceber:criar' %}" class="btn btn-primary">Cadastrar Conta a Receber</a>
+                        <a href="{% url 'contasareceber:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já recebidos">
+                            <i class="fas fa-tags"></i> Categorizar baixados
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+
+                    <!-- Indicadores (valores em R$) — mesmos filtros da listagem abaixo -->
+                    <div class="indicadores-nfse indicadores-contas">
+                        <div class="indicador-card indicador-moeda indicador-total">
+                            <span class="indicador-numero">R$ {{ total_contas_receber|moeda_br }}</span>
+                            <span class="indicador-label">Total Contas a Receber</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-file-invoice-dollar"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-pendente">
+                            <span class="indicador-numero">R$ {{ total_pendente|moeda_br }}</span>
+                            <span class="indicador-label">Total Pendente</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-clock"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-vencido">
+                            <span class="indicador-numero">R$ {{ total_vencido|moeda_br }}</span>
+                            <span class="indicador-label">Total Vencido</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-exclamation-triangle"></i></span>
+                        </div>
+                        <div class="indicador-card indicador-moeda indicador-pago">
+                            <span class="indicador-numero">R$ {{ total_recebido|moeda_br }}</span>
+                            <span class="indicador-label">Total Recebido</span>
+                            <span class="indicador-icone" aria-hidden="true"><i class="fas fa-check-circle"></i></span>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <section class="panel panel-tight mb-4">
+                        <details open>
+                            <summary><i class="fas fa-filter"></i> Filtros e Pesquisa</summary>
+                            <p class="small text-muted mb-2">Emissão define o intervalo principal (padrão: últimos 12 meses). Vencimento e recebimento são opcionais; recebimento só aplica em títulos já com data de recebimento.</p>
+                            <form method="get" class="filtros-form">
+                                {% if resumo_val_receber %}
+                                <input type="hidden" name="resumo_val_receber" value="1">
+                                {% endif %}
+                                <div class="filtros-grid">
+                                    <div>
+                                        <label for="search">Buscar</label>
+                                        <input type="text" id="search" name="search" placeholder="Cliente, CNPJ, documento, autorização..." value="{{ filtros.search }}">
+                                    </div>
+                                    <div>
+                                        <label for="status">Status</label>
+                                        <select id="status" name="status">
+                                            <option value="">Todos os Status</option>
+                                            <option value="pendente" {% if filtros.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                                            <option value="pago" {% if filtros.status == 'pago' %}selected{% endif %}>Pago</option>
+                                            <option value="cartao" {% if filtros.status == 'cartao' %}selected{% endif %}>Cartão</option>
+                                            <option value="cancelado" {% if filtros.status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                                            <option value="vencido" {% if filtros.status == 'vencido' %}selected{% endif %}>Vencido</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="forma_pagamento">Cobrança</label>
+                                        <select id="forma_pagamento" name="forma_pagamento">
+                                            <option value="">Todas as Cobranças</option>
+                                            {% for forma in formas_pagamento %}
+                                            <option value="{{ forma.id }}" {% if forma.id|stringformat:"s" in filtros.forma_pagamento %}selected{% endif %}>{{ forma.descricao }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="filtro_socio">Sócio</label>
+                                        <select id="filtro_socio" name="socio">
+                                            <option value="" {% if not filtros.socio %}selected{% endif %}>Todos</option>
+                                            <option value="sem" {% if filtros.socio == 'sem' %}selected{% endif %}>Sem sócio</option>
+                                            {% for s in socios %}
+                                            <option value="{{ s.id }}" {% if filtros.socio == s.id|stringformat:"s" %}selected{% endif %}>{{ s }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="data_inicio">Emissão (de)</label>
+                                        <input type="date" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}" title="Data de emissão inicial">
+                                    </div>
+                                    <div>
+                                        <label for="data_fim">Emissão (até)</label>
+                                        <input type="date" id="data_fim" name="data_fim" value="{{ filtros.data_fim }}" title="Data de emissão final">
+                                    </div>
+                                    <div>
+                                        <label for="vencimento_inicio">Vencimento (de)</label>
+                                        <input type="date" id="vencimento_inicio" name="vencimento_inicio" value="{{ filtros.vencimento_inicio|default:'' }}">
+                                    </div>
+                                    <div>
+                                        <label for="vencimento_fim">Vencimento (até)</label>
+                                        <input type="date" id="vencimento_fim" name="vencimento_fim" value="{{ filtros.vencimento_fim|default:'' }}">
+                                    </div>
+                                    <div>
+                                        <label for="recebimento_inicio">Recebimento (de)</label>
+                                        <input type="date" id="recebimento_inicio" name="recebimento_inicio" value="{{ filtros.recebimento_inicio|default:'' }}">
+                                    </div>
+                                    <div>
+                                        <label for="recebimento_fim">Recebimento (até)</label>
+                                        <input type="date" id="recebimento_fim" name="recebimento_fim" value="{{ filtros.recebimento_fim|default:'' }}">
+                                    </div>
+                                    <div>
+                                        <label for="per_page">Por página</label>
+                                        <select id="per_page" name="per_page" title="Itens por página">
+                                            <option value="25" {% if filtros.per_page == "25" %}selected{% endif %}>25</option>
+                                            <option value="50" {% if filtros.per_page == "50" %}selected{% endif %}>50</option>
+                                            <option value="100" {% if filtros.per_page == "100" %}selected{% endif %}>100</option>
+                                            <option value="150" {% if filtros.per_page == "150" %}selected{% endif %}>150</option>
+                                            <option value="500" {% if filtros.per_page == "500" %}selected{% endif %}>500</option>
+                                            <option value="900" {% if filtros.per_page == "900" %}selected{% endif %}>900</option>
+                                        </select>
+                                    </div>
+                                    <div class="btn-group-filtros">
+                                        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filtrar</button>
+                                        <a href="{% url 'contasareceber:crlistar' %}" class="btn btn-secondary"><i class="fas fa-times"></i> Limpar</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </details>
+                    </section>
+
+                    <!-- Form para seleção múltipla -->
+                    <form method="post" id="contas-form" action="{% url 'contasareceber:lancar_selecionados' %}">
+                        {% csrf_token %}
+                        <div class="toolbar">
+                            <div class="toolbar-left">
+                                <button type="button" class="btn btn-info btn-sm" id="conciliar-btn">
+                                    <i class="fas fa-sync-alt"></i> Conciliar Selecionadas
+                                </button>
+                                <button type="button" class="btn btn-success btn-sm" id="conciliar-cartao-btn">
+                                    <i class="fas fa-credit-card"></i> Conciliar Cartão
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" id="conciliar-cartao-aprox-btn" title="Data ±2 dias e valor aproximado (recebíveis não conciliados)">
+                                    <i class="fas fa-project-diagram"></i> Cartão (aproximação)
+                                </button>
+                                <button type="button" class="btn btn-warning btn-sm" id="baixar-dinheiro-btn">
+                                    <i class="fas fa-money-bill-wave"></i> Baixar em Dinheiro
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="escolher-categoria-btn">
+                                    <i class="fas fa-tags"></i> Escolher Categoria
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="alterar-socio-btn" title="Define o sócio na nota fiscal vinculada">
+                                    <i class="fas fa-user-edit"></i> Alterar Sócio
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" id="excluir-selecionados-btn" title="Exclui as contas pendentes selecionadas">
+                                    <i class="fas fa-trash"></i> Excluir Selecionados
+                                </button>
+                            </div>
+                            <small class="text-muted">Selecione contas para aplicar ações em lote</small>
+                        </div>
+
+                        <!-- Tabela -->
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="select-all">
+                                        </th>
+                                        <th>Cliente</th>
+                                        <th>CPF/CNPJ</th>
+                                        <th>Sócio</th>
+                                        <th>Categoria</th>
+                                        <th>Data Emissão</th>
+                                        <th>Data Recebimento</th>
+                                        <th>Documento</th>
+                                        <th>Autorização</th>
+                                        <th>Cobrança</th>
+                                        <th>Data Vencimento</th>
+                                        <th>Valor</th>
+                                        <th>Saldo nominal</th>
+                                        <th title="Se recebido (pago/cartão): valor recebido. Se não: valor a receber − tarifa − desconto + juros.">Total líquido</th>
+                                        <th>Desconto</th>
+                                        <th>Juros</th>
+                                        <th>Tarifas</th>
+                                        <th>Status</th>
+                                        <th>Dias Atraso</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for conta in contas %}
+                                    <tr class="{% if conta.is_vencida %}table-warning{% endif %}">
+                                        <td>
+                                            {% if conta.status == 'pendente' or conta.status == 'cartao' %}
+                                            <input type="checkbox" name="contas" value="{{ conta.pk }}" class="conta-checkbox">
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ conta.cliente }}</td>
+                                        <td>{{ conta.cnpj_cpf|default:"-" }}</td>
+                                        <td>{% if conta.socio %}{{ conta.socio.socio }}{% elif conta.nota and conta.nota.socio %}{{ conta.nota.socio.socio }}{% else %}-{% endif %}</td>
+                                        <td>{% if conta.categoria %}{{ conta.categoria.nome }}{% else %}-{% endif %}</td>
+                                        <td>{{ conta.data_emissao|date:"d/m/Y" }}</td>
+                                        <td>{{ conta.data_recebimento|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>
+                                            {% if conta.nota and conta.nota.discriminacao %}
+                                            <span class="link-discriminacao-nf" tabindex="0" aria-label="Ver discriminação da NF">
+                                                {{ conta.doc|default:conta.nota.numero_nota }}
+                                                <span class="discriminacao-nf-popover" role="tooltip">
+                                                    <strong>Discriminação NF{% if conta.nota.numero_nota %} {{ conta.nota.numero_nota }}{% endif %}</strong>
+                                                    <span class="discriminacao-nf-texto">{{ conta.nota.discriminacao }}</span>
+                                                </span>
+                                            </span>
+                                            {% else %}
+                                            {{ conta.doc|default:"-" }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ conta.autorizacao|default:"-" }}</td>
+                                        <td>
+                                            {% if conta.forma_pagamento %}
+                                                {{ conta.forma_pagamento.descricao }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ conta.data_vencimento|date:"d/m/Y" }}</td>
+                                        <td>R$ {{ conta.valor_a_receber|moeda_br }}</td>
+                                        <td>R$ {{ conta.get_saldo_nominal_pendente|moeda_br }}</td>
+                                        <td>R$ {{ conta.get_total_liquido_listagem|moeda_br }}</td>
+                                        <td>R$ {{ conta.desconto|default:0|moeda_br }}</td>
+                                        <td>R$ {{ conta.juros|default:0|moeda_br }}</td>
+                                        <td>R$ {{ conta.tarifas|default:0|moeda_br }}</td>
+                                        <td>
+                                            <span class="badge {% if conta.status == 'pago' %}badge-success{% elif conta.status == 'pendente' %}badge-warning{% elif conta.status == 'cartao' %}badge-info{% else %}badge-secondary{% endif %}">
+                                                {{ conta.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ conta.dias_atraso }}</td>
+                                        <td>
+                                            <div class="dropdown">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        id="acoes-conta-{{ conta.pk }}"
+                                                        data-bs-toggle="dropdown"
+                                                        aria-expanded="false"
+                                                        title="Ações">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="acoes-conta-{{ conta.pk }}">
+                                                    <li>
+                                                        <button type="button" class="dropdown-item"
+                                                                data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                                                                onclick="carregarDetalhes('conta', {{ conta.pk }})">
+                                                            <i class="fas fa-eye me-2 text-info"></i> Detalhes
+                                                        </button>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'contasareceber:detalhes' conta.pk %}?{{ request.GET.urlencode }}">
+                                                            <i class="fas fa-external-link-alt me-2 text-primary"></i> Ver
+                                                        </a>
+                                                    </li>
+                                                    {% if conta.status != 'pago' and conta.status != 'cartao' %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'contasareceber:editar' conta.pk %}">
+                                                            <i class="fas fa-edit me-2 text-warning"></i> Editar
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'contasareceber:baixar' conta.pk %}">
+                                                            <i class="fas fa-check-circle me-2 text-success"></i> Baixar
+                                                        </a>
+                                                    </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="20" class="text-center">Nenhuma conta a receber encontrada.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+
+                    <!-- Paginação -->
+                    {% if page_obj.has_other_pages %}
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div>
+                            <small class="text-muted">
+                                Mostrando {{ page_obj.start_index }} a {{ page_obj.end_index }} de {{ paginator.count }} registros
+                            </small>
+                        </div>
+                        <nav aria-label="Navegação de páginas">
+                            <ul class="pagination pagination-sm mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">&laquo;</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                </li>
+                                {% endif %}
+
+                                {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                                {% endfor %}
+
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Próximo</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">&raquo;</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Modal para Baixa em Dinheiro -->
+<div class="modal fade" id="modalBaixaDinheiro" tabindex="-1" aria-labelledby="modalBaixaDinheiroLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalBaixaDinheiroLabel">
+                    <i class="fas fa-money-bill-wave me-2"></i>Baixar Contas em Dinheiro
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="formBaixaDinheiro" method="post" action="{% url 'contasareceber:baixar_dinheiro' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div id="contasSelecionadasInfo">
+                        <!-- Informações das contas selecionadas serão inseridas aqui via JavaScript -->
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="contaCaixa" class="form-label">Conta Caixa *</label>
+                                <select class="form-select" id="contaCaixa" name="conta_banco" required>
+                                    <option value="">Selecione uma conta caixa...</option>
+                                    <!-- Opções serão carregadas via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dataRecebimento" class="form-label">Data do Recebimento *</label>
+                                <input type="date" class="form-control" id="dataRecebimento" name="data_recebimento" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informações da baixa:</strong><br>
+                        • Valor Recebido = Valor a Receber de cada conta<br>
+                        • Data Recebimento = Data de Vencimento de cada conta<br>
+                        • Histórico = "VLR REF A RECEB COM NF {NUMERODANOTA} – {NOMEDOCLIENTE}"
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success" id="btnConfirmarBaixa">
+                        <i class="fas fa-check me-2"></i>Confirmar Baixa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Escolher Categoria -->
+<div class="modal fade" id="modalEscolherCategoria" tabindex="-1" aria-labelledby="modalEscolherCategoriaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEscolherCategoriaLabel">
+                    <i class="fas fa-tags me-2"></i>Escolher Categoria
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="formEscolherCategoria" method="post" action="{% url 'contasareceber:aplicar_categoria' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div id="contasSelecionadasCategoriaInfo">
+                        <!-- Informações das contas selecionadas serão inseridas aqui via JavaScript -->
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="categoriaInput" class="form-label">Categoria *</label>
+                                <input type="text" class="form-control" id="categoriaInput" name="categoria" placeholder="Digite pelo menos 4 letras para buscar..." required>
+                                <input type="hidden" id="categoriaId" name="categoria_id">
+                                <div class="form-text">A busca automática começa após 4 letras digitadas.</div>
+                                <div id="resultadosCategoriaModal" class="mt-2" style="max-height: 200px; overflow-y: auto; display: none;">
+                                    <!-- Resultados da busca aparecerão aqui -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informações da aplicação:</strong><br>
+                        • A categoria selecionada será aplicada a todas as contas escolhidas<br>
+                        • Se houver nota fiscal vinculada, a categoria também será aplicada à nota fiscal
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnAplicarCategoria">
+                        <i class="fas fa-check me-2"></i>Aplicar Categoria
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: alterar sócio em lote (atualiza nota.socio) -->
+<div class="modal fade" id="modalAlterarSocio" tabindex="-1" aria-labelledby="modalAlterarSocioLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAlterarSocioLabel">
+                    <i class="fas fa-user-edit me-2"></i>Alterar sócio nas NF vinculadas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="formAlterarSocio" method="post" action="{% url 'contasareceber:alterar_socio_lote' %}">
+                {% csrf_token %}
+                <input type="hidden" name="return_path" value="{{ request.get_full_path }}">
+                <div class="modal-body">
+                    <div id="contasSelecionadasSocioInfo"></div>
+                    <div class="mb-3">
+                        <label for="socioIdSelect" class="form-label">Sócio responsável na NF</label>
+                        <select class="form-select" id="socioIdSelect" name="socio_id">
+                            <option value="">— Remover sócio da NF —</option>
+                            {% for s in socios %}
+                            <option value="{{ s.id }}">{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Grava o sócio na NF e replica em todas as parcelas dessa nota. Contas sem NF não são alteradas. Na listagem, amplie <strong>Data início/fim</strong> se a nota for antiga (o filtro padrão é 12 meses).</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check me-1"></i>Aplicar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: conciliação cartão por aproximação -->
+<div class="modal fade" id="modalCartaoAprox" tabindex="-1" aria-labelledby="modalCartaoAproxLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalCartaoAproxLabel">
+                    <i class="fas fa-project-diagram me-2"></i>Conciliar cartão por aproximação
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cartaoAproxLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 mb-0">Buscando recebíveis da maquininha…</p>
+                </div>
+                <div id="cartaoAproxErro" class="alert alert-danger d-none"></div>
+                <div id="cartaoAproxContent" class="d-none">
+                    <p class="small text-muted">
+                        Cobrança <strong>CARTAO DEBITO</strong> no título → só aparecem recebíveis com forma <strong>Débito</strong> (um lançamento por título).
+                        Cobrança <strong>CARTAO CREDITO</strong> → só recebíveis <strong>Crédito</strong>; o resumo compara <strong>título = líquido + taxa</strong> (diferença zerada ao fechar). Enquanto não fechar, o menu
+                        <strong>+ Adicionar recebível</strong> fica habilitado para incluir parcelas. Com valor já fechado, não é possível adicionar outro recebível ao mesmo título.
+                        Janela de <strong>±2 dias</strong> e valor aproximado na sugestão. Confirmação com aviso se ainda houver diferença. Cada recebível só uma vez.
+                    </p>
+                    <h6 class="mt-3">Sugestões automáticas</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle" id="tblCartaoAproxSug">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Vincular</th>
+                                    <th>Título (conta a receber)</th>
+                                    <th>Sugestão inicial</th>
+                                    <th>Recebíveis do cartão (parcelas / vários lançamentos)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <h6 class="mt-3">Títulos sem sugestão</h6>
+                    <p class="small text-muted mb-1">Monte a lista com <strong>+ Adicionar recebível</strong> (vários por título se precisar).</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle" id="tblCartaoAproxSem">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Título</th>
+                                    <th>Recebíveis do cartão (parcelas / vários lançamentos)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <h6 class="mt-3">Recebíveis sem par nesta rodada</h6>
+                    <p class="small text-muted">Disponíveis para troca nos combos acima (cada ID só pode ser usado uma vez).</p>
+                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table table-sm table-striped" id="tblCartaoAproxLivres">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Pagamento</th>
+                                    <th>Forma pagamento</th>
+                                    <th>Bandeira</th>
+                                    <th>Valor bruto</th>
+                                    <th>Líquido</th>
+                                    <th>Maquinha</th>
+                                    <th>Autorização</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnCartaoAproxConfirmar" disabled>
+                    <i class="fas fa-check me-1"></i>Confirmar conciliação selecionada
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1" aria-labelledby="modalDetalhesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesLabel">
+                    <i class="fas fa-info-circle me-2"></i>Detalhes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+console.log('DEBUG: JavaScript carregado');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DEBUG: DOMContentLoaded executado');
+    const selectAllCheckbox = document.getElementById('select-all');
+    const contaCheckboxes = document.querySelectorAll('.conta-checkbox');
+    const conciliarBtn = document.getElementById('conciliar-btn');
+    const contasForm = document.getElementById('contas-form');
+
+    // Função para atualizar o estado do botão
+    function updateButtonState() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        const hasSelection = checkedBoxes.length > 0;
+        console.log('Checked boxes:', checkedBoxes.length, 'Has selection:', hasSelection);
+        // Botão sempre habilitado, validação feita no click
+    }
+
+    // Select all functionality
+    selectAllCheckbox.addEventListener('change', function() {
+        contaCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateButtonState();
+    });
+
+    // Individual checkbox change
+    contaCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            console.log('Checkbox changed:', this.checked, 'Value:', this.value);
+            const allChecked = Array.from(contaCheckboxes).every(cb => cb.checked);
+            const someChecked = Array.from(contaCheckboxes).some(cb => cb.checked);
+
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked && !allChecked;
+
+            updateButtonState();
+        });
+    });
+
+    // Conciliar button click handler
+    conciliarBtn.addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para conciliar.');
+            return;
+        }
+
+        // Change form action to conciliar URL
+        contasForm.action = '{% url "contasareceber:conciliar" %}';
+
+        // Submit the form
+        contasForm.submit();
+    });
+
+    // Conciliar Cartão button click handler
+    const conciliarCartaoBtn = document.getElementById('conciliar-cartao-btn');
+    conciliarCartaoBtn.addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para conciliar com cartão.');
+            return;
+        }
+
+        // Usar sempre a lógica de conciliação por autorização
+        contasForm.action = '{% url "contasareceber:conciliar_cartao" %}';
+
+        // Submit the form
+        contasForm.submit();
+    });
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function cartaoAproxParseMoney(s) {
+        if (s === undefined || s === null) return 0;
+        const t = String(s).trim().replace(',', '.');
+        const n = parseFloat(t);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function cartaoAproxNormalizeFp(s) {
+        if (!s) return '';
+        return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s/g, '');
+    }
+
+    function cartaoAproxRelMatchesTipo(r, tipoCartao) {
+        if (!tipoCartao) return true;
+        const fp = cartaoAproxNormalizeFp(r.forma_pagamento);
+        if (!fp) return false;
+        if (tipoCartao === 'debito') return fp.includes('DEBIT') || fp.includes('DEBITO');
+        if (tipoCartao === 'credito') return fp.includes('CREDIT') || fp.includes('CREDITO');
+        return true;
+    }
+
+    function cartaoAproxRecebivelOptionText(r) {
+        const fp = escapeHtml(r.forma_pagamento || '—');
+        const bd = escapeHtml(r.bandeira || '—');
+        const aut = escapeHtml(r.numero_autorizacao || '—');
+        const bruto = r.valor_bruto != null ? r.valor_bruto : '';
+        return '#' + r.id + ' — ' + (r.data_pagamento || '') +
+            ' — Forma: ' + fp + ' — Band.: ' + bd +
+            ' — Aut.: ' + aut +
+            ' — Bruto R$ ' + bruto + ' — Líq. R$ ' + r.valor_liquido +
+            ' — ' + escapeHtml(r.maquinha || '');
+    }
+
+    function cartaoAproxGetRelIds(tr) {
+        try {
+            return JSON.parse(tr.dataset.relIds || '[]') || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function cartaoAproxSetRelIds(tr, ids) {
+        tr.dataset.relIds = JSON.stringify(ids);
+    }
+
+    function cartaoAproxUsedGloballyExcluding(trSkip) {
+        const used = new Set();
+        document.querySelectorAll('#tblCartaoAproxSug .aprox-titulo-row, #tblCartaoAproxSem .aprox-titulo-row').forEach(function(tr) {
+            if (tr === trSkip) return;
+            cartaoAproxGetRelIds(tr).forEach(function(id) { used.add(Number(id)); });
+        });
+        return used;
+    }
+
+    function cartaoAproxRefreshRow(tr) {
+        const poolById = window.__cartaoAproxPoolById || {};
+        const ids = cartaoAproxGetRelIds(tr);
+        const badges = tr.querySelector('.aprox-badges');
+        const resumo = tr.querySelector('.aprox-resumo');
+        const addSel = tr.querySelector('.aprox-add-rec');
+        if (!badges || !resumo || !addSel) return;
+
+        let sumLiq = 0;
+        let sumTax = 0;
+        let htmlBadges = '';
+        ids.forEach(function(rid) {
+            const r = poolById[rid];
+            if (!r) return;
+            sumLiq += cartaoAproxParseMoney(r.valor_liquido);
+            sumTax += cartaoAproxParseMoney(r.taxa_maquinha);
+            const autBit = (r.numero_autorizacao && String(r.numero_autorizacao).trim())
+                ? (' · Aut. ' + escapeHtml(String(r.numero_autorizacao).trim()))
+                : '';
+            const liqTxt = escapeHtml(r.valor_liquido != null ? String(r.valor_liquido) : '');
+            const shortLabel = '#' + rid + autBit + ' · Líq. R$ ' + liqTxt;
+            htmlBadges += '<span class="badge bg-secondary me-1 mb-1 align-middle">' + shortLabel +
+                ' <button type="button" class="btn btn-link text-white text-decoration-none p-0 ms-1 aprox-remove-rel" data-rel-id="' + rid + '" title="Remover" style="font-size:0.85rem;line-height:1;">×</button></span>';
+        });
+        badges.innerHTML = htmlBadges || '<span class="text-muted small">Nenhum recebível — use o menu abaixo.</span>';
+
+        const vt = cartaoAproxParseMoney(tr.dataset.valorTitulo);
+        const somaLiqMaisTaxa = sumLiq + sumTax;
+        const diff = vt - somaLiqMaisTaxa;
+        const tol = 0.06;
+        const ok = Math.abs(diff) <= tol;
+        const tipoCartao = tr.dataset.tipoCartao || '';
+
+        let extraResumo = '';
+        if (tipoCartao === 'credito' && ids.length > 0 && !ok && diff > tol) {
+            extraResumo = ' <span class="badge bg-info text-dark">Crédito: inclua mais parcelas em + Adicionar recebível</span>';
+        }
+        if (tipoCartao === 'credito' && ids.length > 0 && !ok && diff < -tol) {
+            extraResumo = ' <span class="badge bg-danger">Líquido + taxa acima do título — remova um recebível</span>';
+        }
+
+        resumo.innerHTML = '<span class="' + (ok ? 'text-success' : 'text-warning') + '">' +
+            '<strong>Título R$ ' + vt.toFixed(2) + '</strong> = líquido R$ ' + sumLiq.toFixed(2) +
+            ' + taxa R$ ' + sumTax.toFixed(2) + ' <span class="text-muted">(= R$ ' + somaLiqMaisTaxa.toFixed(2) + ')</span>' +
+            ' · <strong>Dif. R$ ' + diff.toFixed(2) + '</strong>' + (ok ? ' ✓' : '') + '</span>' + extraResumo;
+
+        const otherUsed = cartaoAproxUsedGloballyExcluding(tr);
+        const mySet = new Set(ids.map(Number));
+
+        let allowAdd = true;
+        let addPlaceholder = '+ Adicionar recebível…';
+        if (tipoCartao === 'debito' && ids.length >= 1) {
+            allowAdd = false;
+            addPlaceholder = 'Débito: apenas um recebível (forma Débito no relatório)';
+        } else if (tipoCartao === 'credito' && ok && ids.length > 0) {
+            allowAdd = false;
+            addPlaceholder = 'Crédito: valor fechado — não é necessário outro recebível';
+        } else if (tipoCartao === 'credito' && diff < -tol && ids.length > 0) {
+            allowAdd = false;
+            addPlaceholder = 'Remova um recebível para baixar a soma';
+        }
+
+        if (!allowAdd) {
+            addSel.innerHTML = '<option value="">' + escapeHtml(addPlaceholder) + '</option>';
+            addSel.disabled = true;
+            addSel.value = '';
+            return;
+        }
+
+        addSel.disabled = false;
+        let opt = '<option value="">' + addPlaceholder + '</option>';
+        (window.__cartaoAproxPool || []).forEach(function(r) {
+            if (otherUsed.has(r.id)) return;
+            if (mySet.has(r.id)) return;
+            if (!cartaoAproxRelMatchesTipo(r, tipoCartao)) return;
+            opt += '<option value="' + r.id + '">' + cartaoAproxRecebivelOptionText(r) + '</option>';
+        });
+        addSel.innerHTML = opt;
+        addSel.value = '';
+    }
+
+    function cartaoAproxRefreshAllTituloRows() {
+        document.querySelectorAll('.aprox-titulo-row').forEach(cartaoAproxRefreshRow);
+    }
+
+    const modalCartaoAproxEl = document.getElementById('modalCartaoAprox');
+    if (modalCartaoAproxEl) {
+        modalCartaoAproxEl.addEventListener('click', function(e) {
+            const btn = e.target.closest('.aprox-remove-rel');
+            if (!btn || !modalCartaoAproxEl.contains(btn)) return;
+            const tr = btn.closest('.aprox-titulo-row');
+            if (!tr) return;
+            const rid = parseInt(btn.getAttribute('data-rel-id'), 10);
+            let ids = cartaoAproxGetRelIds(tr).filter(function(x) { return Number(x) !== rid; });
+            cartaoAproxSetRelIds(tr, ids);
+            cartaoAproxRefreshAllTituloRows();
+        });
+        modalCartaoAproxEl.addEventListener('change', function(e) {
+            if (!e.target.classList.contains('aprox-add-rec')) return;
+            const tr = e.target.closest('.aprox-titulo-row');
+            if (!tr) return;
+            const v = e.target.value;
+            if (!v) return;
+            const rid = parseInt(v, 10);
+            if (isNaN(rid)) return;
+            if (tr.dataset.tipoCartao === 'debito' && cartaoAproxGetRelIds(tr).length >= 1) {
+                alert('Cartão débito: use apenas um recebível por título.');
+                e.target.value = '';
+                return;
+            }
+            let ids = cartaoAproxGetRelIds(tr).slice();
+            if (ids.indexOf(rid) === -1) ids.push(rid);
+            cartaoAproxSetRelIds(tr, ids);
+            cartaoAproxRefreshAllTituloRows();
+        });
+    }
+
+    const btnCartaoAprox = document.getElementById('conciliar-cartao-aprox-btn');
+    if (btnCartaoAprox) {
+        btnCartaoAprox.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Selecione pelo menos um título pendente para sugerir conciliação por aproximação.');
+                return;
+            }
+            const contasIds = Array.from(checkedBoxes).map(function(cb) { return cb.value; });
+            const modalEl = document.getElementById('modalCartaoAprox');
+            const loading = document.getElementById('cartaoAproxLoading');
+            const errBox = document.getElementById('cartaoAproxErro');
+            const content = document.getElementById('cartaoAproxContent');
+            const btnOk = document.getElementById('btnCartaoAproxConfirmar');
+
+            errBox.classList.add('d-none');
+            errBox.textContent = '';
+            content.classList.add('d-none');
+            loading.classList.remove('d-none');
+            btnOk.disabled = true;
+
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            fetch('{% url "contasareceber:sugerir_cartao_aprox" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ contas_ids: contasIds })
+            })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(res) {
+                loading.classList.add('d-none');
+                if (!res.ok || !res.data.ok) {
+                    errBox.textContent = res.data.error || res.data.erro || 'Não foi possível montar sugestões.';
+                    errBox.classList.remove('d-none');
+                    return;
+                }
+                const d = res.data;
+                window.__cartaoAproxPool = d.pool_recebiveis || [];
+                window.__cartaoAproxPoolById = {};
+                window.__cartaoAproxPool.forEach(function(r) { window.__cartaoAproxPoolById[r.id] = r; });
+
+                const tbSug = document.querySelector('#tblCartaoAproxSug tbody');
+                const tbSem = document.querySelector('#tblCartaoAproxSem tbody');
+                const tbLiv = document.querySelector('#tblCartaoAproxLivres tbody');
+                tbSug.innerHTML = '';
+                tbSem.innerHTML = '';
+                tbLiv.innerHTML = '';
+
+                const cellMulti = '<div class="aprox-badges d-flex flex-wrap"></div>' +
+                    '<div class="aprox-resumo small mt-1"></div>' +
+                    '<select class="form-select form-select-sm aprox-add-rec mt-1"></select>';
+
+                (d.sugestoes || []).forEach(function(s) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'aprox-titulo-row';
+                    tr.dataset.contaId = s.conta_id;
+                    tr.dataset.valorTitulo = (s.conta && s.conta.valor_a_receber != null) ? s.conta.valor_a_receber : '0';
+                    tr.dataset.tipoCartao = (s.conta && s.conta.tipo_cartao) ? s.conta.tipo_cartao : '';
+                    tr.dataset.relIds = JSON.stringify(s.relatorio_id ? [s.relatorio_id] : []);
+                    const c = s.conta || {};
+                    const rec = s.recebivel || {};
+                    const cobTxt = c.forma_pagamento ? '<br><small class="text-primary">Cobrança: ' + escapeHtml(c.forma_pagamento) + '</small>' : '';
+                    const sugTxt = '<small>#' + rec.id + ' · ' + (rec.data_pagamento || '') +
+                        '<br>Forma: ' + escapeHtml(rec.forma_pagamento || '—') + ' · Band.: ' + escapeHtml(rec.bandeira || '—') +
+                        '<br>Bruto R$ ' + (rec.valor_bruto != null ? rec.valor_bruto : '') + ' · Líq. R$ ' + rec.valor_liquido +
+                        '<br>' + escapeHtml(rec.maquinha || '') + ' · ' + escapeHtml(rec.numero_autorizacao || '') + '</small>';
+                    tr.innerHTML =
+                        '<td><input type="checkbox" class="form-check-input aprox-aceitar" checked title="Desmarque para não vincular este título"></td>' +
+                        '<td><strong>#' + c.id + '</strong> ' + escapeHtml(c.cliente || '') + '<br><small class="text-muted">Venc. ' + (c.data_vencimento || '—') +
+                        ' · R$ ' + c.valor_a_receber + '</small>' + cobTxt + '</td>' +
+                        '<td class="aprox-sugestao-cell">' + sugTxt + '</td>' +
+                        '<td>' + cellMulti + '</td>';
+                    tbSug.appendChild(tr);
+                });
+
+                (d.titulos_sem_sugestao || []).forEach(function(c) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'aprox-titulo-row';
+                    tr.dataset.contaId = c.id;
+                    tr.dataset.valorTitulo = c.valor_a_receber != null ? c.valor_a_receber : '0';
+                    tr.dataset.tipoCartao = c.tipo_cartao || '';
+                    tr.dataset.relIds = '[]';
+                    const cobTxt2 = c.forma_pagamento ? '<br><small class="text-primary">Cobrança: ' + escapeHtml(c.forma_pagamento) + '</small>' : '';
+                    tr.innerHTML =
+                        '<td><strong>#' + c.id + '</strong> ' + escapeHtml(c.cliente || '') + '<br><small class="text-muted">Venc. ' + (c.data_vencimento || '—') +
+                        ' · R$ ' + c.valor_a_receber + '</small>' + cobTxt2 + '</td>' +
+                        '<td>' + cellMulti + '</td>';
+                    tbSem.appendChild(tr);
+                });
+
+                cartaoAproxRefreshAllTituloRows();
+
+                (d.recebiveis_sem_sugestao || []).forEach(function(r) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = '<td>' + r.id + '</td><td>' + escapeHtml(r.data_pagamento || '') + '</td><td>' +
+                        escapeHtml(r.forma_pagamento || '—') + '</td><td>' + escapeHtml(r.bandeira || '—') + '</td><td>R$ ' +
+                        (r.valor_bruto != null ? r.valor_bruto : '') + '</td><td>R$ ' + r.valor_liquido + '</td><td>' +
+                        escapeHtml(r.maquinha || '') + '</td><td>' + escapeHtml(r.numero_autorizacao || '') + '</td>';
+                    tbLiv.appendChild(tr);
+                });
+
+                if ((d.sugestoes || []).length === 0 && (d.titulos_sem_sugestao || []).length === 0) {
+                    errBox.textContent = 'Nenhum título pendente válido na seleção.';
+                    errBox.classList.remove('d-none');
+                    return;
+                }
+
+                content.classList.remove('d-none');
+                btnOk.disabled = false;
+            })
+            .catch(function(e) {
+                loading.classList.add('d-none');
+                errBox.textContent = 'Erro de rede: ' + (e.message || e);
+                errBox.classList.remove('d-none');
+            });
+        });
+
+        document.getElementById('btnCartaoAproxConfirmar').addEventListener('click', function(e) {
+            e.preventDefault();
+            const grupos = [];
+            const usados = new Set();
+            let erroDup = false;
+            const tol = 0.06;
+            let algumDesbalanceado = false;
+
+            function pushGrupo(cid, relIds) {
+                if (!relIds || relIds.length === 0) return;
+                for (let i = 0; i < relIds.length; i++) {
+                    const rid = relIds[i];
+                    if (usados.has(rid)) {
+                        alert('O recebível #' + rid + ' foi usado mais de uma vez. Ajuste as listas.');
+                        erroDup = true;
+                        return;
+                    }
+                }
+                relIds.forEach(function(rid) { usados.add(rid); });
+                grupos.push({ conta_id: cid, relatorio_ids: relIds.slice() });
+            }
+
+            document.querySelectorAll('#tblCartaoAproxSug tbody tr.aprox-titulo-row').forEach(function(tr) {
+                if (erroDup) return;
+                const cb = tr.querySelector('.aprox-aceitar');
+                if (!cb || !cb.checked) return;
+                const cid = parseInt(tr.dataset.contaId, 10);
+                const relIds = cartaoAproxGetRelIds(tr).map(Number);
+                const vt = cartaoAproxParseMoney(tr.dataset.valorTitulo);
+                let sumLiq = 0, sumTax = 0;
+                relIds.forEach(function(rid) {
+                    const r = window.__cartaoAproxPoolById && window.__cartaoAproxPoolById[rid];
+                    if (r) {
+                        sumLiq += cartaoAproxParseMoney(r.valor_liquido);
+                        sumTax += cartaoAproxParseMoney(r.taxa_maquinha);
+                    }
+                });
+                if (relIds.length && Math.abs(vt - sumLiq - sumTax) > tol) algumDesbalanceado = true;
+                pushGrupo(cid, relIds);
+            });
+
+            document.querySelectorAll('#tblCartaoAproxSem tbody tr.aprox-titulo-row').forEach(function(tr) {
+                if (erroDup) return;
+                const cid = parseInt(tr.dataset.contaId, 10);
+                const relIds = cartaoAproxGetRelIds(tr).map(Number);
+                const vt = cartaoAproxParseMoney(tr.dataset.valorTitulo);
+                let sumLiq = 0, sumTax = 0;
+                relIds.forEach(function(rid) {
+                    const r = window.__cartaoAproxPoolById && window.__cartaoAproxPoolById[rid];
+                    if (r) {
+                        sumLiq += cartaoAproxParseMoney(r.valor_liquido);
+                        sumTax += cartaoAproxParseMoney(r.taxa_maquinha);
+                    }
+                });
+                if (relIds.length && Math.abs(vt - sumLiq - sumTax) > tol) algumDesbalanceado = true;
+                pushGrupo(cid, relIds);
+            });
+
+            if (erroDup) return;
+
+            if (grupos.length === 0) {
+                alert('Marque títulos com ao menos um recebível na lista ou adicione lançamentos ao título.');
+                return;
+            }
+
+            if (algumDesbalanceado) {
+                if (!window.confirm('O título não fecha com líquido + taxa dos recebíveis em pelo menos uma linha (em crédito, inclua parcelas até zerar a diferença). Deseja confirmar mesmo assim?')) {
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('btnCartaoAproxConfirmar');
+            btn.disabled = true;
+
+            fetch('{% url "contasareceber:confirmar_cartao_aprox" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ grupos: grupos })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                let msg = 'Vínculos aplicados: ' + (data.aplicados || 0) + '.';
+                if (data.erros && data.erros.length) {
+                    msg += '\n\nAvisos:\n' + data.erros.join('\n');
+                }
+                alert(msg);
+                bootstrap.Modal.getInstance(document.getElementById('modalCartaoAprox')).hide();
+                window.location.reload();
+            })
+            .catch(function() {
+                alert('Erro ao confirmar conciliação.');
+                btn.disabled = false;
+            });
+        });
+    }
+
+    // Baixar em Dinheiro button click handler
+    const baixarDinheiroBtn = document.getElementById('baixar-dinheiro-btn');
+    baixarDinheiroBtn.addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para baixar em dinheiro.');
+            return;
+        }
+
+        // Validar se todas as contas selecionadas têm cobrança DINHEIRO
+        const contasIds = Array.from(checkedBoxes).map(cb => cb.value);
+        validarContasDinheiro(contasIds);
+    });
+
+    // Escolher Categoria button click handler
+    const escolherCategoriaBtn = document.getElementById('escolher-categoria-btn');
+    escolherCategoriaBtn.addEventListener('click', function() {
+        console.log('DEBUG: Botão Escolher Categoria clicado');
+        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+        console.log('DEBUG: Contas selecionadas:', checkedBoxes.length);
+
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma conta para aplicar categoria.');
+            return;
+        }
+
+        // Mostrar modal com informações das contas
+        mostrarModalEscolherCategoria(checkedBoxes);
+    });
+
+    const alterarSocioBtn = document.getElementById('alterar-socio-btn');
+    if (alterarSocioBtn) {
+        alterarSocioBtn.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Selecione pelo menos uma conta para alterar o sócio.');
+                return;
+            }
+            mostrarModalAlterarSocio(checkedBoxes);
+        });
+    }
+
+    const excluirSelecionadosBtn = document.getElementById('excluir-selecionados-btn');
+    if (excluirSelecionadosBtn) {
+        excluirSelecionadosBtn.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Selecione pelo menos uma conta para excluir.');
+                return;
+            }
+            const n = checkedBoxes.length;
+            const msg = n === 1
+                ? 'Excluir a conta selecionada?\n\nEsta ação não pode ser desfeita.'
+                : 'Excluir as ' + n + ' contas selecionadas?\n\nEsta ação não pode ser desfeita.';
+            if (!window.confirm(msg)) {
+                return;
+            }
+            contasForm.action = '{% url "contasareceber:excluir_selecionados" %}';
+            contasForm.submit();
+        });
+    }
+
+    function mostrarModalAlterarSocio(checkedBoxes) {
+        const form = document.getElementById('formAlterarSocio');
+        const contasInfo = document.getElementById('contasSelecionadasSocioInfo');
+        form.querySelectorAll('input[name="contas_ids"]').forEach(function(el) { el.remove(); });
+        contasInfo.innerHTML = '';
+        const contasIds = Array.from(checkedBoxes).map(function(cb) { return cb.value; });
+        const contasRows = Array.from(checkedBoxes).map(function(cb) { return cb.closest('tr'); });
+        let html = '<h6>Contas selecionadas</h6><ul class="list-group mb-3">';
+        contasRows.forEach(function(row) {
+            const cliente = row.cells[1].textContent;
+            html += '<li class="list-group-item">' + cliente + '</li>';
+        });
+        html += '</ul>';
+        contasInfo.innerHTML = html;
+        contasIds.forEach(function(id) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'contas_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        const modal = new bootstrap.Modal(document.getElementById('modalAlterarSocio'));
+        modal.show();
+    }
+
+    // Initial state
+    updateButtonState();
+
+    // Função para validar contas dinheiro
+    function validarContasDinheiro(contasIds) {
+        fetch('/contasareceber/validar_contas_dinheiro/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ contas_ids: contasIds })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.contas_invalidas && data.contas_invalidas.length > 0) {
+                alert('As seguintes contas não têm cobrança DINHEIRO:\n' +
+                      data.contas_invalidas.map(c => `- ${c.cliente} (${c.forma_pagamento})`).join('\n') +
+                      '\n\nSelecione apenas contas com cobrança DINHEIRO.');
+                return;
+            }
+
+            // Mostrar modal com informações das contas
+            mostrarModalBaixaDinheiro(data.contas);
+        })
+        .catch(error => {
+            console.error('Erro na validação:', error);
+            alert('Erro ao validar contas selecionadas.');
+        });
+    }
+
+    // Função para mostrar modal de baixa em dinheiro
+    function mostrarModalBaixaDinheiro(contas) {
+        const modal = new bootstrap.Modal(document.getElementById('modalBaixaDinheiro'));
+        const contasInfo = document.getElementById('contasSelecionadasInfo');
+        const contaCaixaSelect = document.getElementById('contaCaixa');
+
+        // Limpar informações anteriores
+        contasInfo.innerHTML = '';
+        contaCaixaSelect.innerHTML = '<option value="">Selecione uma conta caixa...</option>';
+
+        // Adicionar informações das contas selecionadas
+        let html = '<h6>Contas Selecionadas:</h6><ul class="list-group mb-3">';
+        contas.forEach(conta => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${conta.cliente} - NF ${conta.numero_nota || 'N/A'}
+                    <span class="badge bg-primary rounded-pill">R$ ${conta.valor_pendente}</span>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        contasInfo.innerHTML = html;
+
+        // Carregar contas caixa disponíveis
+        carregarContasCaixa();
+
+        // Definir data atual como padrão
+        const hoje = new Date().toISOString().split('T')[0];
+        document.getElementById('dataRecebimento').value = hoje;
+
+        // Adicionar IDs das contas ao form
+        contas.forEach(conta => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'contas_ids';
+            input.value = conta.id;
+            document.getElementById('formBaixaDinheiro').appendChild(input);
+        });
+
+        modal.show();
+    }
+
+    // Função para mostrar modal de escolher categoria
+    function mostrarModalEscolherCategoria(checkedBoxes) {
+        console.log('DEBUG: Função mostrarModalEscolherCategoria chamada com', checkedBoxes.length, 'contas');
+
+        const modal = new bootstrap.Modal(document.getElementById('modalEscolherCategoria'));
+        const contasInfo = document.getElementById('contasSelecionadasCategoriaInfo');
+
+        // Limpar informações anteriores
+        contasInfo.innerHTML = '';
+
+        // Obter informações das contas selecionadas
+        const contasIds = Array.from(checkedBoxes).map(cb => cb.value);
+        const contasRows = Array.from(checkedBoxes).map(cb => cb.closest('tr'));
+
+        console.log('DEBUG: IDs das contas:', contasIds);
+
+        // Adicionar informações das contas selecionadas
+        let html = '<h6>Contas Selecionadas:</h6><ul class="list-group mb-3">';
+        contasRows.forEach(row => {
+            const cliente = row.cells[1].textContent;
+            const valorPendente = row.cells[12].textContent;
+            console.log('DEBUG: Conta - Cliente:', cliente, 'Valor:', valorPendente);
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${cliente}
+                    <span class="badge bg-primary rounded-pill">${valorPendente}</span>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        contasInfo.innerHTML = html;
+
+        // Adicionar IDs das contas ao form
+        contasIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'contas_ids';
+            input.value = id;
+            document.getElementById('formEscolherCategoria').appendChild(input);
+        });
+
+        console.log('DEBUG: Modal será mostrado');
+        modal.show();
+    }
+
+    // Função para carregar contas caixa
+    function carregarContasCaixa() {
+        fetch('/contasareceber/contas_caixa/')
+        .then(response => response.json())
+        .then(data => {
+            const contaCaixaSelect = document.getElementById('contaCaixa');
+            data.contas_caixa.forEach(conta => {
+                const option = document.createElement('option');
+                option.value = conta.id;
+                option.textContent = conta.descricao;
+                contaCaixaSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar contas caixa:', error);
+        });
+    }
+
+    // Função para implementar busca dinâmica de categoria no modal
+    function inicializarBuscaCategoriaModal() {
+        const categoriaInput = document.getElementById('categoriaInput');
+        const resultadosDiv = document.getElementById('resultadosCategoriaModal');
+        let timeoutId;
+        let categoriaSelecionada = null;
+
+        // Função para buscar categorias
+        function buscarCategorias(termo) {
+            if (termo.length < 4) return;
+
+            fetch('/contasareceber/buscar_categorias/?q=' + encodeURIComponent(termo))
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultados(data.categorias);
+                })
+                .catch(error => {
+                    console.error('Erro na busca:', error);
+                    resultadosDiv.innerHTML = '<div class="alert alert-danger">Erro ao buscar categorias.</div>';
+                    resultadosDiv.style.display = 'block';
+                });
+        }
+
+        // Função para mostrar resultados
+        function mostrarResultados(categorias) {
+            if (categorias.length === 0) {
+                resultadosDiv.innerHTML = '<div class="alert alert-info">Nenhuma categoria encontrada.</div>';
+                resultadosDiv.style.display = 'block';
+                return;
+            }
+
+            let html = '<div class="list-group">';
+            categorias.forEach(categoria => {
+                html += `
+                    <button type="button" class="list-group-item list-group-item-action categoria-item-modal"
+                            data-id="${categoria.id}" data-nome="${categoria.nome_completo}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${categoria.nome_completo}</h6>
+                            <small class="text-muted">${categoria.tipo_display}</small>
+                        </div>
+                        <small class="text-muted">${categoria.grupo || 'Sem grupo'}</small>
+                    </button>
+                `;
+            });
+            html += '</div>';
+            resultadosDiv.innerHTML = html;
+            resultadosDiv.style.display = 'block';
+
+            // Adicionar event listeners para seleção
+            document.querySelectorAll('.categoria-item-modal').forEach(item => {
+                item.addEventListener('click', function() {
+                    // Remover seleção anterior
+                    document.querySelectorAll('.categoria-item-modal').forEach(el => el.classList.remove('active'));
+                    // Selecionar este item
+                    this.classList.add('active');
+                    categoriaSelecionada = {
+                        id: this.dataset.id,
+                        nome: this.dataset.nome
+                    };
+                    categoriaInput.value = this.dataset.nome;
+                    document.getElementById('categoriaId').value = this.dataset.id;
+                    resultadosDiv.style.display = 'none';
+                });
+            });
+        }
+
+        // Event listener para input de categoria
+        categoriaInput.addEventListener('input', function() {
+            const termo = this.value.trim();
+            clearTimeout(timeoutId);
+
+            if (termo.length >= 4) {
+                timeoutId = setTimeout(() => buscarCategorias(termo), 300);
+            } else {
+                resultadosDiv.style.display = 'none';
+                categoriaSelecionada = null;
+                document.getElementById('categoriaId').value = '';
+            }
+        });
+
+        // Event listener para quando o campo perde o foco
+        categoriaInput.addEventListener('blur', function() {
+            // Pequeno delay para permitir clique nos resultados
+            setTimeout(() => {
+                if (!categoriaSelecionada) {
+                    categoriaInput.value = '';
+                    document.getElementById('categoriaId').value = '';
+                }
+            }, 150);
+        });
+
+        // Event listener para quando o campo ganha foco
+        categoriaInput.addEventListener('focus', function() {
+            if (this.value.trim().length >= 4) {
+                buscarCategorias(this.value.trim());
+            }
+        });
+    }
+
+    // Event listener para quando o modal de escolher categoria é mostrado
+    document.getElementById('modalEscolherCategoria').addEventListener('shown.bs.modal', function() {
+        inicializarBuscaCategoriaModal();
+    });
+
+    // Função para carregar detalhes no modal
+    window.carregarDetalhes = function(tipo, id) {
+        const modalBody = document.getElementById('modalDetalhesBody');
+        modalBody.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p>Carregando detalhes...</p>
+            </div>
+        `;
+
+        // Fazer requisição AJAX
+        fetch(`/contasareceber/detalhes/${tipo}/${id}/`)
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Se não é JSON, provavelmente é HTML (login page ou erro)
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    // Verificar se é página de login
+                    return response.text().then(text => {
+                        if (text.includes('<html') || text.includes('<HTML')) {
+                            // Redirecionar para login
+                            window.location.href = '/accounts/login/';
+                            throw new Error('Sessão expirada. Redirecionando para login...');
+                        } else {
+                            throw new Error('Resposta inesperada do servidor');
+                        }
+                    });
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            ${data.error}
+                        </div>
+                    `;
+                } else {
+                    modalBody.innerHTML = data.html;
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar detalhes: ${error.message}
+                    </div>
+                `;
+            });
+    };
+});
+</script>
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

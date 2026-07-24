@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  {% include 'parcial/_head.html' %}
+</head>
+<body>
+  <div id="app-wrapper">
+    {% block sid_Bar %}{% include 'parcial/_nav.html' %}{% endblock %}
+    <div id="app-content" class="app-content-with-nav">
+      <main class="container">
+        {% block conteudo %}{% endblock %}
+      </main>
+      {% block foot %}
+        {% include 'parcial/_footer.html' %}
+      {% endblock %}
+    </div>
+  </div>
+
+  {% include 'parcial/_empresa_selector_modal.html' %}
+
+  <script>
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) csrfToken = csrfToken.value;
+    else csrfToken = '';
+  </script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="{% static 'js/menu.js' %}"></script>
+</body>
+</html>

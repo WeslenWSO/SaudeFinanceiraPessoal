@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">{{ titulo }}</h1>
+
+    <!-- Formulário -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Dados do Anexo</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="anexo" class="form-label">Anexo</label>
+                        <select id="anexo" name="anexo" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            {% for value, label in ANEXO_CHOICES %}
+                            <option value="{{ value }}" {% if anexo and anexo.anexo == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="faixa" class="form-label">Faixa</label>
+                        <input type="text" id="faixa" name="faixa" class="form-control" value="{% if anexo %}{{ anexo.faixa }}{% endif %}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="limite_inferior" class="form-label">Limite Inferior (R$)</label>
+                        <input type="number" id="limite_inferior" name="limite_inferior" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.limite_inferior }}{% endif %}" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="limite_superior" class="form-label">Limite Superior (R$)</label>
+                        <input type="number" id="limite_superior" name="limite_superior" class="form-control" step="0.01" value="{% if anexo and anexo.limite_superior %}{{ anexo.limite_superior }}{% endif %}">
+                        <small class="form-text text-muted">Deixe em branco se não houver limite superior</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="aliquota" class="form-label">Alíquota (%)</label>
+                        <input type="number" id="aliquota" name="aliquota" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.aliquota }}{% endif %}" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="valor_deduzir" class="form-label">Valor a Deduzir (R$)</label>
+                        <input type="number" id="valor_deduzir" name="valor_deduzir" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.valor_deduzir }}{% endif %}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="ano_vigencia" class="form-label">Ano de Vigência</label>
+                        <input type="number" id="ano_vigencia" name="ano_vigencia" class="form-control" value="{% if anexo %}{{ anexo.ano_vigencia }}{% else %}2024{% endif %}" required>
+                    </div>
+                </div>
+
+                <!-- Percentuais de Repartição dos Tributos -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Percentuais de Repartição dos Tributos</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_irpj" class="form-label">IRPJ (%)</label>
+                                <input type="number" id="percentual_irpj" name="percentual_irpj" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_irpj }}{% endif %}">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_csll" class="form-label">CSLL (%)</label>
+                                <input type="number" id="percentual_csll" name="percentual_csll" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_csll }}{% endif %}">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_cofins" class="form-label">COFINS (%)</label>
+                                <input type="number" id="percentual_cofins" name="percentual_cofins" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_cofins }}{% endif %}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_pis" class="form-label">PIS (%)</label>
+                                <input type="number" id="percentual_pis" name="percentual_pis" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_pis }}{% endif %}">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_cpp" class="form-label">CPP (%)</label>
+                                <input type="number" id="percentual_cpp" name="percentual_cpp" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_cpp }}{% endif %}">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="percentual_iss" class="form-label">ISS (%)</label>
+                                <input type="number" id="percentual_iss" name="percentual_iss" class="form-control" step="0.01" value="{% if anexo %}{{ anexo.percentual_iss }}{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salvar
+                    </button>
+                    <a href="{% url 'notasfiscais:anexos_simples_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

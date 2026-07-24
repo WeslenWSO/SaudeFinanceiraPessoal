@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{%block nav_%}
+ {% include 'parcial/_nav.html' %}
+ {%endblock%}
+ {% comment %} {%block sid_Bar%}
+{% include 'parcial/_MenuSideNav.html' %}
+ {%endblock%} {% endcomment %}
+
+{%block conteudo%}
+<main>
+
+
+    <header class="page-header page-header-compact page-header-light border-bottom bg-white mb-4">
+                        <div class="container-xl px-4">
+                            <div class="page-header-content">
+                                <div class="row align-items-center justify-content-between pt-3">
+                                    <div class="col-auto">
+                                        <h1 class="page-header-title">{{ descricao }}</h1>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{% url 'socio:Tela_Cad' %}" role="button" class="btn btn-primary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+                                                <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+                                                <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+                                            </svg> Adicionar Sócio
+                                        </a>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+                    </header>
+
+
+<!--<div class="container-xl px-4 mt-n10">-->
+
+     <div class="card mb-4">
+        <div class="card-header"> {{ descricao }}   </div>
+        
+         
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="datatablesSimple" class="table table-striped">
+         <thead>
+           <tr>
+            <th>ID</th>
+            <th>Sócio</th>
+            <th>Edi.</th>
+            <th>Exc.</th>
+           </tr>
+         </thead>
+         <tbody>
+             {% for socio in socios %}
+
+            <tr>
+                <td> <a class="nav-link"> </a>
+                   {{ socio.id }}
+                </td>
+                <td>
+                  <a>{{ socio.socio }}</a>
+                </td>
+               <td>
+                   
+                      <a href="{% url 'socio:soc_CadTelEd' pk=socio.id %}"
+                        class="btn btn-primary"> 
+                        <i class="fa-solid fa-pen-to-square"></i>
+                       </a>
+                 </td>
+
+                <td>
+                      
+                       <a href="{% url 'socio:soc_CadExcluir' socio.id %}" class="btn btn-danger">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                        
+                      
+                  </td>
+
+                </tr>
+                    {% endfor %}
+
+                    </tbody>
+               </table>
+      </div>
+    </div>
+     </div>
+
+</main>
+{% endblock %}
+
+      {%block foot%}
+      
+
+ {%endblock%}

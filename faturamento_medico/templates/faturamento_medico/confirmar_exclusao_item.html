@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Confirmar Exclusão{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Confirmar Exclusão de Item de Serviço</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'faturamento_medico:detalhes' item.faturamento.pk %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Você está prestes a excluir o item de serviço abaixo.
+                        Esta ação não pode ser desfeita e afetará o valor total da guia.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <dl class="row">
+                                <dt class="col-sm-3">Faturamento:</dt>
+                                <dd class="col-sm-9">{{ item.faturamento }}</dd>
+
+                                <dt class="col-sm-3">Código Serviço:</dt>
+                                <dd class="col-sm-9">{{ item.codigo_servico|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-3">Serviço:</dt>
+                                <dd class="col-sm-9">{{ item.servico|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-3">Porte:</dt>
+                                <dd class="col-sm-9">{{ item.porte|default:"Não informado" }}</dd>
+
+                                <dt class="col-sm-3">Quantidade:</dt>
+                                <dd class="col-sm-9">{{ item.qt }}</dd>
+
+                                <dt class="col-sm-3">Valor Unitário:</dt>
+                                <dd class="col-sm-9">R$ {{ item.valor|floatformat:2 }}</dd>
+
+                                <dt class="col-sm-3">Total do Item:</dt>
+                                <dd class="col-sm-9"><strong>R$ {{ item.total|floatformat:2 }}</strong></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Sim, Excluir Item
+                        </button>
+                        <a href="{% url 'faturamento_medico:detalhes' item.faturamento.pk %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

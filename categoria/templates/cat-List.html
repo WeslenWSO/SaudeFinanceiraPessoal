@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block nav_ %}
+  {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+  .table-wrapper table thead tr th {
+    background-color: #000 !important;
+    color: #fff !important;
+    border-color: #333;
+  }
+  .table-wrapper table.table-categoria-list tbody tr:nth-child(odd) td,
+  .table-wrapper table.table-categoria-list tbody tr:nth-child(odd) {
+    background-color: #f2f2f2 !important;
+  }
+  .table-wrapper table.table-categoria-list tbody tr:nth-child(even) td,
+  .table-wrapper table.table-categoria-list tbody tr:nth-child(even) {
+    background-color: #fff !important;
+  }
+</style>
+  <p>
+    <a href="{% url 'categoria:cat-create' %}" role="button">Nova Categoria</a>
+  </p>
+  {% if messages %}
+    {% include 'parcial/_messages.html' %}
+  {% endif %}
+
+  <form method="get" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+    <input type="text" name="search" placeholder="Buscar por nome ou classificação" value="{{ request.GET.search }}">
+    <button type="submit">Buscar</button>
+    <label for="paginate_by">Itens por página:</label>
+    <select name="paginate_by" id="paginate_by" onchange="this.form.submit()">
+      <option value="5" {% if request.GET.paginate_by == '5' %}selected{% endif %}>5</option>
+      <option value="10" {% if request.GET.paginate_by == '10' %}selected{% endif %}>10</option>
+      <option value="20" {% if request.GET.paginate_by == '20' %}selected{% endif %}>20</option>
+      <option value="50" {% if request.GET.paginate_by == '50' or not request.GET.paginate_by %}selected{% endif %}>50</option>
+    </select>
+    {% for key, value in request.GET.items %}
+      {% if key != 'paginate_by' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
+    {% endfor %}
+  </form>
+
+  <article>
+    <div class="table-wrapper">
+      <table class="table table-categoria-list">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Classificação</th>
+            <th>Sintético</th>
+            <th>Editar</th>
+            <th>Excluir</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat in object_list %}
+          <tr {% if cat.sintetico == 'S' %}style="font-weight: bold;"{% endif %}>
+            <td>{{ cat.id }}</td>
+            <td>{{ cat.nome }}</td>
+            <td>{{ cat.classificacao }}</td>
+            <td>{{ cat.sintetico }}</td>
+            <td><a href="{% url 'categoria:cat-update' cat.id %}" role="button" class="secondary"><i class="fa-solid fa-pen-to-square"></i></a></td>
+            <td><a href="{% url 'categoria:cat-delete' cat.pk %}" role="button" class="contrast" onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"><i class="fas fa-trash"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  {% if is_paginated %}
+  <nav aria-label="Paginação" style="margin-top: 1rem;">
+    <ul style="display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0;">
+      {% if page_obj.has_previous %}
+        <li><a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Primeira</a></li>
+        <li><a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Anterior</a></li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <li><span role="button" aria-current="page">{{ num }}</span></li>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <li><a href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">{{ num }}</a></li>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <li><a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Próxima</a></li>
+        <li><a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Última</a></li>
+      {% endif %}
+    </ul>
+    <p><small>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}. Total: {{ page_obj.paginator.count }} itens.</small></p>
+  </nav>
+  {% endif %}
+{% endblock %}

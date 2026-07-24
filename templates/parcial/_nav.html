@@ -1,0 +1,111 @@
+<style id="smart-nav-critical">
+  /* Crítico: desktop = esconder botão; mobile = menu fechado até JS */
+  @media (min-width: 992px) {
+    #smart-nav .smart-nav-toggler { display: none !important; visibility: hidden !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; }
+  }
+  @media (max-width: 991px) {
+    #smart-nav .smart-nav-menu { display: none !important; }
+    #smart-nav.is-mobile-open .smart-nav-menu { display: flex !important; }
+  }
+</style>
+<nav id="smart-nav" class="smart-nav" role="navigation" aria-label="Menu principal">
+  <div class="smart-nav-inner">
+    <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">Saúde Financeira</a>
+    <button type="button" class="smart-nav-toggler" aria-label="Abrir menu" aria-expanded="false" aria-controls="smart-nav-menu" id="smart-nav-toggler">
+      <i class="fas fa-bars smart-nav-toggler-fa" aria-hidden="true"></i>
+    </button>
+    <ul class="smart-nav-menu" id="smart-nav-menu" role="menubar">
+      <li class="smart-nav-item">
+        <a href="{% url 'dashboard:index' %}" class="smart-nav-trigger-link"><i class="fas fa-chart-line smart-nav-icon"></i> Dashboard</a>
+      </li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-cadastro" id="trigger-cadastro"><i class="fas fa-folder-open smart-nav-icon"></i> Cadastro</button>
+        <ul class="smart-nav-dropdown" id="dropdown-cadastro" role="menu" aria-labelledby="trigger-cadastro">
+          <li role="none"><a href="{% url 'empresa:lista' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-building smart-nav-icon"></i> Empresa</a></li>
+          <li role="none"><a href="{% url 'fornecedor:fornList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-truck smart-nav-icon"></i> Fornecedor</a></li>
+          <li role="none"><a href="{% url 'cliente:clieList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-user-tie smart-nav-icon"></i> Cliente</a></li>
+          <li role="none"><a href="{% url 'cobranca:cobList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-credit-card smart-nav-icon"></i> Cobrança</a></li>
+          <li role="none"><a href="{% url 'categoria:catList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-tags smart-nav-icon"></i> Categoria</a></li>
+          <li role="none"><a href="{% url 'socio:socList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-users smart-nav-icon"></i> Sócios</a></li>
+          <li role="none"><a href="{% url 'regraimposto:ListaRegra' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-percent smart-nav-icon"></i> Regras do Imposto</a></li>
+          <li role="none"><a href="{% url 'regrarateio:regraList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-share-nodes smart-nav-icon"></i> Regra do Rateio</a></li>
+          <li role="none"><a href="{% url 'usuario:usuarioList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-user-cog smart-nav-icon"></i> Usuário</a></li>
+          <li role="none"><a href="{% url 'faturamento_medico:ftlistar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-medical smart-nav-icon"></i> Faturamento Médico</a></li>
+          <li role="none"><a href="{% url 'servicos_medicos:convenio_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-hand-holding-medical smart-nav-icon"></i> Convênios</a></li>
+          <li role="none"><a href="{% url 'servicos_medicos:cabecalho_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-heading smart-nav-icon"></i> Cabeçalhos</a></li>
+          <li role="none"><a href="{% url 'servicos_medicos:servicos_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-stethoscope smart-nav-icon"></i> Serviços Médicos</a></li>
+          <li role="none"><a href="{% url 'servicos_medicos:tabela_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-table-list smart-nav-icon"></i> Tabela de Preços</a></li>
+        </ul>
+      </li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-fiscal" id="trigger-fiscal"><i class="fas fa-file-invoice smart-nav-icon"></i> Fiscal</button>
+        <ul class="smart-nav-dropdown" id="dropdown-fiscal" role="menu" aria-labelledby="trigger-fiscal">
+          <li role="none"><a href="{% url 'notasfiscais:list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-invoice-dollar smart-nav-icon"></i> Notas Fiscais Prestado</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:dashboard' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-chart-pie smart-nav-icon"></i> Dashboard NFSe</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:apuracao_impostos' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-calculator smart-nav-icon"></i> Apuração NFSe</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:apuracao_simples' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-scale-balanced smart-nav-icon"></i> Apuração Simples</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-import smart-nav-icon"></i> Importar XML</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:portal_nacional_import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-cloud-download-alt smart-nav-icon"></i> Portal Nacional (SEFIN / DPS)</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:portal_extensao_import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-puzzle-piece smart-nav-icon"></i> Portal (extensão)</a></li>
+          <li role="none"><a href="{% url 'notafiscalentrada:listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-lines smart-nav-icon"></i> NF Comércio e Tomador</a></li>
+        </ul>
+      </li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-financeiro" id="trigger-financeiro"><i class="fas fa-wallet smart-nav-icon"></i> Financeiro</button>
+        <ul class="smart-nav-dropdown" id="dropdown-financeiro" role="menu" aria-labelledby="trigger-financeiro">
+          <li role="none"><a href="{% url 'extrato:conta_bancaria_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-university smart-nav-icon"></i> Contas Bancárias</a></li>
+          <li role="none"><a href="{% url 'contasapagar:listaAPagar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-money-check-alt smart-nav-icon"></i> Contas a Pagar</a></li>
+          <li role="none"><a href="{% url 'contasareceber:crlistar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-hand-holding-usd smart-nav-icon"></i> Contas a Receber</a></li>
+          <li role="none"><a href="{% url 'contasareceber:categorizar_baixados' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-tags smart-nav-icon"></i> Categorizar recebidos</a></li>
+          <li role="none"><a href="{% url 'extrato:upload_ofx' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-upload smart-nav-icon"></i> Extrato Bancário (Importar)</a></li>
+          <li role="none"><a href="{% url 'extrato:lancamento_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-list-ul smart-nav-icon"></i> Lançamentos Importados</a></li>
+          <li role="none"><a href="{% url 'extrato:extrato_movimento_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-exchange-alt smart-nav-icon"></i> Movimentos / Conciliação</a></li>
+          <li role="none"><a href="{% url 'relatoriorecebiveis:relReclist' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-terminal smart-nav-icon"></i> Recebíveis Maquininha</a></li>
+        </ul>
+      </li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-relatorios" id="trigger-relatorios"><i class="fas fa-chart-bar smart-nav-icon"></i> Relatórios</button>
+        <ul class="smart-nav-dropdown" id="dropdown-relatorios" role="menu" aria-labelledby="trigger-relatorios">
+          <li role="none"><a href="{% url 'emprestimos:listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-invoice-dollar smart-nav-icon"></i> Empréstimos</a></li>
+          <li role="none"><a href="{% url 'fluxo_de_caixa:fluxo_caixa_mensal' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-stream smart-nav-icon"></i> Fluxo de Caixa</a></li>
+          <li role="none"><a href="{% url 'planejamento_orcamentario:dashboard' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-chart-pie smart-nav-icon"></i> Planejamento orçamentário</a></li>
+          <li role="none"><a href="{% url 'dashboard:relatorio_mensal' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-calendar-alt smart-nav-icon"></i> Relatório mensal (12 meses)</a></li>
+          <li role="none"><a href="{% url 'dashboard:resumo_fechamento' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-signature smart-nav-icon"></i> Resumo fechamento</a></li>
+          <li role="none"><a href="{% url 'regrarateio:lancamentoRateioList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-table-list smart-nav-icon"></i> Lançamentos de rateio</a></li>
+          <li role="none"><a href="{% url 'contasareceber:crlistar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-receipt smart-nav-icon"></i> Contas a Receber/Recebido</a></li>
+          <li role="none"><a href="#" role="menuitem" class="smart-nav-link"><i class="fas fa-file-invoice smart-nav-icon"></i> Contas a Pagar/Pagas</a></li>
+          <li role="none"><a href="#" role="menuitem" class="smart-nav-link"><i class="fas fa-tag smart-nav-icon"></i> Por Categoria</a></li>
+          <li role="none"><a href="#" role="menuitem" class="smart-nav-link"><i class="fas fa-user-friends smart-nav-icon"></i> Por Sócio</a></li>
+        </ul>
+      </li>
+      {% if request.session.empresa_id == 16 or request.session.empresa_id == "16" %}
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-links-uteis" id="trigger-links-uteis"><i class="fas fa-link smart-nav-icon"></i> Links úteis</button>
+        <ul class="smart-nav-dropdown" id="dropdown-links-uteis" role="menu" aria-labelledby="trigger-links-uteis">
+          <li role="none"><a href="https://ris.medcloud.co/calendar" target="_blank" rel="noopener noreferrer" role="menuitem" class="smart-nav-link"><i class="fas fa-calendar-check smart-nav-icon"></i> Medcloud RIS</a></li>
+          <li role="none"><a href="https://app.contaazul.com/" target="_blank" rel="noopener noreferrer" role="menuitem" class="smart-nav-link"><i class="fas fa-cloud smart-nav-icon"></i> Conta Azul</a></li>
+          <li role="none"><a href="https://minhaconta2.cielo.com.br/site/login" target="_blank" rel="noopener noreferrer" role="menuitem" class="smart-nav-link"><i class="fas fa-credit-card smart-nav-icon"></i> Cielo</a></li>
+          <li role="none"><a href="https://conta.stone.com.br/login" target="_blank" rel="noopener noreferrer" role="menuitem" class="smart-nav-link"><i class="fas fa-gem smart-nav-icon"></i> Stone</a></li>
+        </ul>
+      </li>
+      {% endif %}
+      <li class="smart-nav-item smart-nav-spacer"></li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-empresa" id="trigger-empresa"><i class="fas fa-building smart-nav-icon"></i> {% if request.session.empresa_nome %}{{ request.session.empresa_nome|truncatechars:15 }}{% else %}Empresa{% endif %}</button>
+        <ul class="smart-nav-dropdown" id="dropdown-empresa" role="menu" aria-labelledby="trigger-empresa">
+          <li role="none"><a href="{% url 'empresa:lista' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-list smart-nav-icon"></i> Ver Empresas</a></li>
+          <li role="none"><a href="{% url 'empresa:trocar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sync-alt smart-nav-icon"></i> Trocar Empresa</a></li>
+          {% if request.session.empresa_id %}
+          <li role="none"><a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}" role="menuitem" class="smart-nav-link"><i class="fas fa-plug smart-nav-icon"></i> Configuração de integração</a></li>
+          {% endif %}
+        </ul>
+      </li>
+      <li class="smart-nav-item smart-nav-has-dropdown">
+        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-user" id="trigger-user"><i class="fas fa-user smart-nav-icon"></i> {% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</button>
+        <ul class="smart-nav-dropdown" id="dropdown-user" role="menu" aria-labelledby="trigger-user">
+          <li role="none"><a href="{% url 'accounts:logout' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sign-out-alt smart-nav-icon"></i> Sair</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</nav>

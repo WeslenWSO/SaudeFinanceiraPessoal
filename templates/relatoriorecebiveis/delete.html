@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+{% block title %}{{ title }}{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ title }}</h3>
+                    <div class="card-tools">
+                        <a href="{% url 'relatoriorecebiveis:detail' relatorio.pk %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p>Tem certeza que deseja excluir o relatório <strong>#{{ relatorio.id }}</strong>?</p>
+
+                    <div class="alert alert-warning">
+                        <strong>Atenção!</strong> Esta ação não pode ser desfeita.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Empresa:</dt>
+                                <dd class="col-sm-8">{{ relatorio.empresa }}</dd>
+
+                                <dt class="col-sm-4">Data Pagamento:</dt>
+                                <dd class="col-sm-8">{{ relatorio.data_pagamento|date:"d/m/Y" }}</dd>
+
+                                <dt class="col-sm-4">Valor Líquido:</dt>
+                                <dd class="col-sm-8">R$ {{ relatorio.valor_liquido }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Sim, excluir
+                        </button>
+                        <a href="{% url 'relatoriorecebiveis:detail' relatorio.pk %}" class="btn btn-secondary">Cancelar</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

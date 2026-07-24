@@ -1,0 +1,578 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+{%block conteudo%}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Notas Fiscais de Entrada</h3>
+                    <div>
+                        <a href="{% url 'notafiscalentrada:importar' %}" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Importar XML
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+
+                    <!-- Filtros -->
+                    <form method="get" class="mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-2">
+                                <select name="tipo_nota" class="form-control">
+                                    <option value="">Todos os Tipos</option>
+                                    <option value="tomador" {% if filtros.tipo_nota == 'tomador' %}selected{% endif %}>Nota de Tomador</option>
+                                    <option value="comercio" {% if filtros.tipo_nota == 'comercio' %}selected{% endif %}>Nota de Comércio</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select name="status" class="form-control">
+                                    <option value="">Todos os Status</option>
+                                    <option value="importada" {% if filtros.status == 'importada' %}selected{% endif %}>Importada</option>
+                                    <option value="processada" {% if filtros.status == 'processada' %}selected{% endif %}>Processada</option>
+                                    <option value="erro" {% if filtros.status == 'erro' %}selected{% endif %}>Erro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="text" name="fornecedor" class="form-control" placeholder="Buscar fornecedor..." value="{{ filtros.fornecedor }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <a href="{% url 'notafiscalentrada:listar' %}" class="btn btn-secondary btn-sm">Limpar Filtros</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Form para seleção múltipla (checkboxes usam form=notas-form na tabela) -->
+                    <form method="post" id="notas-form">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <button type="button" class="btn btn-primary" id="escolher-categoria-btn">
+                                    <i class="fas fa-tags"></i> Aplicar Categoria
+                                </button>
+                                <button type="button" class="btn btn-success" id="escolher-forma-pgto-btn">
+                                    <i class="fas fa-credit-card"></i> Aplicar Forma Pgto
+                                </button>
+                                <button type="submit" class="btn btn-warning" formaction="{% url 'notafiscalentrada:gerar_contas_a_pagar' %}" form="notas-form" id="gerar-contas-btn">
+                                    <i class="fas fa-file-invoice-dollar"></i> Gerar Contas a Pagar
+                                </button>
+                                <small class="text-muted">Selecione notas fiscais para aplicar ações em lote</small>
+                            </div>
+                        </div>
+                    </form>
+
+                        <!-- Tabela -->
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th class="nota-checkbox-column">
+                                            <input type="checkbox" id="select-all" form="notas-form">
+                                        </th>
+                                        <th>Tipo</th>
+                                        <th>Número</th>
+                                        <th>Série</th>
+                                        <th>Fornecedor</th>
+                                        <th>Data Emissão</th>
+                                        <th>Valor Total</th>
+                                        <th>Forma Pgto</th>
+                                        <th>Categoria</th>
+                                        <th>Conta a Pagar</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for nota in notas %}
+                                <tr>
+                                    <td class="nota-checkbox-column">
+                                        {% if not nota.tem_conta_pagar %}
+                                        <input type="checkbox" name="notas" value="{{ nota.pk }}" class="nota-checkbox" form="notas-form">
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if nota.tipo_nota == 'tomador' %}badge-info{% else %}badge-primary{% endif %}">
+                                            {{ nota.get_tipo_nota_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ nota.numero_nota }}</td>
+                                    <td>{{ nota.serie }}</td>
+                                    <td>{{ nota.fornecedor_nome }}</td>
+                                    <td>{{ nota.data_emissao|date:"d/m/Y H:i" }}</td>
+                                    <td>R$ {{ nota.valor_total|floatformat:2 }}</td>
+                                    <td>{% if nota.forma_pagamento %}{{ nota.forma_pagamento.descricao }}{% else %}-{% endif %}</td>
+                                    <td>{% if nota.categoria %}{{ nota.categoria.nome }}{% else %}-{% endif %}</td>
+                                    <td>
+                                        {% if nota.tem_conta_pagar %}
+                                            <span class="badge badge-danger" title="Conta a Pagar Gerada">
+                                                <i class="fas fa-circle"></i>
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-secondary" title="Sem Conta a Pagar">
+                                                <i class="fas fa-circle"></i>
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if nota.status == 'importada' %}badge-warning{% elif nota.status == 'processada' %}badge-success{% else %}badge-danger{% endif %}">
+                                            {{ nota.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-info" title="Detalhes"
+                                                data-bs-toggle="modal" data-bs-target="#modalDetalhes"
+                                                onclick="carregarDetalhes('nota_fiscal', {{ nota.pk }}, 'notafiscalentrada')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if not nota.tem_conta_pagar %}
+                                        <a href="{% url 'notafiscalentrada:editar' nota.pk %}" class="btn btn-sm btn-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="post" action="{% url 'notafiscalentrada:excluir' nota.pk %}" class="d-inline" onsubmit="return confirm('Excluir a nota {{ nota.numero_nota }} ({{ nota.get_tipo_nota_display }})? Esta ação não pode ser desfeita.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Excluir">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center">Nenhuma nota fiscal encontrada.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalhes -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Nota Fiscal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetalhesBody">
+                <!-- Conteúdo será carregado via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Escolher Categoria -->
+<div class="modal fade" id="modalEscolherCategoria" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aplicar Categoria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEscolherCategoria" method="post" action="{% url 'notafiscalentrada:aplicar_categoria' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div id="notasSelecionadasCategoriaInfo"></div>
+                    <div class="mb-3">
+                        <label for="categoriaInput" class="form-label">Categoria</label>
+                        <input type="text" class="form-control" id="categoriaInput" placeholder="Digite para buscar categoria...">
+                        <input type="hidden" id="categoriaId" name="categoria_id">
+                        <div id="resultadosCategoriaModal" class="mt-2" style="display: none;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Aplicar Categoria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Escolher Forma de Pagamento -->
+<div class="modal fade" id="modalEscolherFormaPgto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aplicar Forma de Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEscolherFormaPgto" method="post" action="{% url 'notafiscalentrada:aplicar_forma_pagamento' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div id="notasSelecionadasFormaPgtoInfo"></div>
+                    <div class="mb-3">
+                        <label for="formaPgtoInput" class="form-label">Forma de Pagamento</label>
+                        <input type="text" class="form-control" id="formaPgtoInput" placeholder="Digite para buscar forma de pagamento...">
+                        <input type="hidden" id="formaPgtoId" name="forma_pagamento_id">
+                        <div id="resultadosFormaPgtoModal" class="mt-2" style="display: none;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Aplicar Forma Pgto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Função para limpar formulários dos modais
+function limparModalCategoria() {
+    document.getElementById('categoriaInput').value = '';
+    document.getElementById('categoriaId').value = '';
+    document.getElementById('resultadosCategoriaModal').style.display = 'none';
+    // Remover inputs anteriores
+    const form = document.getElementById('formEscolherCategoria');
+    const existingInputs = form.querySelectorAll('input[name="notas_ids"]');
+    existingInputs.forEach(input => input.remove());
+}
+
+function limparModalFormaPgto() {
+    document.getElementById('formaPgtoInput').value = '';
+    document.getElementById('formaPgtoId').value = '';
+    document.getElementById('resultadosFormaPgtoModal').style.display = 'none';
+    // Remover inputs anteriores
+    const form = document.getElementById('formEscolherFormaPgto');
+    const existingInputs = form.querySelectorAll('input[name="notas_ids_forma_pgto"]');
+    existingInputs.forEach(input => input.remove());
+}
+
+// Função para buscar categorias
+function buscarCategorias(termo) {
+    if (termo.length < 4) {
+        document.getElementById('resultadosCategoriaModal').style.display = 'none';
+        return;
+    }
+
+    fetch(`/notafiscalentrada/buscar_categorias/?q=${encodeURIComponent(termo)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultadosDiv = document.getElementById('resultadosCategoriaModal');
+            if (data.categorias && data.categorias.length > 0) {
+                let html = '<ul class="list-group">';
+                data.categorias.forEach(categoria => {
+                    html += `
+                        <li class="list-group-item list-group-item-action" onclick="selecionarCategoria(${categoria.id}, '${categoria.nome_completo}')">
+                            ${categoria.nome_completo} <small class="text-muted">(${categoria.tipo_display})</small>
+                        </li>
+                    `;
+                });
+                html += '</ul>';
+                resultadosDiv.innerHTML = html;
+                resultadosDiv.style.display = 'block';
+            } else {
+                resultadosDiv.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar categorias:', error);
+        });
+}
+
+// Função para buscar formas de pagamento
+function buscarFormasPagamento(termo) {
+    if (termo.length < 2) {
+        document.getElementById('resultadosFormaPgtoModal').style.display = 'none';
+        return;
+    }
+
+    fetch(`/notafiscalentrada/buscar_formas_pagamento/?q=${encodeURIComponent(termo)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultadosDiv = document.getElementById('resultadosFormaPgtoModal');
+            if (data.formas_pagamento && data.formas_pagamento.length > 0) {
+                let html = '<ul class="list-group">';
+                data.formas_pagamento.forEach(forma => {
+                    html += `
+                        <li class="list-group-item list-group-item-action" onclick="selecionarFormaPagamento(${forma.id}, '${forma.descricao}')">
+                            ${forma.descricao} <small class="text-muted">(${forma.tipo_display})</small>
+                        </li>
+                    `;
+                });
+                html += '</ul>';
+                resultadosDiv.innerHTML = html;
+                resultadosDiv.style.display = 'block';
+            } else {
+                resultadosDiv.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar formas de pagamento:', error);
+        });
+}
+
+// Função para selecionar categoria
+function selecionarCategoria(id, nome) {
+    document.getElementById('categoriaId').value = id;
+    document.getElementById('categoriaInput').value = nome;
+    document.getElementById('resultadosCategoriaModal').style.display = 'none';
+}
+
+// Função para selecionar forma de pagamento
+function selecionarFormaPagamento(id, descricao) {
+    document.getElementById('formaPgtoId').value = id;
+    document.getElementById('formaPgtoInput').value = descricao;
+    document.getElementById('resultadosFormaPgtoModal').style.display = 'none';
+}
+
+// Função para carregar detalhes no modal
+function carregarDetalhes(tipo, id, app) {
+    console.log('DEBUG: carregarDetalhes chamada com tipo:', tipo, 'id:', id, 'app:', app);
+    const modalBody = document.getElementById('modalDetalhesBody');
+    modalBody.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Carregando detalhes...</p>
+        </div>
+    `;
+
+    // Fazer requisição AJAX
+    const url = `/${app}/detalhes/${tipo}/${id}/`;
+    console.log('DEBUG: Fazendo requisição para:', url);
+    fetch(url)
+        .then(response => {
+            console.log('DEBUG: Resposta recebida:', response.status, response.statusText);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('DEBUG: Dados recebidos:', data);
+            if (data.error) {
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.error}
+                    </div>
+                `;
+            } else {
+                modalBody.innerHTML = data.html;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro ao carregar detalhes: ${error.message}
+                </div>
+            `;
+        });
+};
+
+// Função para mostrar modal de escolher categoria
+function mostrarModalEscolherCategoria(notasSelecionadas) {
+    console.log('DEBUG: Função mostrarModalEscolherCategoria chamada com', notasSelecionadas.length, 'notas');
+
+    // Limpar modal antes de mostrar
+    limparModalCategoria();
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEscolherCategoria'));
+    const notasInfo = document.getElementById('notasSelecionadasCategoriaInfo');
+
+    // Limpar informações anteriores
+    notasInfo.innerHTML = '';
+
+    // Adicionar informações das notas selecionadas
+    let html = '<h6>Notas Fiscais Selecionadas:</h6><ul class="list-group mb-3">';
+    notasSelecionadas.forEach(nota => {
+        const row = nota.closest('tr');
+        const numero = row.cells[2].textContent;
+        const fornecedor = row.cells[4].textContent;
+        const valor = row.cells[6].textContent;
+        html += `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                NF ${numero} - ${fornecedor}
+                <span class="badge bg-primary rounded-pill">${valor}</span>
+            </li>
+        `;
+    });
+    html += '</ul>';
+    notasInfo.innerHTML = html;
+
+    // Adicionar IDs das notas ao form
+    notasSelecionadas.forEach(nota => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'notas_ids';
+        input.value = nota.value;
+        document.getElementById('formEscolherCategoria').appendChild(input);
+    });
+
+    console.log('DEBUG: Modal será mostrado');
+    modal.show();
+}
+
+// Função para mostrar modal de escolher forma de pagamento
+function mostrarModalEscolherFormaPgto(notasSelecionadas) {
+    console.log('DEBUG: Função mostrarModalEscolherFormaPgto chamada com', notasSelecionadas.length, 'notas');
+
+    // Limpar modal antes de mostrar
+    limparModalFormaPgto();
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEscolherFormaPgto'));
+    const notasInfo = document.getElementById('notasSelecionadasFormaPgtoInfo');
+
+    // Limpar informações anteriores
+    notasInfo.innerHTML = '';
+
+    // Adicionar informações das notas selecionadas
+    let html = '<h6>Notas Fiscais Selecionadas:</h6><ul class="list-group mb-3">';
+    notasSelecionadas.forEach(nota => {
+        const row = nota.closest('tr');
+        const numero = row.cells[2].textContent;
+        const fornecedor = row.cells[4].textContent;
+        const valor = row.cells[6].textContent;
+        html += `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                NF ${numero} - ${fornecedor}
+                <span class="badge bg-success rounded-pill">${valor}</span>
+            </li>
+        `;
+    });
+    html += '</ul>';
+    notasInfo.innerHTML = html;
+
+    // Adicionar IDs das notas ao form
+    notasSelecionadas.forEach(nota => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'notas_ids_forma_pgto';
+        input.value = nota.value;
+        document.getElementById('formEscolherFormaPgto').appendChild(input);
+    });
+
+    console.log('DEBUG: Modal forma pgto será mostrado');
+    modal.show();
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Select all checkbox
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.nota-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateButtonState();
+    });
+
+    // Individual checkboxes
+    document.querySelectorAll('.nota-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateButtonState);
+    });
+
+    // Aplicar categoria button
+    document.getElementById('escolher-categoria-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.nota-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma nota fiscal.');
+            return;
+        }
+        mostrarModalEscolherCategoria(checkedBoxes);
+    });
+
+    // Gerar contas a pagar button
+    document.getElementById('gerar-contas-btn').addEventListener('click', function(e) {
+        const checkedBoxes = document.querySelectorAll('.nota-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            e.preventDefault();
+            alert('Selecione pelo menos uma nota fiscal.');
+            return;
+        }
+        if (!confirm(`Deseja gerar contas a pagar para ${checkedBoxes.length} nota(s) fiscal(is) selecionada(s)?`)) {
+            e.preventDefault();
+        }
+    });
+
+    // Event listener para limpar modal de categoria quando fechar
+    document.getElementById('modalEscolherCategoria').addEventListener('hidden.bs.modal', function() {
+        limparModalCategoria();
+    });
+
+    // Event listener para limpar modal de forma de pagamento quando fechar
+    document.getElementById('modalEscolherFormaPgto').addEventListener('hidden.bs.modal', function() {
+        limparModalFormaPgto();
+    });
+
+    // Aplicar forma de pagamento button
+    document.getElementById('escolher-forma-pgto-btn').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.nota-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Selecione pelo menos uma nota fiscal.');
+            return;
+        }
+        mostrarModalEscolherFormaPgto(checkedBoxes);
+    });
+
+    // Busca de categorias
+    document.getElementById('categoriaInput').addEventListener('input', function() {
+        buscarCategorias(this.value);
+    });
+
+    // Busca de formas de pagamento
+    document.getElementById('formaPgtoInput').addEventListener('input', function() {
+        buscarFormasPagamento(this.value);
+    });
+
+    function updateButtonState() {
+        const allCheckboxes = document.querySelectorAll('.nota-checkbox');
+        const checkedBoxes = document.querySelectorAll('.nota-checkbox:checked');
+        const selectAllCheckbox = document.getElementById('select-all');
+        const categoriaBtn = document.getElementById('escolher-categoria-btn');
+        const formaPgtoBtn = document.getElementById('escolher-forma-pgto-btn');
+        const gerarContasBtn = document.getElementById('gerar-contas-btn');
+
+        // Atualizar estado do select-all
+        if (checkedBoxes.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedBoxes.length === allCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+
+        categoriaBtn.disabled = checkedBoxes.length === 0;
+        formaPgtoBtn.disabled = checkedBoxes.length === 0;
+        gerarContasBtn.disabled = checkedBoxes.length === 0;
+    }
+
+    // Initial state
+    updateButtonState();
+});
+</script>
+
+{%endblock%}
+
+{%block foot%}
+{% include 'parcial/_footer.html' %}
+{%endblock%}

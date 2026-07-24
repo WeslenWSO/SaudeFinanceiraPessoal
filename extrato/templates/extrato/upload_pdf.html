@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block nav_%}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">📄 Importar Arquivo PDF</h1>
+
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="fas fa-file-pdf me-2"></i>
+                Upload de Arquivo PDF
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Atenção:</strong> A importação de PDF pode ter limitações dependendo do formato do arquivo.
+                Certifique-se de que o PDF contenha tabelas estruturadas com os dados do extrato.
+            </div>
+
+            <form method="post" action="{% url 'extrato:upload_pdf' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="{{ form.conta.id_for_label }}" class="form-label">
+                                <i class="fas fa-university me-1"></i>
+                                Conta Bancária
+                            </label>
+                            {{ form.conta }}
+                            <small class="form-text text-muted">
+                                Apenas contas ativas da empresa logada são exibidas.
+                            </small>
+                            {% if form.conta.errors %}
+                                <div class="text-danger">{{ form.conta.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.arquivo.id_for_label }}" class="form-label">
+                                <i class="fas fa-file-pdf me-1"></i>
+                                Arquivo PDF
+                            </label>
+                            {{ form.arquivo }}
+                            <small class="form-text text-muted">
+                                Selecione o arquivo .pdf do extrato bancário
+                            </small>
+                            {% if form.arquivo.errors %}
+                                <div class="text-danger">{{ form.arquivo.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            Dica: Se o PDF não tiver tabela estruturada, considere converter para CSV primeiro.
+                        </small>
+                    </div>
+                    <div>
+                        <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-secondary me-2">
+                            <i class="fas fa-arrow-left me-1"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-upload me-1"></i> Importar PDF
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-question-circle me-2"></i>
+                Sobre a Importação de PDF
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-check-circle text-success me-2"></i>Compatibilidade</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i>PDFs com tabelas estruturadas</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Extratos bancários padrão</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Formatos de texto reconhecíveis</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-exclamation-triangle text-warning me-2"></i>Limitações</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-times text-danger me-2"></i>PDFs com imagens escaneadas</li>
+                        <li><i class="fas fa-times text-danger me-2"></i>Layouts não estruturados</li>
+                        <li><i class="fas fa-exclamation-triangle text-warning me-2"></i>Formatos muito específicos</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Alternativa:</strong> Se o PDF não for compatível, considere converter o arquivo para formato CSV
+                ou OFX através de ferramentas online ou softwares específicos do seu banco.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block foot %}
+{% include 'parcial/_footer.html' %}
+{% endblock %}

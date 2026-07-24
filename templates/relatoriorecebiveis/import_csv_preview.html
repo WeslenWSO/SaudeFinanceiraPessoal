@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{%block nav_%}
+{% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">{{ title }}</h2>
+                    <small class="text-muted">Arquivo: {{ filename }} | Empresa: {{ empresa.razao }}</small>
+                </div>
+                <div class="card-body">
+                    {% if errors %}
+                    <div class="alert alert-warning">
+                        <h5>Avisos encontrados:</h5>
+                        <ul>
+                            {% for error in errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-info">
+                        <strong>Prévia de {{ preview_data|length }} registros encontrados.</strong>
+                        <br>Máquina selecionada: <strong>{{ selected_maquina }}</strong>
+                        {% if fonte_extracao == 'gemini' %}
+                        <br><span class="badge bg-primary">Extraído com Google Gemini</span>
+                        {% endif %}
+                        <br>Verifique se os dados estão corretos antes de confirmar a importação.
+                    </div>
+
+                    {% if preview_data %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Linha</th>
+                                    <th>Data Pagamento</th>
+                                    <th>Forma Pagamento</th>
+                                    <th>Bandeira</th>
+                                    <th>Valor Bruto</th>
+                                    <th>Taxa Máquina</th>
+                                    <th>Valor Líquido</th>
+                                    <th>Máquina</th>
+                                    <th>N° Autorização</th>
+                                    <th>Data Venda</th>
+                                    <th>Parcelas</th>
+                                    <th>Conciliado</th>
+                                    <th>Nota Fiscal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in preview_data %}
+                                <tr>
+                                    <td>{{ row.linha }}</td>
+                                    <td>{{ row.data_pagamento }}</td>
+                                    <td>{{ row.forma_pagamento }}</td>
+                                    <td>{{ row.bandeira }}</td>
+                                    <td>{{ row.valor_bruto }}</td>
+                                    <td>{{ row.taxa_maquinha }}</td>
+                                    <td>{{ row.valor_liquido }}</td>
+                                    <td>{{ row.maquinha }}</td>
+                                    <td>{{ row.numero_autorizacao }}</td>
+                                    <td>{{ row.data_venda }}</td>
+                                    <td>{{ row.parcelas }}</td>
+                                    <td>
+                                        {% if row.conciliado|lower == 'sim' or row.conciliado|lower == 's' or row.conciliado == '1' or row.conciliado|lower == 'true' or row.conciliado|lower == 'yes' %}
+                                        <span class="badge bg-success">Sim</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Não</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ row.nota_fiscal }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-4">
+                        <form method="post" action="{% if confirm_import_url %}{{ confirm_import_url }}{% else %}{% url 'relatoriorecebiveis:import_csv' %}{% endif %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="confirm_import" value="1">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check"></i> Confirmar Importação ({{ total_rows }} registros)
+                            </button>
+                        </form>
+
+                        <a href="{% if back_upload_url %}{{ back_upload_url }}{% else %}{% url 'relatoriorecebiveis:import_csv' %}{% endif %}" class="btn btn-secondary btn-lg ms-2">
+                            <i class="fas fa-arrow-left"></i> Voltar e Escolher Outro Arquivo
+                        </a>
+
+                        <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-outline-secondary btn-lg ms-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="alert alert-light border">
+                            <h6><i class="fas fa-info-circle"></i> Informações sobre a importação:</h6>
+                            <ul class="mb-0">
+                                <li>Os dados serão importados para a empresa: <strong>{{ empresa.razao }}</strong></li>
+                                <li>Máquina de cartão selecionada: <strong>{{ selected_maquina }}</strong></li>
+                                <li>Registros com erros serão ignorados e não afetarão os demais</li>
+                                <li>Campos vazios serão tratados como valores padrão</li>
+                                <li>Datas serão convertidas automaticamente para o formato brasileiro</li>
+                                <li>Valores monetários terão formatação automática (R$ será removido)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <h5>Nenhum dado encontrado!</h5>
+                        <p>O arquivo CSV não contém dados válidos ou está vazio.</p>
+                        <a href="{% if back_upload_url %}{{ back_upload_url }}{% else %}{% url 'relatoriorecebiveis:import_csv' %}{% endif %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Voltar e Tentar Novamente
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table th, .table td {
+    vertical-align: middle;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.table-responsive {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}
