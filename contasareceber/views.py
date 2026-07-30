@@ -2911,8 +2911,8 @@ def baixar_contas_dinheiro(request):
 def conciliar_cartao_por_autorizacao(request):
     """Conciliar contas a receber com relatório de recebíveis baseado no número de autorização.
 
-    Se houver mais de um recebível (parcelas), vai acumulando na baixa do título
-    até quitar (status pago). Enquanto parcial, permanece cartão e aceita novas parcelas.
+    Vincula recebíveis da maquininha ao título e mantém status «cartão».
+    O status só passa a «pago» quando o extrato bancário conciliar com esses recebíveis.
     """
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:

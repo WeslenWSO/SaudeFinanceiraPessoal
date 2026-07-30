@@ -60,6 +60,14 @@
                     title="Criar parcelas em aberto a partir do último lançamento">
                 <i class="fas fa-plus-circle"></i> Gerar parcelas em aberto
             </button>
+            {% elif not parcelas and not is_sac_emprestimo %}
+            <button type="button"
+                    class="btn btn-outline-warning btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalGerarCronogramaInicial"
+                    title="Gerar cronograma Price com carência">
+                <i class="fas fa-calendar-plus"></i> Gerar cronograma
+            </button>
             {% endif %}
             <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}"
                class="btn btn-outline-success btn-sm"
@@ -114,8 +122,9 @@
                     <div class="col-md-4">
                         <div class="text-muted small">Banco</div>
                         <div class="d-flex align-items-center gap-2 fw-semibold">
-                            {% if emprestimo.banco and emprestimo.banco.logo %}
-                            <img src="{{ emprestimo.banco.logo.url }}" alt="{{ emprestimo.banco.nome }}"
+                            {% with logo=emprestimo.banco|banco_logo_url %}
+                            {% if logo %}
+                            <img src="{{ logo }}" alt="{{ emprestimo.banco.nome }}"
                                  style="width: 36px; height: 36px; object-fit: contain;">
                             {% elif emprestimo.banco %}
                             <div class="d-flex align-items-center justify-content-center rounded bg-light"
@@ -125,6 +134,7 @@
                             {% else %}
                             <i class="fas fa-university text-muted"></i>
                             {% endif %}
+                            {% endwith %}
                             <span>{% if emprestimo.banco %}{{ emprestimo.banco.nome }}{% else %}—{% endif %}</span>
                         </div>
                     </div>
@@ -296,17 +306,20 @@
                 {% if emprestimo.saldo_devedor_atualizado %}
                 <div class="small mt-2 pt-2 border-top">
                     <div class="d-flex justify-content-between gap-2">
-                        <span class="text-muted">Saldo devedor</span>
+                        <span class="text-muted">Saldo para quitação</span>
                         <span class="fw-semibold text-primary">R$ {{ emprestimo.saldo_devedor_atualizado|moeda_br }}</span>
                     </div>
                     <div class="text-muted">
-                        Emissão {{ emprestimo.data_extrato|date:"d/m/Y"|default:"—" }}
+                        PDF em {{ emprestimo.data_extrato|date:"d/m/Y"|default:"—" }}
+                        · inclui principal + juros acumulados
                     </div>
                 </div>
                 {% endif %}
                 <div class="small mt-2">
-                    Taxa cálculo {{ emprestimo.taxa_calculo_am }}% a.m.
-                    <span class="text-muted">(juros {{ emprestimo.taxa_juros_am }}% + mora {{ emprestimo.taxa_mora_am }}%)</span>
+                    Taxa juros {{ emprestimo.taxa_juros_am }}% a.m.
+                    <span class="text-muted">
+                        · a vencer: só juros · atrasada: juros + mora {{ emprestimo.taxa_mora_am }}% · multa 2% da parcela
+                    </span>
                     {% if emprestimo.taxa_juros_aa %} · {{ emprestimo.taxa_juros_aa }}% a.a.{% endif %}
                     {% if emprestimo.indicador %} · {{ emprestimo.indicador.rotulo }}{% endif %}
                 </div>
@@ -322,18 +335,85 @@
         <div class="col-md-3">
             <div class="card h-100"><div class="card-body">
                 <div class="text-muted small">Saldo principal (amortização)</div>
+                {% if carencia_juros_mensais and juros_carencia_total > 0 %}
+                <div class="small mt-1">
+                    <div class="d-flex justify-content-between gap-2">
+                        <span>Amortização</span>
+                        <span>R$ {{ saldo_principal|moeda_br }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between gap-2">
+                        <span>+ Carência</span>
+                        <span>R$ {{ juros_carencia_total|moeda_br }}</span>
+                    </div>
+                </div>
+                <div class="fs-5 fw-bold text-primary border-top pt-1 mt-1">
+                    R$ {{ saldo_principal_total|moeda_br }}
+                </div>
+                <div class="small text-muted">Amort. abertas + encargos da carência</div>
+                {% else %}
                 <div class="fs-5 fw-bold text-primary">R$ {{ saldo_principal|moeda_br }}</div>
                 <div class="small text-muted">Soma amort. parcelas em aberto</div>
+                {% endif %}
             </div></div>
         </div>
         <div class="col-md-3">
             <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">Total parcelas abertas</div>
+                <div class="text-muted small">Total parcelas abertas (face)</div>
                 <div class="fs-5 fw-bold">R$ {{ total_aberto|moeda_br }}</div>
+                <div class="small text-muted">Amort. + juros por parcela (face)</div>
+                {% if juros_carencia_p0 and juros_carencia_p0 > 0 %}
+                <div class="small">Juros carência (parc. 0) R$ {{ juros_carencia_p0|moeda_br }}</div>
+                <div class="small">Juros futuros (parc. 1+) R$ {{ total_juros_futuros|moeda_br }}</div>
+                {% else %}
                 <div class="small">Juros remanescentes R$ {{ total_juros_aberto|moeda_br }}</div>
+                {% endif %}
             </div></div>
         </div>
     </div>
+
+    {% if carencia_juros_mensais %}
+    <div class="alert alert-info py-2 small mb-3">
+        <i class="fas fa-pause-circle"></i>
+        <strong>Carência Caixa:</strong>
+        encargos mensais na carência (principal intacto);
+        depois amortização Price em <strong>48 parcelas</strong>
+        (total <strong>60 meses</strong> = 12 carência + 48 amort).
+        Parcela fixa <strong>R$ 11.624,96</strong> (amortização, parcelas 13 a 60).
+        Saldo devedor = <strong>R$ 400.000</strong> + encargos carência ≈ <strong>R$ 475.427,84</strong>.
+        {% if primeira_parcela_pagamento %}
+        1º pagamento com amortização:
+        <strong>{{ primeira_parcela_pagamento.data_vencimento|date:"d/m/Y" }}</strong>
+        (parcela {{ primeira_parcela_pagamento.numero }}).
+        {% endif %}
+        {% if juros_carencia_mensais and juros_carencia_mensais > 0 %}
+        Encargos pagos na carência (abertas):
+        <strong>R$ {{ juros_carencia_mensais|moeda_br }}</strong>.
+        {% endif %}
+    </div>
+    {% elif parcela_carencia %}
+    <div class="alert alert-info py-2 small mb-3">
+        <i class="fas fa-pause-circle"></i>
+        <strong>Carência:</strong>
+        parcela <strong>{{ parcela_carencia.numero }}</strong>
+        vence em <strong>{{ parcela_carencia.data_vencimento|date:"d/m/Y" }}</strong>
+        (sem pagamento de amortização).
+        {% if primeira_parcela_pagamento %}
+        1º pagamento com amortização:
+        <strong>{{ primeira_parcela_pagamento.data_vencimento|date:"d/m/Y" }}</strong>
+        (parcela {{ primeira_parcela_pagamento.numero }}).
+        {% endif %}
+        {% if emprestimo.saldo_devedor_atualizado and emprestimo.saldo_devedor_atualizado > saldo_principal %}
+        O saldo para quitação (R$ {{ emprestimo.saldo_devedor_atualizado|moeda_br }}) é maior que a soma das
+        amortizações (R$ {{ saldo_principal|moeda_br }}) porque inclui juros acumulados na data do extrato.
+        {% endif %}
+        {% if parcela_carencia.juros and parcela_carencia.juros > 0 %}
+        Juros da carência: 1 mês na parcela 0
+        (<strong>R$ {{ parcela_carencia.juros|moeda_br }}</strong> em juros e parcela);
+        o restante foi incorporado ao saldo devedor.
+        A partir da parcela 1, juros e amortização SAC são calculados normalmente.
+        {% endif %}
+    </div>
+    {% endif %}
 
     {% if simulacoes_recentes %}
     <div class="card mb-3">
@@ -416,7 +496,7 @@
                     <form method="post"
                           action="{% url 'emprestimos:atualizar_parcelas_sac' emprestimo.pk %}"
                           class="d-inline ms-2"
-                          onsubmit="return confirm('Recalcular todas as parcelas EM ABERTO pela regra SAC (amortização constante + juros CDI × % índice)?\n\nParcelas pagas não serão alteradas.');">
+                          onsubmit="return confirm('Recalcular parcelas EM ABERTO pela regra SAC?\n\nCom taxa fixa: juros = saldo × taxa a.m. (pro-rata por dias); carência capitaliza juros.\nCom CDI: juros = saldo × CDI × % índice.\n\nParcelas pagas não serão alteradas.');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-success">
                             <i class="fas fa-sync-alt"></i> Atualizar valores SAC
@@ -427,12 +507,20 @@
                     <form method="post"
                           action="{% url 'emprestimos:atualizar_parcelas_price' emprestimo.pk %}"
                           class="d-inline ms-2"
-                          onsubmit="return confirm('Recalcular parcelas EM ABERTO pela Tabela Price?\n\nJuros = saldo × taxa juros a.m. (por dias)\nAmortização = parcela − juros\nParcela permanece fixa.\n\nParcelas pagas não serão alteradas.');">
+                          onsubmit="return confirm('Recalcular juros e amortização pela Tabela Price?\n\nPercorre todo o cronograma (pagas + abertas).\nJuros = saldo × taxa juros a.m. (por dias)\nAmortização = parcela − juros\nEm aberto: parcela fixa (valor mais frequente na lista).\n\nSem ajuste residual na última parcela.{% if carencia_juros_mensais %}\n\nATENÇÃO: contrato Caixa com carência — este recálculo pode divergir do CCB (12 carência + 48 Price).{% endif %}');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-success">
                             <i class="fas fa-sync-alt"></i> Atualizar valores Price
                         </button>
                     </form>
+                    {% endif %}
+                    {% if parcelas %}
+                    <a href="{% url 'emprestimos:parcelas_excel' emprestimo.pk %}"
+                       class="btn btn-sm btn-outline-success ms-2"
+                       id="btnExportarParcelasExcel"
+                       title="Exportar parcelas para Excel">
+                        <i class="fas fa-file-excel"></i> Exportar Excel
+                    </a>
                     {% endif %}
                     {% if abertas %}
                     <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btnSelTodasAbertas"
@@ -463,9 +551,10 @@
                             <th>Parcela</th>
                             <th>Amortização</th>
                             <th>Juros</th>
-                            <th>Taxas</th>
+                            <th title="Taxa efetiva: juros a.m. (a vencer) ou juros+mora (atrasada)">Taxa juros a.m.</th>
                             <th>Pagamento</th>
                             <th>Valor pago</th>
+                            <th>Multa</th>
                             <th>Mora</th>
                             <th>Correção</th>
                             <th>Status</th>
@@ -505,21 +594,30 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if p.taxa_mil != None %}
-                                {{ p.taxa_mil|floatformat:4 }}%
+                                {% if p.status == 'aberta' %}
+                                {{ p.taxa_juros_efetiva_am }}%
+                                {% elif emprestimo.taxa_juros_am %}
+                                {{ emprestimo.taxa_juros_am }}%
                                 {% else %}
                                 —
                                 {% endif %}
                             </td>
                             <td>{{ p.data_pagamento|date:"d/m/Y"|default:"—" }}</td>
                             <td>{% if p.valor_pago != None %}R$ {{ p.valor_pago|moeda_br }}{% else %}—{% endif %}</td>
+                            <td>R$ {% if p.multa %}{{ p.multa|moeda_br }}{% else %}{{ p.multa_atraso_calculada|moeda_br }}{% endif %}</td>
                             <td>R$ {{ p.mora|moeda_br }}</td>
                             <td>R$ {{ p.correcao|moeda_br }}</td>
                             <td>
                                 {% if p.status == 'aberta' %}
-                                <span class="badge bg-warning text-dark">
-                                    <i class="fas fa-flag"></i> Em aberto
-                                </span>
+                                    {% if p.situacao_cobranca == 'atrasada' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-flag"></i> Atrasada
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-flag"></i> A vencer
+                                    </span>
+                                    {% endif %}
                                 {% elif p.status == 'paga' %}
                                 <span class="badge bg-success">Paga</span>
                                 {% else %}
@@ -639,6 +737,74 @@
                     <button type="submit" class="btn btn-warning"
                             onclick="return confirm('Gerar as parcelas em aberto com amortização constante do último lançamento?');">
                         <i class="fas fa-plus"></i> Criar parcelas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Modal — gerar cronograma inicial (Price + carência) #}
+{% if not parcelas and not is_sac_emprestimo %}
+<div class="modal fade" id="modalGerarCronogramaInicial" tabindex="-1" aria-labelledby="modalGerarCronogramaInicialLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'emprestimos:gerar_cronograma_inicial' emprestimo.pk %}">
+                {% csrf_token %}
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="modalGerarCronogramaInicialLabel">
+                        <i class="fas fa-calendar-plus"></i> Gerar cronograma inicial (Price)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Gera o cronograma conforme o CCB Caixa:
+                        <strong>12 meses</strong> de encargos na carência +
+                        <strong>48 parcelas</strong> Price de amortização
+                        (= <strong>60 meses</strong> totais · PMT R$ 11.624,96).
+                    </p>
+                    <div class="border rounded p-2 mb-3 small bg-light">
+                        <div>Valor: <strong>R$ {{ emprestimo.valor_contrato|moeda_br }}</strong></div>
+                        <div>Taxa juros: <strong>{{ emprestimo.taxa_juros_am }}% a.m.</strong></div>
+                        <div>Operação: <strong>{{ emprestimo.data_operacao|date:"d/m/Y"|default:"—" }}</strong></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="tipo_carencia_inicial">Tipo de carência</label>
+                        <select class="form-select" name="tipo_carencia" id="tipo_carencia_inicial">
+                            <option value="juros_mensais" selected>Juros mensais (Caixa — principal intacto)</option>
+                            <option value="capitalizar">Capitalizar juros (Sicoob — parcela 0)</option>
+                            <option value="sem">Sem carência</option>
+                        </select>
+                        <div class="form-text">
+                            Caixa PEAC: encargos pagos mês a mês; amortização Price sobre o valor original.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="meses_carencia_inicial">Meses de carência</label>
+                        <input type="number" class="form-control" name="meses_carencia" id="meses_carencia_inicial"
+                               min="0" max="120" value="12">
+                        <div class="form-text">Ex.: 12 meses — 1º encargo ~R$ 5.800; reajuste mensal (juros compostos no saldo).</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="n_parcelas_inicial">Parcelas de amortização (Price)</label>
+                        <input type="number" class="form-control" name="n_parcelas" id="n_parcelas_inicial"
+                               min="1" max="600" value="48" required>
+                        <div class="form-text">Prestações de amortização após a carência (ex.: 48 × R$ 11.624,96). Total = carência + amort.</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold" for="dia_vencimento_inicial">Dia do vencimento</label>
+                        <input type="number" class="form-control" name="dia_vencimento" id="dia_vencimento_inicial"
+                               min="1" max="31" required
+                               value="{% if emprestimo.data_operacao %}{{ emprestimo.data_operacao.day }}{% else %}10{% endif %}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning"
+                            onclick="return confirm('Gerar o cronograma completo (carência + parcelas Price)?');">
+                        <i class="fas fa-calendar-plus"></i> Gerar cronograma
                     </button>
                 </div>
             </form>
@@ -900,6 +1066,15 @@
             ev.preventDefault();
             ev.stopPropagation();
             setFlagsAbertas(false);
+        }
+        const btnExcel = ev.target.closest('#btnExportarParcelasExcel');
+        if (btnExcel) {
+            ev.preventDefault();
+            const base = btnExcel.getAttribute('href') || '';
+            const ids = Array.from(document.querySelectorAll('.chk-flag-aberta:checked'))
+                .map(function(c) { return c.value; })
+                .filter(Boolean);
+            window.location.href = ids.length ? (base + '?ids=' + ids.join(',')) : base;
         }
     });
 
@@ -1226,12 +1401,24 @@
         let qtdExtrato = 0;
         let html = '';
         const faixa = faixaNumerosParcelas(vencs, n);
+        let somaAmortAbertas = 0;
+        vencs.forEach(function(v) {
+            if (v.status === 'aberta') {
+                const a = parseFloat(v.amort);
+                if (isFinite(a)) somaAmortAbertas += a;
+            }
+        });
+        let anchorAplicado = false;
         for (let k = faixa.min; k <= faixa.max; k++) {
-            const saldoInicio = saldo;
             const ext = vencs.find(v => v.n === k);
             const dataVenc = ext ? parseIsoDate(ext.venc) : null;
             const status = (ext && ext.status) || '';
             const doExtrato = status === 'paga';
+            if (!doExtrato && !anchorAplicado && somaAmortAbertas > 0) {
+                saldo = somaAmortAbertas;
+                anchorAplicado = true;
+            }
+            const saldoInicio = saldo;
             const isUltima = (k === faixa.max);
 
             let dias = 30;

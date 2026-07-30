@@ -497,6 +497,13 @@ def lista_empresas(request):
     
     # Filtra apenas empresas ativas para seleção
     empresas_ativas = [ue.empresa for ue in usuario_empresas if ue.empresa.status == 'Ativa']
+
+    if not request.session.get('empresa_id') and len(empresas_ativas) == 1:
+        empresa = empresas_ativas[0]
+        request.session['empresa_id'] = empresa.id
+        request.session['empresa_nome'] = empresa.razao
+        request.session['regime_tributario'] = empresa.regime_tributario
+        return redirect('dashboard:index')
     
     context = {
         'usuario_empresas': usuario_empresas,
@@ -540,6 +547,7 @@ def selecionar_empresa_ajax(request):
         # Salva a empresa selecionada na sessão
         request.session['empresa_id'] = empresa_id
         request.session['empresa_nome'] = usuario_empresa.empresa.razao
+        request.session['regime_tributario'] = usuario_empresa.empresa.regime_tributario
           
         
         return JsonResponse({

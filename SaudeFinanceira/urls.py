@@ -58,5 +58,7 @@ urlpatterns = [
     path('regraconciliacao/', include('regraConciliacao.urls', namespace='regraConciliacao')),
     path('emprestimos/', include('emprestimos.urls', namespace='emprestimos')),
     path('planejamento/', include('planejamento_orcamentario.urls', namespace='planejamento_orcamentario')),
+    path('agendador/', include('agendador_tarefas.urls', namespace='agendador_tarefas')),
+    path('opcartao/', include('OPCARTAO.urls', namespace='opcartao')),
 
 ] + static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0]) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

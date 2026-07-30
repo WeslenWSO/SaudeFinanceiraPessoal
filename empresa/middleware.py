@@ -17,6 +17,7 @@ class EmpresaMiddleware:
             '/empresa/selecionar/',
             '/empresa/trocar/',
             '/empresa/atual/',
+            '/agendador/',
         ]
         
         # Verifica se a URL atual está na lista de exceções

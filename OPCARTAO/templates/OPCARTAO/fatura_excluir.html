@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+  <div class="mt-4">
+    <h1>Excluir fatura</h1>
+    <p>Confirma a exclusão da fatura de vencimento {{ fatura.vencimento|date:"d/m/Y"|default:"—" }} (R$ {{ fatura.total_fatura|floatformat:2 }})?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Sim, excluir</button>
+      <a href="{% url 'opcartao:fatura_detalhe' fatura.pk %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<div class="container-fluid px-4">
+  <div class="mt-4">
+    <h1>Excluir cartão</h1>
+    <p>Confirma a exclusão do cartão <strong>{{ cartao.descricao }}</strong> ({{ cartao.get_bandeira_display }})?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Sim, excluir</button>
+      <a href="{% url 'opcartao:cartao_listar' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0">{{ title }}</h3>
+            <small class="text-muted">
+                {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }} + {% endif %}
+                Tarefas gerais — {{ calendario.mes_nome }}/{{ filtros.ano }}
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=lista{% if filtros.status %}&status={{ filtros.status }}{% endif %}{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-list"></i> Lista
+            </a>
+            <a href="{% url 'agendador_tarefas:criar' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Nova tarefa
+            </a>
+        </div>
+    </div>
+
+    {% include 'parcial/_messages.html' %}
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="vista" value="calendario">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroMes">Mês</label>
+                    <input type="number" min="1" max="12" name="mes" id="filtroMes"
+                           class="form-control form-control-sm" value="{{ filtros.mes }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroAno">Ano</label>
+                    <input type="number" min="2000" max="2100" name="ano" id="filtroAno"
+                           class="form-control form-control-sm" value="{{ filtros.ano }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="filtroStatus">Status</label>
+                    <select name="status" id="filtroStatus" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for val, rotulo in status_choices %}
+                        <option value="{{ val }}" {% if filtros.status == val %}selected{% endif %}>{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="filtroQ">Busca</label>
+                    <input type="text" name="q" id="filtroQ" class="form-control form-control-sm"
+                           value="{{ filtros.q }}" placeholder="Título, descrição, responsável">
+                </div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filtrar</button>
+                    <a href="{% url 'agendador_tarefas:listar' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <a class="btn btn-sm btn-outline-secondary"
+           href="?mes={{ calendario.mes_anterior }}&ano={{ calendario.ano_anterior }}&vista=calendario{% if filtros.status %}&status={{ filtros.status }}{% endif %}">
+            <i class="fas fa-chevron-left"></i> {{ calendario.mes_anterior|stringformat:"02d" }}/{{ calendario.ano_anterior }}
+        </a>
+        <h5 class="mb-0">{{ calendario.mes_nome }} de {{ filtros.ano }}</h5>
+        <a class="btn btn-sm btn-outline-secondary"
+           href="?mes={{ calendario.mes_proximo }}&ano={{ calendario.ano_proximo }}&vista=calendario{% if filtros.status %}&status={{ filtros.status }}{% endif %}">
+            {{ calendario.mes_proximo|stringformat:"02d" }}/{{ calendario.ano_proximo }} <i class="fas fa-chevron-right"></i>
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="agenda-calendario">
+                <div class="agenda-calendario-head">
+                    <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
+                </div>
+                {% for semana in calendario.semanas %}
+                <div class="agenda-calendario-semana">
+                    {% for dia in semana %}
+                    <div class="agenda-calendario-dia {% if dia.fora_mes %}fora-mes{% endif %} {% if dia.hoje %}hoje{% endif %} {% if dia.domingo %}domingo{% endif %}">
+                        {% if not dia.fora_mes %}
+                        <div class="agenda-calendario-num">{{ dia.numero }}</div>
+                        <div class="agenda-calendario-tarefas">
+                            {% for t in dia.tarefas %}
+                            <a href="{% url 'agendador_tarefas:editar' t.pk %}"
+                               class="agenda-tarefa bg-{{ t.status_badge }}"
+                               title="{{ t.descricao }}">
+                                {% if t.horario_rotulo %}<span class="agenda-tarefa-hora">{{ t.horario_rotulo }}</span>{% endif %}
+                                <span class="agenda-tarefa-titulo">{{ t.titulo }}</span>
+                                <span class="agenda-tarefa-emp">
+                                    {% if t.is_geral %}Geral{% else %}{{ t.empresa_rotulo }}{% endif %}
+                                    · <span class="agenda-tarefa-resp">{{ t.responsavel|default:"—" }}</span>
+                                </span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.agenda-calendario { display: flex; flex-direction: column; }
+.agenda-calendario-head,
+.agenda-calendario-semana {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+.agenda-calendario-head {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.5rem 0;
+    color: #495057;
+}
+.agenda-calendario-dia {
+    min-height: 120px;
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    padding: 0.35rem;
+    vertical-align: top;
+    background: #fff;
+}
+.agenda-calendario-dia.fora-mes { background: #fafafa; }
+.agenda-calendario-dia.hoje { background: #fffbeb; box-shadow: inset 0 0 0 2px #f59e0b; }
+.agenda-calendario-dia.domingo { background: #f3f4f6; }
+.agenda-calendario-num {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+.agenda-calendario-tarefas { display: flex; flex-direction: column; gap: 0.2rem; }
+.agenda-tarefa {
+    display: block;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    padding: 0.2rem 0.35rem;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #1f2937;
+    border-left: 3px solid rgba(0,0,0,0.15);
+}
+.agenda-tarefa.bg-warning { background: #fef3c7; border-left-color: #f59e0b; }
+.agenda-tarefa.bg-success { background: #d1fae5; border-left-color: #10b981; }
+.agenda-tarefa.bg-info { background: #dbeafe; border-left-color: #3b82f6; }
+.agenda-tarefa:hover { filter: brightness(0.97); color: #111; }
+.agenda-tarefa-hora { font-weight: 700; display: block; }
+.agenda-tarefa-titulo { display: block; }
+.agenda-tarefa-emp { display: block; opacity: 0.85; font-size: 0.62rem; }
+.agenda-tarefa-resp { font-weight: 600; opacity: 1; }
+@media (max-width: 768px) {
+    .agenda-calendario-dia { min-height: 80px; }
+    .agenda-tarefa { font-size: 0.6rem; }
+}
+</style>
+{% endblock %}

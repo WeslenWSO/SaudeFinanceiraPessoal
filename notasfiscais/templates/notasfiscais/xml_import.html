@@ -3,7 +3,10 @@
 
 {% block conteudo %}
 <div class="container-fluid px-4">
-    <h1 class="mt-4 mb-4">Importar NFSe do XML</h1>
+    <h1 class="mt-4 mb-4">{{ page_title|default:"Importar NFSe do XML" }}</h1>
+    {% if page_intro %}
+    <p class="text-muted mb-4">{{ page_intro|safe }}</p>
+    {% endif %}
 
     <!-- Verificação de Empresa Selecionada -->
     {% if not request.session.empresa_id %}

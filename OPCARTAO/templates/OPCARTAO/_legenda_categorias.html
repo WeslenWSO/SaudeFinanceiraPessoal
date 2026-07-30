@@ -1,0 +1,59 @@
+<style>
+  .fatura-legenda {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    background: #fff;
+  }
+  .fatura-legenda-titulo {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+  .fatura-legenda-itens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1.25rem;
+  }
+  .fatura-legenda-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: #333;
+    white-space: nowrap;
+  }
+  .fatura-legenda-item i {
+    width: 1.1rem;
+    text-align: center;
+    color: #555;
+  }
+  .fatura-legenda-nota {
+    margin-top: 0.85rem;
+    margin-bottom: 0;
+    font-size: 0.78rem;
+    color: #666;
+    line-height: 1.4;
+  }
+  .fatura-categoria-icone {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    color: #555;
+  }
+</style>
+
+<div class="fatura-legenda mb-4">
+  <div class="fatura-legenda-titulo">Legenda:</div>
+  <div class="fatura-legenda-itens">
+    {% for cat in legenda_categorias %}
+    <span class="fatura-legenda-item" title="{{ cat.nome }}">
+      <i class="fas {{ cat.icone }}"></i>
+      <span>{{ cat.nome }}</span>
+    </span>
+    {% endfor %}
+  </div>
+  {% if nota_exterior %}
+  <p class="fatura-legenda-nota">(1) {{ nota_exterior }}</p>
+  {% endif %}
+</div>

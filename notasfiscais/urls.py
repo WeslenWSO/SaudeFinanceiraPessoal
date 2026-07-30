@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     NFSeListView, NFSeCreateView, NFSeUpdateView,
     NFSeDetailView, NFSeDeleteView, NFSeRecebimentoView,
-    XMLImportView, NfsePortalNacionalImportView, NfsePortalExtensaoView, NfseAdnImportView, import_xml_ajax,
+    XMLImportView, NfseEventoCancelamentoImportView, NfsePortalNacionalImportView, NfsePortalExtensaoView, NfseAdnImportView, import_xml_ajax,
     portal_extensao_credenciais,
     portal_extensao_executar_selenium,
     portal_extensao_importar_pasta_mes,
@@ -23,6 +23,11 @@ urlpatterns = [
     path('dashboard/', dashboard_nfse, name='dashboard'),
     path('create/', NFSeCreateView.as_view(), name='create'),
     path('import/', XMLImportView.as_view(), name='import'),
+    path(
+        'importar-eventos-cancelamento/',
+        NfseEventoCancelamentoImportView.as_view(),
+        name='import_evento_cancelamento',
+    ),
     path(
         'importar-portal-nacional/',
         NfsePortalNacionalImportView.as_view(),

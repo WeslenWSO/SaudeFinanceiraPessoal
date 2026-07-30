@@ -152,7 +152,7 @@
                     <strong>Valores da Tabela Price</strong> — saldo p/ quitação =
                     <strong>saldo principal + juros</strong> até a data:
                     <code>saldo × ((1+i)<sup>dias/30</sup> − 1)</code>
-                    com a <strong>taxa de juros a.m.</strong> (sem mora), como no extrato Sicoob.
+                    com a <strong>taxa de juros a.m.</strong> (a vencer) ou <strong>juros + mora</strong> (atrasada).
                     {% endif %}
                 </div>
                 <p class="text-muted small mb-3">
@@ -160,6 +160,51 @@
                     (método <strong>{{ metodo_calculo_rotulo }}</strong>).
                     Confirme sempre o valor com o banco.
                 </p>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="data_quitacao_modal">Data que pretendo quitar</label>
+                        <input type="date" class="form-control" id="data_quitacao_modal" name="data_quitacao"
+                               value="{{ data_quitacao|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="quitTaxaJuros">Taxa de Juros (% a.m.)</label>
+                        <input type="text" class="form-control" id="quitTaxaJuros" name="taxa_juros_am"
+                               value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}" inputmode="decimal">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold" for="quitTaxaMora">Taxa de Mora (% a.m.)</label>
+                        <input type="text" class="form-control" id="quitTaxaMora" name="taxa_mora_am"
+                               value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}" inputmode="decimal">
+                        <div class="form-text">Somada à taxa de juros em parcelas <strong>atrasadas</strong></div>
+                    </div>
+                    {% if is_sac_emprestimo %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="selic_periodo_pct_modal">
+                            CDI/SELIC período % (opc.)
+                        </label>
+                        <input type="text" class="form-control" id="selic_periodo_pct_modal" name="selic_periodo_pct"
+                               value="{{ selic_periodo_pct }}" placeholder="Auto BCB">
+                        <div class="form-text">Vazio = consulta CDI/SELIC no Banco Central até a data de quitação</div>
+                    </div>
+                    {% endif %}
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="titulo_simulacao">Título (para pesquisar depois)</label>
+                        <input type="text" class="form-control" id="titulo_simulacao" name="titulo_simulacao"
+                               maxlength="200" placeholder="Ex.: Quitação parcial março / proposta cliente">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="salvar_simulacao" value="1"
+                                   id="salvar_simulacao" checked>
+                            <label class="form-check-label" for="salvar_simulacao">
+                                <strong>Salvar simulação</strong> para consultar depois
+                                e gerar o <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}">relatório sintético</a>
+                            </label>
+                        </div>
+                    </div>
+                    <input type="hidden" name="sim_parcial_json" id="sim_parcial_json" value="">
+                </div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-sm-3">
@@ -195,8 +240,17 @@
                      data-metodo="{{ metodo_calculo|default:'price' }}"
                      data-taxa-am="{{ taxa_quitacao_am|stringformat:'f' }}"
                      data-taxa-juros-am="{{ emprestimo.taxa_juros_am|stringformat:'f' }}"
+                     data-taxa-mora-am="{{ emprestimo.taxa_mora_am|stringformat:'f' }}"
                      data-taxa-aa="{{ taxa_quitacao_aa|default:0|stringformat:'f' }}"
+                     data-valor-contrato="{{ emprestimo.valor_contrato|stringformat:'f' }}"
+                     data-data-operacao="{% if emprestimo.data_operacao %}{{ emprestimo.data_operacao|date:'Y-m-d' }}{% endif %}"
+                     data-carencia-venc="{% if parcela_carencia and parcela_carencia.data_vencimento %}{{ parcela_carencia.data_vencimento|date:'Y-m-d' }}{% endif %}"
+                     data-saldo-pos-carencia="{% if saldo_pos_carencia %}{{ saldo_pos_carencia|stringformat:'f' }}{% endif %}"
+                     data-is-sac="{% if is_sac_emprestimo %}1{% else %}0{% endif %}"
                      data-saldo-principal="{{ saldo_principal|stringformat:'f' }}"
+                     data-saldo-principal-total="{% if saldo_principal_total %}{{ saldo_principal_total|stringformat:'f' }}{% endif %}"
+                     data-carencia-juros-mensais="{% if carencia_juros_mensais %}1{% else %}0{% endif %}"
+                     data-juros-carencia-total="{% if juros_carencia_total %}{{ juros_carencia_total|stringformat:'f' }}{% endif %}"
                      data-pct-indice="{% if emprestimo.pct_correcao_am %}{{ emprestimo.pct_correcao_am|stringformat:'f' }}{% else %}192{% endif %}"
                      data-indice="{{ emprestimo.indice_correcao|default:'CDI' }}"
                      data-ref-juros="{{ data_ref_quitacao|date:'Y-m-d' }}"
@@ -259,51 +313,6 @@
                     </div>
                 </div>
 
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="data_quitacao_modal">Data que pretendo quitar</label>
-                        <input type="date" class="form-control" id="data_quitacao_modal" name="data_quitacao"
-                               value="{{ data_quitacao|date:'Y-m-d' }}" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold" for="quitTaxaJuros">Taxa de Juros (% a.m.)</label>
-                        <input type="text" class="form-control" id="quitTaxaJuros" name="taxa_juros_am"
-                               value="{{ emprestimo.taxa_juros_am|stringformat:'f' }}" inputmode="decimal">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-semibold" for="quitTaxaMora">Taxa de Mora (% a.m.)</label>
-                        <input type="text" class="form-control" id="quitTaxaMora" name="taxa_mora_am"
-                               value="{{ emprestimo.taxa_mora_am|stringformat:'f' }}" inputmode="decimal">
-                        <div class="form-text">Cálculo: juros + mora = <span id="quitTaxaSomaLabel">{{ taxa_quitacao_am }}</span>%</div>
-                    </div>
-                    {% if is_sac_emprestimo %}
-                    <div class="col-md-6">
-                        <label class="form-label fw-semibold" for="selic_periodo_pct_modal">
-                            CDI/SELIC período % (opc.)
-                        </label>
-                        <input type="text" class="form-control" id="selic_periodo_pct_modal" name="selic_periodo_pct"
-                               value="{{ selic_periodo_pct }}" placeholder="Auto BCB">
-                        <div class="form-text">Vazio = consulta CDI/SELIC no Banco Central até a data de quitação</div>
-                    </div>
-                    {% endif %}
-                    <div class="col-12">
-                        <label class="form-label fw-semibold" for="titulo_simulacao">Título (para pesquisar depois)</label>
-                        <input type="text" class="form-control" id="titulo_simulacao" name="titulo_simulacao"
-                               maxlength="200" placeholder="Ex.: Quitação parcial março / proposta cliente">
-                    </div>
-                    <div class="col-12">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="salvar_simulacao" value="1"
-                                   id="salvar_simulacao" checked>
-                            <label class="form-check-label" for="salvar_simulacao">
-                                <strong>Salvar simulação</strong> para consultar depois
-                                e gerar o <a href="{% url 'emprestimos:simulacoes' %}?q={{ emprestimo.numero_contrato }}">relatório sintético</a>
-                            </label>
-                        </div>
-                    </div>
-                    <input type="hidden" name="sim_parcial_json" id="sim_parcial_json" value="">
-                </div>
-
                 <div class="border rounded mb-3 overflow-hidden border-success-subtle"
                      id="quitParcialValorBox">
                     <div class="table-responsive">
@@ -362,7 +371,10 @@
                     <table class="table table-sm table-hover mb-0 align-middle" id="tabelaQuitacaoParcelas">
                         <thead class="table-light sticky-top">
                             <tr>
-                                <th style="width:2rem;"></th>
+                                <th style="width:2rem;" class="text-center" title="Marcar / desmarcar todas">
+                                    <input type="checkbox" class="form-check-input" id="chkQuitTodasHeader"
+                                           aria-label="Marcar ou desmarcar todas as parcelas">
+                                </th>
                                 <th>Nº</th>
                                 <th>Vencimento</th>
                                 <th>Saldo devedor (início)</th>
@@ -375,9 +387,11 @@
                             {% for p in abertas %}
                             <tr class="quit-parcela-row"
                                 data-parcela-id="{{ p.id }}"
+                                data-vencimento="{{ p.data_vencimento|date:'Y-m-d' }}"
                                 data-extrato-parcela="{{ p.valor_parcela|stringformat:'f' }}"
                                 data-extrato-amort="{{ p.amortizacao|stringformat:'f' }}"
-                                data-extrato-juros="{{ p.juros|stringformat:'f' }}">
+                                data-extrato-juros="{{ p.juros|stringformat:'f' }}"
+                                {% if 'encargos mensais' in p.historico|lower %}data-extrato-carencia="1"{% endif %}>
                                 <td>
                                     <input type="checkbox" class="form-check-input chk-quitacao" name="parcelas"
                                            value="{{ p.id }}"
@@ -387,7 +401,13 @@
                                 <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
                                 <td class="quit-val-saldo fw-semibold">—</td>
                                 <td class="quit-val-parcela" data-valor="{{ p.valor_parcela|stringformat:'f' }}">R$ {{ p.valor_parcela|moeda_br }}</td>
-                                <td class="quit-val-amort" data-valor="{{ p.amortizacao|stringformat:'f' }}">R$ {{ p.amortizacao|moeda_br }}</td>
+                                <td class="quit-val-amort" data-valor="{{ p.amortizacao|stringformat:'f' }}">
+                                    {% if 'encargos mensais' in p.historico|lower %}
+                                    <span title="Carência — encargos mensais (sem amortização do principal)">—</span>
+                                    {% else %}
+                                    R$ {{ p.amortizacao|moeda_br }}
+                                    {% endif %}
+                                </td>
                                 <td class="quit-val-juros" data-valor="{{ p.juros|stringformat:'f' }}">R$ {{ p.juros|moeda_br }}</td>
                             </tr>
                             {% endfor %}
@@ -401,7 +421,12 @@
                      data-total-contrato="{{ parcelas|length }}"
                      data-qtd-abertas="{{ abertas|length }}"
                      data-taxa-am="{{ taxa_quitacao_am|stringformat:'f' }}"
-                     data-taxa-aa="{{ taxa_quitacao_aa|default:0|stringformat:'f' }}">
+                     data-taxa-juros-am="{{ emprestimo.taxa_juros_am|stringformat:'f' }}"
+                     data-taxa-mora-am="{{ emprestimo.taxa_mora_am|stringformat:'f' }}"
+                     data-taxa-aa="{{ taxa_quitacao_aa|default:0|stringformat:'f' }}"
+                     data-pct-indice="{% if emprestimo.pct_correcao_am %}{{ emprestimo.pct_correcao_am|stringformat:'f' }}{% else %}192{% endif %}"
+                     data-indice="{{ emprestimo.indice_correcao|default:'CDI' }}"
+                     data-sac-tabela-url="{% url 'emprestimos:sac_tabela_cdi' emprestimo.pk %}">
                     <div class="fw-semibold mb-2">
                         <i class="fas fa-random text-primary"></i> Simulação parcial
                         <span class="text-muted fw-normal small" id="simParcialSubtitulo">
@@ -415,8 +440,9 @@
                             <label class="form-check-label" for="simParcialMesma">
                                 <strong>Mesma quantidade de parcelas</strong>
                                 <div class="small text-muted">
-                                    As marcadas viram 1 parcela (nº da 1ª). A sequência segue igual
-                                    (ex.: 19–23 → parcela 19; restam 20…36 = 17 parcelas). Novo cálculo só reduz o saldo.
+                                    As marcadas viram 1 parcela (nº da 1ª). O novo saldo é recalculado
+                                    em <strong>todas as parcelas em aberto</strong>
+                                    (ex.: 18 abertas → 18 parcelas Price/SAC sobre o saldo remanescente).
                                 </div>
                             </label>
                         </div>
@@ -426,8 +452,8 @@
                             <label class="form-check-label" for="simParcialDiminui">
                                 <strong>Diminuir a quantidade de parcelas</strong>
                                 <div class="small text-muted">
-                                    Abate as marcadas do prazo restante
-                                    (ex.: 18 abertas − 5 marcadas = 13 parcelas remanescentes).
+                                    Abate as marcadas do prazo e remove as <strong>últimas</strong> parcelas em aberto
+                                    (ex.: 18 abertas − 5 marcadas = 13 parcelas, nº 19…31 — caem 32…36).
                                 </div>
                             </label>
                         </div>
@@ -455,35 +481,60 @@
                             </div>
                             <div class="form-text" id="simParcialAmortizarSaldoHint"></div>
                         </div>
+                        <div class="form-check mt-3 pt-2 border-top">
+                            <input class="form-check-input" type="checkbox" id="simParcialAbaterParcela"
+                                   name="sim_parcial_abater_parcela" value="1">
+                            <label class="form-check-label" for="simParcialAbaterParcela">
+                                <strong>Abater pelo valor da parcela</strong> (amort. + juros)
+                                <div class="small text-muted">
+                                    Desmarcado: o saldo do recálculo usa só a <strong>amortização</strong>
+                                    das parcelas selecionadas. Marcado: abate o <strong>valor total da parcela</strong>
+                                    do saldo devedor antes de recalcular a tabela abaixo.
+                                </div>
+                            </label>
+                        </div>
                     </div>
 
-                    <div class="row g-2 mb-2 small" id="simParcialResumo">
-                        <div class="col-6 col-md-3">
+                    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-2 mb-2 small" id="simParcialResumo">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="text-muted" id="simParcialConsolidaLabel">Marcadas → consolidam em</div>
                                 <div class="fw-bold" id="simParcialConsolida">—</div>
                             </div>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
                                 <div class="text-muted">Parcelas remanescentes</div>
                                 <div class="fw-bold text-primary" id="simParcialNRestante">—</div>
                             </div>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col">
                             <div class="border rounded p-2 h-100">
-                                <div class="text-muted">Novo saldo devedor</div>
+                                <div class="text-muted" id="simParcialSaldoLabel">Novo saldo Devedor da Amortização</div>
                                 <div class="fw-bold" id="simParcialSaldo">—</div>
                             </div>
                         </div>
-                            <div class="col-6 col-md-3">
-                                <div class="border rounded p-2 h-100">
-                                    <div class="text-muted" id="simParcialNovaParcelaLabel">
-                                        {% if metodo_calculo == 'sac' %}Amort. constante / 1ª parc. (SAC){% else %}Nova parcela (Price){% endif %}
-                                    </div>
-                                    <div class="fw-bold text-success" id="simParcialNovaParcela">—</div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="text-muted" id="simParcialNovaParcelaLabel">
+                                    {% if metodo_calculo == 'sac' %}Amort. constante / 1ª parc. (SAC){% else %}Nova parcela (Price){% endif %}
                                 </div>
+                                <div class="fw-bold text-success" id="simParcialNovaParcela">—</div>
                             </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="text-muted">Total das parcelas (soma)</div>
+                                <div class="fw-bold text-danger" id="simParcialTotalParcelas">—</div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100 bg-success-subtle">
+                                <div class="text-muted">Diferença do Saldo devedor</div>
+                                <div class="small text-muted" id="simParcialEcoFormula">Total acima − total abaixo</div>
+                                <div class="fw-bold text-success" id="simParcialEconomiaTotal">—</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="small text-muted mb-2" id="simParcialHint"></div>
                     <div class="table-responsive border rounded" style="max-height: 14rem;">
@@ -555,6 +606,258 @@
         return saldo * (Math.pow(1 + i, dias / 30) - 1);
     }
 
+    function taxasContratoQuitacao() {
+        const jEl = document.getElementById('quitTaxaJuros');
+        const mEl = document.getElementById('quitTaxaMora');
+        let juros = jEl ? (parseBrNumber(jEl.value) || 0) : 0;
+        let mora = mEl ? (parseBrNumber(mEl.value) || 0) : 0;
+        if (!(juros > 0)) {
+            const box = document.getElementById('quitValoresQuitarBox') ||
+                document.getElementById('quitSimParcialBox');
+            if (box) juros = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+        }
+        if (!(mora > 0)) {
+            const box = document.getElementById('quitValoresQuitarBox') ||
+                document.getElementById('quitSimParcialBox');
+            if (box) mora = parseBrNumber(box.getAttribute('data-taxa-mora-am') || '0') || 0;
+        }
+        return { juros: juros, mora: mora };
+    }
+
+    function dataReferenciaCobranca() {
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const dq = parseIsoDate((dataQuitEl && dataQuitEl.value) || '');
+        if (dq) return dq;
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+
+    function parcelaAtrasada(vencimento, dataRef) {
+        if (!vencimento || !dataRef) return false;
+        const v = new Date(vencimento.getFullYear(), vencimento.getMonth(), vencimento.getDate());
+        const r = new Date(dataRef.getFullYear(), dataRef.getMonth(), dataRef.getDate());
+        return v.getTime() < r.getTime();
+    }
+
+    /** A vencer: só juros a.m.; atrasada: juros + mora a.m. */
+    function taxaEfetivaAm(vencimento, dataRef) {
+        const t = taxasContratoQuitacao();
+        if (parcelaAtrasada(vencimento, dataRef || dataReferenciaCobranca())) {
+            return Math.round((t.juros + t.mora) * 10000) / 10000;
+        }
+        return Math.round(t.juros * 10000) / 10000;
+    }
+
+    function vencimentoDaLinhaQuitacao(tr) {
+        const iso = tr.getAttribute('data-vencimento') || '';
+        if (iso) return parseIsoDate(iso);
+        const tds = tr.querySelectorAll('td');
+        const vencTxt = (tds[2] && tds[2].textContent || '').trim();
+        const m = vencTxt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        return null;
+    }
+
+    /**
+     * Parcela de carência Caixa — encargos mensais, juros incorporados ao saldo.
+     */
+    function isParcelaCarenciaEncargos(tr) {
+        if (!tr) return false;
+        if (tr.getAttribute('data-extrato-carencia') === '1') return true;
+        const amort = parseBrNumber(tr.getAttribute('data-extrato-amort') || '') || 0;
+        const parcela = parseBrNumber(tr.getAttribute('data-extrato-parcela') || '') || 0;
+        return amort <= 0.001 && parcela > 0;
+    }
+
+    function carenciaJurosMensaisAtiva() {
+        const box = document.getElementById('quitValoresQuitarBox');
+        return !!(box && box.getAttribute('data-carencia-juros-mensais') === '1');
+    }
+
+    function saldoInicialChainQuitacao() {
+        const box = document.getElementById('quitValoresQuitarBox');
+        if (box && carenciaJurosMensaisAtiva()) {
+            const vc = parseBrNumber(box.getAttribute('data-valor-contrato') || '') || 0;
+            if (vc > 0) return vc;
+        }
+        return saldoPrincipalContrato();
+    }
+
+    function avancarSaldoQuitacao(saldoInicio, amort, juros, tr) {
+        if (isParcelaCarenciaEncargos(tr) && juros > 0) {
+            return Math.round((saldoInicio + juros) * 100) / 100;
+        }
+        return Math.max(0, Math.round((saldoInicio - amort) * 100) / 100);
+    }
+
+    /**
+     * Saldo principal na data de quitação — carência Caixa com juros incorporados
+     * mês a mês (parcelas de encargos com vencimento <= data quitação).
+     */
+    function refsQuitacaoCarenciaCaixa(dataQuit) {
+        const box = document.getElementById('quitValoresQuitarBox');
+        if (!box || !carenciaJurosMensaisAtiva() || !dataQuit) return null;
+        const taxaAm = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '') || 0;
+        let saldo = parseBrNumber(box.getAttribute('data-valor-contrato') || '') || 0;
+        if (!(saldo > 0) || !(taxaAm > 0)) return null;
+
+        const dataOp = parseIsoDate(box.getAttribute('data-data-operacao') || '');
+        let ultimoVenc = dataOp;
+        const i = taxaAm / 100;
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            if (!isParcelaCarenciaEncargos(tr)) return;
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            const venc = vencimentoDaLinhaQuitacao(tr);
+            if (!isFinite(numero) || !venc) return;
+            rows.push({ numero: numero, venc: venc });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+
+        let mesesIncorp = 0;
+        rows.forEach(function(row) {
+            if (row.venc.getTime() > dataQuit.getTime()) return;
+            const juros = Math.round(saldo * i * 100) / 100;
+            saldo = Math.round((saldo + juros) * 100) / 100;
+            ultimoVenc = row.venc;
+            mesesIncorp += 1;
+        });
+
+        const dias = ultimoVenc ? diffDias(ultimoVenc, dataQuit) : 0;
+        return {
+            saldoPrinc: saldo,
+            dataRef: ultimoVenc,
+            dias: dias,
+            mesesIncorp: mesesIncorp,
+        };
+    }
+
+    function formatIsoBr(iso) {
+        if (!iso) return '';
+        const p = String(iso).split('-');
+        if (p.length !== 3) return iso;
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    /**
+     * Recalcula juros (e amort.) de cada parcela na tabela principal.
+     * A vencer → taxa juros; atrasada → juros + mora.
+     */
+    function recalcularJurosTabelaParcelas() {
+        const box = document.getElementById('quitValoresQuitarBox');
+        const metodo = (box && box.getAttribute('data-metodo')) || 'price';
+        if (metodo === 'sac') return;
+
+        const saldoInicial = saldoInicialChainQuitacao();
+        if (!(saldoInicial > 0)) return;
+
+        const dataRef = dataReferenciaCobranca();
+        const dataInicio = box ? parseIsoDate(box.getAttribute('data-ref-juros') || '') : null;
+
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            if (!id || !isFinite(numero)) return;
+            rows.push({
+                id: id,
+                numero: numero,
+                tr: tr,
+                venc: vencimentoDaLinhaQuitacao(tr)
+            });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+
+        let saldo = saldoInicialChainQuitacao();
+        let dataAnt = dataInicio || dataRef;
+
+        rows.forEach(function(row, idx) {
+            const saldoInicio = Math.round(saldo * 100) / 100;
+            let dias = 30;
+            if (dataAnt && row.venc) {
+                dias = diffDias(dataAnt, row.venc);
+                if (!(dias > 0)) dias = 30;
+            }
+            const taxaPct = taxaEfetivaAm(row.venc, dataRef);
+            const i = taxaPct / 100;
+            let juros;
+            let amort;
+            let parcela;
+
+            if (isParcelaCarenciaEncargos(row.tr)) {
+                juros = (i > 0 && saldoInicio > 0)
+                    ? Math.round(saldoInicio * i * 100) / 100
+                    : 0;
+                amort = 0;
+                parcela = juros;
+            } else {
+                juros = (i > 0 && saldoInicio > 0) ? jurosPorDias(saldoInicio, i, dias) : 0;
+                juros = Math.round(juros * 100) / 100;
+                const extParcela = parseBrNumber(row.tr.getAttribute('data-extrato-parcela') || '') || 0;
+                const elP = row.tr.querySelector('.quit-val-parcela');
+                parcela = extParcela > 0
+                    ? extParcela
+                    : (elP ? parseFloat(elP.getAttribute('data-valor')) : NaN);
+                if (!isFinite(parcela) || parcela <= 0) {
+                    parcela = extParcela;
+                }
+                amort = Math.round((parcela - juros) * 100) / 100;
+                if (amort < 0) amort = 0;
+                if (idx === rows.length - 1 && saldoInicio > 0) {
+                    amort = saldoInicio;
+                    parcela = Math.round((amort + juros) * 100) / 100;
+                } else if (amort > saldoInicio) {
+                    amort = saldoInicio;
+                    parcela = Math.round((amort + juros) * 100) / 100;
+                }
+            }
+
+            let saldoFim = avancarSaldoQuitacao(saldoInicio, amort, juros, row.tr);
+
+            const L = priceLinhasPorId[row.id] || {};
+            L.saldoInicio = saldoInicio;
+            L.saldoFim = saldoFim;
+            L.juros = juros;
+            L.amort = amort;
+            L.parcela = parcela;
+            L.dias = dias;
+            L.taxa_efetiva = taxaPct;
+            L.status = 'aberta';
+            priceLinhasPorId[row.id] = L;
+
+            const elS = row.tr.querySelector('.quit-val-saldo');
+            const elJ = row.tr.querySelector('.quit-val-juros');
+            const elA = row.tr.querySelector('.quit-val-amort');
+            if (elS) elS.textContent = 'R$ ' + fmtBr(saldoInicio);
+            if (elJ) {
+                elJ.setAttribute('data-valor', String(juros));
+                elJ.textContent = 'R$ ' + fmtBr(juros);
+                elJ.title = fmtBr(taxaPct) + '% a.m.' +
+                    (parcelaAtrasada(row.venc, dataRef) ? ' (juros + mora)' : ' (só juros)');
+            }
+            if (elA) {
+                elA.setAttribute('data-valor', String(amort));
+                if (isParcelaCarenciaEncargos(row.tr)) {
+                    elA.textContent = '—';
+                    elA.title = 'Carência — encargos mensais (sem amortização do principal)';
+                } else {
+                    elA.textContent = 'R$ ' + fmtBr(amort);
+                    elA.title = '';
+                }
+            }
+            const elP = row.tr.querySelector('.quit-val-parcela');
+            if (elP && parcela > 0) {
+                elP.setAttribute('data-valor', String(parcela));
+                elP.textContent = 'R$ ' + fmtBr(parcela);
+            }
+
+            saldo = saldoFim;
+            if (row.venc) dataAnt = row.venc;
+        });
+    }
+
     /**
      * Valor presente das parcelas (uso auxiliar).
      * Quitação Price no extrato = principal + juros por dias (ver atualizarValoresQuitarPorData).
@@ -617,6 +920,180 @@
         const ms = b.getTime() - a.getTime();
         return Math.max(0, Math.round(ms / 86400000));
     }
+
+    function emCarenciaQuitacao(dataQuit, vencP0) {
+        return !!(dataQuit && vencP0 && dataQuit.getTime() < vencP0.getTime());
+    }
+
+    /** Carência parcial: principal = contrato + meses cheios; juros = dias restantes. */
+    function carenciaParcialQuitacao(principal, taxaAm, dataOp, dataQuit, vencP0) {
+        if (!(principal > 0) || !(taxaAm > 0) || !dataOp || !dataQuit || dataQuit <= dataOp) {
+            return { principalBase: principal || 0, jurosDias: 0, total: principal || 0 };
+        }
+        const i = taxaAm / 100;
+        if (vencP0 && dataQuit >= vencP0) {
+            const jurosTotal = jurosPorDias(principal, i, diffDias(dataOp, vencP0));
+            const base = Math.round((principal + jurosTotal) * 100) / 100;
+            return { principalBase: base, jurosDias: 0, total: base };
+        }
+        const diasCarenciaTotal = vencP0 ? diffDias(dataOp, vencP0) : 180;
+        const meses = Math.max(1, Math.round(diasCarenciaTotal / 30));
+        const jurosTotal = jurosPorDias(principal, i, diasCarenciaTotal);
+        const jurosMes = Math.round((jurosTotal / meses) * 100) / 100;
+        const dias = diffDias(dataOp, dataQuit);
+        const mesesCompletos = Math.floor(dias / 30);
+        const jurosMeses = Math.round(jurosMes * mesesCompletos * 100) / 100;
+        const principalBase = Math.round((principal + jurosMeses) * 100) / 100;
+        const dataBase = new Date(dataOp.getTime());
+        dataBase.setDate(dataBase.getDate() + mesesCompletos * 30);
+        let jurosDias = 0;
+        if (dataQuit > dataBase) {
+            jurosDias = jurosPorDias(principalBase, i, diffDias(dataBase, dataQuit));
+            jurosDias = Math.round(jurosDias * 100) / 100;
+        }
+        return {
+            principalBase: principalBase,
+            jurosDias: jurosDias,
+            total: Math.round((principalBase + jurosDias) * 100) / 100,
+        };
+    }
+
+    function jurosCarenciaParcialQuitacao(principal, taxaAm, dataOp, dataQuit, vencP0) {
+        const r = carenciaParcialQuitacao(principal, taxaAm, dataOp, dataQuit, vencP0);
+        return Math.round((r.total - principal) * 100) / 100;
+    }
+
+    function dadosCarenciaQuitacao(box) {
+        if (!box) return {};
+        return {
+            valorContrato: parseBrNumber(box.getAttribute('data-valor-contrato') || '0') || 0,
+            dataOp: parseIsoDate(box.getAttribute('data-data-operacao') || ''),
+            vencP0: parseIsoDate(box.getAttribute('data-carencia-venc') || ''),
+            saldoPosCarencia: parseBrNumber(box.getAttribute('data-saldo-pos-carencia') || '0') || 0,
+            isSac: box.getAttribute('data-is-sac') === '1',
+        };
+    }
+
+    /** Principal para quitação — na carência parcial usa valor do contrato, não saldo pós-capitalização. */
+    function principalQuitacaoContrato() {
+        const box = document.getElementById('quitValoresQuitarBox');
+        const carencia = dadosCarenciaQuitacao(box);
+        const metodo = (box && box.getAttribute('data-metodo')) || 'price';
+        const isSac = carencia.isSac || metodo === 'sac';
+        const taxaFixaSac = box ? (parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0) : 0;
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const dataQuit = parseIsoDate((dataQuitEl && dataQuitEl.value) || '');
+
+        if (
+            isSac && taxaFixaSac > 0 && carencia.valorContrato > 0 &&
+            carencia.dataOp && carencia.vencP0 && dataQuit
+        ) {
+            if (emCarenciaQuitacao(dataQuit, carencia.vencP0)) {
+                const cp = carenciaParcialQuitacao(
+                    carencia.valorContrato, taxaFixaSac, carencia.dataOp, dataQuit, carencia.vencP0,
+                );
+                return cp.principalBase;
+            }
+            if (carencia.saldoPosCarencia > 0) {
+                return carencia.saldoPosCarencia;
+            }
+        }
+
+        if (!isSac && carenciaJurosMensaisAtiva() && dataQuit) {
+            const refs = refsQuitacaoCarenciaCaixa(dataQuit);
+            if (refs && refs.saldoPrinc > 0) return refs.saldoPrinc;
+        }
+
+        if (box) {
+            const sp = parseBrNumber(box.getAttribute('data-saldo-principal') || '');
+            if (sp > 0) return sp;
+        }
+        const tr = document.querySelector('#tabelaQuitacaoParcelas .quit-parcela-row');
+        if (tr) {
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const L = priceLinhasPorId[id] || null;
+            if (L && isFinite(L.saldoInicio) && L.saldoInicio > 0) return L.saldoInicio;
+            const elS = tr.querySelector('.quit-val-saldo');
+            const txt = (elS && elS.textContent || '').trim();
+            if (txt && txt !== '—') {
+                const v = parseBrNumber(txt.replace(/^R\$\s*/i, ''));
+                if (v > 0) return v;
+            }
+        }
+        return 0;
+    }
+
+    function atualizarSaldosVisiveisTabela() {
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const L = priceLinhasPorId[id];
+            if (!L) return;
+            const elS = tr.querySelector('.quit-val-saldo');
+            if (elS && isFinite(L.saldoInicio)) {
+                elS.textContent = 'R$ ' + fmtBr(L.saldoInicio);
+            }
+        });
+    }
+
+    function aplicarCarenciaQuitacaoTaxaFixa(box, dataQuit, qtdContrato, face) {
+        const carencia = dadosCarenciaQuitacao(box);
+        const taxaFixaSac = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+        if (!(taxaFixaSac > 0 && carencia.dataOp && carencia.vencP0 && dataQuit)) {
+            return false;
+        }
+        if (emCarenciaQuitacao(dataQuit, carencia.vencP0)) {
+            const valorBase = carencia.valorContrato > 0
+                ? carencia.valorContrato
+                : principalQuitacaoContrato();
+            const cp = carenciaParcialQuitacao(
+                valorBase, taxaFixaSac, carencia.dataOp, dataQuit, carencia.vencP0,
+            );
+            const diasCarencia = diffDias(carencia.dataOp, dataQuit);
+            const mesesCheios = Math.floor(diasCarencia / 30);
+            const diasExtra = diasCarencia % 30;
+            let hintCarencia = 'Carência parcial: ' + mesesCheios + ' mês(es)';
+            if (diasExtra > 0) hintCarencia += ' + ' + diasExtra + ' dia(s)';
+            hintCarencia += ' · taxa ' + fmtBr(taxaFixaSac) + '% a.m.';
+            hintCarencia += ' · principal R$ ' + fmtBr(cp.principalBase) +
+                ' (350k + ' + mesesCheios + ' mês carência)';
+            if (diasExtra > 0) {
+                hintCarencia += ' + juros ' + diasExtra + ' dia(s) R$ ' + fmtBr(cp.jurosDias);
+            }
+            aplicarValoresQuitar(
+                cp.principalBase, cp.jurosDias, face, hintCarencia, qtdContrato,
+                { c: cp.total },
+            );
+            exibirCardsTopo({
+                qtd: qtdContrato,
+                somaAmort: cp.principalBase,
+                somaParcela: face,
+                somaJuros: cp.jurosDias,
+                saldoDevedor: cp.total,
+            });
+            reancorarSaldosAbertas(cp.principalBase);
+            atualizarSaldosVisiveisTabela();
+            return true;
+        }
+        const basePos = carencia.saldoPosCarencia > 0
+            ? carencia.saldoPosCarencia
+            : principalQuitacaoContrato();
+        const diasPos = diffDias(carencia.vencP0, dataQuit);
+        const jurosPos = Math.round(jurosPorDias(basePos, taxaFixaSac / 100, diasPos) * 100) / 100;
+        const quitPos = Math.round((basePos + jurosPos) * 100) / 100;
+        const hintPos = 'Pós-carência · taxa ' + fmtBr(taxaFixaSac) + '% a.m. · ' +
+            diasPos + ' dia(s) após fim da carência';
+        aplicarValoresQuitar(basePos, jurosPos, face, hintPos, qtdContrato, { c: quitPos });
+        exibirCardsTopo({
+            qtd: qtdContrato,
+            somaAmort: basePos,
+            somaParcela: face,
+            somaJuros: jurosPos,
+            saldoDevedor: quitPos,
+        });
+        reancorarSaldosAbertas(basePos);
+        atualizarSaldosVisiveisTabela();
+        return true;
+    }
     // Modal quitação — selecionar/limpar parcelas
     const quitChecks = () => document.querySelectorAll('.chk-quitacao');
     const btnQuitTodas = document.getElementById('btnQuitSelTodas');
@@ -674,6 +1151,447 @@
         };
     }
 
+    /** Soma amortização das parcelas em aberto NÃO marcadas (= saldo principal remanescente). */
+    function somarAmortNaoMarcadas() {
+        let soma = 0;
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const chk = tr.querySelector('.chk-quitacao');
+            if (chk && chk.checked) return;
+            const elA = tr.querySelector('.quit-val-amort');
+            const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
+            if (isFinite(amort)) soma += amort;
+        });
+        return Math.round(soma * 100) / 100;
+    }
+
+    /** Soma valor da parcela (face) das parcelas marcadas. */
+    function somarParcelaMarcadas() {
+        const res = somarParcelasQuitacao(true);
+        return Math.round((res.somaParcela || 0) * 100) / 100;
+    }
+
+    /** Soma amortização das parcelas marcadas. */
+    function somarAmortMarcadas() {
+        const res = somarParcelasQuitacao(true);
+        return Math.round((res.somaAmort || 0) * 100) / 100;
+    }
+
+    function abaterPorParcelaSimParcial() {
+        const el = document.getElementById('simParcialAbaterParcela');
+        return !!(el && el.checked);
+    }
+
+    /**
+     * Novo saldo para recálculo Price/SAC conforme base de abatimento.
+     * abaterParcela: saldo devedor − Σ parcelas marcadas.
+     * padrão: Σ amortização das não marcadas (principal remanescente).
+     */
+    function calcularNovoSaldoSimParcial(marcadas, abaterParcela) {
+        if (abaterParcela) {
+            const saldoDev = saldoDevedorContrato();
+            const somaParc = somarParcelaMarcadas();
+            if (somaParc > 0 && saldoDev > 0) {
+                return Math.max(0, Math.round((saldoDev - somaParc) * 100) / 100);
+            }
+            if (marcadas && marcadas.length) {
+                const somaParcM = marcadas.reduce(function(s, r) {
+                    return s + (r.parcela || 0);
+                }, 0);
+                if (somaParcM > 0) {
+                    const base = saldoDev > 0
+                        ? saldoDev
+                        : (isFinite(marcadas[0].saldoInicio) ? marcadas[0].saldoInicio : 0);
+                    if (base > 0) {
+                        return Math.max(0, Math.round((base - somaParcM) * 100) / 100);
+                    }
+                }
+            }
+            return 0;
+        }
+        const saldoPrincipal = saldoPrincipalContrato();
+        let novoSaldo = somarAmortNaoMarcadas();
+        if (!(novoSaldo > 0) && marcadas && marcadas.length) {
+            const primeira = marcadas[0];
+            const si = isFinite(primeira.saldoInicio) ? primeira.saldoInicio : saldoPrincipal;
+            const somaAmort = marcadas.reduce(function(s, r) { return s + (r.amort || 0); }, 0);
+            novoSaldo = Math.max(0, Math.round((si - somaAmort) * 100) / 100);
+        }
+        return novoSaldo;
+    }
+
+    /** Taxa de juros contratual (sem mora) para recálculo Price/SAC. */
+    function taxaJurosSimParcial() {
+        const taxaJurosEl = document.getElementById('quitTaxaJuros');
+        let taxa = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
+        if (!(taxa > 0)) {
+            const boxQuit = document.getElementById('quitValoresQuitarBox');
+            if (boxQuit) {
+                taxa = parseBrNumber(boxQuit.getAttribute('data-taxa-juros-am') || '0') || 0;
+            }
+        }
+        if (!(taxa > 0)) {
+            const box = document.getElementById('quitSimParcialBox');
+            if (box) {
+                taxa = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+            }
+        }
+        return taxa;
+    }
+
+    /** Saldo devedor = principal + juros pro-rata até a data de quitação. */
+    function saldoDevedorContrato() {
+        const elA = document.getElementById('quitValA');
+        const elB = document.getElementById('quitValB');
+        if (elA && elB) {
+            const a = parseBrNumber(String(elA.textContent || '').replace(/^R\$\s*/i, ''));
+            const b = parseBrNumber(String(elB.textContent || '').replace(/^R\$\s*/i, ''));
+            if (isFinite(a) && a > 0) {
+                return Math.round((a + (isFinite(b) && b > 0 ? b : 0)) * 100) / 100;
+            }
+        }
+        const box = document.getElementById('quitValoresQuitarBox');
+        const carencia = dadosCarenciaQuitacao(box);
+        const taxaJuros = taxaJurosSimParcial();
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const dataQuit = parseIsoDate((dataQuitEl && dataQuitEl.value) || '');
+        if (
+            carencia.valorContrato > 0 && taxaJuros > 0 &&
+            carencia.dataOp && carencia.vencP0 && dataQuit
+        ) {
+            if (emCarenciaQuitacao(dataQuit, carencia.vencP0)) {
+                const cp = carenciaParcialQuitacao(
+                    carencia.valorContrato, taxaJuros, carencia.dataOp, dataQuit, carencia.vencP0,
+                );
+                return cp.total;
+            }
+            const base = carencia.saldoPosCarencia > 0
+                ? carencia.saldoPosCarencia
+                : carencia.valorContrato;
+            const dias = diffDias(carencia.vencP0, dataQuit);
+            const juros = jurosPorDias(base, taxaJuros / 100, dias);
+            return Math.round((base + juros) * 100) / 100;
+        }
+        const principal = saldoPrincipalContrato();
+        if (!(principal > 0)) return 0;
+        if (carenciaJurosMensaisAtiva() && dataQuit) {
+            const refs = refsQuitacaoCarenciaCaixa(dataQuit);
+            if (refs) {
+                const jurosRef = jurosPorDias(refs.saldoPrinc, taxaJuros / 100, refs.dias);
+                return Math.round((refs.saldoPrinc + jurosRef) * 100) / 100;
+            }
+        }
+        const dataRef = box ? parseIsoDate(box.getAttribute('data-ref-juros') || '') : null;
+        let dias = 0;
+        if (dataRef && dataQuit) {
+            dias = diffDias(dataRef, dataQuit);
+        }
+        const juros = jurosPorDias(principal, taxaJuros / 100, dias);
+        return Math.round((principal + juros) * 100) / 100;
+    }
+
+    function vencimentoParcelaNaTabela(numero) {
+        let dt = null;
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const tds = tr.querySelectorAll('td');
+            const n = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            if (n !== numero) return;
+            const vencTxt = (tds[2] && tds[2].textContent || '').trim();
+            const m = vencTxt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+            if (m) {
+                dt = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+            }
+        });
+        return dt;
+    }
+
+    /** Monta tabela Price/SAC recalculada com juros pro-rata por dias (padrão Sicoob). */
+    function montarFluxoSimParcialRecalc(opts) {
+        const novoSaldo = opts.novoSaldo;
+        const nRestante = opts.nRestante;
+        const numInicio = opts.numInicio;
+        const metodo = opts.metodo || 'price';
+        const i = opts.i;
+        const pmt = metodo === 'sac'
+            ? (novoSaldo / nRestante)
+            : pmtExcel(i, nRestante, novoSaldo);
+
+        const box = document.getElementById('quitValoresQuitarBox');
+        const dataRef = box ? parseIsoDate(box.getAttribute('data-ref-juros') || '') : null;
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const dataQuit = parseIsoDate((dataQuitEl && dataQuitEl.value) || '');
+        let dataAnt = dataQuit || dataRef;
+
+        let saldo = novoSaldo;
+        let html = '';
+        let primeiraParcelaSac = null;
+        const amortFixaSac = metodo === 'sac' ? (novoSaldo / nRestante) : 0;
+        const linhasCalc = [];
+        let totalParcelas = 0;
+
+        for (let k = 0; k < nRestante; k++) {
+            const num = numInicio + k;
+            const saldoInicio = saldo;
+            const dataVenc = vencimentoParcelaNaTabela(num);
+            let dias = 30;
+            if (dataAnt && dataVenc) {
+                dias = diffDias(dataAnt, dataVenc);
+            } else if (k === 0 && dataQuit && dataVenc) {
+                dias = diffDias(dataQuit, dataVenc);
+            }
+            if (!(dias > 0)) dias = 30;
+
+            const dataRefCob = dataReferenciaCobranca();
+            const taxaPctLinha = taxaEfetivaAm(dataVenc, dataRefCob);
+            const juros = jurosPorDias(saldoInicio, taxaPctLinha / 100, dias);
+            let amort, parcela, saldoFim;
+            if (metodo === 'sac') {
+                amort = amortFixaSac;
+                if (k === nRestante - 1 || amort > saldoInicio) amort = saldoInicio;
+                parcela = amort + juros;
+                saldoFim = saldoInicio - amort;
+                if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
+            } else {
+                amort = pmt - juros;
+                parcela = pmt;
+                saldoFim = saldoInicio - amort;
+                if (k === nRestante - 1 || amort > saldoInicio) {
+                    amort = saldoInicio;
+                    parcela = amort + juros;
+                    saldoFim = 0;
+                }
+            }
+            if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
+            const parcelaR = Math.round(parcela * 100) / 100;
+            totalParcelas += parcelaR;
+            linhasCalc.push({
+                numero: num,
+                saldo_inicio: Math.round(saldoInicio * 100) / 100,
+                juros: Math.round(juros * 100) / 100,
+                amortizacao: Math.round(amort * 100) / 100,
+                parcela: parcelaR,
+                saldo_fim: Math.round(saldoFim * 100) / 100,
+                taxa_efetiva: taxaPctLinha
+            });
+            html += '<tr>' +
+                '<td>' + num + '</td>' +
+                '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                '<td title="' + fmtBr(taxaPctLinha) + '% a.m.">R$ ' + fmtBr(juros) + '</td>' +
+                '<td>R$ ' + fmtBr(amort) + '</td>' +
+                '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                '</tr>';
+            saldo = saldoFim;
+            if (dataVenc) dataAnt = dataVenc;
+        }
+
+        const novaParcelaNum = metodo === 'sac'
+            ? (primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac)
+            : pmt;
+
+        return {
+            html: html,
+            linhasCalc: linhasCalc,
+            totalParcelas: totalParcelas,
+            novaParcelaNum: novaParcelaNum,
+            pmt: pmt,
+            amortFixaSac: amortFixaSac,
+            primeiraParcelaSac: primeiraParcelaSac
+        };
+    }
+
+    function rotuloTaxaSimParcial(taxaJurosPct, metodo) {
+        metodo = metodo || 'price';
+        if (metodo === 'sac') {
+            const box = document.getElementById('quitSimParcialBox') ||
+                document.getElementById('quitValoresQuitarBox');
+            const pct = box ? (parseBrNumber(box.getAttribute('data-pct-indice') || '100') || 100) : 100;
+            const indice = box ? (box.getAttribute('data-indice') || 'CDI') : 'CDI';
+            return 'Juros: <strong>' + indice + ' × ' + fmtBr(pct) + '%</strong> ' +
+                '(CDI por período entre vencimentos)';
+        }
+        return 'Taxa recálculo: <strong>' + fmtBr(taxaJurosPct) + '%</strong> a.m. (a vencer) · ' +
+            '<strong>' + fmtBr(taxasContratoQuitacao().juros + taxasContratoQuitacao().mora) +
+            '%</strong> a.m. (atrasada)';
+    }
+
+    function dataInicioSimParcialSac() {
+        const dataQuitEl = document.getElementById('data_quitacao_modal');
+        const dataQuit = (dataQuitEl && dataQuitEl.value) || '';
+        if (dataQuit) return dataQuit;
+        const box = document.getElementById('quitValoresQuitarBox');
+        return box ? (box.getAttribute('data-ref-juros') || '') : '';
+    }
+
+    function fluxoFromSacCdiApi(data) {
+        let html = '';
+        const linhasCalc = [];
+        let totalParcelas = 0;
+        let primeiraParcelaSac = null;
+        const amortFixaSac = parseFloat(data.amort_fixa) || 0;
+        (data.linhas || []).forEach(function(L) {
+            const saldoInicio = parseFloat(L.saldo_inicio);
+            const juros = parseFloat(L.juros);
+            const amort = parseFloat(L.amortizacao);
+            const parcela = parseFloat(L.parcela);
+            const saldoFim = parseFloat(L.saldo_fim);
+            if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
+            const parcelaR = Math.round(parcela * 100) / 100;
+            totalParcelas += parcelaR;
+            linhasCalc.push({
+                numero: L.numero,
+                saldo_inicio: Math.round(saldoInicio * 100) / 100,
+                juros: Math.round(juros * 100) / 100,
+                amortizacao: Math.round(amort * 100) / 100,
+                parcela: parcelaR,
+                saldo_fim: Math.round(saldoFim * 100) / 100
+            });
+            html += '<tr>' +
+                '<td>' + L.numero + '</td>' +
+                '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
+                '<td>R$ ' + fmtBr(juros) + '</td>' +
+                '<td>R$ ' + fmtBr(amort) + '</td>' +
+                '<td>R$ ' + fmtBr(parcela) + '</td>' +
+                '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
+                '</tr>';
+        });
+        return {
+            html: html,
+            linhasCalc: linhasCalc,
+            totalParcelas: totalParcelas,
+            novaParcelaNum: primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac,
+            pmt: primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac,
+            amortFixaSac: amortFixaSac,
+            primeiraParcelaSac: primeiraParcelaSac
+        };
+    }
+
+    let simParcialReqSeq = 0;
+
+    function carregarFluxoSimParcialRecalc(opts) {
+        const metodo = opts.metodo || 'price';
+        if (metodo !== 'sac') {
+            return Promise.resolve(montarFluxoSimParcialRecalc(opts));
+        }
+        const box = document.getElementById('quitSimParcialBox');
+        const urlBase = box ? box.getAttribute('data-sac-tabela-url') : '';
+        if (!urlBase) {
+            return Promise.resolve(montarFluxoSimParcialRecalc(opts));
+        }
+        const quitBox = document.getElementById('quitValoresQuitarBox') || box;
+        const pct = quitBox ? (parseBrNumber(quitBox.getAttribute('data-pct-indice') || '100') || 100) : 100;
+        const params = new URLSearchParams({
+            pv: String(opts.novoSaldo),
+            n: String(opts.nRestante),
+            num_inicio: String(opts.numInicio),
+            pct_indice: String(pct),
+            data_inicio: dataInicioSimParcialSac(),
+            recalc_parcial: '1'
+        });
+        return fetch(urlBase + '?' + params.toString(), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function(r) {
+                return r.json().then(function(j) { return { okHttp: r.ok, j: j }; });
+            })
+            .then(function(res) {
+                if (!res.okHttp || !res.j || !res.j.ok) {
+                    const erro = (res.j && res.j.erro) ? res.j.erro : 'Falha ao calcular juros CDI.';
+                    throw new Error(erro);
+                }
+                return fluxoFromSacCdiApi(res.j);
+            });
+    }
+
+    function finalizarSimParcialComFluxo(fluxo, baseSimParcial, metodo, elPmt, elTotalParcelas, tbody, elHint) {
+        if (elPmt) {
+            if (metodo === 'sac') {
+                elPmt.innerHTML = 'Amort. R$ ' + fmtBr(fluxo.amortFixaSac) +
+                    '<div class="small fw-normal text-muted">1ª parc. R$ ' +
+                    fmtBr(fluxo.primeiraParcelaSac != null ? fluxo.primeiraParcelaSac : fluxo.amortFixaSac) +
+                    '</div>';
+            } else {
+                elPmt.textContent = 'R$ ' + fmtBr(fluxo.pmt);
+            }
+        }
+        if (elTotalParcelas) {
+            elTotalParcelas.textContent = 'R$ ' + fmtBr(Math.round(fluxo.totalParcelas * 100) / 100);
+        }
+        const totalParcR = Math.round(fluxo.totalParcelas * 100) / 100;
+        const faceR = Math.round(totalParcelasFaceContrato() * 100) / 100;
+        atualizarSimParcialEconomiaTotal(totalParcR);
+        tbody.innerHTML = fluxo.html;
+        gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
+            nova_parcela: Math.round(fluxo.novaParcelaNum * 100) / 100,
+            amort_constante: metodo === 'sac' ? Math.round(fluxo.amortFixaSac * 100) / 100 : 0,
+            total_parcelas: totalParcR,
+            total_face: faceR,
+            economia_total: (faceR > 0 && totalParcR > 0)
+                ? Math.round((faceR - totalParcR) * 100) / 100
+                : 0,
+            hint: (elHint && elHint.textContent) || '',
+            linhas: fluxo.linhasCalc
+        }));
+    }
+
+    function htmlCarregandoSimParcialSac() {
+        return '<tr><td colspan="6" class="text-center text-muted py-2">' +
+            '<i class="fas fa-spinner fa-spin"></i> Calculando juros CDI…</td></tr>';
+    }
+
+    /** Lista parcelas em aberto não marcadas (nº + amort do extrato), ordenadas. */
+    function coletarNaoMarcadasQuitacao() {
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const chk = tr.querySelector('.chk-quitacao');
+            if (chk && chk.checked) return;
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            const elA = tr.querySelector('.quit-val-amort');
+            const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
+            if (!isFinite(numero)) return;
+            rows.push({
+                numero: numero,
+                amort: isFinite(amort) ? amort : 0
+            });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+        return rows;
+    }
+
+    /** Cadeia saldo início/fim pelo extrato (amortizações), independente da simulação Price. */
+    function calcularSaldosChainExtrato() {
+        const map = {};
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
+            const id = String(tr.getAttribute('data-parcela-id') || '');
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            const elA = tr.querySelector('.quit-val-amort');
+            const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
+            if (!id || !isFinite(numero)) return;
+            rows.push({
+                id: id,
+                numero: numero,
+                tr: tr,
+                amort: isFinite(amort) ? amort : 0
+            });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+        let saldo = saldoInicialChainQuitacao();
+        rows.forEach(function(row) {
+            const saldoInicio = Math.round(saldo * 100) / 100;
+            const extJuros = parseBrNumber(row.tr.getAttribute('data-extrato-juros') || '') || 0;
+            const elJ = row.tr.querySelector('.quit-val-juros');
+            const juros = elJ ? parseFloat(elJ.getAttribute('data-valor')) : extJuros;
+            const jurosLinha = isFinite(juros) && juros > 0 ? juros : extJuros;
+            const saldoFim = avancarSaldoQuitacao(saldoInicio, row.amort, jurosLinha, row.tr);
+            map[row.id] = { saldoInicio: saldoInicio, saldoFim: saldoFim };
+            saldo = saldoFim;
+        });
+        return map;
+    }
+
     function exibirCardsTopo(resumo) {
         const elQ = document.getElementById('quitResumoQtd');
         const elS = document.getElementById('quitResumoSaldo');
@@ -687,8 +1605,56 @@
         if (elT) elT.textContent = 'R$ ' + fmtBr(resumo.somaParcela);
     }
 
+    /** Total parcelas (face) de todas as abertas — card do topo. */
+    function totalParcelasFaceContrato() {
+        if (quitResumoCarregado && quitResumoCarregado.somaParcela > 0) {
+            return quitResumoCarregado.somaParcela;
+        }
+        const elT = document.getElementById('quitResumoTotal');
+        if (elT) {
+            const v = parseBrNumber(String(elT.textContent || '').replace(/^R\$\s*/i, ''));
+            if (isFinite(v) && v > 0) return v;
+        }
+        return somarParcelasQuitacao(false).somaParcela;
+    }
+
+    /** Card economia = total face (topo) − total recálculo (simulação). */
+    function atualizarSimParcialEconomiaTotal(totalSim) {
+        const elEco = document.getElementById('simParcialEconomiaTotal');
+        const elFormula = document.getElementById('simParcialEcoFormula');
+        if (!elEco) return;
+        const face = totalParcelasFaceContrato();
+        const totalRecalc = isFinite(totalSim) ? totalSim : 0;
+        if (!(face > 0) || !(totalRecalc > 0)) {
+            elEco.textContent = '—';
+            elEco.classList.remove('text-danger');
+            elEco.classList.add('text-success');
+            if (elFormula) elFormula.textContent = 'Total acima − total abaixo';
+            return;
+        }
+        const diff = Math.round((face - totalRecalc) * 100) / 100;
+        elEco.textContent = 'R$ ' + fmtBr(diff);
+        elEco.classList.toggle('text-success', diff >= 0);
+        elEco.classList.toggle('text-danger', diff < 0);
+        if (elFormula) {
+            elFormula.textContent = 'R$ ' + fmtBr(face) + ' − R$ ' + fmtBr(totalRecalc);
+        }
+    }
+
+    function syncQuitHeaderCheckbox() {
+        const hdr = document.getElementById('chkQuitTodasHeader');
+        if (!hdr) return;
+        const all = quitChecks();
+        const marcadas = document.querySelectorAll('.chk-quitacao:checked');
+        const total = all.length;
+        const n = marcadas.length;
+        hdr.checked = total > 0 && n === total;
+        hdr.indeterminate = n > 0 && n < total;
+    }
+
     function syncQuit() {
         if (!btnQuitSubmit) return;
+        syncQuitHeaderCheckbox();
         const n = document.querySelectorAll('.chk-quitacao:checked').length;
         btnQuitSubmit.disabled = n === 0;
         btnQuitSubmit.innerHTML = '<i class="fas fa-calculator"></i> Calcular quitação' + (n ? ' (' + n + ')' : '');
@@ -884,17 +1850,23 @@
         const chkOkP = document.querySelectorAll('#tabelaQuitacaoParcelas .chk-quitacao:checked');
         const todasP = allChkP.length > 0 && chkOkP.length === allChkP.length;
         let saldoP = a;
-        // Só usa saldo do extrato quando TODAS as abertas estão marcadas
-        if (todasP && boxTaxa) {
+        let diasP = dias;
+        if (carenciaJurosMensaisAtiva() && dataQuit && todasP) {
+            const refs = refsQuitacaoCarenciaCaixa(dataQuit);
+            if (refs) {
+                saldoP = refs.saldoPrinc;
+                diasP = refs.dias;
+            }
+        } else if (todasP && boxTaxa) {
             const sp = parseBrNumber(boxTaxa.getAttribute('data-saldo-principal') || '');
             if (sp > 0) saldoP = sp;
         }
         const face = original;
-        const jurosP = Math.round(jurosPorDias(saldoP, taxaJurosAmP / 100, dias) * 100) / 100;
+        const jurosP = Math.round(jurosPorDias(saldoP, taxaJurosAmP / 100, diasP) * 100) / 100;
         aplicarQuitacaoParcialUI(
             saldoP, jurosP, face,
-            'principal R$ ' + fmtBr(saldoP) + ' + juros R$ ' + fmtBr(jurosP) +
-                ' (' + dias + ' d · ' + fmtBr(taxaJurosAmP) + '% a.m.)',
+            'saldo R$ ' + fmtBr(saldoP) + ' + juros R$ ' + fmtBr(jurosP) +
+                ' (' + diasP + ' d · ' + fmtBr(taxaJurosAmP) + '% a.m.)',
             qtd + ' parcela' + (qtd === 1 ? '' : 's') +
                 ' marcada' + (qtd === 1 ? '' : 's') + ' · Price',
             qtd
@@ -902,6 +1874,7 @@
     }
 
     function coletarMarcadasQuitacaoDetalhe() {
+        const chain = calcularSaldosChainExtrato();
         const rows = [];
         document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
             const chk = tr.querySelector('.chk-quitacao');
@@ -910,10 +1883,12 @@
             const tds = tr.querySelectorAll('td');
             const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
             const elA = tr.querySelector('.quit-val-amort');
+            const elP = tr.querySelector('.quit-val-parcela');
             const amort = elA ? parseFloat(elA.getAttribute('data-valor')) : NaN;
-            const L = priceLinhasPorId[id] || null;
-            let saldoInicio = L && isFinite(L.saldoInicio) ? L.saldoInicio : NaN;
-            let saldoFim = L && isFinite(L.saldoFim) ? L.saldoFim : NaN;
+            const parcela = elP ? parseFloat(elP.getAttribute('data-valor')) : NaN;
+            const C = chain[id] || null;
+            let saldoInicio = C && isFinite(C.saldoInicio) ? C.saldoInicio : NaN;
+            let saldoFim = C && isFinite(C.saldoFim) ? C.saldoFim : NaN;
             if (!isFinite(saldoInicio)) {
                 const elS = tr.querySelector('.quit-val-saldo');
                 const txt = (elS && elS.textContent || '').trim();
@@ -925,6 +1900,7 @@
                 id: id,
                 numero: numero,
                 amort: isFinite(amort) ? amort : 0,
+                parcela: isFinite(parcela) ? parcela : 0,
                 saldoInicio: saldoInicio,
                 saldoFim: saldoFim
             });
@@ -963,25 +1939,53 @@
     }
 
     function saldoPrincipalContrato() {
-        const boxQuit = document.getElementById('quitValoresQuitarBox');
-        if (boxQuit) {
-            const sp = parseBrNumber(boxQuit.getAttribute('data-saldo-principal') || '');
-            if (sp > 0) return sp;
-        }
-        // Fallback: saldo início da 1ª parcela aberta na tabela
-        const tr = document.querySelector('#tabelaQuitacaoParcelas .quit-parcela-row');
-        if (tr) {
+        return principalQuitacaoContrato();
+    }
+
+    /** Reancora saldo devedor (início) na soma das amortizações abertas do extrato. */
+    function reancorarSaldosAbertas(saldoPrincipal) {
+        if (!(saldoPrincipal > 0)) return;
+        const rows = [];
+        document.querySelectorAll('#tabelaQuitacaoParcelas .quit-parcela-row').forEach(function(tr) {
             const id = String(tr.getAttribute('data-parcela-id') || '');
-            const L = priceLinhasPorId[id] || null;
-            if (L && isFinite(L.saldoInicio) && L.saldoInicio > 0) return L.saldoInicio;
-            const elS = tr.querySelector('.quit-val-saldo');
-            const txt = (elS && elS.textContent || '').trim();
-            if (txt && txt !== '—') {
-                const v = parseBrNumber(txt.replace(/^R\$\s*/i, ''));
-                if (v > 0) return v;
+            const tds = tr.querySelectorAll('td');
+            const numero = parseInt((tds[1] && tds[1].textContent) || '', 10);
+            if (!id || !isFinite(numero)) return;
+            rows.push({ id: id, numero: numero, tr: tr });
+        });
+        rows.sort(function(a, b) { return a.numero - b.numero; });
+        let saldo = saldoInicialChainQuitacao();
+        rows.forEach(function(row) {
+            let L = priceLinhasPorId[row.id];
+            const extAmort = parseBrNumber(row.tr.getAttribute('data-extrato-amort') || '') || 0;
+            const extJuros = parseBrNumber(row.tr.getAttribute('data-extrato-juros') || '') || 0;
+            const amort = (L && Number(L.amort) > 0) ? Number(L.amort) : extAmort;
+            const juros = (L && Number(L.juros) > 0) ? Number(L.juros) : extJuros;
+            if (!L) {
+                L = {
+                    amort: extAmort,
+                    juros: extJuros,
+                    parcela: parseBrNumber(row.tr.getAttribute('data-extrato-parcela') || '') || 0,
+                    saldoInicio: 0,
+                    saldoFim: 0,
+                    dias: 30,
+                    status: 'aberta'
+                };
+                priceLinhasPorId[row.id] = L;
             }
-        }
-        return 0;
+            L.saldoInicio = Math.round(saldo * 100) / 100;
+            L.saldoFim = avancarSaldoQuitacao(L.saldoInicio, amort, juros, row.tr);
+            if (L.saldoFim < 0 && L.saldoFim > -0.01) L.saldoFim = 0;
+            if (L.saldoFim < 0) L.saldoFim = 0;
+            saldo = L.saldoFim;
+        });
+    }
+
+    function aplicarSaldosExtratoTabela() {
+        const saldoPrincipal = saldoPrincipalContrato();
+        if (!(saldoPrincipal > 0)) return;
+        reancorarSaldosAbertas(saldoPrincipal);
+        recalcularJurosTabelaParcelas();
     }
 
     function primeiroNumeroAberto() {
@@ -995,9 +1999,13 @@
     function syncModoSimParcialUI() {
         const modoEl = document.querySelector('input[name="sim_parcial_modo"]:checked');
         const modo = (modoEl && modoEl.value) || 'mesma';
+        const abaterParcela = abaterPorParcelaSimParcial();
         const campos = document.getElementById('simParcialAmortizarCampos');
         const sub = document.getElementById('simParcialSubtitulo');
         const lblConsolida = document.getElementById('simParcialConsolidaLabel');
+        const lblSaldo = document.getElementById('simParcialSaldoLabel');
+        const inpAmort = document.getElementById('simParcialValorAmortizar');
+        const lblValorAmort = document.querySelector('label[for="simParcialValorAmortizar"]');
         if (campos) campos.classList.toggle('d-none', modo !== 'amortizar');
         if (sub) {
             sub.textContent = modo === 'amortizar'
@@ -1006,16 +2014,41 @@
         }
         if (lblConsolida) {
             lblConsolida.textContent = modo === 'amortizar'
-                ? 'Valor amortizado'
+                ? (abaterParcela ? 'Valor abatido (parcela)' : 'Valor amortizado')
                 : 'Marcadas → consolidam em';
+        }
+        if (lblSaldo) {
+            lblSaldo.textContent = abaterParcela
+                ? 'Novo saldo devedor (após abater parcela)'
+                : 'Novo saldo Devedor da Amortização';
+        }
+        if (lblValorAmort) {
+            lblValorAmort.textContent = abaterParcela
+                ? 'Valor abatido — parcela (R$)'
+                : 'Valor que será amortizado (R$)';
         }
         const hintSaldo = document.getElementById('simParcialAmortizarSaldoHint');
         if (hintSaldo && modo === 'amortizar') {
-            const saldo = saldoPrincipalContrato();
-            hintSaldo.textContent = saldo > 0
-                ? ('Saldo atual do contrato: R$ ' + fmtBr(saldo) +
-                    ' · restante = saldo − valor amortizado')
-                : 'Informe o valor a amortizar sobre o saldo do contrato.';
+            const saldoPrinc = saldoPrincipalContrato();
+            const saldoDev = saldoDevedorContrato();
+            const somaParc = somarParcelaMarcadas();
+            if (abaterParcela) {
+                hintSaldo.textContent = saldoDev > 0
+                    ? ('Saldo devedor: R$ ' + fmtBr(saldoDev) +
+                        (somaParc > 0
+                            ? (' · parcelas marcadas: R$ ' + fmtBr(somaParc) +
+                                ' · restante = devedor − valor da parcela')
+                            : ' · restante = devedor − valor abatido (parcela)'))
+                    : 'Marque parcelas ou informe o valor da parcela a abater.';
+            } else {
+                hintSaldo.textContent = saldoPrinc > 0
+                    ? ('Saldo principal: R$ ' + fmtBr(saldoPrinc) +
+                        ' · restante = principal − valor amortizado')
+                    : 'Informe o valor a amortizar sobre o saldo do contrato.';
+            }
+        }
+        if (modo === 'amortizar' && abaterParcela && inpAmort && somarParcelaMarcadas() > 0) {
+            inpAmort.value = fmtBr(somarParcelaMarcadas());
         }
     }
 
@@ -1031,16 +2064,18 @@
         const modo = (modoEl && modoEl.value) || 'mesma';
         const totalContrato = parseInt(box.getAttribute('data-total-contrato') || '0', 10) || 0;
         const qtdAbertas = parseInt(box.getAttribute('data-qtd-abertas') || '0', 10) || 0;
-        const taxaAm = parseBrNumber(box.getAttribute('data-taxa-am') || '0') || 0;
+        const taxaJurosPct = taxaJurosSimParcial();
         const taxaAa = parseBrNumber(box.getAttribute('data-taxa-aa') || '0') || 0;
         const metodo = (box.getAttribute('data-metodo') || 'price');
-        let i = taxaAm / 100;
+        let i = taxaJurosPct / 100;
         if (!(i > 0) && taxaAa > 0) i = (taxaAa / 100) / 12;
+        const rotuloTaxa = rotuloTaxaSimParcial(taxaJurosPct, metodo);
 
         const elConsolida = document.getElementById('simParcialConsolida');
         const elN = document.getElementById('simParcialNRestante');
         const elSaldo = document.getElementById('simParcialSaldo');
         const elPmt = document.getElementById('simParcialNovaParcela');
+        const elTotalParcelas = document.getElementById('simParcialTotalParcelas');
         const elHint = document.getElementById('simParcialHint');
         const elPmtLabel = document.getElementById('simParcialNovaParcelaLabel');
         if (elPmtLabel) {
@@ -1048,43 +2083,56 @@
                 ? 'Amort. constante / 1ª parc. (SAC)'
                 : 'Nova parcela (Price)';
         }
+        const abaterParcela = abaterPorParcelaSimParcial();
 
         // ——— Modo amortizar: valor informado; prazo = qtd abertas ———
         if (modo === 'amortizar') {
             const inpAmort = document.getElementById('simParcialValorAmortizar');
-            const valorAmort = inpAmort ? (parseBrNumber(inpAmort.value) || 0) : 0;
-            const saldoAtual = saldoPrincipalContrato();
-            const novoSaldo = Math.max(0, Math.round((saldoAtual - valorAmort) * 100) / 100);
+            let valorAbate = inpAmort ? (parseBrNumber(inpAmort.value) || 0) : 0;
+            if (abaterParcela && valorAbate <= 0) {
+                valorAbate = somarParcelaMarcadas();
+            }
+            const saldoBase = abaterParcela ? saldoDevedorContrato() : saldoPrincipalContrato();
+            const novoSaldo = Math.max(0, Math.round((saldoBase - valorAbate) * 100) / 100);
             const nRestante = qtdAbertas;
             const numInicio = primeiroNumeroAberto();
 
-            if (!(valorAmort > 0)) {
+            if (!(valorAbate > 0)) {
                 if (elConsolida) elConsolida.textContent = '—';
                 if (elN) elN.textContent = nRestante ? (nRestante + ' em aberto') : '—';
-                if (elSaldo) elSaldo.textContent = saldoAtual > 0 ? ('R$ ' + fmtBr(saldoAtual)) : '—';
+                if (elSaldo) elSaldo.textContent = saldoBase > 0 ? ('R$ ' + fmtBr(saldoBase)) : '—';
                 if (elPmt) elPmt.textContent = '—';
+                if (elTotalParcelas) elTotalParcelas.textContent = '—';
+                atualizarSimParcialEconomiaTotal(0);
                 if (elHint) {
-                    elHint.textContent = 'Informe o valor que será amortizado. ' +
-                        'O restante dilui nas ' + nRestante + ' parcelas em aberto.';
+                    elHint.textContent = abaterParcela
+                        ? 'Marque parcelas ou informe o valor da parcela a abater. ' +
+                            'O restante dilui nas ' + nRestante + ' parcelas em aberto.'
+                        : 'Informe o valor que será amortizado. ' +
+                            'O restante dilui nas ' + nRestante + ' parcelas em aberto.';
                 }
                 tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
                     'Informe o valor a amortizar para simular o novo fluxo.</td></tr>';
                 gravarSimParcialHidden(null);
                 return;
             }
-            if (!(saldoAtual > 0)) {
+            if (!(saldoBase > 0)) {
                 if (elHint) elHint.textContent = 'Saldo do contrato não encontrado no extrato.';
                 gravarSimParcialHidden(null);
                 return;
             }
-            if (valorAmort > saldoAtual + 0.009) {
+            if (valorAbate > saldoBase + 0.009) {
                 if (elHint) {
-                    elHint.innerHTML = '<span class="text-danger">Valor a amortizar (R$ ' +
-                        fmtBr(valorAmort) + ') maior que o saldo (R$ ' + fmtBr(saldoAtual) + ').</span>';
+                    elHint.innerHTML = '<span class="text-danger">Valor a abater (R$ ' +
+                        fmtBr(valorAbate) + ') maior que o ' +
+                        (abaterParcela ? 'saldo devedor' : 'saldo principal') +
+                        ' (R$ ' + fmtBr(saldoBase) + ').</span>';
                 }
-                if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAmort);
+                if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAbate);
                 if (elSaldo) elSaldo.textContent = 'R$ 0,00';
                 if (elPmt) elPmt.textContent = '—';
+                if (elTotalParcelas) elTotalParcelas.textContent = '—';
+                atualizarSimParcialEconomiaTotal(0);
                 tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
                     'Ajuste o valor a amortizar.</td></tr>';
                 gravarSimParcialHidden(null);
@@ -1095,13 +2143,16 @@
                 ? (nRestante + ' parc. (prazo mantido · ' + numInicio + '…' +
                     (numInicio + nRestante - 1) + ')')
                 : '—';
-            const hint = 'Amortização de <strong>R$ ' + fmtBr(valorAmort) + '</strong> sobre saldo ' +
-                'R$ ' + fmtBr(saldoAtual) + '. Restante <strong>R$ ' + fmtBr(novoSaldo) +
-                '</strong> diluído em <strong>' + nRestante + '</strong> parcelas em aberto ' +
-                '(' + numInicio + '…' + (numInicio + Math.max(0, nRestante - 1)) + '), ' +
-                'método ' + (metodo === 'sac' ? 'SAC' : 'Price') + '.';
+            const rotuloAbate = abaterParcela ? 'Valor parcela' : 'Amortização';
+            const rotuloSaldoAntes = abaterParcela ? 'saldo devedor' : 'saldo principal';
+            const hint = rotuloAbate + ' de <strong>R$ ' + fmtBr(valorAbate) + '</strong> sobre ' +
+                rotuloSaldoAntes + ' R$ ' + fmtBr(saldoBase) + '. Restante <strong>R$ ' +
+                fmtBr(novoSaldo) + '</strong> diluído em <strong>' + nRestante +
+                '</strong> parcelas em aberto (' + numInicio + '…' +
+                (numInicio + Math.max(0, nRestante - 1)) + '), método ' +
+                (metodo === 'sac' ? 'SAC' : 'Price') + '. ' + rotuloTaxa + '.';
 
-            if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAmort);
+            if (elConsolida) elConsolida.textContent = 'R$ ' + fmtBr(valorAbate);
             if (elN) elN.textContent = rotuloRem;
             if (elSaldo) elSaldo.textContent = 'R$ ' + fmtBr(novoSaldo);
             if (elHint) elHint.innerHTML = hint;
@@ -1110,9 +2161,14 @@
                 modo: 'amortizar',
                 metodo: metodo,
                 modo_rotulo: 'Amortizar',
-                consolida: 'Amortização R$ ' + fmtBr(valorAmort),
-                valor_amortizado: Math.round(valorAmort * 100) / 100,
-                saldo_antes: Math.round(saldoAtual * 100) / 100,
+                abater_parcela: abaterParcela,
+                base_abatimento: abaterParcela ? 'parcela' : 'amortizacao',
+                consolida: (abaterParcela ? 'Parcela R$ ' : 'Amortização R$ ') + fmtBr(valorAbate),
+                valor_amortizado: Math.round(valorAbate * 100) / 100,
+                valor_abatido: Math.round(valorAbate * 100) / 100,
+                saldo_antes: Math.round(saldoBase * 100) / 100,
+                saldo_devedor_antes: Math.round(saldoDevedorContrato() * 100) / 100,
+                taxa_recalculo_am: Math.round(taxaJurosPct * 10000) / 10000,
                 n_restante: nRestante,
                 n_restante_rotulo: rotuloRem,
                 num_inicio: numInicio,
@@ -1124,6 +2180,8 @@
 
             if (!(nRestante > 0) || !(novoSaldo > 0) || !(i >= 0)) {
                 if (elPmt) elPmt.textContent = novoSaldo <= 0 ? 'R$ 0,00' : '—';
+                if (elTotalParcelas) elTotalParcelas.textContent = '—';
+                atualizarSimParcialEconomiaTotal(0);
                 tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">' +
                     (novoSaldo <= 0
                         ? 'Saldo zerado após a amortização.'
@@ -1138,75 +2196,27 @@
                 return;
             }
 
-            const pmt = metodo === 'sac'
-                ? (novoSaldo / nRestante)
-                : pmtExcel(i, nRestante, novoSaldo);
-
-            let saldo = novoSaldo;
-            let html = '';
-            let primeiraParcelaSac = null;
-            const amortFixaSac = metodo === 'sac' ? (novoSaldo / nRestante) : 0;
-            const linhasCalc = [];
-
-            for (let k = 0; k < nRestante; k++) {
-                const num = numInicio + k;
-                const saldoInicio = saldo;
-                const juros = saldoInicio * i;
-                let amort, parcela, saldoFim;
-                if (metodo === 'sac') {
-                    amort = amortFixaSac;
-                    if (k === nRestante - 1 || amort > saldoInicio) amort = saldoInicio;
-                    parcela = amort + juros;
-                    saldoFim = saldoInicio - amort;
-                    if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
-                } else {
-                    amort = pmt - juros;
-                    parcela = pmt;
-                    saldoFim = saldoInicio - amort;
-                    if (k === nRestante - 1 || amort > saldoInicio) {
-                        amort = saldoInicio;
-                        parcela = amort + juros;
-                        saldoFim = 0;
-                    }
-                }
-                if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
-                linhasCalc.push({
-                    numero: num,
-                    saldo_inicio: Math.round(saldoInicio * 100) / 100,
-                    juros: Math.round(juros * 100) / 100,
-                    amortizacao: Math.round(amort * 100) / 100,
-                    parcela: Math.round(parcela * 100) / 100,
-                    saldo_fim: Math.round(saldoFim * 100) / 100
-                });
-                html += '<tr>' +
-                    '<td>' + num + '</td>' +
-                    '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
-                    '<td>R$ ' + fmtBr(juros) + '</td>' +
-                    '<td>R$ ' + fmtBr(amort) + '</td>' +
-                    '<td>R$ ' + fmtBr(parcela) + '</td>' +
-                    '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
-                    '</tr>';
-                saldo = saldoFim;
-            }
-            const novaParcelaNum = metodo === 'sac'
-                ? (primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac)
-                : pmt;
-            if (elPmt) {
-                if (metodo === 'sac') {
-                    elPmt.innerHTML = 'Amort. R$ ' + fmtBr(amortFixaSac) +
-                        '<div class="small fw-normal text-muted">1ª parc. R$ ' +
-                        fmtBr(primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac) + '</div>';
-                } else {
-                    elPmt.textContent = 'R$ ' + fmtBr(pmt);
-                }
-            }
-            tbody.innerHTML = html;
-            gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
-                nova_parcela: Math.round(novaParcelaNum * 100) / 100,
-                amort_constante: metodo === 'sac' ? Math.round(amortFixaSac * 100) / 100 : 0,
-                hint: (elHint && elHint.textContent) || '',
-                linhas: linhasCalc
-            }));
+            const reqId = ++simParcialReqSeq;
+            if (metodo === 'sac') tbody.innerHTML = htmlCarregandoSimParcialSac();
+            carregarFluxoSimParcialRecalc({
+                novoSaldo: novoSaldo,
+                nRestante: nRestante,
+                numInicio: numInicio,
+                metodo: metodo,
+                i: i
+            }).then(function(fluxo) {
+                if (reqId !== simParcialReqSeq) return;
+                finalizarSimParcialComFluxo(
+                    fluxo, baseSimParcial, metodo, elPmt, elTotalParcelas, tbody, elHint
+                );
+            }).catch(function(err) {
+                if (reqId !== simParcialReqSeq) return;
+                tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center py-2">' +
+                    (err && err.message ? err.message : 'Erro ao calcular juros CDI.') + '</td></tr>';
+                if (elPmt) elPmt.textContent = '—';
+                if (elTotalParcelas) elTotalParcelas.textContent = '—';
+                atualizarSimParcialEconomiaTotal(0);
+            });
             return;
         }
 
@@ -1215,6 +2225,8 @@
             if (elN) elN.textContent = '—';
             if (elSaldo) elSaldo.textContent = '—';
             if (elPmt) elPmt.textContent = '—';
+            if (elTotalParcelas) elTotalParcelas.textContent = '—';
+            atualizarSimParcialEconomiaTotal(0);
             if (elHint) elHint.textContent = 'Marque as parcelas que serão quitadas parcialmente.';
             tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">Marque parcelas para simular o novo fluxo.</td></tr>';
             gravarSimParcialHidden(null);
@@ -1224,39 +2236,53 @@
         const primeira = marcadas[0];
         const ultima = marcadas[marcadas.length - 1];
         const qtdSel = marcadas.length;
-
-        // Novo saldo = saldo final da última marcada (Price); fallback: saldo início − soma amort
-        let novoSaldo = ultima.saldoFim;
-        if (!isFinite(novoSaldo)) {
-            const si = isFinite(primeira.saldoInicio) ? primeira.saldoInicio : 0;
-            const somaAmort = marcadas.reduce(function(s, r) { return s + (r.amort || 0); }, 0);
-            novoSaldo = Math.max(0, si - somaAmort);
-        }
+        let novoSaldo = calcularNovoSaldoSimParcial(marcadas, abaterParcela);
         if (novoSaldo < 0 && novoSaldo > -0.01) novoSaldo = 0;
 
         let nRestante = 0;
         let numInicio = primeira.numero + 1;
         let hint = '';
+        const rotuloBaseSaldo = abaterParcela ? 'saldo devedor − parcelas marcadas' : 'amortização remanescente';
+        const saldoDevAntes = abaterParcela ? saldoDevedorContrato() : 0;
 
         if (modo === 'mesma') {
-            nRestante = Math.max(0, totalContrato - primeira.numero);
-            numInicio = primeira.numero + 1;
+            nRestante = Math.max(0, qtdAbertas);
+            numInicio = primeiroNumeroAberto();
+            const numFim = nRestante ? (numInicio + nRestante - 1) : numInicio;
             hint = 'Marcadas ' + marcadas.map(function(r) { return r.numero; }).join(', ') +
                 ' consolidam na parcela <strong>' + primeira.numero + '</strong>. ' +
-                'Sequência mantida: <strong>' + numInicio + '…' + totalContrato + '</strong> (' + nRestante +
-                ' parcelas). Recálculo ' + (metodo === 'sac' ? 'SAC' : 'Price') + ' com o novo saldo.';
+                (abaterParcela
+                    ? ('Saldo devedor antes: <strong>R$ ' + fmtBr(saldoDevAntes) +
+                        '</strong> · após abatimento: <strong>R$ ' + fmtBr(novoSaldo) + '</strong>. ')
+                    : ('Saldo por <strong>' + rotuloBaseSaldo + '</strong>: <strong>R$ ' +
+                        fmtBr(novoSaldo) + '</strong>. ')) +
+                'Recálculo ' + (metodo === 'sac' ? 'SAC' : 'Price') + ' em <strong>' +
+                nRestante + '</strong> parcelas (mesma qtd. em aberto: <strong>' + numInicio +
+                '…' + numFim + '</strong>). ' + rotuloTaxa + '.';
         } else {
             nRestante = Math.max(0, qtdAbertas - qtdSel);
-            numInicio = primeira.numero;
+            numInicio = primeiroNumeroAberto();
+            const numFimDim = nRestante ? (numInicio + nRestante - 1) : numInicio;
+            const ultimaAberta = numInicio + qtdAbertas - 1;
             hint = 'Marcadas ' + marcadas.map(function(r) { return r.numero; }).join(', ') +
-                ' (' + qtdSel + ') abatidas do prazo. Restam <strong>' + nRestante +
-                '</strong> parcelas a partir do nº <strong>' + numInicio + '</strong>, com novo saldo.';
+                ' (' + qtdSel + ') quitadas · caem as últimas <strong>' + qtdSel +
+                '</strong> parcelas (<strong>' + (numFimDim + 1) + '…' + ultimaAberta +
+                '</strong>). Restam <strong>' + nRestante + '</strong> parcelas (<strong>' +
+                numInicio + '…' + numFimDim + '</strong>). ' +
+                (abaterParcela
+                    ? ('Saldo devedor antes: <strong>R$ ' + fmtBr(saldoDevAntes) +
+                        '</strong> · após abatimento: <strong>R$ ' + fmtBr(novoSaldo) + '</strong>. ')
+                    : ('Saldo por <strong>' + rotuloBaseSaldo + '</strong>: <strong>R$ ' +
+                        fmtBr(novoSaldo) + '</strong>. ')) +
+                'Recálculo ' + (metodo === 'sac' ? 'SAC' : 'Price') + '. ' + rotuloTaxa + '.';
         }
 
         const numsMarcadas = marcadas.map(function(r) { return r.numero; });
         const rotuloRem = nRestante
-            ? (qtdSel + ' sel. · restam ' + nRestante +
-                ' (' + numInicio + '…' + (numInicio + nRestante - 1) + ')')
+            ? (modo === 'mesma'
+                ? (nRestante + ' parc. em aberto (' + numInicio + '…' + (numInicio + nRestante - 1) + ')')
+                : (qtdSel + ' sel. · ' + nRestante + ' parc. (' + numInicio + '…' +
+                    (numInicio + nRestante - 1) + ')'))
             : (qtdSel + ' selecionada' + (qtdSel === 1 ? '' : 's'));
         if (elN) {
             elN.textContent = rotuloRem;
@@ -1267,6 +2293,8 @@
             modo_rotulo: modo === 'diminui'
                 ? 'Diminuir a quantidade de parcelas'
                 : 'Mesma quantidade de parcelas',
+            abater_parcela: abaterParcela,
+            base_abatimento: abaterParcela ? 'parcela' : 'amortizacao',
             consolida: 'Parcela ' + primeira.numero + ' (' + qtdSel + ' → 1)',
             n_restante: nRestante,
             n_restante_rotulo: rotuloRem,
@@ -1275,6 +2303,8 @@
             qtd_marcadas: qtdSel,
             parcelas_marcadas: numsMarcadas,
             novo_saldo: Math.round(novoSaldo * 100) / 100,
+            saldo_devedor_antes: abaterParcela ? Math.round(saldoDevAntes * 100) / 100 : 0,
+            taxa_recalculo_am: Math.round(taxaJurosPct * 10000) / 10000,
         };
         if (elConsolida) {
             elConsolida.textContent = baseSimParcial.consolida;
@@ -1284,6 +2314,8 @@
 
         if (!(nRestante > 0) || !(novoSaldo > 0) || !(i >= 0)) {
             if (elPmt) elPmt.textContent = '—';
+            if (elTotalParcelas) elTotalParcelas.textContent = '—';
+            atualizarSimParcialEconomiaTotal(0);
             tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-2">Sem parcelas remanescentes ou saldo zerado.</td></tr>';
             gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
                 nova_parcela: 0,
@@ -1294,76 +2326,27 @@
             return;
         }
 
-        const pmt = metodo === 'sac'
-            ? (novoSaldo / nRestante)
-            : pmtExcel(i, nRestante, novoSaldo);
-
-        let saldo = novoSaldo;
-        let html = '';
-        let primeiraParcelaSac = null;
-        const amortFixaSac = metodo === 'sac' ? (novoSaldo / nRestante) : 0;
-        const linhasCalc = [];
-
-        for (let k = 0; k < nRestante; k++) {
-            const num = numInicio + k;
-            const saldoInicio = saldo;
-            const juros = saldoInicio * i;
-            let amort, parcela, saldoFim;
-            if (metodo === 'sac') {
-                amort = amortFixaSac;
-                if (k === nRestante - 1 || amort > saldoInicio) amort = saldoInicio;
-                parcela = amort + juros;
-                saldoFim = saldoInicio - amort;
-                if (primeiraParcelaSac == null) primeiraParcelaSac = parcela;
-            } else {
-                amort = pmt - juros;
-                parcela = pmt;
-                saldoFim = saldoInicio - amort;
-                if (k === nRestante - 1 || amort > saldoInicio) {
-                    amort = saldoInicio;
-                    parcela = amort + juros;
-                    saldoFim = 0;
-                }
-            }
-            if (saldoFim < 0 && saldoFim > -0.01) saldoFim = 0;
-            linhasCalc.push({
-                numero: num,
-                saldo_inicio: Math.round(saldoInicio * 100) / 100,
-                juros: Math.round(juros * 100) / 100,
-                amortizacao: Math.round(amort * 100) / 100,
-                parcela: Math.round(parcela * 100) / 100,
-                saldo_fim: Math.round(saldoFim * 100) / 100
-            });
-            html += '<tr>' +
-                '<td>' + num + '</td>' +
-                '<td>R$ ' + fmtBr(saldoInicio) + '</td>' +
-                '<td>R$ ' + fmtBr(juros) + '</td>' +
-                '<td>R$ ' + fmtBr(amort) + '</td>' +
-                '<td>R$ ' + fmtBr(parcela) + '</td>' +
-                '<td>R$ ' + fmtBr(saldoFim) + '</td>' +
-                '</tr>';
-            saldo = saldoFim;
-        }
-        const novaParcelaNum = metodo === 'sac'
-            ? (primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac)
-            : pmt;
-        if (elPmt) {
-            if (metodo === 'sac') {
-                elPmt.innerHTML = 'Amort. R$ ' + fmtBr(amortFixaSac) +
-                    '<div class="small fw-normal text-muted">1ª parc. R$ ' +
-                    fmtBr(primeiraParcelaSac != null ? primeiraParcelaSac : amortFixaSac) + '</div>';
-            } else {
-                elPmt.textContent = 'R$ ' + fmtBr(pmt);
-            }
-        }
-        tbody.innerHTML = html;
-
-        gravarSimParcialHidden(Object.assign({}, baseSimParcial, {
-            nova_parcela: Math.round(novaParcelaNum * 100) / 100,
-            amort_constante: metodo === 'sac' ? Math.round(amortFixaSac * 100) / 100 : 0,
-            hint: (elHint && elHint.textContent) || '',
-            linhas: linhasCalc
-        }));
+        const reqId = ++simParcialReqSeq;
+        if (metodo === 'sac') tbody.innerHTML = htmlCarregandoSimParcialSac();
+        carregarFluxoSimParcialRecalc({
+            novoSaldo: novoSaldo,
+            nRestante: nRestante,
+            numInicio: numInicio,
+            metodo: metodo,
+            i: i
+        }).then(function(fluxo) {
+            if (reqId !== simParcialReqSeq) return;
+            finalizarSimParcialComFluxo(
+                fluxo, baseSimParcial, metodo, elPmt, elTotalParcelas, tbody, elHint
+            );
+        }).catch(function(err) {
+            if (reqId !== simParcialReqSeq) return;
+            tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center py-2">' +
+                (err && err.message ? err.message : 'Erro ao calcular juros CDI.') + '</td></tr>';
+            if (elPmt) elPmt.textContent = '—';
+            if (elTotalParcelas) elTotalParcelas.textContent = '—';
+            atualizarSimParcialEconomiaTotal(0);
+        });
     }
 
     let quitPreviewTimer = null;
@@ -1421,7 +2404,7 @@
         let pctIndice = 192;
         let previewUrl = '';
         if (box) {
-            taxaAm = parseBrNumber(box.getAttribute('data-taxa-am') || '0') || 0;
+            taxaAm = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
             dataRef = parseIsoDate(box.getAttribute('data-ref-juros') || '');
             pctIndice = parseBrNumber(box.getAttribute('data-pct-indice') || '192') || 192;
             previewUrl = box.getAttribute('data-preview-url') || '';
@@ -1434,11 +2417,8 @@
             dias = Math.max(0, diffDias(dataRef, dataQuit));
         }
 
-        // Principal do contrato: extrato (Price) ou soma de todas as amortizações abertas
-        let saldoPrinc = NaN;
-        if (box) {
-            saldoPrinc = parseBrNumber(box.getAttribute('data-saldo-principal') || '');
-        }
+        // Principal do contrato — na carência parcial = valor do contrato (350k), não saldo futuro
+        let saldoPrinc = principalQuitacaoContrato();
         if (!(saldoPrinc > 0)) {
             saldoPrinc = (isFinite(base.somaAmort) && base.somaAmort > 0) ? base.somaAmort : 0;
         }
@@ -1446,8 +2426,18 @@
         const qtdContrato = base.qtd;
         const a = saldoPrinc;
         const totalParcelasSel = face;
+        const carencia = dadosCarenciaQuitacao(box);
+        const taxaFixaSac = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
+        const isSac = carencia.isSac || metodo === 'sac';
 
-        if (metodo === 'sac') {
+        if (isSac && taxaFixaSac > 0 && box && dataQuit) {
+            if (quitPreviewTimer) clearTimeout(quitPreviewTimer);
+            if (aplicarCarenciaQuitacaoTaxaFixa(box, dataQuit, qtdContrato, totalParcelasSel)) {
+                return;
+            }
+        }
+
+        if (isSac && !(taxaFixaSac > 0 && carencia.dataOp && carencia.vencP0)) {
             const selicEl = document.getElementById('selic_periodo_pct_modal');
             const selicManual = selicEl ? parseBrNumber(selicEl.value || '') : NaN;
             if (isFinite(selicManual) && selicManual > 0 && a > 0) {
@@ -1504,7 +2494,9 @@
                                 });
                                 return;
                             }
+                            const principalResp = parseFloat(j.principal || j.saldo) || a;
                             const juros = parseFloat(j.juros) || 0;
+                            const totalQuit = parseFloat(j.total) || (principalResp + juros);
                             const taxaAmJ = parseFloat(j.taxa_juros_am) || taxaJurosAm;
                             let hint = (j.indice || 'CDI') + ' × ' +
                                 fmtBr(parseFloat(j.pct_indice) || pctIndice) + '% · ' +
@@ -1516,15 +2508,20 @@
                             hint += ' · ' +
                                 isoRef.split('-').reverse().join('/') + ' → ' +
                                 isoQuit.split('-').reverse().join('/') +
-                                ' s/ amort. R$ ' + fmtBr(a) +
-                                ' = total R$ ' + fmtBr(a + juros);
-                            aplicarValoresQuitar(a, juros, totalParcelasSel, hint, qtdContrato);
+                                ' s/ principal R$ ' + fmtBr(principalResp) +
+                                ' = total R$ ' + fmtBr(totalQuit);
+                            aplicarValoresQuitar(
+                                principalResp, juros, totalParcelasSel, hint, qtdContrato,
+                                { c: totalQuit },
+                            );
                             exibirCardsTopo({
                                 qtd: qtdContrato,
-                                somaAmort: a,
+                                somaAmort: principalResp,
                                 somaParcela: face,
                                 somaJuros: juros
                             });
+                            reancorarSaldosAbertas(principalResp);
+                            atualizarSaldosVisiveisTabela();
                         })
                         .catch(function() {
                             aplicarValoresQuitar(
@@ -1550,22 +2547,42 @@
             return;
         }
 
-        // Tabela Price: total do contrato = principal (extrato) + juros até a data
+        // Tabela Price: saldo na data + juros pro-rata desde último evento
         const taxaJurosEl = document.getElementById('quitTaxaJuros');
         let taxaJurosAm = taxaJurosEl ? (parseBrNumber(taxaJurosEl.value) || 0) : 0;
         if (!(taxaJurosAm > 0) && box) {
             taxaJurosAm = parseBrNumber(box.getAttribute('data-taxa-juros-am') || '0') || 0;
         }
 
+        let dataRefJuros = dataRef;
+        let refsCarencia = null;
+        if (carenciaJurosMensaisAtiva() && dataQuit) {
+            refsCarencia = refsQuitacaoCarenciaCaixa(dataQuit);
+            if (refsCarencia) {
+                saldoPrinc = refsCarencia.saldoPrinc;
+                dataRefJuros = refsCarencia.dataRef || dataRef;
+                dias = refsCarencia.dias;
+            }
+        } else if (dataRef && dataQuit) {
+            dias = Math.max(0, diffDias(dataRef, dataQuit));
+        }
+
         const juros = Math.round(jurosPorDias(saldoPrinc, taxaJurosAm / 100, dias) * 100) / 100;
         const quit = Math.round((saldoPrinc + juros) * 100) / 100;
-        const isoRef = (box && box.getAttribute('data-ref-juros')) || '';
+        const isoRefJuros = dataRefJuros
+            ? (dataRefJuros.getFullYear() + '-' +
+                String(dataRefJuros.getMonth() + 1).padStart(2, '0') + '-' +
+                String(dataRefJuros.getDate()).padStart(2, '0'))
+            : ((box && box.getAttribute('data-ref-juros')) || '');
         let hint = dias + ' dia(s) · juros ' + fmtBr(taxaJurosAm) + '% a.m.';
-        if (isoRef && isoQuit) {
-            hint += ' · ' + isoRef.split('-').reverse().join('/') +
+        if (isoRefJuros && isoQuit) {
+            hint += ' · ' + formatIsoBr(isoRefJuros) +
                 ' → ' + isoQuit.split('-').reverse().join('/');
         }
-        hint += ' · s/ principal R$ ' + fmtBr(saldoPrinc) +
+        if (refsCarencia && refsCarencia.mesesIncorp > 0) {
+            hint += ' · ' + refsCarencia.mesesIncorp + ' mês(es) carência incorporado(s)';
+        }
+        hint += ' · s/ saldo R$ ' + fmtBr(saldoPrinc) +
             ' · ' + qtdContrato + ' parcela' + (qtdContrato === 1 ? '' : 's') + ' abertas';
 
         aplicarValoresQuitar(saldoPrinc, juros, face, hint, qtdContrato, { c: quit });
@@ -1579,7 +2596,9 @@
         const hintSaldo = document.getElementById('quitResumoSaldoHint');
         const hintJuros = document.getElementById('quitResumoJurosHint');
         if (hintSaldo) {
-            hintSaldo.textContent = 'Total do contrato — fixo ao desmarcar';
+            hintSaldo.textContent = refsCarencia && refsCarencia.mesesIncorp > 0
+                ? ('Saldo c/ carência (' + refsCarencia.mesesIncorp + ' mês) — fixo ao desmarcar')
+                : 'Total do contrato — fixo ao desmarcar';
         }
         if (hintJuros) {
             hintJuros.textContent = 'Juros do contrato até ' +
@@ -1597,6 +2616,7 @@
             saldoDevedor: saldoPrinc,
             valor_quitacao: quit
         };
+        recalcularJurosTabelaParcelas();
     }
 
     // alias usado em pontos antigos
@@ -1612,6 +2632,14 @@
         quitChecks().forEach(c => { c.checked = false; });
         syncQuit();
     });
+    const chkQuitHeader = document.getElementById('chkQuitTodasHeader');
+    if (chkQuitHeader) {
+        chkQuitHeader.addEventListener('change', function() {
+            const marcar = chkQuitHeader.checked;
+            quitChecks().forEach(function(c) { c.checked = marcar; });
+            syncQuit();
+        });
+    }
     // Snapshot inicial do contrato (todas as abertas — não muda ao desmarcar)
     if (!quitResumoCarregado) {
         quitResumoCarregado = somarParcelasQuitacao(false);
@@ -1625,6 +2653,13 @@
             atualizarSimulacaoParcial();
         });
     });
+    const chkAbaterParcela = document.getElementById('simParcialAbaterParcela');
+    if (chkAbaterParcela) {
+        chkAbaterParcela.addEventListener('change', function() {
+            syncModoSimParcialUI();
+            atualizarSimulacaoParcial();
+        });
+    }
     const inpValorAmort = document.getElementById('simParcialValorAmortizar');
     if (inpValorAmort) {
         inpValorAmort.addEventListener('input', atualizarSimulacaoParcial);
@@ -1644,15 +2679,19 @@
     function syncTaxaCalculoQuitacao() {
         const jEl = document.getElementById('quitTaxaJuros');
         const mEl = document.getElementById('quitTaxaMora');
-        const label = document.getElementById('quitTaxaSomaLabel');
         if (!jEl || !mEl) return;
         const j = parseBrNumber(jEl.value) || 0;
         const m = parseBrNumber(mEl.value) || 0;
-        const soma = Math.round((j + m) * 10000) / 10000;
-        if (label) label.textContent = String(soma).replace('.', ',');
         document.querySelectorAll('[data-taxa-am]').forEach(function(box) {
-            box.setAttribute('data-taxa-am', String(soma));
+            box.setAttribute('data-taxa-am', String(j));
         });
+        document.querySelectorAll('[data-taxa-juros-am]').forEach(function(box) {
+            box.setAttribute('data-taxa-juros-am', String(j));
+        });
+        document.querySelectorAll('[data-taxa-mora-am]').forEach(function(box) {
+            box.setAttribute('data-taxa-mora-am', String(m));
+        });
+        recalcularJurosTabelaParcelas();
     }
 
     ['quitTaxaJuros', 'quitTaxaMora'].forEach(function(id) {
@@ -1662,11 +2701,13 @@
             syncTaxaCalculoQuitacao();
             atualizarValoresQuitarPorData();
             atualizarQuitacaoParcialValor();
+            atualizarSimulacaoParcial();
         });
         el.addEventListener('change', function() {
             syncTaxaCalculoQuitacao();
             atualizarValoresQuitarPorData();
             atualizarQuitacaoParcialValor();
+            atualizarSimulacaoParcial();
         });
     });
 
@@ -1675,10 +2716,12 @@
         dataQuitModal.addEventListener('change', function() {
             atualizarValoresQuitarPorData();
             atualizarQuitacaoParcialValor();
+            atualizarSimulacaoParcial();
         });
         dataQuitModal.addEventListener('input', function() {
             atualizarValoresQuitarPorData();
             atualizarQuitacaoParcialValor();
+            atualizarSimulacaoParcial();
         });
     }
     const selicModal = document.getElementById('selic_periodo_pct_modal');
@@ -1863,7 +2906,7 @@
         const selecionadas = new Set((dados.selecionadas || []).map(String));
         Object.keys(linhas).forEach(function(id) {
             const L = linhas[id] || {};
-            priceLinhasPorId[String(id)] = {
+                priceLinhasPorId[String(id)] = {
                 n: L.n,
                 amort: Number(L.amort) || 0,
                 juros: Number(L.juros) || 0,
@@ -1874,6 +2917,7 @@
                 status: L.status || ''
             };
         });
+        reancorarSaldosAbertas(saldoPrincipalContrato());
         const box = document.getElementById('quitOrigemPriceBox');
         if (box) box.classList.remove('d-none');
         document.querySelectorAll('.chk-quitacao').forEach(function(c) {
@@ -1898,7 +2942,10 @@
                 !(Number(L.juros) > 0.009)
             );
             const temExtrato = extParcela > 0.009 || extAmort > 0.009 || extJuros > 0.009;
-            if (simZerada && temExtrato) {
+            // Price da sessão pode trazer PMT da carência (ex.: 5.800) com amort=0 em todas as linhas
+            const simIncompativel = !simZerada && extAmort > 0.009 && Number(L.amort) <= 0.009 &&
+                extParcela > Number(L.parcela) + 0.01;
+            if ((simZerada || simIncompativel) && temExtrato) {
                 L = {
                     n: L && L.n,
                     amort: extAmort,
@@ -1929,7 +2976,13 @@
                 }
                 if (elA) {
                     elA.setAttribute('data-valor', String(L.amort));
-                    elA.textContent = 'R$ ' + fmtBr(L.amort);
+                    if (isParcelaCarenciaEncargos(tr)) {
+                        elA.textContent = '—';
+                        elA.title = 'Carência — encargos mensais (sem amortização do principal)';
+                    } else {
+                        elA.textContent = 'R$ ' + fmtBr(L.amort);
+                        elA.title = '';
+                    }
                 }
                 if (elJ) {
                     elJ.setAttribute('data-valor', String(L.juros));
@@ -1967,7 +3020,18 @@
         }
         if (dados && (dados.origem === 'price' || dados.origem === 'sac' || dados.linhas)) {
             if (hidden) hidden.value = JSON.stringify(dados);
-            aplicarDadosPriceJson(dados);
+            if (carenciaJurosMensaisAtiva()) {
+                // Caixa PEAC: extrato + recalc (Price da sessão não incorpora carência)
+                const selecionadas = new Set((dados.selecionadas || []).map(String));
+                document.querySelectorAll('.chk-quitacao').forEach(function(c) {
+                    if (selecionadas.size) c.checked = selecionadas.has(String(c.value));
+                });
+                aplicarSaldosExtratoTabela();
+            } else {
+                aplicarDadosPriceJson(dados);
+            }
+        } else {
+            aplicarSaldosExtratoTabela();
         }
     })();
 

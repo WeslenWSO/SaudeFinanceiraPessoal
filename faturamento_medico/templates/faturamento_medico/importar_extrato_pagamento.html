@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Extrato de Pagamento{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+                    <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}" class="btn btn-outline-secondary btn-sm">
+                        Ver extrato importado
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Importe o PDF <strong>Demonstrativo de Pagamento TISS</strong> exportado do portal
+                        Bradesco Saúde (<em>PCBS-DemonstrativosTiss</em>).
+                        PDFs em imagem são lidos via OCR (pode levar alguns segundos).
+                        <strong>Recebido, data de recebimento e banco</strong> não são importados — use o botão
+                        <strong>Baixar</strong> na listagem para conciliar com o extrato bancário.
+                        Informe a <strong>competência uma vez</strong> — ela será aplicada a todos os
+                        <strong>protocolos</strong> encontrados no demonstrativo.
+                    </div>
+
+                    {% if not preview %}
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="preview">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="competencia" class="form-label">Competência (MM/AAAA) *</label>
+                                <input type="text" class="form-control" id="competencia" name="competencia"
+                                       placeholder="01/2026" value="{{ competencia_padrao }}" pattern="\d{2}/\d{4}" required>
+                                <small class="text-muted">Uma competência para todos os protocolos do PDF.</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="arquivo" class="form-label">PDF do demonstrativo</label>
+                                <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".pdf" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Visualizar prévia
+                        </button>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary">Cancelar</a>
+                    </form>
+                    {% else %}
+                    <div class="mb-3">
+                        <strong>Arquivo:</strong> {{ preview.nome_arquivo }}<br>
+                        <strong>Demonstrativo:</strong> {{ preview.cabecalho.numero_demonstrativo|default:"—" }} —
+                        {{ preview.cabecalho.nome_prestador|default:"" }}<br>
+                        <strong>Competência:</strong> {{ preview.competencia|default:"—" }}
+                        — <strong>{{ preview.qtd_protocolos }}</strong> protocolo(s) no PDF
+                    </div>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-bordered table-striped">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Competência</th>
+                                    <th>Convênio</th>
+                                    <th>Data Lote</th>
+                                    <th>Lote</th>
+                                    <th>Protocolo</th>
+                                    <th>Qt Guia</th>
+                                    <th class="text-end">Valor</th>
+                                    <th class="text-end">Glosado</th>
+                                    <th class="text-end">Liberado</th>
+                                    <th class="text-end">Retenções</th>
+                                    <th class="text-end">Líquido</th>
+                                    <th colspan="3" class="text-center text-muted small">
+                                        Conciliação bancária (baixa manual)
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th colspan="14"></th>
+                                    <th>Recebido</th>
+                                    <th>Data Receb.</th>
+                                    <th>Banco</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in preview.linhas %}
+                                <tr>
+                                    <td>{{ linha.competencia|default:"—" }}</td>
+                                    <td>{{ linha.convenio }}</td>
+                                    <td>{{ linha.data_lote|date:"d/m/Y" }}</td>
+                                    <td>{{ linha.lote }}</td>
+                                    <td>{{ linha.protocolo }}</td>
+                                    <td>{{ linha.qt_guias|default:"—" }}</td>
+                                    <td class="text-end">{{ linha.valor|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.valor_glosado|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.valor_liberado|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.retencoes|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.liquido|floatformat:2 }}</td>
+                                    <td colspan="3" class="text-center text-muted"><em>Não importado — baixa manual</em></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="confirmar">
+                        <input type="hidden" name="competencia" value="{{ preview.competencia }}">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check"></i> Confirmar importação ({{ preview.qtd_protocolos }} protocolo(s))
+                        </button>
+                    </form>
+                    <a href="{% url 'faturamento_medico:importar_extrato_pagamento_bradesco' %}" class="btn btn-outline-secondary">
+                        Voltar
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

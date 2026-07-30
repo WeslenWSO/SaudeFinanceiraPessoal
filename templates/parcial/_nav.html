@@ -31,6 +31,7 @@
           <li role="none"><a href="{% url 'regrarateio:regraList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-share-nodes smart-nav-icon"></i> Regra do Rateio</a></li>
           <li role="none"><a href="{% url 'usuario:usuarioList' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-user-cog smart-nav-icon"></i> Usuário</a></li>
           <li role="none"><a href="{% url 'faturamento_medico:ftlistar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-medical smart-nav-icon"></i> Faturamento Médico</a></li>
+          <li role="none"><a href="{% url 'agendador_tarefas:listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-tasks smart-nav-icon"></i> Agendador de Tarefas</a></li>
           <li role="none"><a href="{% url 'servicos_medicos:convenio_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-hand-holding-medical smart-nav-icon"></i> Convênios</a></li>
           <li role="none"><a href="{% url 'servicos_medicos:cabecalho_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-heading smart-nav-icon"></i> Cabeçalhos</a></li>
           <li role="none"><a href="{% url 'servicos_medicos:servicos_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-stethoscope smart-nav-icon"></i> Serviços Médicos</a></li>
@@ -45,6 +46,7 @@
           <li role="none"><a href="{% url 'notasfiscais:apuracao_impostos' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-calculator smart-nav-icon"></i> Apuração NFSe</a></li>
           <li role="none"><a href="{% url 'notasfiscais:apuracao_simples' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-scale-balanced smart-nav-icon"></i> Apuração Simples</a></li>
           <li role="none"><a href="{% url 'notasfiscais:import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-import smart-nav-icon"></i> Importar XML</a></li>
+          <li role="none"><a href="{% url 'notasfiscais:import_evento_cancelamento' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-ban smart-nav-icon"></i> Importar cancelamentos (Eventos)</a></li>
           <li role="none"><a href="{% url 'notasfiscais:portal_nacional_import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-cloud-download-alt smart-nav-icon"></i> Portal Nacional (SEFIN / DPS)</a></li>
           <li role="none"><a href="{% url 'notasfiscais:portal_extensao_import' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-puzzle-piece smart-nav-icon"></i> Portal (extensão)</a></li>
           <li role="none"><a href="{% url 'notafiscalentrada:listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-file-lines smart-nav-icon"></i> NF Comércio e Tomador</a></li>
@@ -61,6 +63,8 @@
           <li role="none"><a href="{% url 'extrato:lancamento_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-list-ul smart-nav-icon"></i> Lançamentos Importados</a></li>
           <li role="none"><a href="{% url 'extrato:extrato_movimento_list' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-exchange-alt smart-nav-icon"></i> Movimentos / Conciliação</a></li>
           <li role="none"><a href="{% url 'relatoriorecebiveis:relReclist' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-terminal smart-nav-icon"></i> Recebíveis Maquininha</a></li>
+          <li role="none"><a href="{% url 'opcartao:cartao_listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-id-card smart-nav-icon"></i> Cartões de Crédito</a></li>
+          <li role="none"><a href="{% url 'opcartao:fatura_listar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-credit-card smart-nav-icon"></i> Faturas de cartão de Crédito</a></li>
         </ul>
       </li>
       <li class="smart-nav-item smart-nav-has-dropdown">

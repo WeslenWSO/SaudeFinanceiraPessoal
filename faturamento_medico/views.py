@@ -16,7 +16,10 @@ import json
 from collections import defaultdict
 from datetime import datetime, date, timedelta
 from urllib.parse import urlencode
-from .models import FaturamentoMedico, DocumentoAnexado, ItemServico, ServicoDisponivel, Lote
+from .models import (
+    FaturamentoMedico, DocumentoAnexado, ItemServico, ServicoDisponivel, Lote,
+    ExtratoPagamentoConvenio,
+)
 from servicos_medicos.models import Convenio
 from empresa.models import Empresa
 from .forms import FaturamentoMedicoForm, DocumentoAnexadoForm, ItemServicoForm, ItemServicoFormSet, ServicoDisponivelForm
@@ -48,6 +51,127 @@ def _q_status_agendamento_cancelados():
     for status in STATUS_AGENDAMENTO_CANCELADOS:
         q |= Q(status_agendamento__iexact=status)
     return q
+
+
+def _filtros_listagem_faturamento(request, use_session_fallback=False):
+    """Lê filtros da listagem (GET, com defaults de data iguais à tela)."""
+    g = request.GET
+    sess = request.session.get('faturamento_filters') or {} if use_session_fallback else {}
+
+    def pick(key, default=''):
+        v = g.get(key)
+        if v is not None and str(v).strip():
+            return str(v).strip()
+        if use_session_fallback:
+            sv = sess.get(key)
+            if sv is not None and str(sv).strip():
+                return str(sv).strip()
+        return default
+
+    convenios = [c.strip() for c in g.getlist('convenio') if c and str(c).strip()]
+    if not convenios and use_session_fallback:
+        convenios = [c for c in (sess.get('convenio') or []) if c and str(c).strip()]
+
+    hoje = date.today()
+    data_inicio = pick('data_inicio')
+    data_fim = pick('data_fim')
+    if not data_inicio:
+        data_inicio = hoje.replace(day=1).strftime('%Y-%m-%d')
+    if not data_fim:
+        proximo_mes = hoje.replace(day=28) + timedelta(days=4)
+        data_fim = (proximo_mes - timedelta(days=proximo_mes.day)).strftime('%Y-%m-%d')
+
+    return {
+        'nome': pick('nome'),
+        'guia': pick('guia'),
+        'anestesista': pick('anestesista'),
+        'status': pick('status'),
+        'status_conferencia': pick('status_conferencia'),
+        'lote': pick('lote'),
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'convenios': convenios,
+        'codigo_relatorio': pick('codigo_relatorio'),
+    }
+
+
+def _query_export_faturamento(filtros):
+    """Monta query string do export Excel a partir dos filtros efetivos da listagem."""
+    params = []
+    for key in (
+        'nome', 'guia', 'anestesista', 'status', 'status_conferencia', 'lote',
+        'data_inicio', 'data_fim', 'codigo_relatorio',
+    ):
+        val = filtros.get(key)
+        if val:
+            params.append((key, val))
+    for conv in filtros.get('convenios') or []:
+        params.append(('convenio', conv))
+    return urlencode(params)
+
+
+def _aplicar_filtros_faturamento_qs(qs, filtros):
+    """Aplica os mesmos filtros da listagem ao queryset de faturamentos."""
+    nome = filtros.get('nome') or ''
+    guia = filtros.get('guia') or ''
+    anestesista = filtros.get('anestesista') or ''
+    status = filtros.get('status') or ''
+    status_conferencia = filtros.get('status_conferencia') or ''
+    lote = filtros.get('lote') or ''
+    data_inicio = filtros.get('data_inicio') or ''
+    data_fim = filtros.get('data_fim') or ''
+    convenios = filtros.get('convenios') or []
+    codigo_relatorio = filtros.get('codigo_relatorio') or ''
+
+    if nome:
+        qs = qs.filter(Q(nome__icontains=nome))
+    if guia:
+        qs = qs.filter(guia__icontains=guia)
+    if codigo_relatorio:
+        qs = qs.filter(codigo_relatorio__icontains=codigo_relatorio)
+    if anestesista:
+        qs = qs.filter(anestesista__icontains=anestesista)
+    if status:
+        qs = qs.filter(status=status)
+    if data_inicio:
+        qs = qs.filter(data__gte=data_inicio)
+    if data_fim:
+        qs = qs.filter(data__lte=data_fim)
+    if convenios:
+        q_objects = Q()
+        for conv in convenios:
+            if conv:
+                q_objects |= Q(convenio__icontains=conv)
+        qs = qs.filter(q_objects)
+    if lote == '__sem__':
+        qs = qs.filter(Q(lote__isnull=True) | Q(lote=''))
+    elif lote:
+        qs = qs.filter(lote=lote)
+
+    qs = qs.exclude(_q_status_agendamento_cancelados())
+
+    if status_conferencia:
+        if status_conferencia == 'CONFERIDO':
+            qs = qs.filter(
+                Q(itens_servico__status_conferencia='CONFERIDO')
+                | Q(itens_servico__conferido=True)
+            ).distinct()
+        else:
+            qs = qs.filter(
+                itens_servico__status_conferencia=status_conferencia,
+                itens_servico__conferido=False,
+            ).distinct()
+    return qs
+
+
+def _status_linha_faturamento(faturamento, item=None):
+    if item is not None:
+        return item.status_conferencia_badge()
+    if not (faturamento.guia or '').strip():
+        return 'FALTA DE GUIA', 'warning'
+    if not faturamento.total:
+        return 'FALTA DE VALOR NA TABELA', 'danger'
+    return 'PENDENTE', 'secondary'
 
 
 def _eh_status_agendamento_cancelado(status):
@@ -260,67 +384,18 @@ def listar_faturamentos(request):
     else:
         faturamentos = FaturamentoMedico.objects.all().order_by('-data')
 
-    # Filtros
-    nome = request.GET.get('nome')
-    guia = request.GET.get('guia')
-    anestesista = request.GET.get('anestesista')
-    status = request.GET.get('status')
-    status_conferencia = (request.GET.get('status_conferencia') or '').strip()
-    lote = (request.GET.get('lote') or '').strip()
-    data_inicio = request.GET.get('data_inicio')
-    data_fim = request.GET.get('data_fim')
-    convenios = request.GET.getlist('convenio')
-    codigo_relatorio =  request.GET.get('codigo_relatorio')
-
-    # Definir valores padrão para datas se não fornecidos
-    hoje = date.today()
-    if not data_inicio:
-        data_inicio = hoje.replace(day=1).strftime('%Y-%m-%d')  # Primeiro dia do mês
-    if not data_fim:
-        # Último dia do mês
-        proximo_mes = hoje.replace(day=28) + timedelta(days=4)  # Garante que vai para o próximo mês
-        data_fim = (proximo_mes - timedelta(days=proximo_mes.day)).strftime('%Y-%m-%d')
-
-    if nome:
-        faturamentos = faturamentos.filter(Q(nome__icontains=nome))
-    if guia:
-        faturamentos = faturamentos.filter(guia__icontains=guia)
-    if codigo_relatorio:
-       faturamentos = faturamentos.filter(codigo_relatorio__icontains=codigo_relatorio  )     
-    if anestesista:
-        faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
-    if status:
-        faturamentos = faturamentos.filter(status=status)
-    if data_inicio:
-        faturamentos = faturamentos.filter(data__gte=data_inicio)
-    if data_fim:
-        faturamentos = faturamentos.filter(data__lte=data_fim)
-    if convenios:
-        # Filtrar por múltiplos convênios
-        q_objects = Q()
-        for conv in convenios:
-            if conv:  # Ignorar valores vazios
-                q_objects |= Q(convenio__icontains=conv)
-        faturamentos = faturamentos.filter(q_objects)
-    if lote == '__sem__':
-        faturamentos = faturamentos.filter(Q(lote__isnull=True) | Q(lote=''))
-    elif lote:
-        faturamentos = faturamentos.filter(lote=lote)
-
-    # Lista principal: exclui cancelados / desistência / deletados
-    faturamentos = faturamentos.exclude(_q_status_agendamento_cancelados())
-
-    if status_conferencia:
-        if status_conferencia == 'CONFERIDO':
-            faturamentos = faturamentos.filter(
-                Q(itens_servico__status_conferencia='CONFERIDO')
-                | Q(itens_servico__conferido=True)
-            ).distinct()
-        else:
-            faturamentos = faturamentos.filter(
-                itens_servico__status_conferencia=status_conferencia,
-                itens_servico__conferido=False,
-            ).distinct()
+    filtros = _filtros_listagem_faturamento(request)
+    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
+    nome = filtros['nome']
+    guia = filtros['guia']
+    anestesista = filtros['anestesista']
+    status = filtros['status']
+    status_conferencia = filtros['status_conferencia']
+    lote = filtros['lote']
+    data_inicio = filtros['data_inicio']
+    data_fim = filtros['data_fim']
+    convenios = filtros['convenios']
+    codigo_relatorio = filtros['codigo_relatorio']
 
     # Estatísticas
     total_faturamentos = faturamentos.count()
@@ -444,16 +519,6 @@ def listar_faturamentos(request):
             return False
         return False
 
-    def _status_linha(faturamento, item=None):
-        if item is not None:
-            return item.status_conferencia_badge()
-        # Sem item: usa regras do faturamento
-        if not (faturamento.guia or '').strip():
-            return 'FALTA DE GUIA', 'warning'
-        if not faturamento.total:
-            return 'FALTA DE VALOR NA TABELA', 'danger'
-        return 'PENDENTE', 'secondary'
-
     def _modalidade_item(faturamento, item=None):
         if item and item.modalidade:
             return item.modalidade
@@ -469,7 +534,7 @@ def listar_faturamentos(request):
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
         if not itens:
-            status_label, status_css = _status_linha(faturamento)
+            status_label, status_css = _status_linha_faturamento(faturamento)
             if status_conferencia and status_label != status_conferencia:
                 continue
             grid_linhas.append({
@@ -490,7 +555,7 @@ def listar_faturamentos(request):
             continue
         itens_filtrados = []
         for item in itens:
-            status_label, status_css = _status_linha(faturamento, item)
+            status_label, status_css = _status_linha_faturamento(faturamento, item)
             if status_conferencia and status_label != status_conferencia:
                 continue
             itens_filtrados.append((item, status_label, status_css))
@@ -693,7 +758,8 @@ def listar_faturamentos(request):
             'convenio': convenios,
             'codigo_relatorio': codigo_relatorio,
             'per_page': str(per_page),
-        }
+        },
+        'export_query_string': _query_export_faturamento(filtros),
     }
 
     return render(request, 'faturamento_medico/listar.html', context)
@@ -1302,40 +1368,18 @@ def exportar_excel(request):
     else:
         faturamentos = FaturamentoMedico.objects.none()
 
-    nome = request.GET.get('nome')
-    guia = request.GET.get('guia')
-    data_inicio = request.GET.get('data_inicio')
-    data_fim = request.GET.get('data_fim')
-    convenios = request.GET.getlist('convenio')
-    anestesista = request.GET.get('anestesista')
-    codigo_relatorio = request.GET.get('codigo_relatorio')
-    status = request.GET.get('status')
-
-    if nome:
-        faturamentos = faturamentos.filter(Q(nome__icontains=nome))
-    if guia:
-        faturamentos = faturamentos.filter(guia__icontains=guia)
-    if codigo_relatorio:
-        faturamentos = faturamentos.filter(
-            Q(codigo_relatorio__icontains=codigo_relatorio)
-            | Q(agendado_via__icontains=codigo_relatorio)
-        )
-    if anestesista:
-        faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
-    if status:
-        faturamentos = faturamentos.filter(status=status)
-    if data_inicio:
-        faturamentos = faturamentos.filter(data__gte=data_inicio)
-    if data_fim:
-        faturamentos = faturamentos.filter(data__lte=data_fim)
-    if convenios:
-        q_objects = Q()
-        for conv in convenios:
-            if conv:
-                q_objects |= Q(convenio__icontains=conv)
-        faturamentos = faturamentos.filter(q_objects)
-
-    faturamentos = faturamentos.exclude(_q_status_agendamento_cancelados())
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
+    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
+    nome = filtros['nome']
+    guia = filtros['guia']
+    anestesista = filtros['anestesista']
+    status = filtros['status']
+    status_conferencia = filtros['status_conferencia']
+    lote = filtros['lote']
+    data_inicio = filtros['data_inicio']
+    data_fim = filtros['data_fim']
+    convenios = filtros['convenios']
+    codigo_relatorio = filtros['codigo_relatorio']
 
     # Cache preços para status de conferência
     precos_por_codigo = set()
@@ -1397,25 +1441,31 @@ def exportar_excel(request):
     ws.cell(row=4, column=1).value = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
     ws.cell(row=4, column=1).font = Font(italic=True)
 
-    filtros = []
+    filtros_excel = []
     if nome:
-        filtros.append(f"Nome: {nome}")
+        filtros_excel.append(f"Nome: {nome}")
     if guia:
-        filtros.append(f"Guia: {guia}")
+        filtros_excel.append(f"Guia: {guia}")
     if codigo_relatorio:
-        filtros.append(f"Código/Agendado via: {codigo_relatorio}")
+        filtros_excel.append(f"Código Relatório: {codigo_relatorio}")
     if anestesista:
-        filtros.append(f"Anestesista: {anestesista}")
+        filtros_excel.append(f"Anestesista: {anestesista}")
     if data_inicio:
-        filtros.append(f"Data início: {data_inicio}")
+        filtros_excel.append(f"Data início: {data_inicio}")
     if data_fim:
-        filtros.append(f"Data fim: {data_fim}")
+        filtros_excel.append(f"Data fim: {data_fim}")
     if convenios:
-        filtros.append(f"Convênios: {', '.join(convenios)}")
+        filtros_excel.append(f"Convênios: {', '.join(convenios)}")
     if status:
-        filtros.append(f"Status: {status}")
+        filtros_excel.append(f"Status: {status}")
+    if status_conferencia:
+        filtros_excel.append(f"Status Conferência: {status_conferencia}")
+    if lote == '__sem__':
+        filtros_excel.append("Lote: Sem lote")
+    elif lote:
+        filtros_excel.append(f"Lote: {lote}")
     ws.cell(row=5, column=1).value = (
-        "Filtros: " + ("; ".join(filtros) if filtros else "nenhum")
+        "Filtros: " + ("; ".join(filtros_excel) if filtros_excel else "nenhum")
     )
     ws.cell(row=5, column=1).font = Font(italic=True)
 
@@ -1492,7 +1542,20 @@ def exportar_excel(request):
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
         if not itens:
+            status_label, _ = _status_linha_faturamento(faturamento)
+            if status_conferencia and status_label != status_conferencia:
+                continue
             itens = [None]
+        else:
+            itens_filtrados = []
+            for item in itens:
+                status_label, _ = _status_linha_faturamento(faturamento, item)
+                if status_conferencia and status_label != status_conferencia:
+                    continue
+                itens_filtrados.append(item)
+            if not itens_filtrados:
+                continue
+            itens = itens_filtrados
 
         for item in itens:
             if item is not None:
@@ -2689,6 +2752,7 @@ def gerar_lote(request):
             # Atualizar o total do lote
             try:
                 lote_existente.atualizar_total()
+                lote_existente.sincronizar_extrato_pagamento()
                 logger.info(f"Total do lote {lote_existente.id} atualizado: {lote_existente.total_lote}")
             except Exception as e:
                 logger.error(f"Erro ao atualizar total do lote {lote_existente.id}: {e}")
@@ -2754,6 +2818,7 @@ def gerar_lote(request):
                 # Atualizar o total do lote
                 try:
                     lote.atualizar_total()
+                    lote.sincronizar_extrato_pagamento()
                     logger.info(f"Total do lote {lote.id} atualizado: {lote.total_lote}")
                 except Exception as e:
                     logger.error(f"Erro ao atualizar total do lote {lote.id}: {e}")
@@ -3519,4 +3584,240 @@ def alterar_status_conferencia_item(request, pk):
         'status': status_label,
         'status_css': status_css,
     })
+
+
+def listar_extrato_pagamento(request):
+    """Lista extrato de pagamento importado por convênio."""
+    from django.db.models import Sum
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    qs = ExtratoPagamentoConvenio.objects.filter(empresa_id=empresa_id)
+
+    competencia = (request.GET.get('competencia') or '').strip()
+    convenio = (request.GET.get('convenio') or '').strip()
+    if competencia:
+        qs = qs.filter(competencia=competencia)
+    if convenio:
+        qs = qs.filter(convenio__icontains=convenio)
+
+    totais = qs.aggregate(
+        total_valor=Sum('valor'),
+        total_glosado=Sum('valor_glosado'),
+        total_liberado=Sum('valor_liberado'),
+        total_retencoes=Sum('retencoes'),
+        total_recebido=Sum('valor_recebido'),
+    )
+
+    competencias = (
+        ExtratoPagamentoConvenio.objects.filter(empresa_id=empresa_id)
+        .exclude(competencia='')
+        .values_list('competencia', flat=True)
+        .distinct()
+        .order_by('-competencia')
+    )
+
+    context = {
+        'titulo': 'Extrato de Pagamento — Convênio',
+        'linhas': qs.order_by('-data_recebimento', '-competencia', 'lote'),
+        'filtros': {'competencia': competencia, 'convenio': convenio},
+        'competencias': competencias,
+        'totais': totais,
+    }
+    return render(request, 'faturamento_medico/listar_extrato_pagamento.html', context)
+
+
+def importar_extrato_pagamento_bradesco(request):
+    """Importa Demonstrativo de Pagamento TISS Bradesco Saúde (PDF)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    def _parse_data_sessao(val):
+        if not val:
+            return None
+        if isinstance(val, date):
+            return val
+        try:
+            return date.fromisoformat(str(val)[:10])
+        except (TypeError, ValueError):
+            return None
+
+    preview = None
+    if request.method == 'POST':
+        acao = request.POST.get('acao', 'preview')
+        competencia = (request.POST.get('competencia') or '').strip()
+
+        if acao == 'confirmar':
+            dados_json = request.session.pop('extrato_pagamento_preview', None)
+            if not dados_json:
+                messages.error(request, 'Prévia expirada. Importe o PDF novamente.')
+                return redirect('faturamento_medico:importar_extrato_pagamento_bradesco')
+            competencia_sessao = (dados_json.get('competencia') or competencia or '').strip()
+            if not competencia_sessao:
+                messages.error(request, 'Competência não informada. Refaça a importação informando MM/AAAA.')
+                return redirect('faturamento_medico:importar_extrato_pagamento_bradesco')
+            criados = 0
+            ignorados = 0
+            for row in dados_json.get('linhas', []):
+                try:
+                    ExtratoPagamentoConvenio.objects.create(
+                        empresa_id=empresa_id,
+                        competencia=competencia_sessao,
+                        convenio=row.get('convenio') or 'BRADESCO SAUDE',
+                        data_lote=_parse_data_sessao(row.get('data_lote')),
+                        lote=row.get('lote') or '',
+                        protocolo=row.get('protocolo') or '',
+                        qt_guias=row.get('qt_guias'),
+                        valor=Decimal(str(row.get('valor') or 0)),
+                        valor_processado=Decimal(str(row.get('valor_processado') or 0)),
+                        valor_glosado=Decimal(str(row.get('valor_glosado') or 0)),
+                        valor_liberado=Decimal(str(row.get('valor_liberado') or 0)),
+                        retencoes=Decimal(str(row.get('retencoes') or 0)),
+                        liquido=Decimal(str(row.get('liquido') or 0)),
+                        data_previsao=_parse_data_sessao(row.get('data_previsao')),
+                        numero_demonstrativo=row.get('numero_demonstrativo') or '',
+                        nome_arquivo=dados_json.get('nome_arquivo') or '',
+                    )
+                    criados += 1
+                except Exception:
+                    ignorados += 1
+            messages.success(
+                request,
+                f'Importação concluída: {criados} protocolo(s) gravado(s) na competência {competencia_sessao}'
+                + (f', {ignorados} duplicado(s) ignorado(s).' if ignorados else '.'),
+            )
+            return redirect('faturamento_medico:listar_extrato_pagamento')
+
+        arquivo = request.FILES.get('arquivo')
+        if not arquivo:
+            messages.error(request, 'Selecione o PDF do demonstrativo.')
+            return redirect('faturamento_medico:importar_extrato_pagamento_bradesco')
+
+        try:
+            from .bradesco_tiss_pdf import parse_extrato_pagamento_bradesco, _parse_competencia
+
+            parsed = parse_extrato_pagamento_bradesco(
+                arquivo,
+                competencia=competencia,
+                nome_arquivo=arquivo.name,
+            )
+            competencia_final = (
+                _parse_competencia(competencia)
+                or parsed['cabecalho'].get('competencia')
+                or _parse_competencia(arquivo.name)
+                or ''
+            )
+            linhas_sessao = []
+            for row in parsed['linhas']:
+                row_copy = dict(row)
+                row_copy['competencia'] = competencia_final
+                linhas_sessao.append({
+                    k: (
+                        v.isoformat() if hasattr(v, 'isoformat')
+                        else float(v) if isinstance(v, Decimal)
+                        else v
+                    )
+                    for k, v in row_copy.items()
+                })
+            cab_serializado = {
+                k: (v.isoformat() if hasattr(v, 'isoformat') else v)
+                for k, v in parsed['cabecalho'].items()
+            }
+            request.session['extrato_pagamento_preview'] = {
+                'cabecalho': cab_serializado,
+                'linhas': linhas_sessao,
+                'nome_arquivo': arquivo.name,
+                'competencia': competencia_final,
+            }
+            linhas_preview = []
+            for row in parsed['linhas']:
+                r = dict(row)
+                r['competencia'] = competencia_final
+                linhas_preview.append(r)
+            preview = {
+                'cabecalho': parsed['cabecalho'],
+                'linhas': linhas_preview,
+                'nome_arquivo': arquivo.name,
+                'competencia': competencia_final,
+                'qtd_protocolos': len(parsed['linhas']),
+            }
+        except Exception as e:
+            logger.exception('Erro ao importar extrato pagamento Bradesco')
+            messages.error(request, f'Erro ao ler PDF: {e}')
+            return redirect('faturamento_medico:importar_extrato_pagamento_bradesco')
+
+    context = {
+        'titulo': 'Importar Extrato de Pagamento — Bradesco Saúde',
+        'preview': preview,
+        'competencia_padrao': (request.POST.get('competencia') or request.GET.get('competencia') or '').strip(),
+    }
+    return render(request, 'faturamento_medico/importar_extrato_pagamento.html', context)
+
+
+def baixar_extrato_pagamento(request, pk):
+    """Baixa manual — concilia recebimento com extrato bancário."""
+    from extrato.models import Banco
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    extrato = get_object_or_404(ExtratoPagamentoConvenio, pk=pk, empresa_id=empresa_id)
+    bancos = Banco.objects.order_by('nome')
+
+    if request.method == 'POST':
+        data_receb = request.POST.get('data_recebimento')
+        valor_raw = (request.POST.get('valor_recebido') or '').strip()
+        banco = (request.POST.get('banco') or '').strip()
+
+        if not data_receb or not valor_raw or not banco:
+            messages.error(request, 'Informe data de recebimento, valor recebido e banco.')
+            return redirect('faturamento_medico:baixar_extrato_pagamento', pk=pk)
+
+        try:
+            from emprestimos.sicoob_pdf import _dec
+            extrato.data_recebimento = date.fromisoformat(data_receb)
+            extrato.valor_recebido = _dec(valor_raw)
+            extrato.banco = banco
+            extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+            messages.success(request, 'Baixa registrada com sucesso.')
+            return redirect('faturamento_medico:listar_extrato_pagamento')
+        except (ValueError, InvalidOperation):
+            messages.error(request, 'Data ou valor inválido.')
+            return redirect('faturamento_medico:baixar_extrato_pagamento', pk=pk)
+
+    sugestao_valor = extrato.liquido or extrato.valor_liberado or Decimal('0')
+    context = {
+        'titulo': 'Baixar recebimento — Extrato convênio',
+        'extrato': extrato,
+        'bancos': bancos,
+        'sugestao_valor': sugestao_valor,
+        'data_hoje': timezone.now().date().isoformat(),
+    }
+    return render(request, 'faturamento_medico/baixar_extrato_pagamento.html', context)
+
+
+def estornar_baixa_extrato_pagamento(request, pk):
+    """Remove baixa para permitir nova conciliação."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    if request.method != 'POST':
+        return redirect('faturamento_medico:listar_extrato_pagamento')
+
+    extrato = get_object_or_404(ExtratoPagamentoConvenio, pk=pk, empresa_id=empresa_id)
+    extrato.data_recebimento = None
+    extrato.valor_recebido = Decimal('0')
+    extrato.banco = ''
+    extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+    messages.success(request, 'Baixa estornada.')
+    return redirect('faturamento_medico:listar_extrato_pagamento')
 

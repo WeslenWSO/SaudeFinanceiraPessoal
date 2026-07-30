@@ -39,6 +39,28 @@
 .nfse-row-actions-item-danger:hover { background: #fef2f2; }
 .table-wrap { overflow: visible; }
 .panel-nfse-table .table-wrap { overflow-x: auto; overflow-y: visible; }
+.table-nfse-list th.nfse-th-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.table-nfse-list th.nfse-th-sortable:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+.table-nfse-list th.nfse-th-sortable::after {
+    content: ' ⇅';
+    font-size: 0.7em;
+    opacity: 0.35;
+    margin-left: 0.15rem;
+}
+.table-nfse-list th.nfse-th-sorted-asc::after {
+    content: ' ▲';
+    opacity: 0.85;
+}
+.table-nfse-list th.nfse-th-sorted-desc::after {
+    content: ' ▼';
+    opacity: 0.85;
+}
 </style>
 <div class="page">
     <div class="page-head">
@@ -84,7 +106,7 @@
                 <div class="filtros-grid">
                     <div>
                         <label for="search">Buscar</label>
-                        <input type="text" id="search" name="search" value="{{ search }}" placeholder="Número, Cliente, CNPJ, Série, Autorização (NSU)..." autocomplete="off">
+                        <input type="text" id="search" name="search" value="{{ search }}" placeholder="Número, Cliente, CNPJ, Discriminação, Autorização..." autocomplete="off">
                     </div>
                     <div>
                         <label for="valor">Valor</label>
@@ -219,30 +241,30 @@
                     <thead>
                         <tr>
                             <th data-col="sel" style="width: 2.5rem;"><input type="checkbox" id="chkTodos"></th>
-                            <th data-col="numero" style="min-width: 4rem;">Número</th>
-                            <th data-col="data_emissao" style="min-width: 5.5rem;">Data Emissão</th>
-                            <th data-col="cnpj" style="min-width: 10rem;">CNPJ/CPF</th>
-                            <th data-col="cliente" style="min-width: 100px;">Cliente</th>
-                            <th data-col="socio" style="min-width: 100px;">Sócio</th>
-                            <th data-col="base_servico" style="min-width: 5rem;">Base Serviço</th>
-                            <th data-col="regra_imposto" style="min-width: 8rem;">Regra Imposto</th>
-                            <th data-col="status_nota" style="min-width: 4.5rem;">Status Nota</th>
-                            <th data-col="valor_bruto" style="min-width: 5rem;">Valor Bruto</th>
-                            <th data-col="iss_retido" style="min-width: 4rem;">Iss Retido</th>
-                            <th data-col="aliquota_iss" style="min-width: 4rem;">Aliquota Iss</th>
-                            <th data-col="valor_iss_retido" style="min-width: 5rem;">Valor Iss Retido</th>
-                            <th data-col="valor_pis" style="min-width: 4rem;">Valor Pis</th>
-                            <th data-col="valor_cofins" style="min-width: 4.5rem;">Valor Cofins</th>
-                            <th data-col="valor_csll" style="min-width: 4rem;">Valor Csll</th>
-                            <th data-col="valor_irpj" style="min-width: 4rem;">Valor Irpj</th>
-                            <th data-col="valor_outras_ret" style="min-width: 4.5rem;">Valor Outras Ret.</th>
-                            <th data-col="valor_inss" style="min-width: 4rem;">Valor Inss</th>
-                            <th data-col="valor_liquido" style="min-width: 5rem;">Valor Líquido</th>
-                            <th data-col="discriminacao" style="min-width: 180px;">Discriminação</th>
-                            <th data-col="forma_pag" style="min-width: 5.5rem;">Forma Pag.</th>
-                            <th data-col="autorizacao" style="min-width: 4rem;">Autorizacao</th>
+                            <th data-col="numero" data-sortable class="nfse-th-sortable{% if sort_col == 'numero' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Número</th>
+                            <th data-col="data_emissao" data-sortable class="nfse-th-sortable{% if sort_col == 'data_emissao' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5.5rem;">Data Emissão</th>
+                            <th data-col="cnpj" data-sortable class="nfse-th-sortable{% if sort_col == 'cnpj' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 10rem;">CNPJ/CPF</th>
+                            <th data-col="cliente" data-sortable class="nfse-th-sortable{% if sort_col == 'cliente' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 100px;">Cliente</th>
+                            <th data-col="socio" data-sortable class="nfse-th-sortable{% if sort_col == 'socio' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 100px;">Sócio</th>
+                            <th data-col="base_servico" data-sortable class="nfse-th-sortable{% if sort_col == 'base_servico' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5rem;">Base Serviço</th>
+                            <th data-col="regra_imposto" data-sortable class="nfse-th-sortable{% if sort_col == 'regra_imposto' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 8rem;">Regra Imposto</th>
+                            <th data-col="status_nota" data-sortable class="nfse-th-sortable{% if sort_col == 'status_nota' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4.5rem;">Status Nota</th>
+                            <th data-col="valor_bruto" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_bruto' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5rem;">Valor Bruto</th>
+                            <th data-col="iss_retido" data-sortable class="nfse-th-sortable{% if sort_col == 'iss_retido' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Iss Retido</th>
+                            <th data-col="aliquota_iss" data-sortable class="nfse-th-sortable{% if sort_col == 'aliquota_iss' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Aliquota Iss</th>
+                            <th data-col="valor_iss_retido" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_iss_retido' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5rem;">Valor Iss Retido</th>
+                            <th data-col="valor_pis" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_pis' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Valor Pis</th>
+                            <th data-col="valor_cofins" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_cofins' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4.5rem;">Valor Cofins</th>
+                            <th data-col="valor_csll" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_csll' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Valor Csll</th>
+                            <th data-col="valor_irpj" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_irpj' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Valor Irpj</th>
+                            <th data-col="valor_outras_ret" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_outras_ret' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4.5rem;">Valor Outras Ret.</th>
+                            <th data-col="valor_inss" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_inss' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Valor Inss</th>
+                            <th data-col="valor_liquido" data-sortable class="nfse-th-sortable{% if sort_col == 'valor_liquido' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5rem;">Valor Líquido</th>
+                            <th data-col="discriminacao" data-sortable class="nfse-th-sortable{% if sort_col == 'discriminacao' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 180px;">Discriminação</th>
+                            <th data-col="forma_pag" data-sortable class="nfse-th-sortable{% if sort_col == 'forma_pag' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 5.5rem;">Forma Pag.</th>
+                            <th data-col="autorizacao" data-sortable class="nfse-th-sortable{% if sort_col == 'autorizacao' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4rem;">Autorizacao</th>
                             <th data-col="conta_rec" style="min-width: 3.5rem;">Conta a Rec.</th>
-                            <th data-col="conciliacao" style="min-width: 4.5rem;">Conciliação</th>
+                            <th data-col="conciliacao" data-sortable class="nfse-th-sortable{% if sort_col == 'conciliacao' %} nfse-th-sorted nfse-th-sorted-{{ sort_dir }}{% endif %}" style="min-width: 4.5rem;">Conciliação</th>
                             <th data-col="acoes" style="min-width: 6rem;">Ações</th>
                         </tr>
                     </thead>
@@ -322,7 +344,7 @@
                                     <span class="text-muted">Não informado</span>
                                 {% endif %}
                             </td>
-                            <td data-col="autorizacao">{{ nfse.nsu }}</td>
+                            <td data-col="autorizacao">{{ nfse.nsu|default:nfse.extracted_autorizacao|default:"—" }}</td>
                             
                             <td data-col="conta_rec" class="text-center">
                                 {% if nfse.id in notas_com_conta %}
@@ -373,12 +395,12 @@
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                         <li class="page-item">
-                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}{% if sort_col %}&sort={{ sort_col }}&dir={{ sort_dir }}{% endif %}">
                                 <i class="fas fa-angle-double-left"></i>
                             </a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}{% if sort_col %}&sort={{ sort_col }}&dir={{ sort_dir }}{% endif %}">
                                 <i class="fas fa-angle-left"></i>
                             </a>
                         </li>
@@ -392,12 +414,12 @@
 
                     {% if page_obj.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}{% if sort_col %}&sort={{ sort_col }}&dir={{ sort_dir }}{% endif %}">
                                 <i class="fas fa-angle-right"></i>
                             </a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if valor_filter %}&valor={{ valor_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if status_nota_filter %}&status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}&forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}&socio={{ socio_filter }}{% endif %}{% if data_inicio %}&data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}&data_fim={{ data_fim }}{% endif %}{% if paginate_by %}&paginate_by={{ paginate_by }}{% endif %}{% if sort_col %}&sort={{ sort_col }}&dir={{ sort_dir }}{% endif %}">
                                 <i class="fas fa-angle-double-right"></i>
                             </a>
                         </li>
@@ -641,6 +663,27 @@
     }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // --- Ordenação por clique no cabeçalho ---
+    (function initSortColunasNfse() {
+        const currentSort = '{{ sort_col|default:"numero"|escapejs }}';
+        const currentDir = '{{ sort_dir|default:"asc"|escapejs }}';
+        document.querySelectorAll('#tabelaNfse thead th[data-sortable]').forEach(function(th) {
+            th.addEventListener('click', function() {
+                const col = th.getAttribute('data-col');
+                if (!col) return;
+                const url = new URL(window.location.href);
+                let dir = 'asc';
+                if (currentSort === col && currentDir === 'asc') {
+                    dir = 'desc';
+                }
+                url.searchParams.set('sort', col);
+                url.searchParams.set('dir', dir);
+                url.searchParams.delete('page');
+                window.location.href = url.toString();
+            });
+        });
+    })();
+
     // --- Colunas: ocultar / reordenar (localStorage) ---
     (function initColunasNfse() {
         const STORAGE_KEY = 'nfse_list_colunas_v1';

@@ -63,8 +63,14 @@
                                 <li><a class="dropdown-item" href="{% url 'faturamento_medico:importar_ris' %}">
                                     <i class="fas fa-file-excel"></i> Importar RIS (.xlsx)
                                 </a></li>
+                                <li><a class="dropdown-item" href="{% url 'faturamento_medico:importar_extrato_pagamento_bradesco' %}">
+                                    <i class="fas fa-file-pdf"></i> Importar Extrato Pagamento Bradesco (.pdf)
+                                </a></li>
                             </ul>
                         </div>
+                        <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-receipt"></i> Extrato Pagamento
+                        </a>
                         <a href="{% url 'faturamento_medico:listar_cancelados' %}" class="btn btn-danger btn-sm">
                             <i class="fas fa-ban"></i> Cancelados / Desistência / Deletados
                         </a>
@@ -77,7 +83,7 @@
                         <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-warning btn-sm">
                             <i class="fas fa-calendar-check"></i> Fechamento Repasse
                         </a>
-                        <a href="{% url 'faturamento_medico:exportar_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success btn-sm">
+                        <a href="{% url 'faturamento_medico:exportar_excel' %}?{{ export_query_string }}" class="btn btn-success btn-sm">
                             <i class="fas fa-file-excel"></i> Exportar Excel
                         </a>
                         <a href="{% url 'faturamento_medico:criar' %}" class="btn btn-primary btn-sm">
@@ -219,6 +225,7 @@
                                         <th class="grid-ris-th">VALOR</th>
                                         <th class="grid-ris-th-conf">CONFERENCIA</th>
                                         <th class="grid-ris-th">STATUS CONFERENCIA</th>
+                                        <th class="grid-ris-th">CONVÊNIO</th>
                                         <th class="grid-ris-th">AÇÕES</th>
                                     </tr>
                                 </thead>
@@ -271,6 +278,7 @@
                                             </span>
                                             {% endif %}
                                         </td>
+                                        <td>{{ linha.faturamento.convenio|default:"-" }}</td>
                                         <td class="text-nowrap">
                                             <details class="fm-row-actions">
                                                 <summary class="btn btn-sm btn-outline-secondary fm-row-actions-btn" title="Ações" aria-label="Ações">

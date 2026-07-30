@@ -267,7 +267,7 @@ def _atualizar_conta_totais_cartao(
     Não altera valor_a_receber (valor de face do título).
     valor_recebido = soma dos líquidos da maquininha; tarifas = soma das taxas.
     Com vários recebíveis (parcelas), soma todos os vinculados.
-    Status: pago se o líquido restante ≈ 0; senão cartão (parcial).
+    Status permanece «cartão» até o extrato bancário conciliar com os recebíveis.
     """
     # Preferir todos já vinculados à conta (+ os informados), sem duplicar
     by_id = {r.pk: r for r in RelatorioRecebiveisMaquinaCartao.objects.filter(conta_a_receber=conta)}
@@ -284,12 +284,8 @@ def _atualizar_conta_totais_cartao(
     conta.valor_recebido = total_liq
     conta.tarifas = total_taxa
     conta.data_recebimento = data_rec
-    # Quitação: face − recebido − desconto − tarifa + juros ≈ 0
-    v = conta.valor_a_receber or Decimal('0')
-    d = conta.desconto or Decimal('0')
-    j = conta.juros or Decimal('0')
-    liquido_restante = v - total_liq - d - total_taxa + j
-    conta.status = 'pago' if liquido_restante <= Decimal('0.02') else 'cartao'
+    # Vinculação maquininha → cartão; «pago» só na conciliação extrato × recebível
+    conta.status = 'cartao'
     update_fields: list[str] = [
         'valor_recebido',
         'tarifas',

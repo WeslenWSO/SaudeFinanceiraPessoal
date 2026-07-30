@@ -17,8 +17,15 @@ env/
 # Django
 db.sqlite3
 db.sqlite3-journal
+db.sqlite3.bak
+db.sqlite3.*.bak
 staticfiles/
 media/
+test_empty.db
+
+# Scripts locais de debug
+_debug_tables.py
+_inspect_db.py
 
 # IDE
 .idea/

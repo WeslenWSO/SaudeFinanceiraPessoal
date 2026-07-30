@@ -34,10 +34,48 @@
             <a href="{% url 'emprestimos:importar' %}" class="btn btn-outline-primary">
                 <i class="fas fa-file-pdf"></i> Importar PDF
             </a>
+            <a href="{% url 'emprestimos:listar_excel' %}{% if export_query_string %}?{{ export_query_string }}{% endif %}" class="btn btn-outline-success">
+                <i class="fas fa-file-excel"></i> Exportar Excel
+            </a>
         </div>
     </div>
 
     {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="filtroBanco">Banco</label>
+                    <select name="banco" id="filtroBanco" class="form-select form-select-sm">
+                        <option value="">Todos os bancos</option>
+                        {% for b in bancos_filtro %}
+                        <option value="{{ b.id }}" {% if filtros.banco_id == b.id %}selected{% endif %}>{{ b.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small mb-1" for="filtroCliente">Cliente</label>
+                    <select name="cliente"
+                            id="filtroCliente"
+                            class="form-select form-select-sm"
+                            multiple
+                            size="4">
+                        {% for c in clientes_filtro %}
+                        <option value="{{ c }}" {% if c in filtros.clientes %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Ctrl+clique para selecionar vários</small>
+                </div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                    <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div class="card">
         <div class="card-body table-responsive">
@@ -48,8 +86,9 @@
                         <th>Contrato</th>
                         <th>Cliente</th>
                         <th>Valor contrato</th>
+                        <th>Início</th>
                         <th>Indicador de cálculo</th>
-                        <th title="Taxa juros a.m. + taxa mora a.m.">Taxa a.m.</th>
+                        <th title="Taxa de juros mensal">Taxa juros a.m.</th>
                         <th>Parcelas</th>
                         <th>Em aberto</th>
                         <th>Saldo principal</th>
@@ -66,8 +105,9 @@
                     <tr>
                         <td>
                             <div class="d-flex align-items-center gap-2">
-                                {% if row.emprestimo.banco and row.emprestimo.banco.logo %}
-                                <img src="{{ row.emprestimo.banco.logo.url }}"
+                                {% with logo=row.emprestimo.banco|banco_logo_url %}
+                                {% if logo %}
+                                <img src="{{ logo }}"
                                      alt="{{ row.emprestimo.banco.nome }}"
                                      title="{{ row.emprestimo.banco.nome }}"
                                      style="width: 36px; height: 36px; object-fit: contain;">
@@ -83,6 +123,7 @@
                                     <i class="fas fa-university"></i>
                                 </div>
                                 {% endif %}
+                                {% endwith %}
                                 <span class="fw-semibold">
                                     {% if row.emprestimo.banco %}{{ row.emprestimo.banco.nome }}{% else %}—{% endif %}
                                 </span>
@@ -91,6 +132,7 @@
                         <td><strong>{{ row.emprestimo.numero_contrato }}</strong></td>
                         <td>{{ row.emprestimo.cliente|default:"-" }}</td>
                         <td>R$ {{ row.emprestimo.valor_contrato|moeda_br }}</td>
+                        <td>{{ row.emprestimo.data_operacao|date:"d/m/Y"|default:"—" }}</td>
                         <td>
                             {% with rotulo=row.emprestimo.indicador_display %}
                             {% if rotulo and rotulo != '—' %}
@@ -102,9 +144,9 @@
                             {% endif %}
                             {% endwith %}
                         </td>
-                        <td title="Juros {{ row.emprestimo.taxa_juros_am }}% + mora {{ row.emprestimo.taxa_mora_am }}%">
-                            {% if row.emprestimo.taxa_calculo_am %}
-                            {{ row.emprestimo.taxa_calculo_am }}%
+                        <td>
+                            {% if row.emprestimo.taxa_juros_am %}
+                            {{ row.emprestimo.taxa_juros_am }}%
                             {% elif row.emprestimo.taxa_juros_aa %}
                             {{ row.emprestimo.taxa_juros_aa }}% a.a.
                             {% else %}
@@ -133,11 +175,16 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="15" class="text-center text-muted py-4">
+                        <td colspan="16" class="text-center text-muted py-4">
+                            {% if filtros.banco_id or filtros.clientes %}
+                            Nenhum empréstimo encontrado com os filtros aplicados.
+                            <a href="{% url 'emprestimos:listar' %}">Limpar filtros</a>.
+                            {% else %}
                             Nenhum empréstimo cadastrado.
                             <a href="{% url 'emprestimos:cadastrar' %}">Cadastrar empréstimo</a>
                             ou
                             <a href="{% url 'emprestimos:importar' %}">importar PDF</a>.
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -147,6 +194,7 @@
                     <tr class="fw-bold">
                         <td colspan="3">Total ({{ totais.qtd_contratos }} contrato{{ totais.qtd_contratos|pluralize }})</td>
                         <td>R$ {{ totais.valor_contrato|moeda_br }}</td>
+                        <td></td>
                         <td></td>
                         <td></td>
                         <td>{{ totais.qtd_parcelas }}</td>

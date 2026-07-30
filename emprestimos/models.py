@@ -181,7 +181,7 @@ class Emprestimo(models.Model):
 
     @property
     def taxa_calculo_am(self):
-        """Taxa mensal usada no cálculo: juros a.m. + mora a.m."""
+        """Referência contratual: juros a.m. + mora a.m. (usada só em parcelas atrasadas)."""
         return (
             (self.taxa_juros_am or Decimal('0'))
             + (self.taxa_mora_am or Decimal('0'))
@@ -272,6 +272,10 @@ class ParcelaEmprestimo(models.Model):
     historico = models.CharField(max_length=200, blank=True, default='')
     valor_pago = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     mora = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'))
+    multa = models.DecimalField(
+        max_digits=15, decimal_places=2, default=Decimal('0'),
+        verbose_name='Multa (atraso)',
+    )
     iof = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'))
     correcao = models.DecimalField(
         max_digits=15, decimal_places=2, default=Decimal('0'),
@@ -291,6 +295,36 @@ class ParcelaEmprestimo(models.Model):
     @property
     def is_aberta(self):
         return self.status == 'aberta'
+
+    def situacao_cobranca(self, data_ref=None):
+        from django.utils import timezone
+
+        from .taxas_parcela import situacao_parcela_aberta
+
+        ref = data_ref or timezone.localdate()
+        return situacao_parcela_aberta(self, ref)
+
+    def taxa_juros_efetiva_am(self, data_ref=None):
+        from django.utils import timezone
+
+        from .taxas_parcela import taxa_juros_am_parcela
+
+        ref = data_ref or timezone.localdate()
+        emp = self.emprestimo
+        return taxa_juros_am_parcela(
+            self,
+            taxa_juros_am=emp.taxa_juros_am or Decimal('0'),
+            taxa_mora_am=emp.taxa_mora_am or Decimal('0'),
+            data_ref=ref,
+        )
+
+    def multa_atraso_calculada(self, data_ref=None):
+        from django.utils import timezone
+
+        from .taxas_parcela import multa_atraso_parcela
+
+        ref = data_ref or timezone.localdate()
+        return multa_atraso_parcela(self, ref)
 
     @property
     def taxa_mil(self):

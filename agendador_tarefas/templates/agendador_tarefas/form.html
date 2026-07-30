@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="mb-3">
+        <h3 class="mb-0">{{ title }}</h3>
+        <small class="text-muted">
+            {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }}{% else %}Tarefa geral (sem empresa){% endif %}
+        </small>
+    </div>
+
+    {% include 'parcial/_messages.html' %}
+
+    {% if form.errors %}
+    <div class="alert alert-danger">
+        <strong>Não foi possível salvar:</strong>
+        {% if form.non_field_errors %}
+        <ul class="mb-0 mt-1">{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% else %}
+        <span class="ms-1">verifique os campos em vermelho abaixo.</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.competencia_mes.id_for_label }}">Competência — mês</label>
+                        {{ form.competencia_mes }}
+                        {% if form.competencia_mes.errors %}<div class="text-danger small">{{ form.competencia_mes.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.competencia_ano.id_for_label }}">Competência — ano</label>
+                        {{ form.competencia_ano }}
+                        {% if form.competencia_ano.errors %}<div class="text-danger small">{{ form.competencia_ano.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.data.id_for_label }}">Data</label>
+                        {{ form.data }}
+                        {% if form.data.errors %}<div class="text-danger small">{{ form.data.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.previsao_conclusao.id_for_label }}">Previsão de conclusão</label>
+                        {{ form.previsao_conclusao }}
+                        {% if form.previsao_conclusao.errors %}<div class="text-danger small">{{ form.previsao_conclusao.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.hora_inicio.id_for_label }}">Hora início</label>
+                        {{ form.hora_inicio }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="{{ form.hora_fim.id_for_label }}">Hora fim</label>
+                        {{ form.hora_fim }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="{{ form.titulo.id_for_label }}">Título</label>
+                        {{ form.titulo }}
+                        {% if form.titulo.errors %}<div class="text-danger small">{{ form.titulo.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável</label>
+                        {{ form.responsavel }}
+                        {% if form.responsavel.errors %}<div class="text-danger small">{{ form.responsavel.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            {{ form.tarefa_geral }}
+                            <label class="form-check-label" for="{{ form.tarefa_geral.id_for_label }}">{{ form.tarefa_geral.label }}</label>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="{{ form.observacao_passagem.id_for_label }}">Observação da passagem</label>
+                        {{ form.observacao_passagem }}
+                        <small class="text-muted">Preencha ao trocar o responsável — ficará no log.</small>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
+                        {{ form.descricao }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="{{ form.data_conclusao.id_for_label }}">Data da conclusão</label>
+                        {{ form.data_conclusao }}
+                    </div>
+                </div>
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
+                    <a href="{% url 'agendador_tarefas:listar' %}" class="btn btn-outline-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if tarefa and logs_responsavel %}
+    <div class="card mt-3">
+        <div class="card-header py-2">
+            <strong><i class="fas fa-history"></i> Log de passagem de responsável</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Quando</th>
+                        <th>De</th>
+                        <th>Para</th>
+                        <th>Quem passou</th>
+                        <th>Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs_responsavel %}
+                    <tr>
+                        <td>{{ log.alterado_em|date:"d/m/Y H:i" }}</td>
+                        <td>{{ log.responsavel_anterior|default:"—" }}</td>
+                        <td>{{ log.responsavel_novo|default:"—" }}</td>
+                        <td>
+                            {% if log.alterado_por %}
+                                {{ log.alterado_por.get_full_name|default:log.alterado_por.username }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ log.observacao|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

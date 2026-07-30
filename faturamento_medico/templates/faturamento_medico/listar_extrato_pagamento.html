@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Extrato de Pagamento{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+                    <div>
+                        <a href="{% url 'faturamento_medico:importar_extrato_pagamento_bradesco' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-file-pdf"></i> Importar PDF Bradesco
+                        </a>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">Faturamento</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-2 mb-3">
+                        <div class="col-md-2">
+                            <select name="competencia" class="form-control form-control-sm">
+                                <option value="">Competência (todas)</option>
+                                {% for c in competencias %}
+                                <option value="{{ c }}" {% if filtros.competencia == c %}selected{% endif %}>{{ c }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" name="convenio" class="form-control form-control-sm"
+                                   placeholder="Convênio" value="{{ filtros.convenio }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Filtrar</button>
+                            <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                        </div>
+                    </form>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-hover">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Competência</th>
+                                    <th>Convênio</th>
+                                    <th>Data Lote</th>
+                                    <th>Lote</th>
+                                    <th>Protocolo</th>
+                                    <th>Qt Guia</th>
+                                    <th class="text-end">Valor</th>
+                                    <th class="text-end">Glosado</th>
+                                    <th class="text-end">Liberado</th>
+                                    <th>Obs.</th>
+                                    <th>Nota</th>
+                                    <th class="text-end">Vlr Nota</th>
+                                    <th class="text-end">Retenções</th>
+                                    <th class="text-end">Líquido</th>
+                                    <th>Previsão</th>
+                                    <th>Recebimento</th>
+                                    <th class="text-end">Recebido</th>
+                                    <th>Banco</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in linhas %}
+                                <tr class="{% if not linha.baixado %}table-warning{% endif %}">
+                                    <td>{{ linha.competencia }}</td>
+                                    <td>{{ linha.convenio }}</td>
+                                    <td>{% if linha.data_lote %}{{ linha.data_lote|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                                    <td>{{ linha.lote }}</td>
+                                    <td>{{ linha.protocolo }}</td>
+                                    <td>{{ linha.qt_guias|default:"—" }}</td>
+                                    <td class="text-end">{{ linha.valor|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.valor_glosado|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.valor_liberado|floatformat:2 }}</td>
+                                    <td>{{ linha.observacao|truncatechars:20 }}</td>
+                                    <td>{{ linha.nota|default:"—" }}</td>
+                                    <td class="text-end">{% if linha.valor_nota %}{{ linha.valor_nota|floatformat:2 }}{% else %}—{% endif %}</td>
+                                    <td class="text-end">{{ linha.retencoes|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.liquido|floatformat:2 }}</td>
+                                    <td>{% if linha.data_previsao %}{{ linha.data_previsao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                                    <td>{% if linha.data_recebimento %}{{ linha.data_recebimento|date:"d/m/Y" }}{% else %}<span class="text-muted">Pendente</span>{% endif %}</td>
+                                    <td class="text-end">{% if linha.baixado %}{{ linha.valor_recebido|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td>{% if linha.banco %}{{ linha.banco }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td class="text-nowrap">
+                                        {% if linha.baixado %}
+                                        <span class="badge bg-success">Baixado</span>
+                                        <form method="post" action="{% url 'faturamento_medico:estornar_baixa_extrato_pagamento' linha.pk %}" class="d-inline"
+                                              onsubmit="return confirm('Estornar baixa deste recebimento?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-warning btn-sm py-0 px-1" title="Estornar baixa">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <a href="{% url 'faturamento_medico:baixar_extrato_pagamento' linha.pk %}" class="btn btn-success btn-sm">
+                                            <i class="fas fa-university"></i> Baixar
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="19" class="text-center text-muted py-4">
+                                        Nenhum extrato importado.
+                                        <a href="{% url 'faturamento_medico:importar_extrato_pagamento_bradesco' %}">Importar PDF Bradesco</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            {% if linhas %}
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="6" class="text-end">Totais</td>
+                                    <td class="text-end">{{ totais.total_valor|default:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ totais.total_glosado|default:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ totais.total_liberado|default:0|floatformat:2 }}</td>
+                                    <td colspan="4"></td>
+                                    <td class="text-end">{{ totais.total_retencoes|default:0|floatformat:2 }}</td>
+                                    <td colspan="2"></td>
+                                    <td class="text-end">{{ totais.total_recebido|default:0|floatformat:2 }}</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

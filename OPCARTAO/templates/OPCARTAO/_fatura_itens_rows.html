@@ -1,0 +1,31 @@
+{% load opcartao_extras %}
+{% for item in itens %}
+<tr>
+  <td class="text-center">
+    {% with cat=item|categoria_legenda %}
+    {% if cat %}
+    <span class="fatura-categoria-icone" title="{{ cat.nome }}">
+      <i class="fas {{ cat.icone }}"></i>
+    </span>
+    {% else %}
+    <span class="text-muted">—</span>
+    {% endif %}
+    {% endwith %}
+  </td>
+  <td>{{ item.data|date:"d/m/Y"|default:"—" }}</td>
+  <td>{{ item.hora|default:"—" }}</td>
+  <td>{{ item.cidade|default:"—" }}</td>
+  <td>
+    {% if item.tipo == 'pagamento' %}
+    <span class="badge bg-success">Pagamento</span>
+    {% elif item.tipo == 'iof' %}
+    <span class="badge bg-warning text-dark">IOF</span>
+    {% else %}
+    {{ item.tipo_compra|default:"Compra" }}
+    {% endif %}
+  </td>
+  <td>{{ item.descricao }}</td>
+  <td>{{ item.parcela|default:"—" }}</td>
+  <td class="text-end {% if item.valor < 0 %}text-success{% endif %}">R$ {{ item.valor|floatformat:2 }}</td>
+</tr>
+{% endfor %}

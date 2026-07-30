@@ -1,6 +1,15 @@
 {% comment %} {% extends 'base.html' %} {% endcomment %}
 {% load static %}
-
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login — Saude Financeira</title>
+    <link rel="icon" href="{% static 'icons/favicon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
 <style>
 * {
     box-sizing: border-box;
@@ -26,7 +35,7 @@ body {
     background: #1a2a3a;
 }
 
-/* Fundo fotográfico realista (ressonância / raio-X / ultrassom) */
+/* Fundo fotográfico: ressonância, raio-X, ultrassom, eletroencefalograma */
 .login-bg-photos {
     position: absolute;
     inset: 0;
@@ -43,7 +52,7 @@ body {
     background-repeat: no-repeat;
     opacity: 0;
     transform: scale(1.06);
-    animation: bgPhotoFade 18s ease-in-out infinite;
+    animation: bgPhotoFade 24s ease-in-out infinite;
 }
 
 .login-bg-photos .bg-photo:nth-child(1) {
@@ -61,11 +70,16 @@ body {
     animation-delay: 12s;
 }
 
+.login-bg-photos .bg-photo:nth-child(4) {
+    background-image: url("{% static 'media/login/bg-eeg.jpg' %}");
+    animation-delay: 18s;
+}
+
 @keyframes bgPhotoFade {
     0% { opacity: 0; transform: scale(1.06); }
-    8% { opacity: 1; transform: scale(1); }
-    30% { opacity: 1; transform: scale(1.03); }
-    38% { opacity: 0; transform: scale(1.05); }
+    4% { opacity: 1; transform: scale(1); }
+    21% { opacity: 1; transform: scale(1.03); }
+    25% { opacity: 0; transform: scale(1.05); }
     100% { opacity: 0; transform: scale(1.06); }
 }
 
@@ -74,8 +88,8 @@ body {
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(165deg, rgba(180, 210, 235, 0.55) 0%, rgba(210, 225, 240, 0.45) 45%, rgba(230, 238, 248, 0.55) 100%),
-        radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+        linear-gradient(165deg, rgba(180, 210, 235, 0.35) 0%, rgba(210, 225, 240, 0.28) 45%, rgba(230, 238, 248, 0.35) 100%),
+        radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
     z-index: 1;
 }
 
@@ -84,127 +98,54 @@ body {
     display: none;
 }
 
-/* Ícones médicos de fundo: ressonância, raio-X, ultrassom */
-.login-bg-icons {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    overflow: hidden;
-}
-
-.login-bg-icons .med-icon {
-    position: absolute;
-    color: rgba(255, 255, 255, 0.22);
-    animation: iconDrift 14s ease-in-out infinite;
-}
-
-.login-bg-icons .med-icon svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    filter: drop-shadow(0 4px 12px rgba(80, 140, 200, 0.12));
-}
-
-.login-bg-icons .med-icon--mri {
-    width: 140px;
-    height: 140px;
-    top: 8%;
-    left: 6%;
-    animation-delay: 0s;
-}
-
-.login-bg-icons .med-icon--xray {
-    width: 120px;
-    height: 120px;
-    top: 12%;
-    right: 8%;
-    animation-delay: -4s;
-    animation-direction: reverse;
-}
-
-.login-bg-icons .med-icon--ultra {
-    width: 130px;
-    height: 130px;
-    bottom: 14%;
-    left: 10%;
-    animation-delay: -7s;
-}
-
-.login-bg-icons .med-icon--mri2 {
-    width: 100px;
-    height: 100px;
-    bottom: 10%;
-    right: 12%;
-    opacity: 0.85;
-    animation-delay: -2s;
-    animation-direction: reverse;
-}
-
-.login-bg-icons .med-icon--xray2 {
-    width: 90px;
-    height: 90px;
-    top: 42%;
-    left: 3%;
-    opacity: 0.75;
-    animation-delay: -9s;
-}
-
-.login-bg-icons .med-icon--ultra2 {
-    width: 95px;
-    height: 95px;
-    top: 48%;
-    right: 4%;
-    opacity: 0.8;
-    animation-delay: -5s;
-}
-
-@keyframes iconDrift {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-14px) rotate(4deg); }
-}
-
-@media (max-width: 768px) {
-    .login-bg-icons .med-icon--mri { width: 96px; height: 96px; }
-    .login-bg-icons .med-icon--xray { width: 84px; height: 84px; }
-    .login-bg-icons .med-icon--ultra { width: 88px; height: 88px; }
-    .login-bg-icons .med-icon--mri2,
-    .login-bg-icons .med-icon--xray2,
-    .login-bg-icons .med-icon--ultra2 { display: none; }
-}
-
 .login-card {
     width: 100%;
-    max-width: 420px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    max-width: 380px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
     border-radius: 28px;
-    background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(28px) saturate(160%);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    background: rgba(255, 255, 255, 0.48);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
     box-shadow:
-        0 8px 32px rgba(31, 38, 135, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        0 12px 40px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75);
     overflow: visible;
-    animation: slideIn 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
     z-index: 2;
 }
 
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px) scale(0.98);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
 .login-header {
-    padding: 2.25rem 2rem 1.25rem;
+    padding: 1.5rem 2rem 1rem;
     text-align: center;
     background: transparent;
+}
+
+.logo-wrap {
+    width: 148px;
+    height: 148px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+        0 8px 24px rgba(15, 23, 42, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+
+.logo-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: contain;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .login-header h2 {
@@ -238,18 +179,15 @@ body {
 
 .form-label {
     font-weight: 500;
-    color: rgba(60, 60, 67, 0.7);
-    margin-bottom: 0.4rem;
-    display: flex;
-    align-items: center;
-    font-size: 0.8rem;
+    color: rgba(28, 28, 30, 0.72);
+    margin-bottom: 0.45rem;
+    display: block;
+    font-size: 0.875rem;
     letter-spacing: 0.01em;
 }
 
-.form-label i {
-    margin-right: 0.4rem;
-    color: rgba(60, 60, 67, 0.45);
-    font-size: 0.85rem;
+.form-group {
+    margin-bottom: 1rem;
 }
 
 .login-body .form-control,
@@ -257,26 +195,24 @@ body {
 .login-body input[type="password"] {
     width: 100%;
     border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    padding: 0.9rem 1rem;
-    margin-bottom: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    padding: 0.85rem 1rem;
+    margin-bottom: 0;
     font-size: 1rem;
-    color: rgba(28, 28, 30, 0.95);
+    color: rgba(28, 28, 30, 0.92);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-    background: rgba(255, 255, 255, 0.14) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.72) !important;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .login-body .form-control:focus,
 .login-body input[type="text"]:focus,
 .login-body input[type="password"]:focus {
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 1);
     box-shadow:
-        0 0 0 3px rgba(0, 122, 255, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.22) !important;
+        0 0 0 3px rgba(0, 122, 255, 0.18),
+        inset 0 1px 2px rgba(15, 23, 42, 0.04);
+    background: rgba(255, 255, 255, 0.9) !important;
     outline: none;
 }
 
@@ -289,29 +225,27 @@ body {
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-top: 0.35rem;
-    padding: 0.95rem 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.32);
+    margin-top: 0.5rem;
+    padding: 0.9rem 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.85);
     border-radius: 14px;
     font-weight: 600;
-    font-size: 1.05rem;
+    font-size: 1rem;
     letter-spacing: -0.01em;
     color: rgba(28, 28, 30, 0.88);
-    background: rgba(255, 255, 255, 0.16);
-    backdrop-filter: blur(16px) saturate(150%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    background: rgba(255, 255, 255, 0.72);
     box-shadow:
-        0 2px 12px rgba(0, 0, 0, 0.05),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        0 2px 10px rgba(15, 23, 42, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
     transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
     cursor: pointer;
 }
 
 .btn-login:hover {
-    background: rgba(255, 255, 255, 0.26);
+    background: rgba(255, 255, 255, 0.88);
     box-shadow:
-        0 4px 18px rgba(0, 0, 0, 0.07),
-        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        0 4px 16px rgba(15, 23, 42, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 
 .btn-login:active {
@@ -336,20 +270,6 @@ body {
 .alert-danger {
     background: rgba(255, 69, 58, 0.18);
     color: #c41e1e;
-}
-
-.logo-img {
-    width: 360px;
-    height: 360px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow:
-        0 4px 16px rgba(0, 0, 0, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 
 .form-control:focus-visible {
@@ -382,7 +302,12 @@ body {
     }
 
     .login-header {
-        padding: 1.75rem 1.35rem 1rem;
+        padding: 1.25rem 1.35rem 0.85rem;
+    }
+
+    .logo-wrap {
+        width: 128px;
+        height: 128px;
     }
 
     .login-header h2 {
@@ -438,16 +363,9 @@ body {
     pointer-events: none;
 }
 
-.login-splash .login-bg-icons {
-    z-index: 0;
-}
-
-.login-splash .splash-glass {
+.splash-glass {
     position: relative;
     z-index: 1;
-}
-
-.splash-glass {
     width: min(280px, 78vw);
     padding: 1.75rem 1.5rem 1.4rem;
     border-radius: 24px;
@@ -582,8 +500,8 @@ body {
 }
 
 .login-card {
-    opacity: 0;
-    transform: translateY(14px);
+    opacity: 1;
+    transform: none;
     transition: opacity 0.5s ease 0.05s, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
 }
 
@@ -607,23 +525,15 @@ body {
 }
 </style>
 
-{% block conteudo %}
+{% load static %}
+{% include 'parcial/_tarefas_letreiro.html' %}
+
 <div class="login-splash" id="loginSplash" aria-hidden="false">
     <div class="login-bg-photos" aria-hidden="true">
-        <div class="bg-photo"></div>
-        <div class="bg-photo"></div>
-        <div class="bg-photo"></div>
-    </div>
-    <div class="login-bg-icons" aria-hidden="true">
-        <div class="med-icon med-icon--mri">
-            <svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="34" rx="18" ry="22" stroke="currentColor" stroke-width="2.2"/><ellipse cx="32" cy="34" rx="10" ry="14" stroke="currentColor" stroke-width="1.6" opacity="0.7"/><path d="M18 22 C22 14 42 14 46 22" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="32" cy="34" r="3" fill="currentColor" opacity="0.45"/></svg>
-        </div>
-        <div class="med-icon med-icon--xray">
-            <svg viewBox="0 0 64 64" fill="none"><rect x="14" y="8" width="36" height="48" rx="4" stroke="currentColor" stroke-width="2.2"/><path d="M32 16 V48" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M24 22 L32 30 L40 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 42 L32 34 L40 42" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <div class="med-icon med-icon--ultra">
-            <svg viewBox="0 0 64 64" fill="none"><path d="M20 46 C20 30 28 18 32 14 C36 18 44 30 44 46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M18 50 H46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M32 14 V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M38 22 C44 24 48 30 48 36" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.45"/></svg>
-        </div>
+        <div class="bg-photo" data-label="Ressonância"></div>
+        <div class="bg-photo" data-label="Raio X"></div>
+        <div class="bg-photo" data-label="Ultrassom"></div>
+        <div class="bg-photo" data-label="Eletroencefalograma"></div>
     </div>
     <div class="splash-glass">
         <p class="splash-brand">Saude Financeira</p>
@@ -664,96 +574,32 @@ body {
 
 <div class="login-container">
     <div class="login-bg-photos" aria-hidden="true">
-        <div class="bg-photo"></div>
-        <div class="bg-photo"></div>
-        <div class="bg-photo"></div>
-    </div>
-    <div class="login-bg-icons" aria-hidden="true">
-        <!-- Ressonância (MRI) -->
-        <div class="med-icon med-icon--mri">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <ellipse cx="32" cy="34" rx="18" ry="22" stroke="currentColor" stroke-width="2.2"/>
-                <ellipse cx="32" cy="34" rx="10" ry="14" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
-                <path d="M18 22 C22 14 42 14 46 22" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <path d="M22 18 C26 12 38 12 42 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.65"/>
-                <circle cx="32" cy="34" r="3" fill="currentColor" opacity="0.45"/>
-                <path d="M14 34 H50" stroke="currentColor" stroke-width="1.2" opacity="0.35" stroke-dasharray="3 3"/>
-                <path d="M32 14 V54" stroke="currentColor" stroke-width="1.2" opacity="0.35" stroke-dasharray="3 3"/>
-            </svg>
-        </div>
-        <!-- Raio-X -->
-        <div class="med-icon med-icon--xray">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="14" y="8" width="36" height="48" rx="4" stroke="currentColor" stroke-width="2.2"/>
-                <path d="M32 16 V48" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M24 22 L32 30 L40 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M24 42 L32 34 L40 42" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="26" cy="28" r="2.2" fill="currentColor" opacity="0.4"/>
-                <circle cx="38" cy="28" r="2.2" fill="currentColor" opacity="0.4"/>
-                <path d="M20 52 H44" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
-            </svg>
-        </div>
-        <!-- Ultrassom -->
-        <div class="med-icon med-icon--ultra">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 46 C20 30 28 18 32 14 C36 18 44 30 44 46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <path d="M24 46 C24 34 29 24 32 20 C35 24 40 34 40 46" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
-                <path d="M18 50 H46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <path d="M22 54 H42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
-                <path d="M32 14 V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <circle cx="32" cy="6" r="2.5" fill="currentColor" opacity="0.5"/>
-                <path d="M38 22 C44 24 48 30 48 36" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.45"/>
-                <path d="M40 26 C44 28 46 32 46 36" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
-            </svg>
-        </div>
-        <div class="med-icon med-icon--mri2">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <ellipse cx="32" cy="34" rx="18" ry="22" stroke="currentColor" stroke-width="2.2"/>
-                <ellipse cx="32" cy="34" rx="10" ry="14" stroke="currentColor" stroke-width="1.6" opacity="0.7"/>
-                <path d="M18 22 C22 14 42 14 46 22" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <circle cx="32" cy="34" r="3" fill="currentColor" opacity="0.45"/>
-            </svg>
-        </div>
-        <div class="med-icon med-icon--xray2">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="14" y="8" width="36" height="48" rx="4" stroke="currentColor" stroke-width="2.2"/>
-                <path d="M32 16 V48" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-                <path d="M24 22 L32 30 L40 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M24 42 L32 34 L40 42" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </div>
-        <div class="med-icon med-icon--ultra2">
-            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 46 C20 30 28 18 32 14 C36 18 44 30 44 46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <path d="M18 50 H46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                <path d="M32 14 V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M38 22 C44 24 48 30 48 36" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.45"/>
-            </svg>
-        </div>
+        <div class="bg-photo" data-label="Ressonância"></div>
+        <div class="bg-photo" data-label="Raio X"></div>
+        <div class="bg-photo" data-label="Ultrassom"></div>
+        <div class="bg-photo" data-label="Eletroencefalograma"></div>
     </div>
     <div class="login-card" id="loginCard">
         <div class="login-header">
-            <img alt="Logo Saude Financeira" class="logo-img mb-3" src="{% static 'media/fotos/2022/logo.png' %}">
+            <div class="logo-wrap">
+                <img alt="Logo Saude Financeira" class="logo-img" src="{% static 'media/fotos/2022/logo.png' %}">
+            </div>
             <h2 class="mb-0">Saude Financeira</h2>
             <span class="barra-horizontal"></span>
             <p class="mb-0">Faça o seu login</p>
         </div>
         <div class="login-body">
-            <form method="post">
+            <form method="post" id="loginForm">
                 {% csrf_token %}
-                <div class="mb-3">
-                    <label for="{{ form.username.id_for_label }}" class="form-label">
-                        <i class="fas fa-user me-2"></i>Usuário
-                    </label>
+                <div class="form-group">
+                    <label for="{{ form.username.id_for_label }}" class="form-label">Usuário</label>
                     {{ form.username }}
                     {% if form.username.errors %}
                         <div class="text-danger small">{{ form.username.errors.0 }}</div>
                     {% endif %}
                 </div>
-                <div class="mb-3">
-                    <label for="{{ form.password.id_for_label }}" class="form-label">
-                        <i class="fas fa-lock me-2"></i>Senha
-                    </label>
+                <div class="form-group">
+                    <label for="{{ form.password.id_for_label }}" class="form-label">Senha</label>
                     {{ form.password }}
                     {% if form.password.errors %}
                         <div class="text-danger small">{{ form.password.errors.0 }}</div>
@@ -764,9 +610,7 @@ body {
                         {{ form.non_field_errors.0 }}
                     </div>
                 {% endif %}
-                <button class="btn btn-login" type="submit">
-                    <i class="fas fa-sign-in-alt me-2"></i>Entrar
-                </button>
+                <button class="btn btn-login" type="submit" id="loginSubmitBtn">Entrar</button>
             </form>
             <div class="text-center mt-3">
                 <a href="#">Esqueceu a senha?</a>
@@ -778,19 +622,36 @@ body {
 (function () {
     var splash = document.getElementById('loginSplash');
     var card = document.getElementById('loginCard');
+    var loginForm = document.getElementById('loginForm');
+    var loginBtn = document.getElementById('loginSubmitBtn');
+    var splashSeen = false;
+    try {
+        splashSeen = sessionStorage.getItem('loginSplashSeen') === '1';
+    } catch (e) {}
+
+    if (loginForm && loginBtn) {
+        loginForm.addEventListener('submit', function () {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = 'Entrando...';
+        });
+    }
+
     if (!splash || !card) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || splashSeen) {
         splash.classList.add('is-done');
         card.classList.add('is-visible');
+        if (splash.parentNode) splash.parentNode.removeChild(splash);
         return;
     }
     setTimeout(function () {
         splash.classList.add('is-done');
         card.classList.add('is-visible');
+        try { sessionStorage.setItem('loginSplashSeen', '1'); } catch (e) {}
         setTimeout(function () {
             if (splash.parentNode) splash.parentNode.removeChild(splash);
         }, 600);
-    }, 2200);
+    }, 700);
 })();
 </script>
-{% endblock %}
+</body>
+</html>

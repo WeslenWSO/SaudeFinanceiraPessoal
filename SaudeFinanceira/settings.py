@@ -16,20 +16,64 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-print(BASE_DIR)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-i*t9-j%j_57l=(qr6^bj^b%ela@muq4xmqq0hp#=q%j_dxf!)_'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-i*t9-j%j_57l=(qr6^bj^b%ela@muq4xmqq0hp#=q%j_dxf!)_',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Com DEBUG=False o runserver não expõe /static/ (helper static() em urls fica vazio) — CSS/JS 404.
-# Em produção: DJANGO_DEBUG=false + collectstatic + nginx/whitenoise.
+# Em produção: DJANGO_DEBUG=false + collectstatic + whitenoise.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS =  ['localhost' , '127.0.0.1' ,'10.10.1.151', '192.168.1.10' ,'DESKTOP-8KU7E4Q' ,'10.10.1.61', '10.10.1.106','192.168.1.24' ,"django01.intra.local"]
+_default_hosts = [
+    'localhost', '127.0.0.1', '[::1]', '10.10.1.151', '192.168.1.2', '192.168.1.10',
+    'DESKTOP-8KU7E4Q', '10.10.1.61', '10.10.1.106', '192.168.1.24',
+    'django01.intra.local', '.onrender.com',
+    'saudefinanceira-pessoal.onrender.com',
+]
+_env_hosts = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+ALLOWED_HOSTS = list(dict.fromkeys(_default_hosts + _env_hosts))
+
+if DEBUG:
+    import socket
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip and ip not in ALLOWED_HOSTS:
+                ALLOWED_HOSTS.append(ip)
+    except OSError:
+        pass
+
+_default_csrf_origins = [
+    'https://saudefinanceira-pessoal.onrender.com',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'http://192.168.1.2:8000',
+]
+CSRF_TRUSTED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(_default_csrf_origins)).split(',')
+    if o.strip() and '*' not in o.strip()
+] or _default_csrf_origins
+
+if DEBUG:
+    for host in ALLOWED_HOSTS:
+        if host.startswith('.') or host in ('localhost', '[::1]'):
+            continue
+        origin = f'http://{host}:8000'
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Login real em /login/ (accounts.urls); o padrão do Django é /accounts/login/ (404 neste projeto)
 LOGIN_URL = '/login/'
@@ -74,6 +118,7 @@ INSTALLED_APPS = [
     'regraConciliacao',
     'emprestimos',
     'planejamento_orcamentario',
+    'agendador_tarefas',
     
 
 
@@ -81,6 +126,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'notasfiscais.middleware.HandleSessionInterruptedMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'notasfiscais.middleware.ClearNFSeFiltersOnLeaveMiddleware',
@@ -108,6 +154,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'SaudeFinanceira.context_processors.cotacao_context',
+                'agendador_tarefas.context_processors.tarefas_letreiro',
             ],
         },
     },
@@ -123,16 +170,17 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-
-        # MySQL (descomente para usar e instale mysqlclient):
-        #'ENGINE': 'django.db.backends.mysql',
-        #'NAME': 'saude_financeira',
-        #'HOST': '10.10.1.61',
-        #'PORT': '3306',
-        #'USER': 'root',
-        #'PASSWORD': 'root',
     }
 }
+
+_database_url = os.environ.get('DATABASE_URL', '').strip()
+if _database_url:
+    import dj_database_url
+    DATABASES['default'] = dj_database_url.config(
+        default=_database_url,
+        conn_max_age=600,
+        ssl_require=_database_url.startswith('postgres'),
+    )
 
 
 # Password validation
@@ -194,7 +242,9 @@ STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
 ]
 
-STATIC_ROOT = BASE_DIR/ "staticfiles"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+if not DEBUG:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

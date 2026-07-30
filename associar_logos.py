@@ -28,6 +28,11 @@ def associar_logos():
         'SICOOB_Rjb7Izm.jpg': '756',  # SICOOB
         'SICOOB.jpg': '756',  # SICOOB alternativo
         '237.png': '237',  # Bradesco
+        '104.png': '104',
+        'caixa.png': '104',
+        '999.png': '999',
+        '707.png': '707',
+        'daycoval.png': '707',
         '001_AKnK77y.png': '001',  # Banco do Brasil
         '001_bMaOKoZ.png': '001',  # Banco do Brasil alternativo
         '001.png': '001',  # Banco do Brasil

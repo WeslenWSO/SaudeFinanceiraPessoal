@@ -109,9 +109,45 @@ def _ocr_score_texto(txt: str) -> int:
     return n
 
 
+_OCR_MAX_DIM = 4000
+_OCR_CHUNK_H = 3000
+_OCR_OVERLAP = 200
+
+
+def _redimensionar_para_ocr(pil, max_dim: int = _OCR_MAX_DIM):
+    from PIL import Image
+
+    w, h = pil.size
+    if max(w, h) <= max_dim:
+        return pil
+    scale = max_dim / max(w, h)
+    return pil.resize(
+        (max(1, int(w * scale)), max(1, int(h * scale))),
+        Image.Resampling.LANCZOS,
+    )
+
+
+def _ocr_imagem_com_chunks(pil) -> str:
+    """Reduz imagens grandes e fatia páginas altas (extrato Sicoob em imagem única)."""
+    pil = _redimensionar_para_ocr(pil)
+    w, h = pil.size
+    if h <= _OCR_CHUNK_H:
+        return _ocr_uma_imagem(pil)
+    partes: list[str] = []
+    y = 0
+    while y < h:
+        box = (0, y, w, min(y + _OCR_CHUNK_H, h))
+        partes.append(_ocr_uma_imagem(pil.crop(box)))
+        if y + _OCR_CHUNK_H >= h:
+            break
+        y += _OCR_CHUNK_H - _OCR_OVERLAP
+    return '\n'.join(partes)
+
+
 def _ocr_uma_imagem(pil) -> str:
     import pytesseract
 
+    pil = _redimensionar_para_ocr(pil)
     try:
         return pytesseract.image_to_string(pil, lang='por+eng', config='--psm 6') or ''
     except Exception:
@@ -173,8 +209,10 @@ def _ocr_pdf(file_obj) -> str:
     partes: list[str] = []
     with pdfplumber.open(file_obj) as pdf:
         for page in pdf.pages:
-            # 350dpi + contraste: tabelas densas (ex.: 16939567) falhavam em 300dpi
-            im = page.to_image(resolution=350)
+            # Páginas muito altas (extrato Sicoob em imagem única): 200dpi evita estouro no Tesseract
+            h_pt = float(page.height or 0)
+            res = 200 if h_pt > 2000 else 350
+            im = page.to_image(resolution=res)
             pil = im.original.convert('RGB')
             g = ImageOps.grayscale(pil)
             variantes = [
@@ -182,9 +220,8 @@ def _ocr_pdf(file_obj) -> str:
                 ImageEnhance.Sharpness(ImageEnhance.Contrast(g).enhance(2.0)).enhance(1.8),
                 g.point(lambda x: 0 if x < 160 else 255),
             ]
-            textos = [_ocr_uma_imagem(v) for v in variantes]
-            # também tenta a página colorida original
-            textos.append(_ocr_uma_imagem(pil))
+            textos = [_ocr_imagem_com_chunks(v) for v in variantes]
+            textos.append(_ocr_imagem_com_chunks(pil))
             partes.append(_ocr_mesclar_textos(textos))
     return '\n'.join(partes)
 
@@ -723,8 +760,10 @@ def _completar_campos_custos(dados: dict[str, Any]) -> dict[str, Any]:
 
 def detectar_e_parsear_pdf_emprestimo(file_obj) -> dict[str, Any]:
     """
-    Detecta Sicoob ou Bradesco e devolve o dict padronizado de importação.
+    Detecta Daycoval, Caixa, Sicoob ou Bradesco e devolve o dict padronizado de importação.
     """
+    from .caixa_pdf import extrair_texto_caixa, parece_caixa, parse_extrato_caixa
+    from .daycoval_pdf import parece_daycoval, parse_extrato_daycoval
     from .sicoob_pdf import parse_extrato_sicoob
 
     if hasattr(file_obj, 'seek'):
@@ -738,23 +777,26 @@ def detectar_e_parsear_pdf_emprestimo(file_obj) -> dict[str, Any]:
     if hasattr(file_obj, 'seek'):
         file_obj.seek(0)
 
+    # PDF só imagem: OCR antes da detecção (Caixa / Bradesco)
+    if not texto_amostra.strip():
+        try:
+            texto_amostra = extrair_texto_caixa(file_obj)
+        except Exception:
+            texto_amostra = ''
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+
     u = texto_amostra.upper()
 
-    # Bradesco (texto nativo ou PDF só imagem → OCR dentro do parser)
-    if _parece_bradesco(texto_amostra) or not texto_amostra.strip():
-        try:
-            return _completar_campos_custos(parse_extrato_bradesco(file_obj))
-        except Exception as exc_br:
-            if not texto_amostra.strip():
-                if hasattr(file_obj, 'seek'):
-                    file_obj.seek(0)
-                try:
-                    dados = parse_extrato_sicoob(file_obj)
-                    dados.setdefault('banco', 'sicoob')
-                    return _completar_campos_custos(dados)
-                except Exception:
-                    raise ValueError(str(exc_br)) from None
-            raise
+    if parece_daycoval(texto_amostra):
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+        return _completar_campos_custos(parse_extrato_daycoval(file_obj))
+
+    if parece_caixa(texto_amostra):
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+        return _completar_campos_custos(parse_extrato_caixa(file_obj))
 
     if (
         'SICOOB' in u
@@ -767,6 +809,13 @@ def detectar_e_parsear_pdf_emprestimo(file_obj) -> dict[str, Any]:
         dados.setdefault('banco', 'sicoob')
         return _completar_campos_custos(dados)
 
+    # Bradesco (texto nativo ou PDF só imagem → OCR dentro do parser)
+    if _parece_bradesco(texto_amostra):
+        try:
+            return _completar_campos_custos(parse_extrato_bradesco(file_obj))
+        except Exception:
+            raise
+
     if hasattr(file_obj, 'seek'):
         file_obj.seek(0)
     try:
@@ -776,4 +825,8 @@ def detectar_e_parsear_pdf_emprestimo(file_obj) -> dict[str, Any]:
     except Exception:
         if hasattr(file_obj, 'seek'):
             file_obj.seek(0)
+        if parece_caixa(texto_amostra):
+            return _completar_campos_custos(parse_extrato_caixa(file_obj))
+        if parece_daycoval(texto_amostra):
+            return _completar_campos_custos(parse_extrato_daycoval(file_obj))
         return _completar_campos_custos(parse_extrato_bradesco(file_obj))

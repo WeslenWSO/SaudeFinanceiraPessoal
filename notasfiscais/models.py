@@ -164,6 +164,17 @@ class NotaFiscalServico(models.Model):
         default='NORMAL',
     )
     data_cancelamento = models.DateField(verbose_name='Data de Cancelamento', null=True, blank=True)
+    codigo_motivo_cancelamento = models.CharField(
+        verbose_name='Código motivo cancelamento',
+        max_length=10,
+        blank=True,
+        default='',
+    )
+    motivo_cancelamento = models.TextField(
+        verbose_name='Motivo do cancelamento',
+        blank=True,
+        default='',
+    )
     forma_pagamento = models.ForeignKey(
         'cobranca.Cobranca',
         verbose_name='Forma de Pagamento',
@@ -240,12 +251,17 @@ class NotaFiscalServico(models.Model):
 
     @property
     def extracted_autorizacao(self):
-        """Extrai a autorização da discriminação"""
+        """Autorização do cartão: campo nsu ou extraída da discriminação (AUT / STONE ID)."""
+        nsu = (self.nsu or '').strip()
+        if nsu:
+            return nsu
         if self.discriminacao:
-            import re
-            m = re.search(r'\bAUT[: ]\s*([A-Za-z0-9\-\/\.]+)', self.discriminacao, flags=re.IGNORECASE)
-            return m.group(1).strip() if m else None
+            from notasfiscais.utils import extrair_autorizacao
+            return extrair_autorizacao(self.discriminacao)
         return None
+
+    def autorizacao_para_conta_receber(self):
+        return self.extracted_autorizacao
 
     def extract_payment_method_from_description(self):
         """Extrai a forma de pagamento da discriminação"""
@@ -356,6 +372,11 @@ class NotaFiscalServico(models.Model):
         if vl is None or vl <= Decimal('0'):
             return
         if ContaAReceber.objects.filter(nota_id=self.pk).exists():
+            auth = self.autorizacao_para_conta_receber()
+            if auth:
+                ContaAReceber.objects.filter(nota_id=self.pk).filter(
+                    models.Q(autorizacao__isnull=True) | models.Q(autorizacao='')
+                ).update(autorizacao=auth)
             return
         data_vencimento = self.data_emissao
         if hasattr(self.forma_pagamento, 'formapgto') and self.forma_pagamento.formapgto == '1':
@@ -371,7 +392,7 @@ class NotaFiscalServico(models.Model):
             valor_a_receber=self.valor_liquido,
             parcela='1/1',
             doc=self.numero_nota,
-            autorizacao=self.extracted_autorizacao,
+            autorizacao=self.autorizacao_para_conta_receber(),
             forma_pagamento=self.forma_pagamento,
             observacao=self.discriminacao or f'Nota Fiscal {self.numero_nota}',
         )
@@ -382,7 +403,7 @@ class NotaFiscalServico(models.Model):
         'valor_liquido', 'valor_bruto', 'data_emissao',
         'cliente', 'cnpj_cpf', 'numero_nota', 'serie', 'discriminacao',
         'empresa', 'empresa_id',
-        'data_cancelamento',
+        'data_cancelamento', 'nsu',
     })
 
     def save(self, *args, **kwargs):
@@ -398,6 +419,13 @@ class NotaFiscalServico(models.Model):
                     self.forma_pagamento = forma_pgto
                 except (Cobranca.DoesNotExist, Exception):
                     pass
+        if self.discriminacao and not (self.nsu or '').strip():
+            from notasfiscais.utils import extrair_autorizacao
+            auth = extrair_autorizacao(self.discriminacao)
+            if auth:
+                self.nsu = auth
+                if update_fields is not None:
+                    kwargs['update_fields'] = list(set(update_fields) | {'nsu'})
         self.issapuracao = self.calcular_iss_apuracao()
         self.pisapuracao = self.calcular_pis_apuracao()
         self.cofinsapuracao = self.calcular_cofins_apuracao()

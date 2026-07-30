@@ -1,11 +1,13 @@
 from decimal import Decimal, ROUND_HALF_UP
 import json
 import re
+from datetime import date, datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q, Sum
+from django.db.models.functions import TruncMonth
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -25,6 +27,38 @@ def _empresa_sessao(request):
     if not empresa_id:
         return None
     return Empresa.objects.filter(pk=empresa_id).first()
+
+
+_MESES_PT = (
+    '',
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+)
+
+
+def _rotulo_mes_ano(valor: str) -> str:
+    try:
+        dt = datetime.strptime(valor, '%Y-%m')
+    except (TypeError, ValueError):
+        return valor
+    nome = _MESES_PT[dt.month] if 1 <= dt.month <= 12 else str(dt.month)
+    return f'{nome}/{dt.year}'
+
+
+def _meses_abertos_opcoes(qs) -> list[dict[str, str]]:
+    meses = (
+        qs.annotate(mes=TruncMonth('data_vencimento'))
+        .values_list('mes', flat=True)
+        .distinct()
+        .order_by('mes')
+    )
+    opcoes: list[dict[str, str]] = []
+    for mes in meses:
+        if not mes:
+            continue
+        valor = mes.strftime('%Y-%m')
+        opcoes.append({'valor': valor, 'rotulo': _rotulo_mes_ano(valor)})
+    return opcoes
 
 
 def _banco_sicoob():
@@ -52,10 +86,39 @@ def _banco_bradesco():
     return Banco.objects.create(nome='BRADESCO', codigo='237')
 
 
+def _banco_caixa():
+    """Resolve o cadastro Caixa usado nos demonstrativos de evolução contratual."""
+    banco = (
+        Banco.objects.filter(codigo__in=('104', '0104')).first()
+        or Banco.objects.filter(nome__iexact='CAIXA').first()
+        or Banco.objects.filter(nome__icontains='caixa econ').first()
+        or Banco.objects.filter(nome__icontains='caixa').first()
+    )
+    if banco:
+        return banco
+    return Banco.objects.create(nome='CAIXA', codigo='104')
+
+
+def _banco_daycoval():
+    """Resolve o cadastro Daycoval usado nos fluxos financeiros de leasing."""
+    banco = (
+        Banco.objects.filter(codigo__in=('707', '0707')).first()
+        or Banco.objects.filter(nome__iexact='DAYCOVAL').first()
+        or Banco.objects.filter(nome__icontains='daycoval').first()
+    )
+    if banco:
+        return banco
+    return Banco.objects.create(nome='DAYCOVAL', codigo='707')
+
+
 def _banco_do_pdf(dados: dict):
     banco_key = (dados.get('banco') or '').lower()
     if banco_key == 'bradesco':
         return _banco_bradesco()
+    if banco_key == 'caixa':
+        return _banco_caixa()
+    if banco_key == 'daycoval':
+        return _banco_daycoval()
     return _banco_sicoob()
 
 
@@ -75,35 +138,63 @@ def _parse_taxa_post(raw) -> Decimal | None:
         return None
 
 
-def _taxa_calculo_am(emp, request=None) -> Decimal:
+def _taxa_juros_am_efetiva(emp, request=None) -> Decimal:
     """
-    Taxa mensal do cálculo = juros a.m. + mora a.m.
-    No POST da simulação, aceita override dos campos editáveis.
+    Taxa de juros a.m. usada nos cálculos (sem mora).
+    No POST da simulação, aceita override de taxa_juros_am.
     """
     juros = emp.taxa_juros_am or Decimal('0')
-    mora = emp.taxa_mora_am or Decimal('0')
     if request is not None and request.method == 'POST':
         j = _parse_taxa_post(request.POST.get('taxa_juros_am'))
-        m = _parse_taxa_post(request.POST.get('taxa_mora_am'))
         if j is not None:
             juros = j
-        if m is not None:
-            mora = m
-    return (juros + mora).quantize(Decimal('0.0001'))
+    return juros.quantize(Decimal('0.0001'))
 
 
-@login_required
-def emprestimo_list(request):
-    empresa = _empresa_sessao(request)
-    if not empresa:
-        messages.error(request, 'Selecione uma empresa.')
-        return redirect('accounts:login')
+def _taxa_calculo_am(emp, request=None) -> Decimal:
+    """Alias legado — cálculos usam só taxa de juros a.m."""
+    return _taxa_juros_am_efetiva(emp, request)
 
+
+def _emprestimo_filtros_request(request):
+    """Lê filtros GET da listagem de empréstimos."""
+    banco_id = (request.GET.get('banco') or '').strip()
+    clientes = [c.strip() for c in request.GET.getlist('cliente') if c and str(c).strip()]
+    try:
+        banco_id = int(banco_id) if banco_id else None
+    except (TypeError, ValueError):
+        banco_id = None
+    return {'banco_id': banco_id, 'clientes': clientes}
+
+
+def _emprestimo_filtros_opcoes(empresa):
+    """Bancos e clientes disponíveis nos empréstimos da empresa."""
+    qs = Emprestimo.objects.filter(empresa=empresa)
+    bancos = (
+        Banco.objects.filter(emprestimos__empresa=empresa)
+        .distinct()
+        .order_by('nome')
+    )
+    clientes = sorted({
+        c.strip() for c in qs.values_list('cliente', flat=True) if c and str(c).strip()
+    })
+    return bancos, clientes
+
+
+def _emprestimo_list_rows(empresa, *, banco_id=None, clientes=None):
+    """Monta linhas e totais da listagem de empréstimos (tela e Excel)."""
     qs = (
         Emprestimo.objects.filter(empresa=empresa)
         .select_related('indicador', 'banco')
         .order_by('-data_operacao', '-id')
     )
+    if banco_id:
+        qs = qs.filter(banco_id=banco_id)
+    if clientes:
+        q_clientes = Q()
+        for cliente in clientes:
+            q_clientes |= Q(cliente__iexact=cliente)
+        qs = qs.filter(q_clientes)
     rows = []
     tot_valor_contrato = Decimal('0')
     tot_saldo_principal = Decimal('0')
@@ -149,23 +240,183 @@ def emprestimo_list(request):
         tot_qtd_abertas += qtd_abertas
         tot_qtd_parcelas += qtd_parcelas
 
+    totais = {
+        'valor_contrato': tot_valor_contrato,
+        'saldo_principal': tot_saldo_principal,
+        'total_aberto': tot_parcelas_abertas,
+        'ja_pago': tot_ja_pago,
+        'juros_pago': tot_juros_pago,
+        'total_correcao': tot_correcao,
+        'total_mora': tot_mora,
+        'qtd_abertas': tot_qtd_abertas,
+        'qtd_parcelas': tot_qtd_parcelas,
+        'qtd_contratos': len(rows),
+    }
+    return rows, totais
+
+
+@login_required
+def emprestimo_list(request):
+    from urllib.parse import urlencode
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    filtros = _emprestimo_filtros_request(request)
+    bancos, clientes = _emprestimo_filtros_opcoes(empresa)
+    rows, totais = _emprestimo_list_rows(
+        empresa,
+        banco_id=filtros['banco_id'],
+        clientes=filtros['clientes'],
+    )
+    export_params = []
+    if filtros['banco_id']:
+        export_params.append(('banco', str(filtros['banco_id'])))
+    for cliente in filtros['clientes']:
+        export_params.append(('cliente', cliente))
+
     return render(request, 'emprestimos/listar.html', {
         'title': 'Empréstimos bancários',
         'rows': rows,
         'empresa': empresa,
-        'totais': {
-            'valor_contrato': tot_valor_contrato,
-            'saldo_principal': tot_saldo_principal,
-            'total_aberto': tot_parcelas_abertas,
-            'ja_pago': tot_ja_pago,
-            'juros_pago': tot_juros_pago,
-            'total_correcao': tot_correcao,
-            'total_mora': tot_mora,
-            'qtd_abertas': tot_qtd_abertas,
-            'qtd_parcelas': tot_qtd_parcelas,
-            'qtd_contratos': len(rows),
-        },
+        'totais': totais,
+        'bancos_filtro': bancos,
+        'clientes_filtro': clientes,
+        'filtros': filtros,
+        'export_query_string': urlencode(export_params),
     })
+
+
+@login_required
+@require_GET
+def emprestimo_list_excel(request):
+    """Exporta a listagem de empréstimos para Excel."""
+    from io import BytesIO
+
+    from django.http import HttpResponse
+    from django.utils import timezone as dj_tz
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    filtros = _emprestimo_filtros_request(request)
+    rows, totais = _emprestimo_list_rows(
+        empresa,
+        banco_id=filtros['banco_id'],
+        clientes=filtros['clientes'],
+    )
+    hoje = dj_tz.localdate()
+    money_format = '#,##0.00'
+    header_fill = PatternFill('solid', fgColor='198754')
+    header_font = Font(bold=True, color='FFFFFF')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Empréstimos'
+
+    ws['A1'] = 'Empréstimos bancários'
+    ws['A1'].font = Font(bold=True, size=13)
+    ws.merge_cells('A1:O1')
+    ws['A2'] = str(empresa)
+    ws['A3'] = f'Exportado em: {hoje.strftime("%d/%m/%Y")}'
+    ws['A4'] = f'Contratos: {totais["qtd_contratos"]}'
+
+    headers = [
+        'Banco',
+        'Contrato',
+        'Cliente',
+        'Valor contrato',
+        'Início',
+        'Indicador de cálculo',
+        'Taxa juros a.m.',
+        'Parcelas',
+        'Em aberto',
+        'Saldo principal',
+        'Total parcelas abertas',
+        'Total já pago',
+        'Total juros pago',
+        'Total correção',
+        'Total mora',
+    ]
+    row0 = 6
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row0, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', wrap_text=True)
+
+    for i, row in enumerate(rows):
+        r = row0 + 1 + i
+        emp = row['emprestimo']
+        banco_nome = emp.banco.nome if emp.banco_id else ''
+        if emp.taxa_juros_am:
+            taxa_txt = float(emp.taxa_juros_am)
+        elif emp.taxa_juros_aa:
+            taxa_txt = f'{emp.taxa_juros_aa} a.a.'
+        else:
+            taxa_txt = ''
+
+        ws.cell(row=r, column=1, value=banco_nome)
+        ws.cell(row=r, column=2, value=emp.numero_contrato)
+        ws.cell(row=r, column=3, value=emp.cliente or '')
+        cell = ws.cell(row=r, column=4, value=float(emp.valor_contrato or 0))
+        cell.number_format = money_format
+        ws.cell(
+            row=r, column=5,
+            value=emp.data_operacao.strftime('%d/%m/%Y') if emp.data_operacao else '',
+        )
+        ws.cell(row=r, column=6, value=emp.indicador_display if emp.indicador_display != '—' else '')
+        taxa_cell = ws.cell(row=r, column=7, value=taxa_txt)
+        if isinstance(taxa_txt, float):
+            taxa_cell.number_format = '0.0000'
+        ws.cell(row=r, column=8, value=row['qtd_parcelas'])
+        ws.cell(row=r, column=9, value=row['qtd_abertas'])
+        for col, key in enumerate(
+            ('saldo_principal', 'total_aberto', 'ja_pago', 'juros_pago', 'total_correcao', 'total_mora'),
+            start=10,
+        ):
+            cell = ws.cell(row=r, column=col, value=float(row[key] or 0))
+            cell.number_format = money_format
+
+    total_row = row0 + 1 + len(rows)
+    ws.cell(row=total_row, column=1, value='TOTAL').font = Font(bold=True)
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
+    cell = ws.cell(row=total_row, column=4, value=float(totais['valor_contrato'] or 0))
+    cell.number_format = money_format
+    cell.font = Font(bold=True)
+    ws.cell(row=total_row, column=8, value=totais['qtd_parcelas']).font = Font(bold=True)
+    ws.cell(row=total_row, column=9, value=totais['qtd_abertas']).font = Font(bold=True)
+    for col, key in enumerate(
+        ('saldo_principal', 'total_aberto', 'ja_pago', 'juros_pago', 'total_correcao', 'total_mora'),
+        start=10,
+    ):
+        cell = ws.cell(row=total_row, column=col, value=float(totais[key] or 0))
+        cell.number_format = money_format
+        cell.font = Font(bold=True)
+
+    widths = [14, 18, 28, 16, 12, 22, 14, 10, 10, 16, 20, 16, 16, 14, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    bio = BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+
+    empresa_slug = re.sub(r'[^\w.-]+', '_', str(empresa)[:40])
+    nome = f'emprestimos_{empresa_slug}_{hoje.strftime("%Y%m%d")}.xlsx'
+
+    response = HttpResponse(
+        bio.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nome}"'
+    return response
 
 
 @login_required
@@ -175,14 +426,32 @@ def emprestimo_parcelas_abertas(request):
         messages.error(request, 'Selecione uma empresa.')
         return redirect('accounts:login')
 
-    parcelas = (
+    parcelas_qs = (
         ParcelaEmprestimo.objects.filter(
             emprestimo__empresa=empresa,
             status='aberta',
         )
         .select_related('emprestimo', 'emprestimo__banco', 'emprestimo__indicador')
-        .order_by('data_vencimento', 'emprestimo__numero_contrato', 'numero')
     )
+    meses_opcoes = _meses_abertos_opcoes(parcelas_qs)
+
+    mes_filtro = (request.GET.get('mes') or '').strip()
+    mes_rotulo = ''
+    if mes_filtro:
+        try:
+            ano, mes = mes_filtro.split('-', 1)
+            parcelas = parcelas_qs.filter(
+                data_vencimento__year=int(ano),
+                data_vencimento__month=int(mes),
+            )
+            mes_rotulo = _rotulo_mes_ano(mes_filtro)
+        except (ValueError, TypeError):
+            mes_filtro = ''
+            parcelas = parcelas_qs
+    else:
+        parcelas = parcelas_qs
+
+    parcelas = parcelas.order_by('data_vencimento', 'emprestimo__numero_contrato', 'numero')
 
     totais = parcelas.aggregate(
         valor_parcela=Sum('valor_parcela'),
@@ -196,6 +465,9 @@ def emprestimo_parcelas_abertas(request):
         'title': 'Parcelas em aberto',
         'empresa': empresa,
         'parcelas': parcelas,
+        'mes_filtro': mes_filtro,
+        'mes_rotulo': mes_rotulo,
+        'meses_opcoes': meses_opcoes,
         'totais': {
             'qtd': parcelas.count(),
             'valor_parcela': totais['valor_parcela'] or Decimal('0'),
@@ -305,6 +577,7 @@ def emprestimo_importar(request):
                     historico=p['historico'],
                     valor_pago=p['valor_pago'],
                     mora=p['mora'],
+                    multa=p.get('multa') or Decimal('0'),
                     iof=p['iof'],
                     correcao=p.get('correcao') or Decimal('0'),
                     status=p['status'],
@@ -327,6 +600,79 @@ def emprestimo_importar(request):
         'title': 'Importar PDF de empréstimo',
         'empresa': empresa,
     })
+
+
+def _vals_parcela_pdf(row: dict) -> dict:
+    valor_parcela = row.get('valor_parcela') or Decimal('0')
+    juros = row.get('juros') or Decimal('0')
+    amortizacao = row.get('amortizacao') or Decimal('0')
+    correcao = row.get('correcao') or Decimal('0')
+    if valor_parcela > 0 and amortizacao <= 0:
+        amortizacao = max(
+            Decimal('0'),
+            (valor_parcela - juros - correcao).quantize(Decimal('0.01')),
+        )
+    return {
+        'data_vencimento': row.get('data_vencimento'),
+        'valor_parcela': valor_parcela,
+        'amortizacao': amortizacao,
+        'juros': juros,
+        'data_pagamento': None,
+        'historico': row.get('historico') or '',
+        'valor_pago': None,
+        'mora': row.get('mora') or Decimal('0'),
+        'iof': row.get('iof') or Decimal('0'),
+        'correcao': correcao,
+        'status': 'aberta',
+    }
+
+
+def _reimportar_parcelas_daycoval(emp, parcelas_pdf: list[dict]) -> tuple[int, int, int, int, date | None]:
+    """
+    Daycoval: PARCELA + RESIDUAL com vencimentos distintos — casa por data de vencimento.
+    """
+    ultima_paga_venc = (
+        emp.parcelas.filter(status='paga')
+        .order_by('-data_vencimento')
+        .values_list('data_vencimento', flat=True)
+        .first()
+    )
+    por_vencimento = {p.data_vencimento: p for p in emp.parcelas.all()}
+    max_num = emp.parcelas.order_by('-numero').values_list('numero', flat=True).first() or 0
+
+    atualizadas = criadas = ignoradas = restauradas = 0
+
+    for row in parcelas_pdf:
+        venc = row.get('data_vencimento')
+        if not venc:
+            continue
+
+        if ultima_paga_venc and venc <= ultima_paga_venc:
+            existente = por_vencimento.get(venc)
+            if existente and existente.status != 'paga':
+                existente.status = 'paga'
+                existente.save(update_fields=['status'])
+                restauradas += 1
+            ignoradas += 1
+            continue
+
+        vals = _vals_parcela_pdf(row)
+        existente = por_vencimento.get(venc)
+        if existente:
+            if existente.status == 'paga':
+                ignoradas += 1
+                continue
+            for k, v in vals.items():
+                setattr(existente, k, v)
+            existente.save()
+            atualizadas += 1
+        else:
+            max_num += 1
+            nova = ParcelaEmprestimo.objects.create(emprestimo=emp, numero=max_num, **vals)
+            por_vencimento[venc] = nova
+            criadas += 1
+
+    return atualizadas, criadas, ignoradas, restauradas, ultima_paga_venc
 
 
 @login_required
@@ -385,6 +731,7 @@ def emprestimo_importar_parcelas_pdf(request, pk):
     criadas = 0
     ignoradas_baixadas = 0
     restauradas_status = 0
+    ultima_paga_venc = None
 
     with transaction.atomic():
         indicador_obj = IndicadorCalculoSicoob.from_texto_pdf(dados.get('indicador_calculo') or '')
@@ -438,69 +785,83 @@ def emprestimo_importar_parcelas_pdf(request, pk):
         emp.arquivo_origem = pdf.name[:255]
         emp.save()
 
-        por_numero = {p.numero: p for p in emp.parcelas.all()}
+        if (dados.get('banco') or '').lower() == 'daycoval':
+            atualizadas, criadas, ignoradas_baixadas, restauradas_status, ultima_paga_venc = (
+                _reimportar_parcelas_daycoval(emp, parcelas_pdf)
+            )
+            ultima_paga = (
+                emp.parcelas.filter(status='paga')
+                .order_by('-numero')
+                .values_list('numero', flat=True)
+                .first()
+            )
+            inicio_aberto = None
+        else:
+            por_numero = {p.numero: p for p in emp.parcelas.all()}
 
-        # Garante que baixadas acidentais (reabertas) voltem a paga se nº <= última paga
-        for num, p in por_numero.items():
-            if num < inicio_aberto and p.status != 'paga':
-                p.status = 'paga'
-                p.save(update_fields=['status'])
-                restauradas_status += 1
+            # Garante que baixadas acidentais (reabertas) voltem a paga se nº <= última paga
+            for num, p in por_numero.items():
+                if num < inicio_aberto and p.status != 'paga':
+                    p.status = 'paga'
+                    p.save(update_fields=['status'])
+                    restauradas_status += 1
 
-        for row in parcelas_pdf:
-            numero = int(row.get('numero') or 0)
-            if numero < inicio_aberto:
-                # Nunca altera baixadas / anteriores à âncora
-                ignoradas_baixadas += 1
-                continue
-
-            valor_parcela = row.get('valor_parcela') or Decimal('0')
-            juros = row.get('juros') or Decimal('0')
-            amortizacao = row.get('amortizacao') or Decimal('0')
-            correcao = row.get('correcao') or Decimal('0')
-            if valor_parcela > 0 and amortizacao <= 0:
-                amortizacao = max(Decimal('0'), (valor_parcela - juros - correcao).quantize(Decimal('0.01')))
-
-            vals = {
-                'data_vencimento': row.get('data_vencimento'),
-                'valor_parcela': valor_parcela,
-                'amortizacao': amortizacao,
-                'juros': juros,
-                'data_pagamento': None,
-                'historico': row.get('historico') or '',
-                'valor_pago': None,
-                'mora': row.get('mora') or Decimal('0'),
-                'iof': row.get('iof') or Decimal('0'),
-                'correcao': correcao,
-                'status': 'aberta',
-            }
-            existente = por_numero.get(numero)
-            if existente:
-                if existente.status == 'paga':
-                    # Segurança: não reabre baixada mesmo se número >= início
+            for row in parcelas_pdf:
+                numero = int(row.get('numero') or 0)
+                if numero < inicio_aberto:
+                    # Nunca altera baixadas / anteriores à âncora
                     ignoradas_baixadas += 1
                     continue
-                for k, v in vals.items():
-                    setattr(existente, k, v)
-                existente.save()
-                atualizadas += 1
-            else:
-                ParcelaEmprestimo.objects.create(emprestimo=emp, numero=numero, **vals)
-                criadas += 1
 
-    messages.success(
-        request,
-        f'Parcelas em aberto atualizadas a partir da nº {inicio_aberto} '
-        f'(última baixada no sistema: {ultima_paga or "nenhuma"}). '
-        f'{atualizadas} atualizada(s), {criadas} criada(s). '
-        f'Baixadas preservadas: {ignoradas_baixadas}.',
-    )
-    if restauradas_status:
-        messages.warning(
-            request,
-            f'{restauradas_status} parcela(s) que tinham sido reabertas por engano '
-            f'voltaram para status paga (nº < {inicio_aberto}).',
+                vals = _vals_parcela_pdf(row)
+                existente = por_numero.get(numero)
+                if existente:
+                    if existente.status == 'paga':
+                        # Segurança: não reabre baixada mesmo se número >= início
+                        ignoradas_baixadas += 1
+                        continue
+                    for k, v in vals.items():
+                        setattr(existente, k, v)
+                    existente.save()
+                    atualizadas += 1
+                else:
+                    ParcelaEmprestimo.objects.create(emprestimo=emp, numero=numero, **vals)
+                    criadas += 1
+
+    if (dados.get('banco') or '').lower() == 'daycoval':
+        ancora = (
+            ultima_paga_venc.strftime('%d/%m/%Y')
+            if ultima_paga_venc
+            else 'nenhuma'
         )
+        messages.success(
+            request,
+            f'Parcelas Daycoval atualizadas após vencimento {ancora} '
+            f'(inclui PARCELA e RESIDUAL VRG). '
+            f'{atualizadas} atualizada(s), {criadas} criada(s). '
+            f'Baixadas preservadas: {ignoradas_baixadas}.',
+        )
+    else:
+        messages.success(
+            request,
+            f'Parcelas em aberto atualizadas a partir da nº {inicio_aberto} '
+            f'(última baixada no sistema: {ultima_paga or "nenhuma"}). '
+            f'{atualizadas} atualizada(s), {criadas} criada(s). '
+            f'Baixadas preservadas: {ignoradas_baixadas}.',
+        )
+    if restauradas_status:
+        if (dados.get('banco') or '').lower() == 'daycoval':
+            messages.warning(
+                request,
+                f'{restauradas_status} parcela(s) com vencimento já quitado '
+                f'voltaram para status paga.',
+            )
+        else:
+            messages.warning(
+                request,
+                f'{restauradas_status} parcela(s) que tinham sido reabertas por engano '
+                f'voltaram para status paga (nº < {inicio_aberto}).',
+            )
     if dados.get('aviso'):
         messages.warning(request, dados['aviso'])
     return redirect('emprestimos:detalhe', pk=emp.pk)
@@ -559,6 +920,18 @@ def _juros_price_pro_rata(saldo: Decimal, taxa_am: Decimal, dias: int) -> Decima
     return juros.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def _saldo_principal_abertas(parcelas):
+    """Soma das amortizações das parcelas em aberto (saldo principal do extrato)."""
+    if hasattr(parcelas, 'filter'):
+        qs = parcelas.filter(status='aberta')
+    else:
+        qs = [p for p in parcelas if getattr(p, 'status', None) == 'aberta']
+    return sum(
+        (p.amortizacao or Decimal('0') for p in qs),
+        Decimal('0'),
+    ).quantize(Decimal('0.01'))
+
+
 def _resumo_quitacao_contrato(emp, abertas, pagas, data_quitacao, is_sac: bool, taxa_juros_am: Decimal):
     """
     Valores da quitação TOTAL do contrato (todas as abertas) na data informada.
@@ -566,11 +939,46 @@ def _resumo_quitacao_contrato(emp, abertas, pagas, data_quitacao, is_sac: bool, 
     """
     from datetime import date as date_cls
 
-    saldo = max(
-        Decimal('0'),
-        (emp.valor_contrato or Decimal('0'))
-        - sum((p.amortizacao or Decimal('0') for p in pagas), Decimal('0')),
-    )
+    from .sac_calculo import saldo_quitacao_sac_taxa_fixa
+
+    parcela_carencia = next((p for p in abertas if p.numero == 0), None)
+    pago_amort = sum((p.amortizacao or Decimal('0') for p in pagas), Decimal('0'))
+    taxa = taxa_juros_am or Decimal('0')
+
+    if (
+        is_sac
+        and taxa > 0
+        and parcela_carencia
+        and emp.data_operacao
+        and parcela_carencia.data_vencimento
+        and data_quitacao
+    ):
+        saldo, juros, quitacao = saldo_quitacao_sac_taxa_fixa(
+            valor_contrato=emp.valor_contrato or Decimal('0'),
+            taxa_juros_am=taxa,
+            data_operacao=emp.data_operacao,
+            data_quitacao=data_quitacao,
+            vencimento_p0=parcela_carencia.data_vencimento,
+            pago_amort=pago_amort,
+        )
+        face = sum((p.valor_parcela or Decimal('0') for p in abertas), Decimal('0'))
+        dias = max(0, (data_quitacao - emp.data_operacao).days)
+        return {
+            'valor_principal': saldo.quantize(Decimal('0.01')),
+            'valor_parcela_original': face.quantize(Decimal('0.01')),
+            'valor_quitacao': quitacao,
+            'diferenca': (face - quitacao).quantize(Decimal('0.01')),
+            'juros': juros,
+            'dias': dias,
+        }
+
+    saldo = _saldo_principal_abertas(abertas)
+    if saldo <= 0:
+        saldo = max(
+            Decimal('0'),
+            (emp.valor_contrato or Decimal('0'))
+            - sum((p.amortizacao or Decimal('0') for p in pagas), Decimal('0')),
+        )
     face = sum((p.valor_parcela or Decimal('0') for p in abertas), Decimal('0'))
     data_ref = _data_ref_quitacao(emp, pagas, data_quitacao or date_cls.today())
     dias = max(0, (data_quitacao - data_ref).days) if data_quitacao and data_ref else 0
@@ -738,7 +1146,7 @@ def _processar_simulacao_quitacao(request, emp, abertas, pagas, data_quitacao):
             messages.warning(request, 'Taxa SELIC manual inválida — usando consulta BCB.')
 
     dias_juros = max(0, (data_fim_juros - data_ref).days)
-    taxa = _taxa_calculo_am(emp, request)
+    taxa = _taxa_juros_am_efetiva(emp, request)
     juros_pro_rata = Decimal('0.00')
     juros_selic = Decimal('0.00')
     juros_aa = Decimal('0.00')
@@ -1028,6 +1436,41 @@ def emprestimo_detalhe(request, pk):
     if parcela_fixa_price <= 0 and parcelas:
         parcela_fixa_price = parcelas[0].valor_parcela or Decimal('0')
 
+    parcela_carencia = next((p for p in parcelas if p.numero == 0), None)
+    primeira_parcela_pagamento = next(
+        (p for p in abertas if (p.amortizacao or Decimal('0')) > 0),
+        None,
+    )
+    juros_carencia_p0 = (parcela_carencia.juros or Decimal('0')) if parcela_carencia else Decimal('0')
+    juros_carencia_total = sum(
+        (p.juros or Decimal('0')) for p in parcelas
+        if p.numero >= 1 and 'encargos mensais' in (p.historico or '').lower()
+    )
+    juros_carencia_mensais = sum(
+        (p.juros or Decimal('0')) for p in abertas
+        if p.numero >= 1 and 'encargos mensais' in (p.historico or '').lower()
+    )
+    carencia_juros_mensais = juros_carencia_total > 0
+    juros_carencia_incorporados = juros_carencia_total
+    if (
+        parcela_carencia
+        and juros_carencia_p0 <= 0
+        and juros_carencia_mensais > 0
+        and 'incorporados' in (parcela_carencia.historico or '').lower()
+    ):
+        juros_carencia_p0 = juros_carencia_mensais
+    total_juros_aberto = sum((p.juros for p in abertas), Decimal('0'))
+    total_juros_futuros = sum(
+        (p.juros or Decimal('0')) for p in abertas if (p.amortizacao or Decimal('0')) > 0
+    )
+    if total_juros_futuros < 0:
+        total_juros_futuros = Decimal('0')
+
+    saldo_principal = sum((p.amortizacao for p in abertas), Decimal('0'))
+    saldo_principal_total = saldo_principal
+    if carencia_juros_mensais and juros_carencia_total > 0:
+        saldo_principal_total = (saldo_principal + juros_carencia_total).quantize(Decimal('0.01'))
+
     return render(request, 'emprestimos/detalhe.html', {
         'title': f'Empréstimo {emp.numero_contrato}',
         'emprestimo': emp,
@@ -1036,13 +1479,20 @@ def emprestimo_detalhe(request, pk):
         'pagas': pagas,
         'total_aberto': sum((p.valor_parcela for p in abertas), Decimal('0')),
         'amortizacao_paga': sum((p.amortizacao for p in pagas), Decimal('0')),
-        'saldo_principal': sum((p.amortizacao for p in abertas), Decimal('0')),
-        'total_juros_aberto': sum((p.juros for p in abertas), Decimal('0')),
+        'saldo_principal': saldo_principal,
+        'saldo_principal_total': saldo_principal_total,
+        'juros_carencia_total': juros_carencia_total,
+        'total_juros_aberto': total_juros_aberto,
+        'juros_carencia_p0': juros_carencia_p0,
+        'juros_carencia_mensais': juros_carencia_mensais,
+        'juros_carencia_incorporados': juros_carencia_incorporados,
+        'carencia_juros_mensais': carencia_juros_mensais,
+        'total_juros_futuros': total_juros_futuros,
         'simulacao': None,
         'selecionadas_ids': set(),
         'data_quitacao': hoje,
         'data_ref_quitacao': data_ref_quitacao,
-        'taxa_quitacao_am': _taxa_calculo_am(emp),
+        'taxa_quitacao_am': _taxa_juros_am_efetiva(emp),
         'juros_por_parcela': {},
         'selic_periodo_pct': '',
         'is_sac_emprestimo': is_sac,
@@ -1053,6 +1503,9 @@ def emprestimo_detalhe(request, pk):
         'sugestao_total_parcelas': sugestao_total_parcelas,
         'sugestao_dia_vencimento': sugestao_dia_vencimento,
         'parcela_fixa_price': parcela_fixa_price,
+        'parcela_carencia': parcela_carencia,
+        'primeira_parcela_pagamento': primeira_parcela_pagamento,
+        'data_ref_cobranca': hoje,
     })
 
 
@@ -1078,6 +1531,37 @@ def emprestimo_quitacao(request, pk):
     hoje = dj_tz.localdate()
     is_sac, metodo = _metodo_flags(emp)
     data_ref_quitacao = _data_ref_quitacao(emp, pagas, hoje)
+    parcela_carencia = next((p for p in parcelas if p.numero == 0), None)
+    juros_carencia_total = sum(
+        (p.juros or Decimal('0')) for p in parcelas
+        if p.numero >= 1 and 'encargos mensais' in (p.historico or '').lower()
+    )
+    carencia_juros_mensais = juros_carencia_total > 0
+    if not parcela_carencia and carencia_juros_mensais:
+        parcela_carencia = next(
+            (p for p in reversed(parcelas) if 'encargos mensais' in (p.historico or '').lower()),
+            None,
+        )
+    saldo_pos_carencia = None
+    if (
+        parcela_carencia
+        and emp.data_operacao
+        and parcela_carencia.data_vencimento
+        and (emp.taxa_juros_am or Decimal('0')) > 0
+    ):
+        from .sac_calculo import _juros_carencia_divididos
+
+        pago_amort = sum((p.amortizacao or Decimal('0') for p in pagas), Decimal('0'))
+        principal_base = max(
+            Decimal('0'),
+            (emp.valor_contrato or Decimal('0')) - pago_amort,
+        )
+        _jp0, _jc, saldo_pos_carencia = _juros_carencia_divididos(
+            saldo_inicial=principal_base,
+            taxa_juros_am=emp.taxa_juros_am,
+            data_inicio=emp.data_operacao,
+            vencimento_p0=parcela_carencia.data_vencimento,
+        )
 
     session_key = f'quitacao_sim_{pk}'
     session_key_legacy = f'quitacao_price_{pk}'
@@ -1163,13 +1647,19 @@ def emprestimo_quitacao(request, pk):
         'pagas': pagas,
         'total_aberto': sum((p.valor_parcela for p in abertas), Decimal('0')),
         'amortizacao_paga': sum((p.amortizacao for p in pagas), Decimal('0')),
-        'saldo_principal': sum((p.amortizacao for p in abertas), Decimal('0')),
+        'saldo_principal': sum((p.amortizacao or Decimal('0') for p in abertas), Decimal('0')),
+        'saldo_principal_total': (
+            sum((p.amortizacao or Decimal('0') for p in abertas), Decimal('0'))
+            + (juros_carencia_total if carencia_juros_mensais else Decimal('0'))
+        ).quantize(Decimal('0.01')),
+        'juros_carencia_total': juros_carencia_total,
+        'carencia_juros_mensais': carencia_juros_mensais,
         'total_juros_aberto': sum((p.juros for p in abertas), Decimal('0')),
         'simulacao': sim,
         'selecionadas_ids': selecionadas_ids,
         'data_quitacao': data_quitacao,
         'data_ref_quitacao': data_ref_quitacao,
-        'taxa_quitacao_am': _taxa_calculo_am(emp, request if request.method == 'POST' else None),
+        'taxa_quitacao_am': _taxa_juros_am_efetiva(emp, request if request.method == 'POST' else None),
         'taxa_quitacao_aa': emp.taxa_juros_aa or Decimal('0'),
         'selic_periodo_pct': (request.POST.get('selic_periodo_pct') if request.method == 'POST' else '') or '',
         'is_sac_emprestimo': is_sac,
@@ -1179,6 +1669,8 @@ def emprestimo_quitacao(request, pk):
         'origem_simulacao': origem_simulacao,
         'origem_price': origem_price,
         'origem_sac': origem_sac,
+        'parcela_carencia': parcela_carencia,
+        'saldo_pos_carencia': saldo_pos_carencia,
     })
 
 
@@ -1328,37 +1820,37 @@ def emprestimo_simulacoes_relatorio_sintetico(request):
 
     ws['A1'] = 'Relatório sintético — Simulações de quitação'
     ws['A1'].font = Font(bold=True, size=13)
-    ws.merge_cells('A1:K1')
+    ws.merge_cells('A1:L1')
     ws['A2'] = f'Empresa: {getattr(empresa, "razao", None) or getattr(empresa, "nome_fantasia", None) or empresa}'
     ws['A3'] = f'Gerado em: {dj_tz.localtime().strftime("%d/%m/%Y %H:%M")}'
     ws['A4'] = f'Simulações: {len(sims)}'
 
     # Linha 5 — agrupadores
     row_grp = 5
-    ws.merge_cells(start_row=row_grp, start_column=3, end_row=row_grp, end_column=6)
-    c_parc = ws.cell(row=row_grp, column=3, value='parcial')
+    ws.merge_cells(start_row=row_grp, start_column=4, end_row=row_grp, end_column=7)
+    c_parc = ws.cell(row=row_grp, column=4, value='parcial')
     c_parc.fill = group_fill
     c_parc.font = group_font
     c_parc.alignment = center
-    for col in range(3, 7):
+    for col in range(4, 8):
         ws.cell(row=row_grp, column=col).fill = group_fill
         ws.cell(row=row_grp, column=col).border = thin
 
-    ws.merge_cells(start_row=row_grp, start_column=8, end_row=row_grp, end_column=11)
-    c_tot = ws.cell(row=row_grp, column=8, value='total')
+    ws.merge_cells(start_row=row_grp, start_column=9, end_row=row_grp, end_column=12)
+    c_tot = ws.cell(row=row_grp, column=9, value='total')
     c_tot.fill = group_fill
     c_tot.font = group_font
     c_tot.alignment = center
-    for col in range(8, 12):
+    for col in range(9, 13):
         ws.cell(row=row_grp, column=col).fill = group_fill
         ws.cell(row=row_grp, column=col).border = thin
 
-    ws.merge_cells(start_row=row_grp, start_column=13, end_row=row_grp, end_column=15)
-    c_qp = ws.cell(row=row_grp, column=13, value='quando tiver parcial')
+    ws.merge_cells(start_row=row_grp, start_column=14, end_row=row_grp, end_column=16)
+    c_qp = ws.cell(row=row_grp, column=14, value='quando tiver parcial')
     c_qp.fill = group_fill
     c_qp.font = group_font
     c_qp.alignment = center
-    for col in (13, 14, 15):
+    for col in (14, 15, 16):
         ws.cell(row=row_grp, column=col).fill = group_fill
         ws.cell(row=row_grp, column=col).border = thin
 
@@ -1367,18 +1859,19 @@ def emprestimo_simulacoes_relatorio_sintetico(request):
     headers = {
         1: 'Banco',
         2: 'Contrato',
-        3: 'Valor principal',
-        4: 'Valor parcela original',
-        5: 'Quitação total',
-        6: 'Diferença',
-        7: 'Data quitação',
-        8: 'Valor principal',
-        9: 'Valor parcela original',
-        10: 'Quitação total',
-        11: 'Diferença',
-        13: 'Valor restante',
-        14: 'Valor parcelas',
-        15: 'Remanescentes',
+        3: 'Parcela atual',
+        4: 'Valor principal',
+        5: 'Valor parcela original',
+        6: 'Quitação total',
+        7: 'Diferença',
+        8: 'Data quitação',
+        9: 'Valor principal',
+        10: 'Valor parcela original',
+        11: 'Quitação total',
+        12: 'Diferença',
+        14: 'Valor restante',
+        15: 'Valor parcelas',
+        16: 'Remanescentes',
     }
     for col, h in headers.items():
         cell = ws.cell(row=row0, column=col, value=h)
@@ -1455,36 +1948,40 @@ def emprestimo_simulacoes_relatorio_sintetico(request):
         ws.cell(row=r, column=1, value=banco or '—').border = thin
         ws.cell(row=r, column=2, value=emp.numero_contrato or '').border = thin
 
-        _money(ws.cell(row=r, column=3), p_prin)
-        _money(ws.cell(row=r, column=4), p_face)
-        _money(ws.cell(row=r, column=5), p_quit, green=True)
-        cdiff = ws.cell(row=r, column=6)
+        parcela_atual = s.valor_parcela_extrato or emp.valor_parcela_do_extrato()
+        _money(ws.cell(row=r, column=3), parcela_atual if parcela_atual else None)
+        ws.cell(row=r, column=3).border = thin
+
+        _money(ws.cell(row=r, column=4), p_prin)
+        _money(ws.cell(row=r, column=5), p_face)
+        _money(ws.cell(row=r, column=6), p_quit, green=True)
+        cdiff = ws.cell(row=r, column=7)
         _money(cdiff, p_diff, green=(p_diff >= 0))
         if p_diff < 0:
             cdiff.font = Font(bold=True, color='DC3545')
 
         ws.cell(
-            row=r, column=7,
+            row=r, column=8,
             value=s.data_quitacao.strftime('%d/%m/%Y') if s.data_quitacao else '',
         ).border = thin
 
-        _money(ws.cell(row=r, column=8), t_prin if t_prin else None)
-        _money(ws.cell(row=r, column=9), t_face if t_face else None)
-        _money(ws.cell(row=r, column=10), t_quit if t_quit else None, green=bool(t_quit))
-        cdiff2 = ws.cell(row=r, column=11)
+        _money(ws.cell(row=r, column=9), t_prin if t_prin else None)
+        _money(ws.cell(row=r, column=10), t_face if t_face else None)
+        _money(ws.cell(row=r, column=11), t_quit if t_quit else None, green=bool(t_quit))
+        cdiff2 = ws.cell(row=r, column=12)
         if t_face or t_quit:
             _money(cdiff2, t_diff, green=(t_diff >= 0))
             if t_diff < 0:
                 cdiff2.font = Font(bold=True, color='DC3545')
 
         if r_saldo:
-            _money(ws.cell(row=r, column=13), r_saldo)
+            _money(ws.cell(row=r, column=14), r_saldo)
         if r_parc:
-            _money(ws.cell(row=r, column=14), r_parc, green=True)
-        crem = ws.cell(row=r, column=15, value=r_rem)
+            _money(ws.cell(row=r, column=15), r_parc, green=True)
+        crem = ws.cell(row=r, column=16, value=r_rem)
         crem.border = thin
 
-        for col in (3, 4, 5, 6, 8, 9, 10, 11, 13, 14):
+        for col in (3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15):
             ws.cell(row=r, column=col).border = thin
 
         sums['p_prin'] += p_prin
@@ -1501,16 +1998,16 @@ def emprestimo_simulacoes_relatorio_sintetico(request):
     rtot = row0 + 1 + len(sims)
     ws.cell(row=rtot, column=1, value='TOTAL').font = Font(bold=True)
     for col, key, green in (
-        (3, 'p_prin', False),
-        (4, 'p_face', False),
-        (5, 'p_quit', True),
-        (6, 'p_diff', True),
-        (8, 't_prin', False),
-        (9, 't_face', False),
-        (10, 't_quit', True),
-        (11, 't_diff', True),
-        (13, 'r_saldo', False),
-        (14, 'r_parc', True),
+        (4, 'p_prin', False),
+        (5, 'p_face', False),
+        (6, 'p_quit', True),
+        (7, 'p_diff', True),
+        (9, 't_prin', False),
+        (10, 't_face', False),
+        (11, 't_quit', True),
+        (12, 't_diff', True),
+        (14, 'r_saldo', False),
+        (15, 'r_parc', True),
     ):
         cell = ws.cell(row=rtot, column=col, value=float(sums[key]))
         cell.number_format = money_format
@@ -1518,8 +2015,8 @@ def emprestimo_simulacoes_relatorio_sintetico(request):
         cell.border = thin
 
     widths = {
-        'A': 18, 'B': 12, 'C': 15, 'D': 18, 'E': 14, 'F': 12, 'G': 13,
-        'H': 15, 'I': 18, 'J': 14, 'K': 12, 'L': 3, 'M': 14, 'N': 14, 'O': 28,
+        'A': 18, 'B': 12, 'C': 14, 'D': 15, 'E': 18, 'F': 14, 'G': 12, 'H': 13,
+        'I': 15, 'J': 18, 'K': 14, 'L': 12, 'M': 3, 'N': 14, 'O': 14, 'P': 28,
     }
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
@@ -1585,7 +2082,7 @@ def emprestimo_quitacao_excel(request, pk):
         except Exception:
             return Decimal(default)
 
-    taxa_am = _taxa_calculo_am(emp)
+    taxa_am = _taxa_juros_am_efetiva(emp)
 
     wb = Workbook()
     ws = wb.active
@@ -1608,7 +2105,7 @@ def emprestimo_quitacao_excel(request, pk):
         if origem == 'price'
         else 'Origem dos valores: extrato / lista principal'
     )
-    ws['A7'] = 'Taxa cálculo a.m. (juros + mora):'
+    ws['A7'] = 'Taxa de juros a.m.:'
     ws['A7'].font = Font(bold=True)
     ws['B7'] = float(taxa_am)
     ws['B7'].number_format = '0.000000'
@@ -1867,6 +2364,170 @@ def emprestimo_quitacao_excel(request, pk):
     return response
 
 
+def _rotulo_status_parcela(parcela, data_ref):
+    if parcela.status == 'paga':
+        return 'Paga'
+    if parcela.status == 'aberta':
+        if parcela.situacao_cobranca(data_ref) == 'atrasada':
+            return 'Atrasada'
+        return 'A vencer'
+    return parcela.get_status_display()
+
+
+@login_required
+@require_GET
+def emprestimo_parcelas_excel(request, pk):
+    """Exporta a tabela de parcelas do contrato para Excel."""
+    from io import BytesIO
+
+    from django.http import HttpResponse
+    from django.utils import timezone as dj_tz
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    emp = get_object_or_404(
+        Emprestimo.objects.select_related('indicador', 'banco'),
+        pk=pk,
+        empresa=empresa,
+    )
+    hoje = dj_tz.localdate()
+    parcelas = list(emp.parcelas.order_by('numero'))
+
+    ids_raw = (request.GET.get('ids') or '').strip()
+    if ids_raw:
+        try:
+            ids = {int(x) for x in ids_raw.split(',') if x.strip().isdigit()}
+        except ValueError:
+            ids = set()
+        if ids:
+            parcelas = [p for p in parcelas if p.id in ids]
+
+    if not parcelas:
+        messages.warning(request, 'Nenhuma parcela para exportar.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    money_format = '#,##0.00'
+    header_fill = PatternFill('solid', fgColor='198754')
+    header_font = Font(bold=True, color='FFFFFF')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Parcelas'
+
+    ws['A1'] = f'Parcelas — Contrato {emp.numero_contrato}'
+    ws['A1'].font = Font(bold=True, size=13)
+    ws.merge_cells('A1:M1')
+    ws['A2'] = emp.cliente or ''
+    ws['A3'] = f'Indicador: {emp.indicador_display}'
+    ws['A4'] = f'Valor contrato: R$ {emp.valor_contrato or 0}'
+    ws['A5'] = f'Taxa juros a.m.: {emp.taxa_juros_am or 0}%'
+    if emp.data_operacao:
+        ws['A6'] = f'Data operação: {emp.data_operacao.strftime("%d/%m/%Y")}'
+    ws['A7'] = f'Exportado em: {hoje.strftime("%d/%m/%Y")}'
+
+    headers = [
+        'Nº',
+        'Vencimento',
+        'Parcela',
+        'Amortização',
+        'Juros',
+        'Taxa juros a.m.',
+        'Pagamento',
+        'Valor pago',
+        'Multa',
+        'Mora',
+        'Correção',
+        'Status',
+        'Histórico',
+    ]
+    row0 = 9
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row0, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+
+    tot_parcela = Decimal('0')
+    tot_amort = Decimal('0')
+    tot_juros = Decimal('0')
+    tot_pago = Decimal('0')
+    tot_multa = Decimal('0')
+    tot_mora = Decimal('0')
+    tot_correcao = Decimal('0')
+
+    for i, p in enumerate(parcelas):
+        r = row0 + 1 + i
+        multa = p.multa if (p.multa or Decimal('0')) > 0 else p.multa_atraso_calculada(hoje)
+        taxa = p.taxa_juros_efetiva_am(hoje) if p.status == 'aberta' else (emp.taxa_juros_am or Decimal('0'))
+        valor_pago = p.valor_pago if p.valor_pago is not None else None
+
+        tot_parcela += p.valor_parcela or Decimal('0')
+        tot_amort += p.amortizacao or Decimal('0')
+        tot_juros += p.juros or Decimal('0')
+        if valor_pago is not None:
+            tot_pago += valor_pago
+        tot_multa += multa or Decimal('0')
+        tot_mora += p.mora or Decimal('0')
+        tot_correcao += p.correcao or Decimal('0')
+
+        ws.cell(row=r, column=1, value=p.numero)
+        ws.cell(row=r, column=2, value=p.data_vencimento.strftime('%d/%m/%Y') if p.data_vencimento else '')
+        for col, val in enumerate(
+            (p.valor_parcela, p.amortizacao, p.juros), start=3
+        ):
+            cell = ws.cell(row=r, column=col, value=float(val or 0))
+            cell.number_format = money_format
+        ws.cell(row=r, column=6, value=float(taxa or 0))
+        ws.cell(row=r, column=6).number_format = '0.0000'
+        ws.cell(
+            row=r, column=7,
+            value=p.data_pagamento.strftime('%d/%m/%Y') if p.data_pagamento else '',
+        )
+        if valor_pago is not None:
+            cell = ws.cell(row=r, column=8, value=float(valor_pago))
+            cell.number_format = money_format
+        for col, val in enumerate((multa, p.mora, p.correcao), start=9):
+            cell = ws.cell(row=r, column=col, value=float(val or 0))
+            cell.number_format = money_format
+        ws.cell(row=r, column=12, value=_rotulo_status_parcela(p, hoje))
+        ws.cell(row=r, column=13, value=(p.historico or '').strip())
+
+    total_row = row0 + 1 + len(parcelas)
+    ws.cell(row=total_row, column=1, value='TOTAL').font = Font(bold=True)
+    for col, val in enumerate(
+        (tot_parcela, tot_amort, tot_juros, tot_pago, tot_multa, tot_mora, tot_correcao),
+        start=3,
+    ):
+        cell = ws.cell(row=total_row, column=col, value=float(val))
+        cell.number_format = money_format
+        cell.font = Font(bold=True)
+
+    widths = [6, 12, 14, 14, 14, 14, 12, 14, 12, 12, 12, 12, 28]
+    for i, w in enumerate(widths, start=1):
+        col_letter = chr(64 + i) if i <= 26 else None
+        if col_letter:
+            ws.column_dimensions[col_letter].width = w
+
+    bio = BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+
+    contrato_slug = re.sub(r'[^\w.-]+', '_', emp.numero_contrato or str(pk))
+    nome = f'parcelas_{contrato_slug}_{hoje.strftime("%Y%m%d")}.xlsx'
+
+    response = HttpResponse(
+        bio.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nome}"'
+    return response
+
+
 @login_required
 @require_GET
 def emprestimo_quitacao_juros_preview(request, pk):
@@ -1913,6 +2574,45 @@ def emprestimo_quitacao_juros_preview(request, pk):
         taxa_am = emp.taxa_juros_am or Decimal('0')
     if not data_inicio or not data_fim or saldo <= 0:
         return JsonResponse({'ok': False, 'erro': 'Parâmetros inválidos.'}, status=400)
+
+    parcela_carencia = emp.parcelas.filter(numero=0).first()
+    if (
+        taxa_am > 0
+        and parcela_carencia
+        and emp.data_operacao
+        and parcela_carencia.data_vencimento
+        and _metodo_flags(emp)[0]
+    ):
+        from .sac_calculo import saldo_quitacao_sac_taxa_fixa
+
+        pago_amort = sum(
+            (p.amortizacao or Decimal('0') for p in emp.parcelas.filter(status='paga')),
+            Decimal('0'),
+        )
+        principal, juros, total = saldo_quitacao_sac_taxa_fixa(
+            valor_contrato=emp.valor_contrato or saldo,
+            taxa_juros_am=taxa_am,
+            data_operacao=emp.data_operacao,
+            data_quitacao=data_fim,
+            vencimento_p0=parcela_carencia.data_vencimento,
+            pago_amort=pago_amort,
+        )
+        em_carencia = data_fim < parcela_carencia.data_vencimento
+        dias = max(0, (data_fim - emp.data_operacao).days)
+        return JsonResponse({
+            'ok': True,
+            'juros': str(juros),
+            'total': str(total),
+            'saldo': str(principal),
+            'principal': str(principal),
+            'dias_corridos': dias,
+            'dias_uteis': 0,
+            'taxa_juros_am': str(taxa_am),
+            'pct_indice': str(pct),
+            'indice': 'Taxa fixa',
+            'em_carencia': em_carencia,
+            'modo': 'carencia_parcial' if em_carencia else 'pos_carencia',
+        })
 
     indice = (emp.indice_correcao or '').upper()
     usa_cdi = 'CDI' in indice or (pct != Decimal('100') and 'SELIC' not in indice) or (
@@ -2011,8 +2711,117 @@ def emprestimo_sac_tabela_cdi(request, pk):
     if pv <= 0 or n < 1:
         return JsonResponse({'ok': False, 'erro': 'PV e nº de parcelas inválidos.'}, status=400)
 
+    recalc_parcial = request.GET.get('recalc_parcial') in ('1', 'true', 'True')
+    try:
+        num_inicio = int(request.GET.get('num_inicio') or 1)
+    except ValueError:
+        num_inicio = 1
+    if num_inicio < 1:
+        num_inicio = 1
+
     parcelas = list(emp.parcelas.order_by('numero'))
     venc_por_n = {p.numero: p for p in parcelas}
+
+    if recalc_parcial:
+        import calendar as cal
+
+        ultimo_venc = None
+        for k in range(num_inicio, num_inicio + n):
+            p = venc_por_n.get(k)
+            if p and p.data_vencimento:
+                ultimo_venc = p.data_vencimento
+        if ultimo_venc is None:
+            y, m, d = data_inicio.year, data_inicio.month, data_inicio.day
+            m += n
+            while m > 12:
+                m -= 12
+                y += 1
+            ultimo_venc = date(y, m, min(d, cal.monthrange(y, m)[1]))
+
+        series = []
+        avisos = []
+        try:
+            series = carregar_cdi_diario(data_inicio, max(ultimo_venc, date.today()))
+        except Exception as exc:
+            avisos.append(
+                f'CDI BCB indisponível: {exc}. Usando estimativa com última taxa quando possível.'
+            )
+
+        amort_fixa = (pv / Decimal(n)).quantize(Decimal('0.01'))
+        saldo = pv
+        linhas = []
+        data_ant = data_inicio
+
+        for idx in range(n):
+            k = num_inicio + idx
+            p = venc_por_n.get(k)
+            if p and p.data_vencimento:
+                data_venc = p.data_vencimento
+            else:
+                y, m = data_ant.year, data_ant.month + 1
+                if m > 12:
+                    m = 1
+                    y += 1
+                data_venc = date(y, m, min(data_ant.day, cal.monthrange(y, m)[1]))
+
+            saldo_inicio = saldo.quantize(Decimal('0.01'))
+            amort = amort_fixa
+            if idx == n - 1 or amort > saldo_inicio:
+                amort = saldo_inicio
+            amort = amort.quantize(Decimal('0.01'))
+            juros, det = juros_cdi_sobre_saldo(
+                saldo=saldo_inicio,
+                data_inicio=data_ant,
+                data_fim=data_venc,
+                pct_indice=pct,
+                series=series if series else None,
+            )
+            parcela = (amort + juros).quantize(Decimal('0.01'))
+            saldo_fim = (saldo_inicio - amort).quantize(Decimal('0.01'))
+            if saldo_fim < 0:
+                saldo_fim = Decimal('0.00')
+            if idx == n - 1:
+                saldo_fim = Decimal('0.00')
+
+            linhas.append({
+                'numero': k,
+                'id': p.id if p else None,
+                'status': p.status if p else 'aberta',
+                'origem': 'calculado',
+                'vencimento': data_venc.isoformat(),
+                'dias_uteis': det.get('dias_uteis') or 0,
+                'saldo_inicio': str(saldo_inicio),
+                'juros': str(juros),
+                'amortizacao': str(amort),
+                'parcela': str(parcela),
+                'saldo_fim': str(saldo_fim),
+                'amort_extrato': None,
+                'juros_extrato': None,
+                'parcela_extrato': None,
+                'mensagem': det.get('mensagem') or '',
+                'fator': str(det.get('fator') or '1'),
+            })
+            saldo = saldo_fim
+            data_ant = data_venc
+
+        return JsonResponse({
+            'ok': True,
+            'pv': str(pv),
+            'n': n,
+            'num_inicio': num_inicio,
+            'recalc_parcial': True,
+            'pct_indice': str(pct),
+            'amort_fixa': str(amort_fixa),
+            'data_inicio': data_inicio.isoformat(),
+            'indice': emp.indice_correcao or 'CDI',
+            'qtd_extrato': 0,
+            'avisos': avisos,
+            'linhas': linhas,
+            'formula': (
+                'Simulação parcial: juros = saldo × (fator CDI × pct/100 − 1) '
+                'por período entre vencimentos; parcela = amort + juros.'
+            ),
+        })
 
     # Carrega CDI uma vez cobrindo todo o horizonte (com margem futura estimada)
     ultimo_venc = None
@@ -2045,6 +2854,8 @@ def emprestimo_sac_tabela_cdi(request, pk):
             break
 
     saldo = pv
+    saldo_principal_abertas = _saldo_principal_abertas(parcelas)
+    anchor_aplicado = False
     linhas = []
     data_ant = data_inicio
     qtd_extrato = 0
@@ -2060,6 +2871,10 @@ def emprestimo_sac_tabela_cdi(request, pk):
                 y += 1
             import calendar as cal
             data_venc = date(y, m, min(data_ant.day, cal.monthrange(y, m)[1]))
+
+        if p and p.status != 'paga' and not anchor_aplicado and saldo_principal_abertas > 0:
+            saldo = saldo_principal_abertas
+            anchor_aplicado = True
 
         saldo_inicio = saldo.quantize(Decimal('0.01'))
         origem = 'calculado'
@@ -2205,8 +3020,8 @@ def emprestimo_gerar_parcelas_sac(request, pk):
         messages.error(request, 'A última parcela não tem amortização válida.')
         return redirect('emprestimos:detalhe', pk=pk)
 
-    # Taxa mensal para prévia de juros (juros + mora)
-    taxa_calc = _taxa_calculo_am(emp)
+    # Taxa mensal para prévia de juros (somente juros contratuais)
+    taxa_calc = _taxa_juros_am_efetiva(emp)
     if taxa_calc > 0:
         i_am = taxa_calc / Decimal('100')
     elif emp.taxa_juros_aa and emp.taxa_juros_aa > 0:
@@ -2291,6 +3106,138 @@ def emprestimo_gerar_parcelas_sac(request, pk):
 
 @login_required
 @require_POST
+def emprestimo_gerar_cronograma_inicial(request, pk):
+    """Gera cronograma inicial (Price + carência) quando o contrato ainda não tem parcelas."""
+    from .price_calculo import gerar_cronograma_price_com_carencia
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    emp = get_object_or_404(Emprestimo.objects.select_related('indicador'), pk=pk, empresa=empresa)
+    if emp.parcelas.exists():
+        messages.error(request, 'Este contrato já possui parcelas. Use importar PDF ou atualizar valores.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    is_sac, _metodo = _metodo_flags(emp)
+    if is_sac:
+        messages.error(request, 'Geração automática disponível apenas para Tabela Price.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    pv = (emp.valor_contrato or Decimal('0')).quantize(Decimal('0.01'))
+    if pv <= 0:
+        messages.error(request, 'Informe o valor do contrato antes de gerar o cronograma.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    if not emp.data_operacao:
+        messages.error(request, 'Informe a data da operação antes de gerar o cronograma.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    taxa = _taxa_juros_am_efetiva(emp)
+    if taxa <= 0:
+        messages.error(request, 'Informe a taxa de juros (% a.m.) antes de gerar o cronograma.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    try:
+        n_parcelas = int((request.POST.get('n_parcelas') or '').strip())
+    except ValueError:
+        n_parcelas = 0
+    try:
+        meses_carencia = int((request.POST.get('meses_carencia') or '0').strip())
+    except ValueError:
+        meses_carencia = 0
+    try:
+        dia_venc = int((request.POST.get('dia_vencimento') or '').strip())
+    except ValueError:
+        dia_venc = emp.data_operacao.day
+
+    if n_parcelas < 1 or n_parcelas > 600:
+        messages.error(request, 'Nº de parcelas inválido (1–600).')
+        return redirect('emprestimos:detalhe', pk=pk)
+    if meses_carencia < 0 or meses_carencia > 120:
+        messages.error(request, 'Meses de carência inválido (0–120).')
+        return redirect('emprestimos:detalhe', pk=pk)
+    if dia_venc < 1 or dia_venc > 31:
+        messages.error(request, 'Dia de vencimento inválido (1–31).')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    tipo_carencia = (request.POST.get('tipo_carencia') or 'juros_mensais').strip().lower()
+    if tipo_carencia not in ('juros_mensais', 'capitalizar', 'sem'):
+        tipo_carencia = 'juros_mensais'
+
+    linhas = gerar_cronograma_price_com_carencia(
+        valor_contrato=pv,
+        taxa_juros_am=taxa,
+        data_operacao=emp.data_operacao,
+        n_parcelas=n_parcelas,
+        meses_carencia=meses_carencia,
+        dia_vencimento=dia_venc,
+        tipo_carencia=tipo_carencia,
+    )
+    if not linhas:
+        messages.error(request, 'Não foi possível gerar o cronograma.')
+        return redirect('emprestimos:detalhe', pk=pk)
+
+    ultima_venc = linhas[-1]['data_vencimento']
+    prazo_dias = max(1, (ultima_venc - emp.data_operacao).days)
+    if tipo_carencia == 'juros_mensais' and meses_carencia > 0:
+        juros_carencia = sum(
+            (p['juros'] for p in linhas if p['numero'] >= 1 and 'encargos mensais' in (p.get('historico') or '')),
+            Decimal('0'),
+        )
+        saldo_devedor = (pv + juros_carencia).quantize(Decimal('0.01'))
+    else:
+        juros_incorporados = sum(
+            (p['juros'] for p in linhas if p['numero'] >= 1 and 'encargos mensais' in (p.get('historico') or '')),
+            Decimal('0'),
+        )
+        saldo_devedor = (pv + juros_incorporados).quantize(Decimal('0.01')) if juros_incorporados > 0 else pv
+
+    with transaction.atomic():
+        ParcelaEmprestimo.objects.bulk_create([
+            ParcelaEmprestimo(
+                emprestimo=emp,
+                numero=p['numero'],
+                data_vencimento=p['data_vencimento'],
+                valor_parcela=p['valor_parcela'],
+                amortizacao=p['amortizacao'],
+                juros=p['juros'],
+                data_pagamento=p['data_pagamento'],
+                historico=p['historico'],
+                valor_pago=p['valor_pago'],
+                mora=p['mora'],
+                iof=p['iof'],
+                correcao=p['correcao'],
+                status=p['status'],
+            )
+            for p in linhas
+        ])
+        emp.data_vencimento = ultima_venc
+        emp.prazo_dias = prazo_dias
+        emp.saldo_devedor_atualizado = saldo_devedor
+        emp.save(update_fields=['data_vencimento', 'prazo_dias', 'saldo_devedor_atualizado', 'atualizado_em'])
+
+    qtd_carencia = (
+        meses_carencia
+        if tipo_carencia == 'juros_mensais' and meses_carencia > 0
+        else (1 if tipo_carencia == 'capitalizar' and meses_carencia > 0 else 0)
+    )
+    rotulo_carencia = {
+        'juros_mensais': 'juros mensais',
+        'capitalizar': 'capitalizada (parc. 0)',
+        'sem': 'sem carência',
+    }.get(tipo_carencia, tipo_carencia)
+    messages.success(
+        request,
+        f'Cronograma gerado: {qtd_carencia} mês(es) carência ({rotulo_carencia}) + '
+        f'{n_parcelas} parcela(s) Price (taxa {taxa}% a.m.).',
+    )
+    return redirect('emprestimos:detalhe', pk=pk)
+
+
+@login_required
+@require_POST
 def emprestimo_atualizar_parcelas_sac(request, pk):
     """
     Recalcula parcelas EM ABERTO pela regra SAC:
@@ -2303,6 +3250,7 @@ def emprestimo_atualizar_parcelas_sac(request, pk):
     from datetime import date
 
     from .cdi import carregar_cdi_diario, juros_cdi_sobre_saldo
+    from .sac_calculo import recalcular_sac_taxa_fixa_modelos
 
     empresa = _empresa_sessao(request)
     if not empresa:
@@ -2358,6 +3306,29 @@ def emprestimo_atualizar_parcelas_sac(request, pk):
     pct = emp.pct_correcao_am or Decimal('192')
     if pct <= 0:
         pct = Decimal('192')
+
+    taxa_am = emp.taxa_juros_am or Decimal('0')
+    taxa_mora = emp.taxa_mora_am or Decimal('0')
+    if taxa_am > 0:
+        from django.utils import timezone as dj_tz
+
+        data_ref = dj_tz.localdate()
+        atualizadas = recalcular_sac_taxa_fixa_modelos(
+            parcelas=parcelas,
+            abertas=abertas,
+            pagas=pagas,
+            valor_contrato=pv,
+            taxa_juros_am=taxa_am,
+            taxa_mora_am=taxa_mora,
+            data_operacao=emp.data_operacao,
+            data_ref=data_ref,
+        )
+        messages.success(
+            request,
+            f'{atualizadas} parcela(s) em aberto recalculada(s) pela regra SAC '
+            f'(a vencer: juros {taxa_am}% a.m.; atrasada: juros+mora; multa 2% se vencida).',
+        )
+        return redirect('emprestimos:detalhe', pk=pk)
 
     ultimo_venc = abertas[-1].data_vencimento or data_ant
     series = []
@@ -2418,18 +3389,136 @@ def emprestimo_atualizar_parcelas_sac(request, pk):
     return redirect('emprestimos:detalhe', pk=pk)
 
 
+def _parcela_fixa_price(parcelas) -> Decimal:
+    """PMT de referência: valor de parcela mais frequente na lista."""
+    from collections import Counter
+
+    vals = [
+        (p.valor_parcela or Decimal('0')).quantize(Decimal('0.01'))
+        for p in parcelas
+        if (p.valor_parcela or Decimal('0')) > 0
+    ]
+    if vals:
+        return Counter(vals).most_common(1)[0][0]
+    return Decimal('0')
+
+
+def _recalcular_juros_amort_price(
+    emp,
+    parcelas,
+    *,
+    data_ref=None,
+) -> int:
+    """
+    Recalcula juros e amortização pela Tabela Price em todo o cronograma.
+
+    Percorre pagas + abertas desde o valor do contrato para manter saldo coerente.
+    """
+    from datetime import date
+
+    from django.utils import timezone as dj_tz
+
+    from .taxas_parcela import multa_atraso_parcela, taxa_juros_am_parcela
+
+    if not parcelas:
+        return 0
+
+    taxa_juros = emp.taxa_juros_am or Decimal('0')
+    taxa_mora = emp.taxa_mora_am or Decimal('0')
+    if taxa_juros <= 0:
+        return 0
+
+    data_ref = data_ref or dj_tz.localdate()
+    parcela_fixa = _parcela_fixa_price(parcelas)
+    if parcela_fixa <= 0:
+        return 0
+
+    saldo = (emp.valor_contrato or Decimal('0')).quantize(Decimal('0.01'))
+    data_ant = emp.data_operacao
+    atualizadas = 0
+
+    for idx, p in enumerate(parcelas):
+        if not p.data_vencimento:
+            continue
+
+        saldo_inicio = saldo.quantize(Decimal('0.01'))
+        if p.status == 'paga':
+            taxa_p = taxa_juros
+        else:
+            taxa_p = taxa_juros_am_parcela(
+                p,
+                taxa_juros_am=taxa_juros,
+                taxa_mora_am=taxa_mora,
+                data_ref=data_ref,
+            )
+
+        dias = max(0, (p.data_vencimento - data_ant).days) if data_ant else 30
+        if dias <= 0:
+            dias = 30
+        i = taxa_p / Decimal('100')
+        if i > 0 and dias > 0 and saldo_inicio > 0:
+            fator = (Decimal('1') + i) ** (Decimal(dias) / Decimal('30'))
+            juros = (saldo_inicio * (fator - Decimal('1'))).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP,
+            )
+        else:
+            juros = Decimal('0.00')
+
+        parcela = (p.valor_parcela or Decimal('0')).quantize(Decimal('0.01'))
+        if parcela <= 0:
+            parcela = parcela_fixa
+        elif p.status == 'aberta' and parcela_fixa > 0:
+            parcela = parcela_fixa
+
+        amort = (parcela - juros).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if amort < 0:
+            amort = Decimal('0.00')
+        if amort > saldo_inicio:
+            amort = saldo_inicio.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        saldo_fim = (saldo_inicio - amort).quantize(Decimal('0.01'))
+        if saldo_fim < 0:
+            saldo_fim = Decimal('0.00')
+
+        mudou = (
+            p.amortizacao != amort
+            or p.juros != juros
+            or (p.valor_parcela or Decimal('0')) != parcela
+        )
+        if mudou:
+            p.amortizacao = amort
+            p.juros = juros
+            if (p.valor_parcela or Decimal('0')) <= 0 or p.status == 'aberta':
+                p.valor_parcela = parcela
+            if p.status == 'aberta':
+                p.multa = multa_atraso_parcela(p, data_ref)
+            hist = (p.historico or '').strip()
+            tag = 'Atualizada Price'
+            if tag not in hist:
+                p.historico = f'{hist} | {tag}'.strip(' |') if hist else tag
+            campos = ['amortizacao', 'juros', 'historico']
+            if (p.valor_parcela or Decimal('0')) == parcela:
+                campos.append('valor_parcela')
+            if p.status == 'aberta':
+                campos.append('multa')
+            p.save(update_fields=campos)
+            atualizadas += 1
+
+        saldo = saldo_fim
+        data_ant = p.data_vencimento
+
+    return atualizadas
+
+
 @login_required
 @require_POST
 def emprestimo_atualizar_parcelas_price(request, pk):
     """
-    Recalcula parcelas EM ABERTO pela Tabela Price:
-      Parcela = fixa (da lista)
-      Juros = saldo × ((1 + i)^(dias/30) − 1)   i = taxa juros a.m.
+    Recalcula juros e amortização pela Tabela Price em todo o cronograma:
+      Parcela = valor do extrato (ou PMT fixa se zerada)
+      Juros = saldo × ((1 + i)^(dias/30) − 1)
       Amortização = parcela − juros
-      Saldo = anterior − amortização
-    Parcelas pagas não são alteradas.
     """
-    from datetime import date
+    from django.utils import timezone as dj_tz
 
     empresa = _empresa_sessao(request)
     if not empresa:
@@ -2451,121 +3540,30 @@ def emprestimo_atualizar_parcelas_price(request, pk):
         messages.error(request, 'Não há parcelas neste contrato.')
         return redirect('emprestimos:detalhe', pk=pk)
 
-    pagas = [p for p in parcelas if p.status == 'paga']
-    abertas = [p for p in parcelas if p.status == 'aberta']
-    if not abertas:
-        messages.warning(request, 'Não há parcelas em aberto para atualizar.')
-        return redirect('emprestimos:detalhe', pk=pk)
-
-    taxa_am = emp.taxa_juros_am or Decimal('0')
-    if taxa_am <= 0:
+    if not (emp.taxa_juros_am or Decimal('0')) > 0:
         messages.error(request, 'Informe a Taxa de Juros (% a.m.) do contrato antes de recalcular.')
         return redirect('emprestimos:detalhe', pk=pk)
-    i = taxa_am / Decimal('100')
 
-    # Parcela fixa = última paga / 1ª aberta com valor > 0
-    parcela_fixa = Decimal('0')
-    for p in reversed(pagas):
-        if (p.valor_parcela or Decimal('0')) > 0:
-            parcela_fixa = (p.valor_parcela or Decimal('0')).quantize(Decimal('0.01'))
-            break
-    if parcela_fixa <= 0:
-        for p in abertas:
-            if (p.valor_parcela or Decimal('0')) > 0:
-                parcela_fixa = (p.valor_parcela or Decimal('0')).quantize(Decimal('0.01'))
-                break
-    if parcela_fixa <= 0:
-        messages.error(request, 'Não há valor de parcela fixa na lista para usar no cálculo.')
-        return redirect('emprestimos:detalhe', pk=pk)
-
-    pv = (emp.valor_contrato or Decimal('0')).quantize(Decimal('0.01'))
-    pago_amort = sum((p.amortizacao or Decimal('0') for p in pagas), Decimal('0'))
-    saldo = (pv - pago_amort).quantize(Decimal('0.01'))
-    if saldo < 0:
-        saldo = Decimal('0')
-
-    if pagas:
-        ultima_paga = max(
-            pagas,
-            key=lambda p: (p.data_vencimento or p.data_pagamento or date.min, p.numero),
-        )
-        data_ant = ultima_paga.data_vencimento or ultima_paga.data_pagamento or emp.data_operacao
-    else:
-        data_ant = emp.data_operacao
-
-    atualizadas = 0
     with transaction.atomic():
-        for idx, p in enumerate(abertas):
-            if not p.data_vencimento:
-                continue
-            saldo_inicio = saldo.quantize(Decimal('0.01'))
-            if data_ant and p.data_vencimento:
-                dias = max(0, (p.data_vencimento - data_ant).days)
-            else:
-                dias = 30
-            if dias <= 0:
-                dias = 30
+        atualizadas = _recalcular_juros_amort_price(
+            emp, parcelas, data_ref=dj_tz.localdate(),
+        )
 
-            # Juros = saldo × ((1+i)^(dias/30) − 1)
-            if i > 0 and dias > 0 and saldo_inicio > 0:
-                fator = (Decimal('1') + i) ** (Decimal(dias) / Decimal('30'))
-                juros = (saldo_inicio * (fator - Decimal('1'))).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP,
-                )
-            else:
-                juros = Decimal('0.00')
-
-            # Parcela FIXA (preenche zeradas com a parcela da lista)
-            parcela = (p.valor_parcela or Decimal('0')).quantize(Decimal('0.01'))
-            if parcela <= 0:
-                parcela = parcela_fixa
-
-            # Amortização = parcela − juros
-            amort = (parcela - juros).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            if amort < 0:
-                amort = Decimal('0.00')
-
-            # Só a ÚLTIMA parcela ajusta residual (não zera as do meio)
-            eh_ultima = idx == len(abertas) - 1
-            if eh_ultima:
-                amort = saldo_inicio
-                parcela = (amort + juros).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                saldo_fim = Decimal('0.00')
-            else:
-                if amort > saldo_inicio:
-                    amort = saldo_inicio
-                    parcela = (amort + juros).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                saldo_fim = (saldo_inicio - amort).quantize(Decimal('0.01'))
-                if saldo_fim < 0:
-                    saldo_fim = Decimal('0.00')
-
-            p.amortizacao = amort
-            p.juros = juros
-            p.valor_parcela = parcela
-            hist = (p.historico or '').strip()
-            tag = 'Atualizada Price'
-            if tag not in hist:
-                p.historico = f'{hist} | {tag}'.strip(' |') if hist else tag
-            p.save(update_fields=[
-                'amortizacao', 'juros', 'valor_parcela', 'historico',
-            ])
-            atualizadas += 1
-            saldo = saldo_fim
-            data_ant = p.data_vencimento
-
-    messages.success(
-        request,
-        f'{atualizadas} parcela(s) em aberto atualizada(s) pela Tabela Price '
-        f'(parcela fixa R$ {parcela_fixa} · juros {taxa_am}% a.m. · '
-        f'amortização = parcela − juros).',
-    )
+    if atualizadas <= 0:
+        messages.warning(request, 'Nenhuma parcela foi atualizada.')
+    else:
+        messages.success(
+            request,
+            f'{atualizadas} parcela(s) atualizada(s) pela Tabela Price '
+            f'(juros {emp.taxa_juros_am}% a.m.; atrasada: juros+mora).',
+        )
     return redirect('emprestimos:detalhe', pk=pk)
 
 
 @login_required
 @require_POST
 def emprestimo_atualizar_taxas(request, pk):
-    """Salva taxas do contrato (juros, mora, multa, % índice) usadas nos cálculos."""
+    """Salva taxas do contrato (juros, mora, multa, % índice). Juros a.m. no cálculo; mora só se atrasada."""
     empresa = _empresa_sessao(request)
     if not empresa:
         messages.error(request, 'Selecione uma empresa.')
@@ -2637,8 +3635,8 @@ def emprestimo_atualizar_taxas(request, pk):
     ])
     messages.success(
         request,
-        f'Taxas salvas: cálculo {emp.taxa_calculo_am}% a.m. '
-        f'(juros {emp.taxa_juros_am}% + mora {emp.taxa_mora_am}%); '
+        f'Taxas salvas: juros {emp.taxa_juros_am}% a.m.; '
+        f'mora {emp.taxa_mora_am}% (só parcelas atrasadas); '
         f'índice {emp.indice_correcao or "—"} {emp.pct_correcao_am}%.',
     )
     return redirect('emprestimos:detalhe', pk=pk)

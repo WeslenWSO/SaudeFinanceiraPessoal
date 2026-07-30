@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+{% load opcartao_extras %}
+
+{% block conteudo %}
+<style>
+  .fatura-cartao-celula {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .bandeira-icone {
+    flex-shrink: 0;
+    line-height: 1;
+  }
+</style>
+<div class="container-fluid px-4">
+  {% if messages %}
+    {% include 'parcial/_messages.html' %}
+  {% endif %}
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 mb-3">
+    <div>
+      <h1 class="mb-0">Faturas de cartão de crédito</h1>
+      <p class="text-muted mb-0">Importação de faturas Sicredi e Sicoob (PDF)</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'opcartao:cartao_listar' %}" class="btn btn-secondary">Cartões</a>
+      <a href="{% url 'opcartao:fatura_importar' %}" class="btn btn-success">
+        <i class="fas fa-file-import"></i> Importar fatura
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      {% if faturas %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Vencimento</th>
+              <th>Referência</th>
+              <th>Banco</th>
+              <th>Cartão</th>
+              <th>Titular</th>
+              <th class="text-end">Total</th>
+              <th class="text-center">Itens</th>
+              <th>Importado em</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in faturas %}
+            <tr>
+              <td>{{ f.vencimento|date:"d/m/Y"|default:"—" }}</td>
+              <td>{{ f.referencia_mes|default:"—" }}</td>
+              <td>{{ f.get_banco_display }}</td>
+              <td>
+                <span class="fatura-cartao-celula">
+                  {% bandeira_icone f.bandeira f.cartao %}
+                  <span>
+                    {% if f.conta_cartao %}<span class="d-block small text-muted">Conta {{ f.conta_cartao }}</span>{% endif %}
+                    {% if f.cartoes_resumo|length > 1 %}
+                    {{ f.cartoes_resumo|length }} cartões ({% for c in f.cartoes_resumo %}{{ c.final }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                    {% elif f.bandeira %}{{ f.bandeira }}{% if f.cartao_final %} final {{ f.cartao_final }}{% endif %}
+                    {% elif f.cartao %}{{ f.cartao.get_bandeira_display }}{% if f.cartao.final_cartao %} final {{ f.cartao.final_cartao }}{% endif %}
+                    {% elif f.cartao_final %}final {{ f.cartao_final }}
+                    {% endif %}
+                  </span>
+                </span>
+              </td>
+              <td>{{ f.titular|default:"—" }}</td>
+              <td class="text-end fw-bold">R$ {{ f.total_fatura|floatformat:2 }}</td>
+              <td class="text-center">{{ f.itens.count }}</td>
+              <td>{{ f.importado_em|date:"d/m/Y H:i" }}</td>
+              <td class="text-nowrap">
+                <a href="{% url 'opcartao:fatura_detalhe' f.pk %}" class="btn btn-sm btn-primary">Ver</a>
+                <a href="{% url 'opcartao:fatura_excluir' f.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="fas fa-credit-card fa-3x mb-3"></i>
+        <p class="mb-3">Nenhuma fatura importada ainda.</p>
+        <a href="{% url 'opcartao:fatura_importar' %}" class="btn btn-success">Importar primeira fatura</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

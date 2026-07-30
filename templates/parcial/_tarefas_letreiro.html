@@ -1,0 +1,26 @@
+{% load static %}
+{% if tarefas_letreiro_mensagens %}
+<link rel="stylesheet" href="{% static 'css/tarefas-letreiro.css' %}">
+<div class="tarefas-letreiro" role="marquee" aria-live="polite" aria-label="Tarefas a vencer">
+  <div class="tarefas-letreiro-label">
+    <i class="fas fa-bell" aria-hidden="true"></i>
+  </div>
+  <div class="tarefas-letreiro-viewport">
+    <div class="tarefas-letreiro-track">
+      {% for item in tarefas_letreiro_mensagens %}
+      <span class="tarefas-letreiro-item">
+        {% if item.url %}<a href="{{ item.url }}">{{ item.texto }}</a>{% else %}{{ item.texto }}{% endif %}
+      </span>
+      <span class="tarefas-letreiro-sep" aria-hidden="true">◆</span>
+      {% endfor %}
+      {% for item in tarefas_letreiro_mensagens %}
+      <span class="tarefas-letreiro-item">
+        {% if item.url %}<a href="{{ item.url }}">{{ item.texto }}</a>{% else %}{{ item.texto }}{% endif %}
+      </span>
+      <span class="tarefas-letreiro-sep" aria-hidden="true">◆</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<script>document.body.classList.add('has-tarefas-letreiro');</script>
+{% endif %}

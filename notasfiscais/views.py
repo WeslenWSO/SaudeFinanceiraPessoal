@@ -81,13 +81,45 @@ def serialize_resultado(resultado):
     return {
         'notas_importadas': resultado_serializado.get('notas_importadas', []),
         'notas_ignoradas': resultado_serializado.get('notas_ignoradas', []),
+        'notas_canceladas': resultado_serializado.get('notas_canceladas', []),
         'total_processadas': int(resultado_serializado.get('total_processadas', 0)),
         'total_importadas': int(resultado_serializado.get('total_importadas', 0)),
+        'total_canceladas': int(resultado_serializado.get('total_canceladas', 0)),
         'total_ignoradas': int(resultado_serializado.get('total_ignoradas', 0))
     }
 
 # Chave de session para persistir filtros da listagem NFSe (limpa ao sair do módulo via middleware)
 NFS_FILTROS_SESSION_KEY = 'nfs_filtros'
+
+NFSE_DEFAULT_SORT = 'numero'
+NFSE_DEFAULT_SORT_DIR = 'asc'
+
+# Colunas ordenáveis da listagem (chave data-col -> campo ORM)
+NFSE_SORT_FIELDS = {
+    'numero': 'numero_nota_int',
+    'data_emissao': 'data_emissao',
+    'cnpj': 'cnpj_cpf',
+    'cliente': 'cliente',
+    'socio': 'socio__socio',
+    'base_servico': 'base_servico',
+    'regra_imposto': 'codigo_da_regra_do_imposto__DescricaoRegraImposto',
+    'status_nota': 'data_cancelamento',
+    'valor_bruto': 'valor_bruto',
+    'iss_retido': 'iss_retido',
+    'aliquota_iss': 'aliquota',
+    'valor_iss_retido': 'valor_iss_retido',
+    'valor_pis': 'valor_pis',
+    'valor_cofins': 'valor_cofins',
+    'valor_csll': 'valor_csll',
+    'valor_irpj': 'valor_ir',
+    'valor_outras_ret': 'outras_retencoes',
+    'valor_inss': 'valor_inss',
+    'valor_liquido': 'valor_liquido',
+    'discriminacao': 'discriminacao',
+    'forma_pag': 'forma_pagamento__descricao',
+    'autorizacao': 'nsu',
+    'conciliacao': 'status_conciliacao',
+}
 
 
 def _get_default_dates():
@@ -155,6 +187,54 @@ def _apply_filtro_valor_nfse(queryset, valor_str):
     if valor is None:
         return queryset
     return queryset.filter(Q(valor_bruto=valor) | Q(valor_liquido=valor))
+
+
+def _apply_filtro_search_nfse(queryset, search):
+    """Busca em número, cliente, CPF/CNPJ, autorização, série e discriminação."""
+    termo = (search or '').strip()
+    if not termo:
+        return queryset
+    return queryset.filter(
+        Q(numero_nota__icontains=termo)
+        | Q(cliente__icontains=termo)
+        | Q(cnpj_cpf__icontains=termo)
+        | Q(nsu__icontains=termo)
+        | Q(serie__icontains=termo)
+        | Q(discriminacao__icontains=termo)
+    )
+
+
+def _get_nfse_sort_from_request(request, filters):
+    """
+    Lê sort/dir do GET (clique no cabeçalho), persiste na session e retorna valores válidos.
+    """
+    sort_get = (request.GET.get('sort') or '').strip()
+    dir_get = (request.GET.get('dir') or '').strip().lower()
+    if sort_get in NFSE_SORT_FIELDS:
+        filters['sort'] = sort_get
+        filters['dir'] = dir_get if dir_get in ('asc', 'desc') else 'asc'
+        request.session[NFS_FILTROS_SESSION_KEY] = filters
+
+    sort_col = filters.get('sort', NFSE_DEFAULT_SORT)
+    sort_dir = filters.get('dir', NFSE_DEFAULT_SORT_DIR)
+    if sort_col not in NFSE_SORT_FIELDS:
+        sort_col = NFSE_DEFAULT_SORT
+    if sort_dir not in ('asc', 'desc'):
+        sort_dir = NFSE_DEFAULT_SORT_DIR
+    return sort_col, sort_dir
+
+
+def _apply_nfse_sort(queryset, sort_col, sort_dir):
+    """Aplica order_by conforme coluna e direção; desempate por número da nota."""
+    queryset = queryset.annotate(
+        numero_nota_int=Cast('numero_nota', IntegerField())
+    )
+    field = NFSE_SORT_FIELDS[sort_col]
+    prefix = '-' if sort_dir == 'desc' else ''
+    order_fields = [f'{prefix}{field}']
+    if sort_col != 'numero':
+        order_fields.append('numero_nota_int')
+    return queryset.order_by(*order_fields)
 
 
 def _normalize_filters(raw_dict, default_paginate_by=20):
@@ -262,6 +342,8 @@ class NFSeListView(LoginRequiredMixin, ListView):
                 'data_inicio': d_ini.isoformat(),
                 'data_fim': d_fim.isoformat(),
                 'paginate_by': self.paginate_by,
+                'sort': NFSE_DEFAULT_SORT,
+                'dir': NFSE_DEFAULT_SORT_DIR,
             }
             self.request.session[NFS_FILTROS_SESSION_KEY] = filters
         return filters
@@ -278,19 +360,15 @@ class NFSeListView(LoginRequiredMixin, ListView):
             return NotaFiscalServico.objects.none()
 
         filters = self._get_current_filters()
+        sort_col, sort_dir = _get_nfse_sort_from_request(self.request, filters)
+        self._sort_col = sort_col
+        self._sort_dir = sort_dir
+
         queryset = NotaFiscalServico.objects.filter(empresa_id=empresa_id).select_related(
-            'codigo_da_regra_do_imposto', 'socio'
+            'codigo_da_regra_do_imposto', 'socio', 'forma_pagamento'
         )
 
-        search = filters.get('search', '')
-        if search:
-            queryset = queryset.filter(
-                Q(numero_nota__icontains=search) |
-                Q(cliente__icontains=search) |
-                Q(cnpj_cpf__icontains=search) |
-                Q(nsu__icontains=search) |
-                Q(serie__icontains=search)
-            )
+        queryset = _apply_filtro_search_nfse(queryset, filters.get('search'))
 
         queryset = _apply_filtro_valor_nfse(queryset, filters.get('valor'))
 
@@ -324,11 +402,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
             d_ini, d_fim = d_fim, d_ini
         queryset = queryset.filter(data_emissao__range=(d_ini, d_fim))
 
-        # Ordenação numérica por número da nota (CharField ordenado como inteiro: 1, 2, 10, 11...)
-        queryset = queryset.annotate(
-            numero_nota_int=Cast('numero_nota', IntegerField())
-        ).order_by('numero_nota_int')
-        return queryset
+        return _apply_nfse_sort(queryset, sort_col, sort_dir)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -409,6 +483,8 @@ class NFSeListView(LoginRequiredMixin, ListView):
             'socios': socios_list,
             'aplicar_socio_url': aplicar_socio_url,
             'aplicar_cobranca_url': aplicar_cobranca_url,
+            'sort_col': getattr(self, '_sort_col', filters.get('sort', NFSE_DEFAULT_SORT)),
+            'sort_dir': getattr(self, '_sort_dir', filters.get('dir', NFSE_DEFAULT_SORT_DIR)),
         })
 
         if empresa_id:
@@ -789,8 +865,10 @@ class XMLImportView(LoginRequiredMixin, FormView):
         resultado_total = {
             'notas_importadas': [],
             'notas_ignoradas': [],
+            'notas_canceladas': [],
             'total_processadas': 0,
             'total_importadas': 0,
+            'total_canceladas': 0,
             'total_ignoradas': 0,
         }
 
@@ -810,13 +888,27 @@ class XMLImportView(LoginRequiredMixin, FormView):
                     )
                     resultado_total['notas_importadas'].extend(resultado.get('notas_importadas', []))
                     resultado_total['notas_ignoradas'].extend(resultado.get('notas_ignoradas', []))
+                    resultado_total['notas_canceladas'].extend(resultado.get('notas_canceladas', []))
                     resultado_total['total_processadas'] += resultado.get('total_processadas', 0)
                     resultado_total['total_importadas'] += resultado.get('total_importadas', 0)
+                    resultado_total['total_canceladas'] += resultado.get('total_canceladas', 0)
                     resultado_total['total_ignoradas'] += resultado.get('total_ignoradas', 0)
                 finally:
                     _nfse_safe_unlink(path)
 
-            if resultado_total['total_importadas'] > 0:
+            if resultado_total.get('total_canceladas', 0) > 0:
+                if resultado_total['total_canceladas'] == 1:
+                    n = resultado_total['notas_canceladas'][0]
+                    messages.success(
+                        request,
+                        f"NFSe {n['numero_nota']} cancelada com sucesso. Motivo: {n.get('motivo', '—')}",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"{resultado_total['total_canceladas']} NFSe canceladas com sucesso via evento.",
+                    )
+            elif resultado_total['total_importadas'] > 0:
                 if resultado_total['total_importadas'] == 1:
                     messages.success(
                         request,
@@ -891,8 +983,10 @@ class XMLImportView(LoginRequiredMixin, FormView):
             resultado_total = {
                 'notas_importadas': [],
                 'notas_ignoradas': [],
+                'notas_canceladas': [],
                 'total_processadas': 0,
                 'total_importadas': 0,
+                'total_canceladas': 0,
                 'total_ignoradas': 0
             }
 
@@ -907,12 +1001,26 @@ class XMLImportView(LoginRequiredMixin, FormView):
                 # Agrega os resultados
                 resultado_total['notas_importadas'].extend(resultado.get('notas_importadas', []))
                 resultado_total['notas_ignoradas'].extend(resultado.get('notas_ignoradas', []))
+                resultado_total['notas_canceladas'].extend(resultado.get('notas_canceladas', []))
                 resultado_total['total_processadas'] += resultado.get('total_processadas', 0)
                 resultado_total['total_importadas'] += resultado.get('total_importadas', 0)
+                resultado_total['total_canceladas'] += resultado.get('total_canceladas', 0)
                 resultado_total['total_ignoradas'] += resultado.get('total_ignoradas', 0)
             
             # Preparar mensagens baseadas no resultado total (todos os arquivos)
-            if resultado_total['total_importadas'] > 0:
+            if resultado_total.get('total_canceladas', 0) > 0:
+                if resultado_total['total_canceladas'] == 1:
+                    n = resultado_total['notas_canceladas'][0]
+                    messages.success(
+                        self.request,
+                        f"NFSe {n['numero_nota']} cancelada com sucesso. Motivo: {n.get('motivo', '—')}",
+                    )
+                else:
+                    messages.success(
+                        self.request,
+                        f"{resultado_total['total_canceladas']} NFSe canceladas com sucesso via evento.",
+                    )
+            elif resultado_total['total_importadas'] > 0:
                 if resultado_total['total_importadas'] == 1:
                     messages.success(self.request, f'NFSe {resultado_total["notas_importadas"][0]["numero_nota"]} importada com sucesso!')
                 else:
@@ -951,6 +1059,20 @@ class XMLImportView(LoginRequiredMixin, FormView):
         print(f"Form data: {form.data}")
         print(f"Form files: {form.files}")
         return super().form_invalid(form)
+
+
+class NfseEventoCancelamentoImportView(XMLImportView):
+    """Importação de XML de eventos de cancelamento NFS-e (pasta Eventos do portal nacional)."""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['page_title'] = 'Importar eventos de cancelamento NFS-e'
+        ctx['page_intro'] = (
+            'Selecione os XML da pasta <strong>Eventos</strong> '
+            '(ex.: <code>4642_Cancelamento de NFS-e_15559.xml</code>). '
+            'O sistema localiza a NFSe, marca como cancelada, zera os valores e grava o motivo.'
+        )
+        return ctx
 
 
 class NfsePortalNacionalImportView(LoginRequiredMixin, FormView):
@@ -1792,24 +1914,8 @@ def _normaliza(s: str) -> str:
 
 
 def extrair_autorizacao(discriminacao: str) -> Optional[str]:
-    if not discriminacao:
-        return None
-
-    # Padrões para capturar códigos de autorização (AUT, STONEID, etc.)
-    patterns = [
-        r'\bAUT[:\s]*([A-Za-z0-9\-\/\.]+)',  # AUT: 164097 / AUT 038314
-        r'\bAUT([A-Za-z0-9\-\/\.]+)',        # AUT colado ao código
-        r'aut[:\s]*([A-Za-z0-9\-\/\.]+)',
-        r'autorizacao[:\s]*([A-Za-z0-9\-\/\.]+)',
-        r'\bSTONE\s*ID[:\s]*([0-9]+)',       # STONEID: 18411 / STONE ID 18411
-        r'\bSTONEID[:\s]*([0-9]+)',          # STONEID18411
-    ]
-
-    for pattern in patterns:
-        m = re.search(pattern, discriminacao, flags=re.IGNORECASE)
-        if m:
-            return m.group(1).strip()
-    return None
+    from notasfiscais.utils import extrair_autorizacao as _extrair_autorizacao_util
+    return _extrair_autorizacao_util(discriminacao)
 
 
 def extrair_data_cancelamento(discriminacao: str)  -> Optional[str]:
@@ -2093,7 +2199,7 @@ def gerar_contas_receber_bulk(request):
                         valor_a_receber=nf.valor_liquido,
                         doc=f"NF {nf.numero_nota}",
                         forma_pagamento=nf.forma_pagamento,
-                        autorizacao=nf.nsu
+                        autorizacao=nf.autorizacao_para_conta_receber(),
                     )
 
                     contas_criadas += 1
@@ -2492,13 +2598,7 @@ def get_filtered_ids(request):
         data_fim = ultimo_dia_mes.strftime('%Y-%m-%d')
 
     if search:
-        queryset = queryset.filter(
-            Q(numero_nota__icontains=search) |
-            Q(cliente__icontains=search) |
-            Q(cnpj_cpf__icontains=search) |
-            Q(nsu__icontains=search) |
-            Q(serie__icontains=search)
-        )
+        queryset = _apply_filtro_search_nfse(queryset, search)
 
     queryset = _apply_filtro_valor_nfse(queryset, valor)
 
@@ -2563,13 +2663,7 @@ def export_excel(request):
         data_fim = ultimo_dia_mes.strftime('%Y-%m-%d')
 
     if search:
-        queryset = queryset.filter(
-            Q(numero_nota__icontains=search) |
-            Q(cliente__icontains=search) |
-            Q(cnpj_cpf__icontains=search) |
-            Q(nsu__icontains=search) |
-            Q(serie__icontains=search)
-        )
+        queryset = _apply_filtro_search_nfse(queryset, search)
 
     queryset = _apply_filtro_valor_nfse(queryset, valor)
 

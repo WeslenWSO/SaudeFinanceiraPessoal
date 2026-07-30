@@ -119,9 +119,10 @@ def extrair_numero_contrato(texto: str) -> str | None:
     Fallback: últimos dígitos do Número IPOC.
     """
     for padrao in (
-        r'N[uú]mero\s+Contrato:\s*([^\n]+)',
+        r'N[uú]mero\s+(?:do\s+)?Contrato:\s*([^\n]+)',
         r'(?m)^Contrato:\s*([\d.]+)\b',
         r'\bContrato:\s*([\d.]+)\b',
+        r'N[uúº]?\s*Contrato\s+Modalidade\s*\n\s*(\d+)\b',
     ):
         m = re.search(padrao, texto, flags=re.IGNORECASE)
         if m:
@@ -202,7 +203,14 @@ def extrair_texto_pdf(file_obj) -> str:
                             partes.append(' '.join(cells))
             except Exception:
                 pass
-    return '\n'.join(partes)
+    texto = '\n'.join(partes)
+    if not texto.strip():
+        from .bradesco_pdf import extrair_texto_bradesco
+
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+        return extrair_texto_bradesco(file_obj)
+    return texto
 
 
 def _compactar_fluxo_ddc(texto: str) -> str:
@@ -249,13 +257,15 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
     texto_upper = texto.upper()
     eh_ddc = 'DOCUMENTO DESCRITIVO' in texto_upper or ' DDC' in texto_upper or texto_upper.startswith('DDC')
     eh_extrato = 'EXTRATO DE OPERA' in texto_upper or 'NÚMERO CONTRATO' in texto_upper or 'NUMERO CONTRATO' in texto_upper
+    eh_consulta = _eh_extrato_consulta(texto_upper)
 
-    if 'SICOOB' not in texto_upper and not eh_extrato and not eh_ddc:
+    if 'SICOOB' not in texto_upper and not eh_extrato and not eh_ddc and not eh_consulta:
         if 'Contrato:' not in texto and 'Número Contrato' not in texto:
             raise ValueError('PDF não parece ser um Extrato/DDC de crédito Sicoob.')
 
     texto_nl = _compactar_fluxo_ddc(texto.replace('\r', '\n'))
     texto_norm = re.sub(r'[ \t]+', ' ', texto_nl)
+    consulta = _parse_cabecalho_consulta(texto_nl, texto_norm) if eh_consulta else {}
 
     numero_contrato = extrair_numero_contrato(texto_norm) or extrair_numero_contrato(texto_nl)
     if not numero_contrato:
@@ -264,10 +274,10 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
             'No Extrato use "Número Contrato:"; no DDC o campo é "Contrato:".'
         )
 
-    cooperativa = _campo(texto_norm, r'Cooperativa:\s*([^\n]+)') or ''
-    cliente = _campo(texto_norm, r'Cliente:\s*([^\n]+)') or ''
+    cooperativa = _campo(texto_norm, r'Cooperativa:\s*([^\n]+)') or consulta.get('cooperativa') or ''
+    cliente = _campo(texto_norm, r'Cliente:\s*([^\n]+)') or consulta.get('cliente') or ''
 
-    modalidade = _campo(texto_norm, r'Modalidade:\s*([^\n]+)') or ''
+    modalidade = _campo(texto_norm, r'Modalidade:\s*([^\n]+)') or consulta.get('modalidade') or ''
     if not modalidade or modalidade.strip() in (':',):
         m_mod = re.search(
             r'(\d{3,5}-Capital[^\n]*)\s*Modalidade:\s*([^\n]*)',
@@ -289,10 +299,11 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
                 if m_giro2:
                     modalidade = f'Capital de {m_giro2.group(1).strip()}'
 
-    data_operacao = _parse_data(_campo(texto_norm, r'Data Opera[cç][aã]o:\s*(\d{2}/\d{2}/\d{4})'))
+    data_operacao = _parse_data(_campo(texto_norm, r'Data Opera[cç][aã]o:\s*(\d{2}/\d{2}/\d{4})')) or consulta.get('data_operacao')
     data_vencimento = (
         _parse_data(_campo(texto_norm, r'Data Vencimento:\s*(\d{2}/\d{2}/\d{4})'))
         or _parse_data(_campo(texto_norm, r'Data Vencto:\s*(\d{2}/\d{2}/\d{4})'))
+        or consulta.get('data_vencimento')
     )
     data_extrato = (
         _parse_data(_campo(texto_norm, r'Data de Emiss[aã]o:\s*(\d{2}/\d{2}/\d{4})'))
@@ -303,19 +314,26 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         _campo(texto_norm, r'Prazo em dias:\s*([\d.]+)')
         or _campo(texto_norm, r'Prazo total:\s*([\d.]+)')
     )
-    prazo_dias = int(prazo_raw.replace('.', '')) if prazo_raw else None
+    prazo_dias = int(prazo_raw.replace('.', '')) if prazo_raw else consulta.get('prazo_dias')
 
     valor_contrato = (
-        _dec(_campo(texto_norm, r'Valor Contrato:\s*([\d.,]+)'))
+        _dec(_campo(texto_norm, r'Valor Contrato:\s*R\$\s*([\d.,]+)'))
+        or _dec(_campo(texto_norm, r'Valor Contrato:\s*([\d.,]+)'))
+        or _dec(_campo(texto_norm, r'Valor Opera[cç][aã]o:\s*R\$\s*([\d.,]+)'))
         or _dec(_campo(texto_norm, r'Valor Opera[cç][aã]o:\s*([\d.,]+)'))
+        or consulta.get('valor_contrato')
+        or Decimal('0')
     )
 
     # --- Taxas do extrato Sicoob (rótulos do DDC / Extrato) ---
     # Taxa Juros: 0,0000 % a.m.  (em CDI/SAC costuma ser 0 — correção pelo índice)
     taxa_juros_am = (
-        _dec_pct(_campo(texto_norm, r'Taxa\s*Juros\s*\(a\.m\.\):\s*([\d.,]+)'))
+        _dec_pct(_campo(texto_norm, r'Taxa\s*Juros\s*\([^)]*\):\s*([\d.,]+)'))
+        or _dec_pct(_campo(texto_norm, r'Taxa\s*Juros\s*\(a\.m\.\):\s*([\d.,]+)'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Juros:\s*([\d.,]+)\s*%\s*a\.m'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Juros:\s*([\d.,]+)'))
+        or consulta.get('taxa_juros_am')
+        or Decimal('0')
     )
     # CET no fluxo (informativo): "CET 2.35 % a.a.CDI … 0.19 % a.m.CDI"
     cet_am = (
@@ -339,6 +357,8 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         _dec_pct(_campo(texto_norm, r'Taxa\s*Mora\s*\(a\.m\.\):\s*([\d.,]+)'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Mora:\s*([\d.,]+)\s*%\s*a\.m'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Mora:\s*([\d.,]+)'))
+        or consulta.get('taxa_mora_am')
+        or Decimal('0')
     )
 
     # Taxa Juros Inad.: 1,0000 % a.m.  (grava em taxa_multa_am)
@@ -348,6 +368,8 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Multa\s*\(a\.m\.\):\s*([\d.,]+)'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Multa:\s*([\d.,]+)\s*%\s*a\.m'))
         or _dec_pct(_campo(texto_norm, r'Taxa\s*Multa:\s*([\d.,]+)'))
+        or consulta.get('taxa_multa_am')
+        or Decimal('0')
     )
 
     # Índice Correção: CDI
@@ -431,23 +453,31 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         taxa_juros_am = cet_am
     if not taxa_juros_aa and cet_aa and not tem_indice_flutuante:
         taxa_juros_aa = cet_aa
-    indicador_raw = extrair_indicador_do_texto(texto_nl) or extrair_indicador_do_texto(texto_norm)
+    indicador_raw = (
+        extrair_indicador_do_texto(texto_nl)
+        or extrair_indicador_do_texto(texto_norm)
+        or consulta.get('indicador_calculo')
+        or ''
+    )
     rotulo, codigo, nome, tipo = normalizar_indicador_calculo(indicador_raw)
 
     parcelas_ext = _parse_parcelas_extrato(texto_norm, tipo=tipo, indice_correcao=indice_correcao)
+    parcelas_consulta = _parse_parcelas_consulta(texto_norm) if eh_consulta else []
     parcelas_ddc = _parse_parcelas_ddc(texto_nl)
     if len(parcelas_ddc) < 2:
         parcelas_ddc2 = _parse_parcelas_ddc(texto_norm)
         if len(parcelas_ddc2) > len(parcelas_ddc):
             parcelas_ddc = parcelas_ddc2
 
-    # Prefere o formato que trouxe mais parcelas (DDC multi-página vs Extrato)
-    if len(parcelas_ddc) >= len(parcelas_ext):
-        parcelas = parcelas_ddc
-    else:
-        parcelas = parcelas_ext
+    # Prefere o parse com melhor qualidade (pagas, amortização); desempate por qtd.
+    parcelas = _escolher_melhor_parse_parcelas(parcelas_ext, parcelas_ddc)
+    if parcelas_consulta:
+        parcelas = _escolher_melhor_parse_parcelas(parcelas, parcelas_consulta)
 
-    qtd_informada = _campo(texto_norm, r'Parcelas:\s*(\d+)')
+    qtd_informada = (
+        _campo(texto_norm, r'Qtd de Parcelas:\s*(\d+)')
+        or _campo(texto_norm, r'Parcelas:\s*(\d+)')
+    )
     qtd_esperada = int(qtd_informada) if qtd_informada and qtd_informada.isdigit() else None
 
     if not parcelas:
@@ -466,6 +496,39 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
 
     parcelas.sort(key=lambda p: p['numero'])
 
+    if tipo == 'sac' and taxa_juros_am > 0:
+        from .sac_calculo import recalcular_sac_taxa_fixa_dicts
+
+        parcelas = recalcular_sac_taxa_fixa_dicts(
+            parcelas,
+            valor_contrato=valor_contrato,
+            taxa_juros_am=taxa_juros_am,
+            taxa_mora_am=taxa_mora or Decimal('0'),
+            data_operacao=data_operacao,
+        )
+
+    saldo_devedor_atualizado = (
+        _dec(_campo(texto_norm, r'Saldo para Quita[cç][aã]o:\s*R\$\s*([\d.,]+)'))
+        or _dec(_campo(texto_norm, r'Saldo para Quita[cç][aã]o:\s*([\d.,]+)'))
+    )
+
+    qtd_abertas_pdf = _campo(texto_norm, r'Parcelas em aberto:\s*(\d+)')
+    if parcelas and any(p.get('numero') == 0 for p in parcelas):
+        carencia = next(p for p in parcelas if p.get('numero') == 0)
+        venc_c = carencia.get('data_vencimento')
+        primeira_pag = next((p for p in parcelas if p.get('numero', 0) >= 1), None)
+        if data_operacao and venc_c and primeira_pag:
+            meses_c = max(0, (venc_c.year - data_operacao.year) * 12 + venc_c.month - data_operacao.month)
+            hint_carencia = (
+                f'Carência até {venc_c.strftime("%d/%m/%Y")} '
+                f'({meses_c} meses após a operação). '
+                f'1º pagamento: {primeira_pag["data_vencimento"].strftime("%d/%m/%Y")}.'
+            )
+            if aviso:
+                aviso = f'{hint_carencia} {aviso}'
+            else:
+                aviso = hint_carencia
+
     return {
         'cooperativa': cooperativa[:200],
         'cliente': cliente[:250],
@@ -475,6 +538,7 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         'data_vencimento': data_vencimento,
         'prazo_dias': prazo_dias,
         'valor_contrato': valor_contrato,
+        'saldo_devedor_atualizado': saldo_devedor_atualizado,
         'taxa_juros_am': taxa_juros_am,
         'taxa_juros_aa': taxa_juros_aa,
         'taxa_multa_am': taxa_multa,
@@ -491,7 +555,159 @@ def parse_extrato_sicoob(file_obj) -> dict[str, Any]:
         'parcelas': parcelas,
         'aviso': aviso,
         'qtd_parcelas_informada': qtd_esperada,
+        'qtd_parcelas_abertas_pdf': int(qtd_abertas_pdf) if qtd_abertas_pdf and qtd_abertas_pdf.isdigit() else None,
     }
+
+
+def _pontuacao_parse_parcelas(parcelas: list[dict[str, Any]]) -> tuple[int, int, float, int]:
+    """
+    Maior = melhor. Prioriza: qtd parcelas, pagas, amortização total, linhas com amort>0.
+    """
+    if not parcelas:
+        return (0, 0, 0, 0)
+    pagas = sum(1 for p in parcelas if p.get('status') == 'paga')
+    amort_total = float(sum((p.get('amortizacao') or Decimal('0') for p in parcelas), Decimal('0')))
+    com_amort = sum(1 for p in parcelas if (p.get('amortizacao') or Decimal('0')) > 0)
+    return (len(parcelas), pagas, int(amort_total), com_amort)
+
+
+def _escolher_melhor_parse_parcelas(
+    parcelas_ext: list[dict[str, Any]],
+    parcelas_ddc: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Escolhe extrato vs DDC pela qualidade (não só pela quantidade)."""
+    if not parcelas_ext:
+        return parcelas_ddc
+    if not parcelas_ddc:
+        return parcelas_ext
+    score_ext = _pontuacao_parse_parcelas(parcelas_ext)
+    score_ddc = _pontuacao_parse_parcelas(parcelas_ddc)
+    if score_ext >= score_ddc:
+        return parcelas_ext
+    return parcelas_ddc
+
+
+def _eh_extrato_consulta(texto_upper: str) -> bool:
+    return (
+        'CONSULTA DE EMPR' in texto_upper
+        or 'EXTRATO DE OPERA' in texto_upper and 'CONSULTA' in texto_upper
+        or 'VALOR DAPARCELA' in texto_upper
+        or 'VALOR DA PARCELA' in texto_upper and 'PAGO' in texto_upper
+    )
+
+
+def _parse_cabecalho_consulta(texto_nl: str, texto_norm: str) -> dict[str, Any]:
+    """Layout 'Consulta de empréstimos / Extrato de operações' (PDF em imagem)."""
+    out: dict[str, Any] = {}
+
+    m_cli = re.search(
+        r'Cooperativa\s+Cliente\s*\n\s*(?P<linha>[^\n]+)',
+        texto_nl,
+        flags=re.IGNORECASE,
+    )
+    if m_cli:
+        linha = m_cli.group('linha').strip()
+        m_coop = re.match(r'(\d{4})', linha)
+        if m_coop:
+            out['cooperativa'] = m_coop.group(1)
+        m_conta = re.search(r'(\d{4,6}-\d\s+.+)', linha)
+        if m_conta:
+            out['cliente'] = m_conta.group(1).strip()[:250]
+        elif 'LTDA' in linha.upper():
+            out['cliente'] = linha[:250]
+
+    m_mod = re.search(
+        r'N[uúº]?\s*Contrato\s+Modalidade\s*\n\s*\d+\s+([^\n]+(?:\n[^\n]+)?)',
+        texto_nl,
+        flags=re.IGNORECASE,
+    )
+    if m_mod:
+        modalidade = re.sub(r'\s+', ' ', m_mod.group(1)).strip()
+        out['modalidade'] = modalidade[:200]
+
+    m_datas = re.search(
+        r'Data da opera[cç][aã]o\s+Vencimento\s*\n\s*'
+        r'(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})',
+        texto_norm,
+        flags=re.IGNORECASE,
+    )
+    if m_datas:
+        out['data_operacao'] = _parse_data(m_datas.group(1))
+        out['data_vencimento'] = _parse_data(m_datas.group(2))
+
+    m_prazo = re.search(
+        r'Prazo\s+Valor do contrato\s*\n\s*(\d+)\s*dias\s*(?:R\$|RS)\s*([\d.,]+)',
+        texto_norm,
+        flags=re.IGNORECASE,
+    )
+    if m_prazo:
+        out['prazo_dias'] = int(m_prazo.group(1))
+        out['valor_contrato'] = _dec(m_prazo.group(2))
+
+    m_taxas = re.search(
+        r'Taxa de Juros\s+Taxa de Mora\s*\n\s*([\d.,]+)\s*%\s*([\d.,]+)\s*%',
+        texto_norm,
+        flags=re.IGNORECASE,
+    )
+    if m_taxas:
+        out['taxa_juros_am'] = _dec_pct(m_taxas.group(1))
+        out['taxa_mora_am'] = _dec_pct(m_taxas.group(2))
+
+    m_multa = re.search(
+        r'Taxa de Multa\s+Indicador[^\n]*\n\s*([\d.,]+)\s*%\s*(\d+\s*-\s*[^\n]+)',
+        texto_norm,
+        flags=re.IGNORECASE,
+    )
+    if m_multa:
+        out['taxa_multa_am'] = _dec_pct(m_multa.group(1))
+        out['indicador_calculo'] = re.sub(r'\s+', ' ', m_multa.group(2)).strip()
+
+    return out
+
+
+def _parse_parcelas_consulta(texto_norm: str) -> list[dict[str, Any]]:
+    """
+    Extrato Consulta Sicoob (imagem):
+      1 10/03/2025 R$ 12.053,82 Sim
+      18 10/08/2026 R$ 12.053,82 -
+    """
+    parcela_re = re.compile(
+        r'(?m)^(?P<num>\d{1,3})\s+'
+        r'(?P<venc>\d{2}/\d{2}/\d{4})\s+'
+        r'(?:R\$|RS)\s*(?P<parc>[\d.,]+)\s+'
+        r'(?P<pago>Sim|=|-=?)'
+        r'\s*$',
+        flags=re.IGNORECASE,
+    )
+    por_num: dict[int, dict[str, Any]] = {}
+    for m in parcela_re.finditer(texto_norm):
+        num = int(m.group('num'))
+        if num > 600:
+            continue
+        venc = _parse_data(m.group('venc'))
+        if not venc:
+            continue
+        valor_parcela = _dec(m.group('parc'))
+        pago = (m.group('pago') or '').strip().lower().startswith('sim')
+        row = {
+            'numero': num,
+            'data_vencimento': venc,
+            'valor_parcela': valor_parcela,
+            'amortizacao': valor_parcela,
+            'juros': Decimal('0'),
+            'data_pagamento': venc if pago else None,
+            'historico': '',
+            'valor_pago': valor_parcela if pago else None,
+            'mora': Decimal('0'),
+            'multa': Decimal('0'),
+            'iof': Decimal('0'),
+            'correcao': Decimal('0'),
+            'status': 'paga' if pago else 'aberta',
+        }
+        ant = por_num.get(num)
+        if ant is None or (pago and ant.get('status') != 'paga'):
+            por_num[num] = row
+    return list(por_num.values())
 
 
 def _parse_parcelas_extrato(
@@ -500,14 +716,15 @@ def _parse_parcelas_extrato(
     tipo: str,
     indice_correcao: str,
 ) -> list[dict[str, Any]]:
-    """Formato Extrato: N venc(yy) parc amort [juros|data] [data] ..."""
+    """Formato Extrato: N venc parc amort juros [pagamento] ..."""
+    _money = r'(?:R\$\s*)?[\d.]+,\d{2}'
     parcela_re = re.compile(
         r'(?m)^(?P<num>\d+)\s+'
-        r'(?P<venc>\d{2}/\d{2}/\d{2})\s+'
-        r'(?P<parc>[\d.]+,\d{2})\s+'
-        r'(?P<amort>[\d.]+,\d{2})'
-        r'(?:\s+(?P<a>[\d.]+,\d{2}|\d{2}/\d{2}/\d{2}))?'
-        r'(?:\s+(?P<b>\d{2}/\d{2}/\d{2}))?'
+        r'(?P<venc>\d{2}/\d{2}/\d{2,4})\s+'
+        rf'(?P<parc>{_money})\s+'
+        rf'(?P<amort>{_money})'
+        rf'(?:\s+(?P<juros_or_extra>{_money}|\d{{2}}/\d{{2}}/\d{{2,4}}|-))?'
+        rf'(?:\s+(?P<pag_extra>\d{{2}}/\d{{2}}/\d{{2,4}}|-))?'
         r'(?P<resto>.*)$'
     )
 
@@ -523,19 +740,53 @@ def _parse_parcelas_extrato(
         if not venc:
             continue
 
+        parc_raw = m.group('parc')
+        amort_raw = m.group('amort')
+        valor_parcela = _dec(re.sub(r'^R\$\s*', '', parc_raw))
+        amortizacao = _dec(re.sub(r'^R\$\s*', '', amort_raw))
+
         juros = Decimal('0')
         data_pag = None
-        a = m.group('a')
-        b = m.group('b')
+        juros_or_extra = (m.group('juros_or_extra') or '').strip()
+        pag_extra = (m.group('pag_extra') or '').strip()
         resto = (m.group('resto') or '').strip()
 
-        if a:
-            if re.match(r'\d{2}/\d{2}/\d{2}$', a):
-                data_pag = _parse_data(a)
-            else:
-                juros = _dec(a)
-                if b:
-                    data_pag = _parse_data(b)
+        if juros_or_extra and re.match(rf'^{_money}$', juros_or_extra):
+            juros = _dec(re.sub(r'^R\$\s*', '', juros_or_extra))
+        elif juros_or_extra and re.match(r'\d{2}/\d{2}/\d{2,4}', juros_or_extra):
+            data_pag = _parse_data(juros_or_extra)
+        elif juros_or_extra == '-':
+            pass
+
+        if pag_extra and re.match(r'\d{2}/\d{2}/\d{2,4}', pag_extra):
+            data_pag = _parse_data(pag_extra)
+
+        # SAC "operação em aberto": parcela R$ 0,00 e amortização preenchida
+        if valor_parcela <= 0 and amortizacao > 0:
+            valor_parcela = (amortizacao + juros).quantize(Decimal('0.01'))
+        elif valor_parcela > 0 and amortizacao <= 0 and juros <= 0:
+            amortizacao = max(
+                Decimal('0'),
+                (valor_parcela - juros).quantize(Decimal('0.01')),
+            )
+
+        if valor_parcela <= 0 and amortizacao <= 0 and juros <= 0:
+            if num == 0:
+                parcelas.append({
+                    'numero': num,
+                    'data_vencimento': venc,
+                    'valor_parcela': Decimal('0.00'),
+                    'amortizacao': Decimal('0.00'),
+                    'juros': Decimal('0.00'),
+                    'data_pagamento': None,
+                    'historico': 'Carência',
+                    'valor_pago': None,
+                    'mora': Decimal('0'),
+                    'iof': Decimal('0'),
+                    'correcao': Decimal('0'),
+                    'status': 'aberta',
+                })
+            continue
 
         historico = ''
         valor_pago = None
@@ -544,24 +795,26 @@ def _parse_parcelas_extrato(
         correcao = Decimal('0')
 
         if data_pag:
-            moneys = re.findall(r'[\d.]+,\d{2}', resto)
+            moneys = re.findall(r'(?:R\$\s*)?[\d.]+,\d{2}', resto)
             hist_bits = re.findall(r'[A-Za-zÀ-ú/]+', resto)
             historico = ' '.join(hist_bits[:8]).strip()
             if moneys:
-                valor_pago = _dec(moneys[0])
+                valor_pago = _dec(re.sub(r'^R\$\s*', '', moneys[0]))
             if len(moneys) >= 2:
                 if tipo == 'sac' or 'corre' in historico.lower() or indice_correcao:
-                    correcao = _dec(moneys[1])
+                    correcao = _dec(re.sub(r'^R\$\s*', '', moneys[1]))
                 else:
-                    mora = _dec(moneys[1])
+                    mora = _dec(re.sub(r'^R\$\s*', '', moneys[1]))
             if len(moneys) >= 3:
-                iof = _dec(moneys[2])
+                iof = _dec(re.sub(r'^R\$\s*', '', moneys[2]))
+        elif resto.startswith('-') or ' - ' in resto:
+            data_pag = None
 
         parcelas.append({
             'numero': num,
             'data_vencimento': venc,
-            'valor_parcela': _dec(m.group('parc')),
-            'amortizacao': _dec(m.group('amort')),
+            'valor_parcela': valor_parcela,
+            'amortizacao': amortizacao,
             'juros': juros,
             'data_pagamento': data_pag,
             'historico': historico[:200],
@@ -572,6 +825,53 @@ def _parse_parcelas_extrato(
             'status': 'paga' if data_pag else 'aberta',
         })
     return parcelas
+
+
+def _interpretar_colunas_aberto(vals: list[str], valor_parcela: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+    """
+    Mapeia colunas de parcela em aberto (DDC Sicoob).
+
+    Layouts comuns na extração do PDF:
+      A) parcela | correção | juros | …
+      B) parcela | juros | …           (sem coluna correção — frequente no PDF)
+      C) parcela | amort | juros       (formato legado)
+    """
+    col = [_dec(x) for x in vals[1:]]
+    while len(col) < 3:
+        col.append(Decimal('0'))
+
+    correcao = Decimal('0')
+    juros = Decimal('0')
+    amortizacao = Decimal('0')
+    c1, c2, c3 = col[0], col[1], col[2]
+
+    # SAC extrato em aberto: parcela zerada, amortização na 2ª coluna
+    if valor_parcela <= 0 and c2 > 0:
+        amortizacao = c2
+        juros = c3 if c3 > 0 else Decimal('0')
+        return correcao, juros, amortizacao
+
+    # Layout A: correção (geralmente 0) + juros na 3ª coluna
+    if c2 > 0 and c2 < valor_parcela and (c1 == 0 or c1 <= c2):
+        correcao = c1
+        juros = c2
+    # Layout B: juros na 2ª coluna (PDF omite coluna correção)
+    elif c1 > 0 and c1 < valor_parcela and c2 == 0:
+        juros = c1
+    # Layout C legado: amort explícita na 2ª coluna
+    elif c1 > 0 and c1 < valor_parcela:
+        if c2 > 0 and abs((c1 + c2) - valor_parcela) <= Decimal('0.05'):
+            amortizacao = c1
+            juros = c2
+        elif c2 == 0:
+            amortizacao = c1
+
+    if amortizacao <= 0:
+        amortizacao = max(
+            Decimal('0'),
+            (valor_parcela - juros - correcao).quantize(Decimal('0.01')),
+        )
+    return correcao, juros, amortizacao
 
 
 def _parse_parcelas_ddc(texto: str) -> list[dict[str, Any]]:
@@ -617,40 +917,29 @@ def _parse_parcelas_ddc(texto: str) -> list[dict[str, Any]]:
         liquidada = bool(re.search(r'(?:^|\s)S(?:\s|$)', resto))
         nao_liquidada = bool(re.search(r'(?:^|\s)N(?:\s|$)', resto))
 
-        blocos = list(re.finditer(r'[\d.]+,\d{2}', resto))
-        if len(blocos) < 3:
-            continue
+        blocos = list(re.finditer(r'(?:R\$\s*)?[\d.]+,\d{2}', resto))
 
-        # Em aberto (sem data de pagamento / não liquidada):
-        # PDF recente: Valor Parcela | Valor Correção | Valor Juros | …
-        # Não usar o mapeamento de 7 colunas das liquidadas.
         em_aberto = (
             (not data_pag and not liquidada)
             or nao_liquidada
             or pag_raw == '-'
         )
 
+        min_blocos = 2 if em_aberto else 3
+        if len(blocos) < min_blocos:
+            continue
+
+        # Em aberto (sem data de pagamento / não liquidada):
+        # PDF recente: Valor Parcela | Valor Correção | Valor Juros | …
+        # Não usar o mapeamento de 7 colunas das liquidadas.
+
         if em_aberto:
-            vals = [x.group(0) for x in blocos]
+            vals = [re.sub(r'^R\$\s*', '', x.group(0)) for x in blocos]
             valor_pago = Decimal('0')
-            # Se começa com "0 67.828,07…" o "0" de dias não entra em blocos (sem vígula).
             valor_parcela = _dec(vals[0])
-            correcao = _dec(vals[1]) if len(vals) > 1 else Decimal('0')
-            juros = _dec(vals[2]) if len(vals) > 2 else Decimal('0')
-            # Alguns PDFs antigos trazem amortização na 2ª coluna (sem correção):
-            # se a 2ª for bem maior que juros e próxima de (parcela−juros), trata como amort.
-            amort_cand = correcao
-            amort_calc = (valor_parcela - juros).quantize(Decimal('0.01'))
-            if amort_cand > 0 and juros > 0 and abs(amort_cand - amort_calc) <= Decimal('0.05'):
-                amortizacao = amort_cand
-                correcao = Decimal('0')
-            elif amort_cand > 0 and juros == 0 and len(vals) >= 3 and _dec(vals[2]) == 0:
-                # Formato antigo: parcela, amort, juros
-                amortizacao = amort_cand
-                juros = _dec(vals[2]) if len(vals) > 2 else Decimal('0')
-                correcao = Decimal('0')
-            else:
-                amortizacao = max(Decimal('0'), amort_calc)
+            correcao, juros, amortizacao = _interpretar_colunas_aberto(vals, valor_parcela)
+            if valor_parcela <= 0 and amortizacao > 0:
+                valor_parcela = (amortizacao + juros + correcao).quantize(Decimal('0.01'))
             mora = _dec(vals[3]) if len(vals) > 3 else Decimal('0')
             iof = _dec(vals[6]) if len(vals) > 6 else Decimal('0')
             money_matches = blocos

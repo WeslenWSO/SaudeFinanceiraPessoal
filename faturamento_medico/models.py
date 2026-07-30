@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from empresa.models import Empresa
+from decimal import Decimal
 import os
 
 
@@ -457,3 +458,146 @@ class Lote(models.Model):
         self.total_lote = total_faturamentos
         # Salva sem chamar save() novamente para evitar loop
         super().save(update_fields=['total_lote'])
+
+    def sincronizar_extrato_pagamento(self):
+        """Cria ou atualiza linha na tabela Extrato de Pagamento ao gerar/adicionar lote."""
+        from django.db.models import Count
+        from django.db.models.functions import TruncMonth
+
+        faturamentos = FaturamentoMedico.objects.filter(
+            empresa_id=self.empresa_id,
+            lote=str(self.id),
+        )
+        if not faturamentos.exists():
+            ExtratoPagamentoConvenio.objects.filter(lote_faturamento=self).delete()
+            return None
+
+        qt_guias = (
+            faturamentos.exclude(guia__isnull=True)
+            .exclude(guia='')
+            .values('guia')
+            .distinct()
+            .count()
+        )
+        if not qt_guias:
+            qt_guias = faturamentos.count()
+
+        mes_dominante = (
+            faturamentos.annotate(mes=TruncMonth('data'))
+            .values('mes')
+            .annotate(qtd=Count('id'))
+            .order_by('-qtd', '-mes')
+            .first()
+        )
+        if mes_dominante and mes_dominante.get('mes'):
+            ref = mes_dominante['mes']
+            competencia = f'{ref.month:02d}/{ref.year}'
+        else:
+            ref = self.data_lote or timezone.now().date()
+            competencia = f'{ref.month:02d}/{ref.year}'
+
+        convenio = (self.convenio or '').strip()
+
+        self.atualizar_total()
+        valor = self.total_lote or Decimal('0')
+
+        existente = ExtratoPagamentoConvenio.objects.filter(lote_faturamento=self).first()
+        defaults = {
+            'empresa_id': self.empresa_id,
+            'competencia': competencia,
+            'convenio': convenio,
+            'data_lote': self.data_lote,
+            'lote': str(self.id),
+            'qt_guias': qt_guias,
+            'valor': valor,
+            'banco': existente.banco if existente else '',
+            'observacao': (
+                existente.observacao if existente and existente.observacao
+                else 'Gerado automaticamente ao formar lote de faturamento.'
+            ),
+        }
+        if not existente or not existente.protocolo:
+            defaults.update({
+                'valor_processado': Decimal('0'),
+                'valor_glosado': Decimal('0'),
+                'valor_liberado': Decimal('0'),
+                'retencoes': Decimal('0'),
+                'liquido': Decimal('0'),
+                'valor_recebido': Decimal('0'),
+            })
+
+        extrato, _created = ExtratoPagamentoConvenio.objects.update_or_create(
+            lote_faturamento=self,
+            defaults=defaults,
+        )
+        return extrato
+
+
+class ExtratoPagamentoConvenio(models.Model):
+    """Linha importada do Demonstrativo de Pagamento TISS (convênio)."""
+
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, verbose_name='Empresa')
+    lote_faturamento = models.ForeignKey(
+        Lote,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='linhas_extrato_pagamento',
+        verbose_name='Lote de faturamento',
+    )
+    competencia = models.CharField(verbose_name='Competência', max_length=7, blank=True, default='')
+    convenio = models.CharField(verbose_name='Convênio', max_length=100, blank=True, default='')
+    data_lote = models.DateField(verbose_name='Data do Lote', null=True, blank=True)
+    lote = models.CharField(verbose_name='Lote', max_length=50, blank=True, default='')
+    protocolo = models.CharField(verbose_name='Protocolo', max_length=50, blank=True, default='')
+    qt_guias = models.PositiveIntegerField(verbose_name='Qt de Guia', null=True, blank=True)
+    valor = models.DecimalField(verbose_name='Valor', max_digits=12, decimal_places=2, default=0)
+    valor_processado = models.DecimalField(
+        verbose_name='Valor Processado', max_digits=12, decimal_places=2, default=0, blank=True
+    )
+    valor_glosado = models.DecimalField(verbose_name='Valor Glosado', max_digits=12, decimal_places=2, default=0)
+    valor_liberado = models.DecimalField(verbose_name='Valor Liberado', max_digits=12, decimal_places=2, default=0)
+    observacao = models.TextField(verbose_name='Observação', blank=True, default='')
+    nota = models.CharField(verbose_name='Nota', max_length=50, blank=True, default='')
+    valor_nota = models.DecimalField(
+        verbose_name='Valor da Nota', max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    retencoes = models.DecimalField(verbose_name='Retenções', max_digits=12, decimal_places=2, default=0)
+    liquido = models.DecimalField(verbose_name='Líquido', max_digits=12, decimal_places=2, default=0)
+    data_previsao = models.DateField(verbose_name='Data de Previsão', null=True, blank=True)
+    data_recebimento = models.DateField(verbose_name='Data de Recebimento', null=True, blank=True)
+    valor_recebido = models.DecimalField(verbose_name='Valor Recebido', max_digits=12, decimal_places=2, default=0)
+    banco = models.CharField(verbose_name='Banco', max_length=100, blank=True, default='')
+    numero_demonstrativo = models.CharField(
+        verbose_name='Nº Demonstrativo', max_length=50, blank=True, default=''
+    )
+    nome_arquivo = models.CharField(verbose_name='Arquivo origem', max_length=255, blank=True, default='')
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Extrato de Pagamento — Convênio'
+        verbose_name_plural = 'Extratos de Pagamento — Convênio'
+        ordering = ['-data_recebimento', '-competencia', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lote_faturamento'],
+                condition=models.Q(lote_faturamento__isnull=False),
+                name='uniq_extrato_por_lote_faturamento',
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    'empresa', 'competencia', 'protocolo', 'lote',
+                    'data_recebimento', 'valor', 'valor_liberado',
+                ],
+                condition=models.Q(lote_faturamento__isnull=True),
+                name='uniq_extrato_pagamento_convenio',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.convenio} — {self.competencia} — lote {self.lote} — R$ {self.valor_recebido}'
+
+    @property
+    def baixado(self) -> bool:
+        return self.data_recebimento is not None and (self.valor_recebido or 0) > 0

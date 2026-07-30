@@ -5,6 +5,8 @@
   {% include 'parcial/_head.html' %}
 </head>
 <body>
+  {% load static %}
+  {% include 'parcial/_tarefas_letreiro.html' %}
   <div id="app-wrapper">
     {% block sid_Bar %}{% include 'parcial/_nav.html' %}{% endblock %}
     <div id="app-content" class="app-content-with-nav">

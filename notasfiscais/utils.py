@@ -628,12 +628,15 @@ def extrair_valores_mesma_forma_da_discriminacao(
 
 
 def extrair_aut_todos(discriminacao: str) -> List[str]:
-    """Retorna todos os códigos AUT encontrados na discriminação."""
+    """Retorna todos os códigos AUT / STONE ID encontrados na discriminação."""
     if not discriminacao:
         return []
     padroes = [
         r"\bAUT[:\s]*([A-Za-z0-9\-/\.]+)",
         r"\bAUT([A-Za-z0-9\-/\.]+)",
+        r"\bSTONE\s*ID[:\s]*([0-9]+)",
+        r"\bSTONEID[:\s]*([0-9]+)",
+        r"autorizacao[:\s]*([A-Za-z0-9\-/\.]+)",
     ]
     auts = []
     for pat in padroes:
@@ -642,6 +645,12 @@ def extrair_aut_todos(discriminacao: str) -> List[str]:
             if cod and cod not in auts:
                 auts.append(cod)
     return auts
+
+
+def extrair_autorizacao(discriminacao: str) -> Optional[str]:
+    """Primeiro código de autorização (AUT, STONE ID, etc.) na discriminação."""
+    auts = extrair_aut_todos(discriminacao)
+    return auts[0] if auts else None
 
 
 def _eh_forma_cartao(forma_normalizada: str) -> bool:
@@ -1374,6 +1383,14 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
             safe_print(f"[ERRO] Erro de parsing XML: {str(parse_err)}")
             safe_print(f"[ERRO] Arquivo pode estar corrompido ou ter formato inválido")
             raise ValueError(f"Erro ao processar XML: {str(parse_err)}")
+
+        from notasfiscais.nfse_evento_cancelamento import (
+            import_evento_cancelamento_nfse,
+            is_evento_cancelamento_nfse,
+        )
+        if is_evento_cancelamento_nfse(root):
+            logger.info("XML detectado como evento de cancelamento NFS-e (SPED)")
+            return import_evento_cancelamento_nfse(xml_file, user, empresa)
         
         # Portal Nacional (SPED NFSe): root NFSe com namespace http://www.sped.fazenda.gov.br/nfse
         if _is_nfse_sped(root):
@@ -2279,6 +2296,13 @@ def extract_xml_data_preview(xml_file, empresa):
             safe_print(f"[ERRO] Erro de parsing XML para preview: {str(parse_err)}")
             safe_print(f"[ERRO] Arquivo pode estar corrompido ou ter formato inválido")
             raise ValueError(f"Erro ao processar XML: {str(parse_err)}")
+
+        from notasfiscais.nfse_evento_cancelamento import (
+            extract_evento_cancelamento_preview,
+            is_evento_cancelamento_nfse,
+        )
+        if is_evento_cancelamento_nfse(root):
+            return extract_evento_cancelamento_preview(root, empresa)
         
         if _is_nfse_sped(root):
             return extract_sped_preview(root, empresa)

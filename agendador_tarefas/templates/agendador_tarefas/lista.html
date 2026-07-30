@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0">{{ title }}</h3>
+            <small class="text-muted">
+                {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }} + {% endif %}
+                Tarefas gerais — {{ filtros.mes|stringformat:"02d" }}/{{ filtros.ano }}
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=calendario{% if filtros.status %}&status={{ filtros.status }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-calendar"></i> Calendário
+            </a>
+            <a href="{% url 'agendador_tarefas:criar' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Nova tarefa
+            </a>
+        </div>
+    </div>
+
+    {% include 'parcial/_messages.html' %}
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="vista" value="lista">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroMes">Mês</label>
+                    <input type="number" min="1" max="12" name="mes" id="filtroMes"
+                           class="form-control form-control-sm" value="{{ filtros.mes }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroAno">Ano</label>
+                    <input type="number" min="2000" max="2100" name="ano" id="filtroAno"
+                           class="form-control form-control-sm" value="{{ filtros.ano }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="filtroStatus">Status</label>
+                    <select name="status" id="filtroStatus" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for val, rotulo in status_choices %}
+                        <option value="{{ val }}" {% if filtros.status == val %}selected{% endif %}>{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1" for="filtroQ">Busca</label>
+                    <input type="text" name="q" id="filtroQ" class="form-control form-control-sm"
+                           value="{{ filtros.q }}" placeholder="Título, descrição, responsável">
+                </div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filtrar</button>
+                    <a href="{% url 'agendador_tarefas:listar' %}?vista=lista" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Título</th>
+                        <th>Empresa</th>
+                        <th>Data</th>
+                        <th>Horário</th>
+                        <th>Previsão</th>
+                        <th>Status</th>
+                        <th>Responsável</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tarefas %}
+                    <tr>
+                        <td>
+                            <strong>{{ t.titulo }}</strong>
+                            {% if t.descricao %}
+                            <br><small class="text-muted">{{ t.descricao|truncatechars:80 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ t.empresa_rotulo }}</td>
+                        <td>{{ t.data|date:"d/m/Y" }}</td>
+                        <td>{{ t.horario_rotulo|default:"—" }}</td>
+                        <td>{{ t.previsao_conclusao|date:"d/m/Y" }}</td>
+                        <td><span class="badge bg-{{ t.status_badge }}">{{ t.get_status_display }}</span></td>
+                        <td>{{ t.responsavel|default:"—" }}</td>
+                        <td class="text-end text-nowrap">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'agendador_tarefas:editar' t.pk %}" class="btn btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="post" action="{% url 'agendador_tarefas:excluir' t.pk %}" class="d-inline"
+                                      onsubmit="return confirm('Excluir tarefa {{ t.titulo }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">Nenhuma tarefa neste período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
