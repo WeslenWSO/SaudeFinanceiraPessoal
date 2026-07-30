@@ -27,3 +27,5 @@ services:
         value: financaspessoais-eloo.onrender.com,.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
         value: https://financaspessoais-eloo.onrender.com
+      - key: GEMINI_API_KEY
+        sync: false

@@ -262,6 +262,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 if not DEBUG:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 MEDIA_URL = '/media/'
+# Uploads locais (anexos, certificados enviados pelo usuário). No Render o disco é efêmero:
+# arquivos em media/ somem após redeploy — use Render Disk ou S3 para persistência.
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # NFS-e ambiente nacional (SEFIN), mTLS com certificado A1 (.pfx) no servidor.

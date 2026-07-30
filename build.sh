@@ -6,7 +6,7 @@ if command -v apt-get >/dev/null 2>&1; then
   apt-get update -qq && apt-get install -y -qq tesseract-ocr tesseract-ocr-por || true
 fi
 
-pip install -r requirements.txt
+pip install -r requirements-render.txt
 
 python manage.py collectstatic --noinput
 if [ ! -f staticfiles/accounts/img/logo.png ] && [ ! -f static/accounts/img/logo.png ]; then

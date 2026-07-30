@@ -1,5 +1,6 @@
-# Dependencias para deploy (Render/Linux).
-# Desenvolvimento local completo (Windows): pip install -r requirements-local.txt
+# Dependencias padrao (Linux/Render). Mesmo conteudo de requirements-render.txt.
+# Windows/dev completo: pip install -r requirements-local.txt
+# Deploy Render (build.sh): requirements-render.txt
 amqp==5.2.0
 asgiref==3.7.2
 attrs==24.2.0
