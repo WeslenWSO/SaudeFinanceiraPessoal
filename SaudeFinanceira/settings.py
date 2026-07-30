@@ -29,10 +29,14 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 # Com DEBUG=False o runserver não expõe /static/ (helper static() em urls fica vazio) — CSS/JS 404.
 # Em produção: DJANGO_DEBUG=false + collectstatic + whitenoise.
-# No Render, default e false (evita servir static/ direto sem os arquivos do Git).
+# No Render, DEBUG deve ser false (WhiteNoise serve staticfiles/ via collectstatic).
 _on_render = os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
-_debug_env = os.environ.get('DJANGO_DEBUG', 'false' if _on_render else 'true').lower()
-DEBUG = _debug_env in ('true', '1', 'yes')
+_render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if _render_host or _on_render:
+    DEBUG = False
+else:
+    _debug_env = os.environ.get('DJANGO_DEBUG', 'true').lower()
+    DEBUG = _debug_env in ('true', '1', 'yes')
 
 _default_hosts = [
     'localhost', '127.0.0.1', '[::1]', '10.10.1.151', '192.168.1.2', '192.168.1.10',
@@ -43,7 +47,6 @@ _default_hosts = [
     'saudefinanceira-pessoal.onrender.com',
 ]
 _env_hosts = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
-_render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
 if _render_host and _render_host not in _env_hosts:
     _env_hosts.append(_render_host)
 ALLOWED_HOSTS = list(dict.fromkeys(_default_hosts + _env_hosts))
