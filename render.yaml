@@ -1,6 +1,6 @@
 databases:
   - name: financas-db
-    plan: free
+    plan: standard
     databaseName: financas_db
     user: financas_db
 
@@ -8,7 +8,7 @@ services:
   - type: web
     name: FinancasPessoais
     runtime: python
-    plan: free
+    plan: standard
     buildCommand: bash build.sh
     startCommand: bash start.sh
     envVars:

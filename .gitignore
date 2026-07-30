@@ -20,7 +20,7 @@ db.sqlite3-journal
 db.sqlite3.bak
 db.sqlite3.*.bak
 staticfiles/
-media/
+/media/
 test_empty.db
 
 # Scripts locais de debug
@@ -60,3 +60,5 @@ credentials.json
 # Backup de migracao SQLite -> Postgres (nao commitar)
 backup_render.json
 fixtures/import_*.json
+render_db.url
+import_log*.txt

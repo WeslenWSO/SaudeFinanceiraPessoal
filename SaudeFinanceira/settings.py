@@ -29,7 +29,10 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 # Com DEBUG=False o runserver não expõe /static/ (helper static() em urls fica vazio) — CSS/JS 404.
 # Em produção: DJANGO_DEBUG=false + collectstatic + whitenoise.
-DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() in ('true', '1', 'yes')
+# No Render, default e false (evita servir static/ direto sem os arquivos do Git).
+_on_render = os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
+_debug_env = os.environ.get('DJANGO_DEBUG', 'false' if _on_render else 'true').lower()
+DEBUG = _debug_env in ('true', '1', 'yes')
 
 _default_hosts = [
     'localhost', '127.0.0.1', '[::1]', '10.10.1.151', '192.168.1.2', '192.168.1.10',
@@ -40,6 +43,9 @@ _default_hosts = [
     'saudefinanceira-pessoal.onrender.com',
 ]
 _env_hosts = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+_render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if _render_host and _render_host not in _env_hosts:
+    _env_hosts.append(_render_host)
 ALLOWED_HOSTS = list(dict.fromkeys(_default_hosts + _env_hosts))
 
 if DEBUG:
@@ -65,6 +71,11 @@ CSRF_TRUSTED_ORIGINS = [
     for o in os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(_default_csrf_origins)).split(',')
     if o.strip() and '*' not in o.strip()
 ] or _default_csrf_origins
+
+if _render_host:
+    _render_origin = f'https://{_render_host}'
+    if _render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_render_origin)
 
 if DEBUG:
     for host in ALLOWED_HOSTS:

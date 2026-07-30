@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Importa backup_render.json em lotes por app (mais seguro para arquivos grandes).
-Requer DATABASE_URL no ambiente.
+Importa backup_render.json inteiro para PostgreSQL (loaddata unico).
+Ordena registros por dependencia antes de carregar.
 
   set DATABASE_URL=postgresql://...
-  python scripts/importar_para_postgres_lotes.py
+  python scripts/importar_postgres_completo.py
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "backup_render.json"
+URL_FILE = ROOT / "render_db.url"
 
-# Ordem aproximada de dependencias entre apps Django
 APP_ORDER = [
     "auth",
     "admin",
@@ -82,10 +82,36 @@ with connection.cursor() as cursor:
     )
 print("truncate cascade ok")
 """
-    subprocess.check_call([sys.executable, "-c", code], env=env)
+    subprocess.check_call([sys.executable, "-c", code], env=env, cwd=ROOT)
+
+
+def _ordenar_fixture(rows: list[dict]) -> list[dict]:
+    by_app: dict[str, list] = defaultdict(list)
+    for row in rows:
+        app = row["model"].split(".", 1)[0]
+        if app == "regrarateio":
+            bucket = (
+                "regrarateio_lancamentos"
+                if row["model"] == "regrarateio.lancamentorateio"
+                else "regrarateio_base"
+            )
+            by_app[bucket].append(row)
+        else:
+            by_app[app].append(row)
+
+    ordered_apps = [a for a in APP_ORDER if a in by_app]
+    ordered_apps += sorted(set(by_app) - set(ordered_apps))
+
+    ordered: list[dict] = []
+    for app in ordered_apps:
+        ordered.extend(by_app[app])
+    return ordered
 
 
 def main() -> int:
+    if not os.environ.get("DATABASE_URL") and URL_FILE.is_file():
+        os.environ["DATABASE_URL"] = URL_FILE.read_text(encoding="utf-8").strip()
+
     if not os.environ.get("DATABASE_URL"):
         print("Defina DATABASE_URL (External URL do financas-db no Render).", file=sys.stderr)
         return 1
@@ -93,7 +119,6 @@ def main() -> int:
         print(f"Arquivo nao encontrado: {FIXTURE}", file=sys.stderr)
         return 1
 
-    os.chdir(ROOT)
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
@@ -102,6 +127,7 @@ def main() -> int:
     subprocess.check_call(
         [sys.executable, "manage.py", "migrate", "--skip-checks", "--noinput"],
         env=env,
+        cwd=ROOT,
     )
 
     print("limpar dados (truncate cascade) ...")
@@ -110,43 +136,22 @@ def main() -> int:
     with FIXTURE.open(encoding="utf-8") as f:
         rows = json.load(f)
 
-    by_app: dict[str, list] = defaultdict(list)
-    for row in rows:
-        app = row["model"].split(".", 1)[0]
-        by_app[app].append(row)
+    ordered = _ordenar_fixture(rows)
+    print(f"ordenando {len(ordered)} registros por dependencia ...")
 
-    # regrarateio.lancamentorateio referencia contas a pagar/receber; carregar em etapa separada.
-    regra_rows = by_app.pop("regrarateio", [])
-    if regra_rows:
-        by_app["regrarateio_base"] = [
-            r for r in regra_rows if r["model"] != "regrarateio.lancamentorateio"
-        ]
-        by_app["regrarateio_lancamentos"] = [
-            r for r in regra_rows if r["model"] == "regrarateio.lancamentorateio"
-        ]
-
-    ordered_apps = [a for a in APP_ORDER if a in by_app]
-    ordered_apps += sorted(set(by_app) - set(ordered_apps))
-
-    print(f"Total registros: {len(rows)} em {len(by_app)} apps")
-    tmpdir = Path(tempfile.mkdtemp(prefix="sfp_import_"))
-
+    tmp = Path(tempfile.mkstemp(prefix="sfp_sorted_", suffix=".json")[1])
     try:
-        for app in ordered_apps:
-            chunk = by_app[app]
-            path = tmpdir / f"{app}.json"
-            path.write_text(json.dumps(chunk, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"loaddata {app} ({len(chunk)} registros) ...")
-            subprocess.check_call(
-                [sys.executable, "manage.py", "loaddata", "--skip-checks", str(path)],
-                env=env,
-            )
+        tmp.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"loaddata (pode levar varios minutos) ...")
+        subprocess.check_call(
+            [sys.executable, "manage.py", "loaddata", "--skip-checks", str(tmp)],
+            env=env,
+            cwd=ROOT,
+        )
     finally:
-        for p in tmpdir.glob("*.json"):
-            p.unlink(missing_ok=True)
-        tmpdir.rmdir()
+        tmp.unlink(missing_ok=True)
 
-    print("Importacao por lotes concluida.")
+    print("Importacao concluida.")
     return 0
 
 

@@ -42,7 +42,7 @@ Após `migrate`, cadastre ao menos uma empresa no admin antes que algumas migra�
 
 ## Deploy no Render (SaudeFinanceiraPessoal)
 
-URL: **https://financaspessoais-eloo.onrender.com**
+URL: **https://financaspessoais-eloo.onrender.com** (plano **Standard** — sempre ativo)
 
 Guia passo a passo: [`RENDER_CONFIGURAR.md`](RENDER_CONFIGURAR.md)
 
@@ -54,5 +54,7 @@ Resumo:
 4. **Manual Deploy**
 5. Shell: `python manage.py createsuperuser`
 6. Importar dados: `scripts/importar_para_postgres.ps1`
+
+**Imagens do login:** logo e fundos ficam em `static/media/` (versionados no Git). O `.gitignore` ignora só `/media/` (uploads), nao `static/media/`.
 
 Desenvolvimento local: `pip install -r requirements-local.txt`

@@ -27,6 +27,26 @@ def _on_render() -> bool:
     return os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
 
 
+def _log_database_backend() -> None:
+    if not _on_render():
+        return
+    import django
+    django.setup()
+    from django.conf import settings
+    from django.contrib.auth.models import User
+
+    db = settings.DATABASES['default']
+    engine = db.get('ENGINE', '')
+    print(f'[startup] DATABASE ENGINE: {engine}', flush=True)
+    if 'sqlite' in engine:
+        print(
+            '[startup] AVISO: SQLite no Render — configure DATABASE_URL no Environment.',
+            flush=True,
+        )
+    else:
+        print(f'[startup] auth_user count: {User.objects.count()}', flush=True)
+
+
 def _bootstrap_database_and_static() -> None:
     """Migrate/collectstatic no Render (mesmo sem DATABASE_URL configurado ainda)."""
     if not (_on_render() or os.environ.get('DATABASE_URL', '').strip()):
@@ -36,6 +56,9 @@ def _bootstrap_database_and_static() -> None:
     from django.core.management import call_command
     call_command('migrate', '--noinput', verbosity=0)
     call_command('collectstatic', '--noinput', verbosity=0)
+
+
+_log_database_backend()
 
 
 _bootstrap_database_and_static()

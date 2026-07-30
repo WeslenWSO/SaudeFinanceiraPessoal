@@ -25,8 +25,15 @@ def login_view(request):
         
         if form.is_valid():
             username = form.cleaned_data['username'].strip()
-            password = form.cleaned_data['password']
-            user = authenticate(request, username=username, password=password)
+            password = form.cleaned_data['password'].strip()
+            from django.contrib.auth.models import User
+
+            try:
+                db_user = User.objects.get(username__iexact=username)
+                auth_username = db_user.username
+            except User.DoesNotExist:
+                auth_username = username
+            user = authenticate(request, username=auth_username, password=password)
 
             if user is not None:
                 login(request, user)
