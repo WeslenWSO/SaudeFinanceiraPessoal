@@ -9,12 +9,15 @@ def forwards_assign_empresa(apps, schema_editor):
     RegraRateioItem = apps.get_model('regrarateio', 'RegraRateioItem')
     Socio = apps.get_model('socio', 'Socio')
     Empresa = apps.get_model('empresa', 'Empresa')
+    pending = RegraRateio.objects.filter(empresa__isnull=True)
+    if not pending.exists():
+        return
     first_emp = Empresa.objects.order_by('id').first()
     if not first_emp:
         raise ValueError(
             'Migração requer ao menos uma empresa cadastrada. Cadastre uma empresa e rode migrate de novo.'
         )
-    for regra in RegraRateio.objects.filter(empresa__isnull=True):
+    for regra in pending:
         eid = None
         item = RegraRateioItem.objects.filter(regrarateio=regra).first()
         if item and item.socios_id:
