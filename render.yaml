@@ -4,8 +4,7 @@ databases:
     databaseName: financas_db
     user: financas_db
 
-# Blueprint: servico Saude Financeira (projeto Render "SaudeFinanceira").
-# Financas Pessoais (0muq) e outro app/repo — ver RENDER_DOIS_PROJETOS.md
+# Blueprint: Saude Financeira — https://financaspessoais-eloo.onrender.com
 services:
   - type: web
     name: saude-financeira

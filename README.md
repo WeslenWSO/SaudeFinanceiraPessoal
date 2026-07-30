@@ -46,7 +46,7 @@ URL: **https://financaspessoais-eloo.onrender.com** (plano **Standard** — semp
 
 Guia passo a passo: [`RENDER_CONFIGURAR.md`](RENDER_CONFIGURAR.md)
 
-Dois apps no Render (Financas Pessoais + Saude Financeira): [`RENDER_DOIS_PROJETOS.md`](RENDER_DOIS_PROJETOS.md)
+Mapa de recursos no Render: [`RENDER_DOIS_PROJETOS.md`](RENDER_DOIS_PROJETOS.md)
 
 Resumo:
 
