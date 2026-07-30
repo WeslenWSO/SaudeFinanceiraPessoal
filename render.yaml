@@ -10,10 +10,8 @@ services:
     runtime: python
     plan: free
     buildCommand: bash build.sh
-    startCommand: gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: bash start.sh
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.4"
       - key: PYTHON_VERSION
         value: "3.12.4"
       - key: DJANGO_DEBUG

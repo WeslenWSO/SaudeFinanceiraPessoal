@@ -42,25 +42,17 @@ Após `migrate`, cadastre ao menos uma empresa no admin antes que algumas migra�
 
 ## Deploy no Render (SaudeFinanceiraPessoal)
 
-URL principal: **https://financaspessoais-eloo.onrender.com**
+URL: **https://financaspessoais-eloo.onrender.com**
 
-Serviço **FinancasPessoais** (`srv-d9hui8jtqb8s73a97d70`) apontado para este repositório.
+Guia passo a passo: [`RENDER_CONFIGURAR.md`](RENDER_CONFIGURAR.md)
 
-1. Faça push da branch `main` para o GitHub.
-2. No [Render Dashboard](https://dashboard.render.com/web/srv-d9hui8jtqb8s73a97d70) → **FinancasPessoais**:
-   - **Build & Deploy**: repo `WeslenWSO/SaudeFinanceiraPessoal`, branch `main`, build `bash build.sh`, start `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
-   - **Environment**:
-     - `DATABASE_URL` = Internal URL do **financas-db**
-     - `DJANGO_DEBUG` = `false`
-     - `ALLOWED_HOSTS` = `financaspessoais-eloo.onrender.com,.onrender.com`
-     - `CSRF_TRUSTED_ORIGINS` = `https://financaspessoais-eloo.onrender.com`
-3. **Manual Deploy** → Deploy latest commit.
-4. Após o deploy, abra **Shell** e rode:
-   ```bash
-   python manage.py createsuperuser
-   ```
-5. Acesse `https://financaspessoais-eloo.onrender.com/login/`
+Resumo:
 
-O [`render.yaml`](render.yaml) documenta a mesma configuração (Blueprint / referência).
+1. [FinancasPessoais](https://dashboard.render.com/web/srv-d9hui8jtqb8s73a97d70) -> **Build & Deploy**: `bash build.sh` / `bash start.sh`
+2. **Environment** -> **Add from Database** -> `financas-db` -> `DATABASE_URL` (Internal)
+3. Variaveis: `PYTHON_VERSION=3.12.4`, `DJANGO_DEBUG=false`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` (ver [`render.env.example`](render.env.example))
+4. **Manual Deploy**
+5. Shell: `python manage.py createsuperuser`
+6. Importar dados: `scripts/importar_para_postgres.ps1`
 
-Build usa [`requirements-render.txt`](requirements-render.txt) (sem pacotes exclusivos do Windows).
+Desenvolvimento local: `pip install -r requirements-local.txt`
