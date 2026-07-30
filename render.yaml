@@ -1,12 +1,12 @@
 databases:
-  - name: saudefinanceira-pessoal-db
+  - name: financas-db
     plan: free
-    databaseName: saudefinanceira_pessoal
-    user: saudefinanceira_pessoal
+    databaseName: financas_db
+    user: financas_db
 
 services:
   - type: web
-    name: saudefinanceira-pessoal
+    name: financas-pessoais
     runtime: python
     plan: free
     buildCommand: ./build.sh
@@ -20,9 +20,9 @@ services:
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
-          name: saudefinanceira-pessoal-db
+          name: financas-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: saudefinanceira-pessoal.onrender.com,.onrender.com
+        value: financas-pessoais.onrender.com,.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://saudefinanceira-pessoal.onrender.com
+        value: https://financas-pessoais.onrender.com

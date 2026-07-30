@@ -54,6 +54,15 @@ Serviço **separado** do projeto pessoal (`financaspessoais-eloo`).
    ```bash
    python manage.py createsuperuser
    ```
-6. Acesse `https://saudefinanceira-pessoal.onrender.com/login/` (ajuste a URL se o Render gerar nome diferente — atualize `ALLOWED_HOSTS` e `CSRF_TRUSTED_ORIGINS` no painel).
+6. Acesse `https://financas-pessoais.onrender.com/login/` (ou a URL do seu serviço no Render).
+
+### Colocar serviços no projeto "SaudeFinanceira" (Render)
+
+Se `financas-pessoais` e `financas-db` estão em **Ungrouped**:
+
+1. Abra cada serviço → **Settings** → **Project** → selecione **SaudeFinanceira** → Save.
+2. No Web Service **financas-pessoais** → **Settings** → **Build & Deploy** → conecte o repo **WeslenWSO/SaudeFinanceiraPessoal** (branch `main`).
+3. Build Command: `./build.sh` | Start: `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
+4. **Environment** → vincule `DATABASE_URL` ao **financas-db** (Internal Database URL).
 
 Build usa [`requirements-render.txt`](requirements-render.txt) (sem pacotes exclusivos do Windows).
