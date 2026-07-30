@@ -35,6 +35,7 @@ _default_hosts = [
     'localhost', '127.0.0.1', '[::1]', '10.10.1.151', '192.168.1.2', '192.168.1.10',
     'DESKTOP-8KU7E4Q', '10.10.1.61', '10.10.1.106', '192.168.1.24',
     'django01.intra.local', '.onrender.com',
+    'financaspessoais-eloo.onrender.com',
     'financas-pessoais-0muq.onrender.com',
     'saudefinanceira-pessoal.onrender.com',
 ]
@@ -52,6 +53,7 @@ if DEBUG:
         pass
 
 _default_csrf_origins = [
+    'https://financaspessoais-eloo.onrender.com',
     'https://financas-pessoais-0muq.onrender.com',
     'https://saudefinanceira-pessoal.onrender.com',
     'http://127.0.0.1:8000',

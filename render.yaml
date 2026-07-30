@@ -6,10 +6,10 @@ databases:
 
 services:
   - type: web
-    name: financas-pessoais
+    name: FinancasPessoais
     runtime: python
     plan: free
-    buildCommand: ./build.sh
+    buildCommand: bash build.sh
     startCommand: gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
@@ -23,6 +23,6 @@ services:
           name: financas-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: financas-pessoais-0muq.onrender.com,.onrender.com
+        value: financaspessoais-eloo.onrender.com,.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://financas-pessoais-0muq.onrender.com
+        value: https://financaspessoais-eloo.onrender.com
