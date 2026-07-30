@@ -23,6 +23,6 @@ services:
           name: financas-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: financas-pessoais.onrender.com,.onrender.com
+        value: financas-pessoais-0muq.onrender.com,.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://financas-pessoais.onrender.com
+        value: https://financas-pessoais-0muq.onrender.com
