@@ -22,11 +22,21 @@ if not hasattr(_django_inspect, 'lazy_annotations'):
 
 from django.core.wsgi import get_wsgi_application
 
-if os.environ.get('DATABASE_URL'):
+
+def _on_render() -> bool:
+    return os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
+
+
+def _bootstrap_database_and_static() -> None:
+    """Migrate/collectstatic no Render (mesmo sem DATABASE_URL configurado ainda)."""
+    if not (_on_render() or os.environ.get('DATABASE_URL', '').strip()):
+        return
     import django
     django.setup()
     from django.core.management import call_command
     call_command('migrate', '--noinput', verbosity=0)
     call_command('collectstatic', '--noinput', verbosity=0)
 
+
+_bootstrap_database_and_static()
 application = get_wsgi_application()
