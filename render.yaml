@@ -14,6 +14,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"
+      - key: PYTHON_VERSION
+        value: "3.12.4"
       - key: DJANGO_DEBUG
         value: "false"
       - key: SECRET_KEY

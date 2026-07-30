@@ -16,7 +16,7 @@ click-repl==0.3.0
 colorama==0.4.4
 crispy-tailwind==1.0.3
 cryptography==45.0.6
-distlib==0.3.9
+distlib==0.3.9; sys_platform == 'win32'
 Django==4.2.2
 django-axes==7.0.0
 django-bootstrap4==23.2
@@ -25,7 +25,7 @@ django-crispy-forms==2.4
 django-cron==0.6.0
 django-table-sort==0.5.0
 et-xmlfile==1.1.0
-filelock==3.16.1
+filelock==3.16.1; sys_platform == 'win32'
 Flask==3.0.3
 google-ai-generativelanguage==0.6.15
 google-api-core==2.25.1
@@ -70,25 +70,25 @@ pyasn1_modules==0.4.2
 PyAutoGUI==0.9.54; sys_platform == 'win32'
 pycparser==2.22
 pydantic==1.7.3
-pydev==0.0.1
+pydev==0.0.1; sys_platform == 'win32'
 PyGetWindow==0.0.9; sys_platform == 'win32'
-pyinstaller==6.11.0
-pyinstaller-hooks-contrib==2024.9
+pyinstaller==6.11.0; sys_platform == 'win32'
+pyinstaller-hooks-contrib==2024.9; sys_platform == 'win32'
 PyMsgBox==1.0.9; sys_platform == 'win32'
 PyMySQL==1.1.0; sys_platform == 'win32'
 pyparsing==3.2.5
 pypdfium2==4.30.0
-pyperclip==1.9.0
+pyperclip==1.9.0; sys_platform == 'win32'
 PyRect==0.2.0; sys_platform == 'win32'
 PyScreeze==1.0.1; sys_platform == 'win32'
 PySocks==1.7.1
 pytesseract==0.3.13
 python-dateutil==2.9.0.post0
 python-Levenshtein==0.27.1
-pytweening==1.2.0
+pytweening==1.2.0; sys_platform == 'win32'
 pytz==2024.2
-pywhatkit==5.4
-pywin32-ctypes==0.2.3
+pywhatkit==5.4; sys_platform == 'win32'
+pywin32-ctypes==0.2.3; sys_platform == 'win32'
 RapidFuzz==3.14.1
 redis==5.1.1
 requests==2.31.0
@@ -110,7 +110,7 @@ tzdata==2023.3
 uritemplate==4.2.0
 urllib3==2.0.3
 vine==5.1.0
-virtualenv==20.27.0
+virtualenv==20.27.0; sys_platform == 'win32'
 waitress==3.0.0
 wcwidth==0.2.13
 websocket-client==1.8.0

@@ -5,7 +5,9 @@ from pathlib import Path
 WIN_ONLY = {
     "mysqlclient", "mysql-connector-python", "PyMySQL",
     "PyAutoGUI", "PyGetWindow", "PyScreeze", "MouseInfo", "PyMsgBox", "PyRect",
-    "pefile", "tk",
+    "pefile", "tk", "pyinstaller", "pyinstaller-hooks-contrib", "pywin32-ctypes",
+    "pywhatkit", "pydev", "pyperclip", "pytweening",
+    "distlib", "filelock", "virtualenv",
 }
 path = Path("requirements.txt")
 lines = []
