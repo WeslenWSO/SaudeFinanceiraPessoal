@@ -54,15 +54,26 @@ Serviço **separado** do projeto pessoal (`financaspessoais-eloo`).
    ```bash
    python manage.py createsuperuser
    ```
-6. Acesse `https://financas-pessoais.onrender.com/login/` (ou a URL do seu serviço no Render).
+6. Acesse `https://financas-pessoais-0muq.onrender.com/login/`
 
-### Colocar serviços no projeto "SaudeFinanceira" (Render)
+### Colocar no projeto **SaudeFinanceira** (painel Render)
 
-Se `financas-pessoais` e `financas-db` estão em **Ungrouped**:
+Os serviços `financas-pessoais` e `financas-db` estão em **Ungrouped**. Para agrupar:
 
-1. Abra cada serviço → **Settings** → **Project** → selecione **SaudeFinanceira** → Save.
-2. No Web Service **financas-pessoais** → **Settings** → **Build & Deploy** → conecte o repo **WeslenWSO/SaudeFinanceiraPessoal** (branch `main`).
-3. Build Command: `./build.sh` | Start: `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
-4. **Environment** → vincule `DATABASE_URL` ao **financas-db** (Internal Database URL).
+1. Abra **financas-pessoais** → **Settings** → **Project** → **SaudeFinanceira** → **Production** → Save.
+2. Abra **financas-db** → **Settings** → **Project** → **SaudeFinanceira** → Save.
+3. Em **financas-pessoais** → **Settings** → **Build & Deploy**:
+   - Repository: `WeslenWSO/SaudeFinanceiraPessoal`
+   - Branch: `main`
+   - Build Command: `./build.sh`
+   - Start Command: `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
+4. **Environment** → adicione ou confira:
+   - `DATABASE_URL` = Internal URL do **financas-db**
+   - `DJANGO_DEBUG` = `false`
+   - `ALLOWED_HOSTS` = `financas-pessoais-0muq.onrender.com,.onrender.com`
+   - `CSRF_TRUSTED_ORIGINS` = `https://financas-pessoais-0muq.onrender.com`
+5. **Manual Deploy** → Deploy latest commit (após o push no GitHub).
+
+> **Não** use o serviço `FinancasPessoais` em "My project" (`financaspessoais-eloo`) — esse é o outro repositório pessoal.
 
 Build usa [`requirements-render.txt`](requirements-render.txt) (sem pacotes exclusivos do Windows).
