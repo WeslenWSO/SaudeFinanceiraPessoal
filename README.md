@@ -46,6 +46,8 @@ URL: **https://financaspessoais-eloo.onrender.com** (plano **Standard** — semp
 
 Guia passo a passo: [`RENDER_CONFIGURAR.md`](RENDER_CONFIGURAR.md)
 
+Dois apps no Render (Financas Pessoais + Saude Financeira): [`RENDER_DOIS_PROJETOS.md`](RENDER_DOIS_PROJETOS.md)
+
 Resumo:
 
 1. [FinancasPessoais](https://dashboard.render.com/web/srv-d9hui8jtqb8s73a97d70) -> **Build & Deploy**: `bash build.sh` / `bash start.sh`
