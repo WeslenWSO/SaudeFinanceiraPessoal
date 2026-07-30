@@ -62,3 +62,5 @@ backup_render.json
 fixtures/import_*.json
 render_db.url
 import_log*.txt
+import_lotes_log*.txt
+import_progress.json

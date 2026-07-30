@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SQLITE = ROOT / 'db.sqlite3'
+sys.path.insert(0, str(ROOT))
 
 
 def _hash_sqlite(username: str) -> tuple[str, bool] | None:
@@ -39,12 +40,12 @@ def _hash_sqlite(username: str) -> tuple[str, bool] | None:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print('Uso: python scripts/sincronizar_senha_postgres.py USUARIO', file=sys.stderr)
+        print('Uso: python scripts/sincronizar_senha_postgres.py USUARIO|--todos', file=sys.stderr)
         return 1
 
-    username = sys.argv[1].strip()
-    if not username:
-        print('Informe o username.', file=sys.stderr)
+    target = sys.argv[1].strip()
+    if not target:
+        print('Informe o username ou --todos.', file=sys.stderr)
         return 1
 
     url_file = ROOT / 'render_db.url'
@@ -55,33 +56,42 @@ def main() -> int:
         print('Defina DATABASE_URL (External URL do financas-db no Render).', file=sys.stderr)
         return 1
 
-    local = _hash_sqlite(username)
-    if not local:
-        return 1
-    password_hash, is_active = local
-
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SaudeFinanceira.settings')
+    os.chdir(ROOT)
     import django
 
     django.setup()
-    from django.contrib.auth import authenticate
     from django.contrib.auth.models import User
 
-    try:
-        user = User.objects.get(username__iexact=username)
-    except User.DoesNotExist:
-        print(f'Usuario "{username}" nao existe no PostgreSQL.', file=sys.stderr)
-        return 1
+    if target == '--todos':
+        conn = sqlite3.connect(SQLITE)
+        try:
+            usernames = [r[0] for r in conn.execute('SELECT username FROM auth_user ORDER BY username')]
+        finally:
+            conn.close()
+    else:
+        usernames = [target]
 
-    user.password = password_hash
-    user.is_active = is_active
-    user.save(update_fields=['password', 'is_active'])
+    ok = 0
+    for username in usernames:
+        local = _hash_sqlite(username)
+        if not local:
+            continue
+        password_hash, is_active = local
+        try:
+            user = User.objects.get(username__iexact=username)
+        except User.DoesNotExist:
+            print(f'PULADO: {username} nao existe no PostgreSQL.')
+            continue
+        user.password = password_hash
+        user.is_active = is_active
+        user.is_staff = True
+        user.save(update_fields=['password', 'is_active', 'is_staff'])
+        print(f'OK: {user.username}')
+        ok += 1
 
-    print(f'OK: senha de "{user.username}" copiada do SQLite -> PostgreSQL.')
-    print(f'  hash: {password_hash[:28]}...')
-    print(f'  ativo: {is_active}')
-    print('Teste o login no site. Se ainda falhar, confira DATABASE_URL no web service.')
-    return 0
+    print(f'Sincronizados: {ok}/{len(usernames)}')
+    return 0 if ok else 1
 
 
 if __name__ == '__main__':

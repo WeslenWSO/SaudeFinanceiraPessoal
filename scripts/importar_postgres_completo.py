@@ -35,13 +35,13 @@ APP_ORDER = [
     "fornecedor",
     "regrarateio_base",
     "regraImposto",
-    "extrato",
     "regraConciliacao",
+    "extrato_base",
+    "notasfiscais",
+    "notafiscalentrada",
     "contasapagar",
     "contasareceber",
     "regrarateio_lancamentos",
-    "notasfiscais",
-    "notafiscalentrada",
     "emprestimos",
     "OPCARTAO",
     "faturamento_medico",
@@ -50,11 +50,29 @@ APP_ORDER = [
     "relatoriorecebiveis",
     "planejamento_orcamentario",
     "agendador_tarefas",
+    "extrato_movimentos",
     "dashboard",
 ]
 
 
-def _limpar_dados_postgres(env: dict[str, str]) -> None:
+def _banco_ja_vazio(env: dict[str, str]) -> bool:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.contrib.auth.models import User
+from empresa.models import Empresa
+print(User.objects.count(), Empresa.objects.count())
+"""
+    out = subprocess.check_output(
+        [sys.executable, "-c", code], env=env, cwd=ROOT, text=True
+    ).strip()
+    users, empresas = (int(x) for x in out.split())
+    return users == 0 and empresas == 0
+
+
+def _contagem_dados_usuario(env: dict[str, str]) -> int:
     code = """
 import os
 import django
@@ -64,25 +82,39 @@ from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute(
         '''
-        DO $$ DECLARE r RECORD;
-        BEGIN
-            FOR r IN (
-                SELECT tablename FROM pg_tables
-                WHERE schemaname = current_schema()
-                  AND tablename NOT IN (
-                      'django_migrations',
-                      'django_content_type',
-                      'auth_permission'
-                  )
-            ) LOOP
-                EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
-            END LOOP;
-        END $$;
+        SELECT COALESCE(SUM(n_live_tup), 0)::bigint
+        FROM pg_stat_user_tables
+        WHERE schemaname = current_schema()
+          AND relname NOT IN (
+              'django_migrations',
+              'django_content_type',
+              'auth_permission'
+          )
         '''
     )
-print("truncate cascade ok")
+    print(int(cursor.fetchone()[0]))
 """
-    subprocess.check_call([sys.executable, "-c", code], env=env, cwd=ROOT)
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=ROOT,
+    )
+    return int(result.stdout.strip() or "0")
+
+
+def _limpar_dados_postgres(env: dict[str, str]) -> None:
+    if _banco_ja_vazio(env):
+        print("banco sem dados de negocio — pulando truncate")
+        return
+    print("flush (limpar dados) ...")
+    subprocess.check_call(
+        [sys.executable, "manage.py", "flush", "--skip-checks", "--noinput"],
+        env=env,
+        cwd=ROOT,
+    )
 
 
 def _ordenar_fixture(rows: list[dict]) -> list[dict]:
@@ -94,6 +126,13 @@ def _ordenar_fixture(rows: list[dict]) -> list[dict]:
                 "regrarateio_lancamentos"
                 if row["model"] == "regrarateio.lancamentorateio"
                 else "regrarateio_base"
+            )
+            by_app[bucket].append(row)
+        elif app == "extrato":
+            bucket = (
+                "extrato_movimentos"
+                if row["model"] == "extrato.extratomovimento"
+                else "extrato_base"
             )
             by_app[bucket].append(row)
         else:
@@ -131,7 +170,12 @@ def main() -> int:
     )
 
     print("limpar dados (truncate cascade) ...")
-    _limpar_dados_postgres(env)
+    rows = _contagem_dados_usuario(env)
+    if rows == 0:
+        print("banco ja vazio — pulando truncate.")
+    else:
+        print(f"removendo ~{rows} registros existentes ...")
+        _limpar_dados_postgres(env)
 
     with FIXTURE.open(encoding="utf-8") as f:
         rows = json.load(f)
