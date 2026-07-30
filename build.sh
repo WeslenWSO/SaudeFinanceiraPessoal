@@ -9,8 +9,8 @@ fi
 pip install -r requirements.txt
 
 python manage.py collectstatic --noinput
-if [ ! -f staticfiles/media/fotos/2022/logo.png ]; then
-  echo "ERRO: logo do login nao foi coletado. Confira static/media/ no Git."
+if [ ! -f staticfiles/accounts/img/logo.png ] && [ ! -f staticfiles/media/fotos/2022/logo.png ]; then
+  echo "ERRO: logo do login nao foi coletado. Confira accounts/static/ no Git."
   exit 1
 fi
 python manage.py migrate --noinput
