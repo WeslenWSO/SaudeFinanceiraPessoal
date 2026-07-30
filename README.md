@@ -42,38 +42,25 @@ Após `migrate`, cadastre ao menos uma empresa no admin antes que algumas migra�
 
 ## Deploy no Render (SaudeFinanceiraPessoal)
 
-Serviço **separado** do projeto pessoal (`financaspessoais-eloo`).
+URL principal: **https://financaspessoais-eloo.onrender.com**
+
+Serviço **FinancasPessoais** (`srv-d9hui8jtqb8s73a97d70`) apontado para este repositório.
 
 1. Faça push da branch `main` para o GitHub.
-2. No [Render Dashboard](https://dashboard.render.com): **New → Blueprint**.
-3. Conecte o repositório `WeslenWSO/SaudeFinanceiraPessoal`.
-4. O [`render.yaml`](render.yaml) cria automaticamente:
-   - PostgreSQL `saudefinanceira-pessoal-db`
-   - Web Service `saudefinanceira-pessoal` com `DATABASE_URL` vinculado
-5. Após o deploy, abra **Shell** do Web Service e rode:
+2. No [Render Dashboard](https://dashboard.render.com/web/srv-d9hui8jtqb8s73a97d70) → **FinancasPessoais**:
+   - **Build & Deploy**: repo `WeslenWSO/SaudeFinanceiraPessoal`, branch `main`, build `bash build.sh`, start `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
+   - **Environment**:
+     - `DATABASE_URL` = Internal URL do **financas-db**
+     - `DJANGO_DEBUG` = `false`
+     - `ALLOWED_HOSTS` = `financaspessoais-eloo.onrender.com,.onrender.com`
+     - `CSRF_TRUSTED_ORIGINS` = `https://financaspessoais-eloo.onrender.com`
+3. **Manual Deploy** → Deploy latest commit.
+4. Após o deploy, abra **Shell** e rode:
    ```bash
    python manage.py createsuperuser
    ```
-6. Acesse `https://financas-pessoais-0muq.onrender.com/login/`
+5. Acesse `https://financaspessoais-eloo.onrender.com/login/`
 
-### Colocar no projeto **SaudeFinanceira** (painel Render)
-
-Os serviços `financas-pessoais` e `financas-db` estão em **Ungrouped**. Para agrupar:
-
-1. Abra **financas-pessoais** → **Settings** → **Project** → **SaudeFinanceira** → **Production** → Save.
-2. Abra **financas-db** → **Settings** → **Project** → **SaudeFinanceira** → Save.
-3. Em **financas-pessoais** → **Settings** → **Build & Deploy**:
-   - Repository: `WeslenWSO/SaudeFinanceiraPessoal`
-   - Branch: `main`
-   - Build Command: `./build.sh`
-   - Start Command: `gunicorn SaudeFinanceira.wsgi:application --bind 0.0.0.0:$PORT`
-4. **Environment** → adicione ou confira:
-   - `DATABASE_URL` = Internal URL do **financas-db**
-   - `DJANGO_DEBUG` = `false`
-   - `ALLOWED_HOSTS` = `financas-pessoais-0muq.onrender.com,.onrender.com`
-   - `CSRF_TRUSTED_ORIGINS` = `https://financas-pessoais-0muq.onrender.com`
-5. **Manual Deploy** → Deploy latest commit (após o push no GitHub).
-
-> **Não** use o serviço `FinancasPessoais` em "My project" (`financaspessoais-eloo`) — esse é o outro repositório pessoal.
+O [`render.yaml`](render.yaml) documenta a mesma configuração (Blueprint / referência).
 
 Build usa [`requirements-render.txt`](requirements-render.txt) (sem pacotes exclusivos do Windows).
