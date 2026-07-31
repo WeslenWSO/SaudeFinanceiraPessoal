@@ -6,6 +6,7 @@ from django.views.generic.edit import UpdateView, CreateView
 from usuario.models import Usuario
 from usuario.forms import UsuarioForm
 from usuario.auth_sync import sincronizar_login_usuario
+from usuario.permissoes_menu import salvar_permissoes_menu
 
 # Create your views here.
 def listaUsuario(request):
@@ -49,6 +50,7 @@ class UsuarioCreate(CreateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
+        salvar_permissoes_menu(self.object, form.cleaned_data.get('permissoes_menu') or [])
         messages.success(
             self.request,
             f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.',
@@ -79,5 +81,6 @@ class UsuarioUpdate(UpdateView):
         response = super().form_valid(form)
         senha = form.cleaned_data.get('senha') or None
         sincronizar_login_usuario(self.object, senha)
+        salvar_permissoes_menu(self.object, form.cleaned_data.get('permissoes_menu') or [])
         messages.success(self.request, f'Usuario "{self.object.usuario}" atualizado.')
         return response

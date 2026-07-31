@@ -1,8 +1,15 @@
 from django.contrib import admin
 
 from .forms import UsuarioForm
-from .models import Usuario
+from .models import PermissaoMenuUsuario, Usuario
 from .auth_sync import sincronizar_login_usuario
+from .permissoes_menu import salvar_permissoes_menu
+
+
+class PermissaoMenuUsuarioInline(admin.TabularInline):
+    model = PermissaoMenuUsuario
+    extra = 0
+    fields = ('codigo',)
 
 
 @admin.register(Usuario)
@@ -31,9 +38,23 @@ class UsuarioAdmin(admin.ModelAdmin):
                 ),
             },
         ),
+        (
+            'Permissões do menu',
+            {
+                'fields': ('permissoes_menu',),
+            },
+        ),
     )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         senha = form.cleaned_data.get('senha') or None
         sincronizar_login_usuario(obj, senha)
+        salvar_permissoes_menu(obj, form.cleaned_data.get('permissoes_menu') or [])
+
+
+@admin.register(PermissaoMenuUsuario)
+class PermissaoMenuUsuarioAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'codigo')
+    list_filter = ('codigo',)
+    search_fields = ('usuario__username', 'codigo')

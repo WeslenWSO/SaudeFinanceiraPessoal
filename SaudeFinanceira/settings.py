@@ -171,6 +171,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'SaudeFinanceira.context_processors.cotacao_context',
                 'agendador_tarefas.context_processors.tarefas_letreiro',
+                'usuario.context_processors.menu_nav',
             ],
         },
     },

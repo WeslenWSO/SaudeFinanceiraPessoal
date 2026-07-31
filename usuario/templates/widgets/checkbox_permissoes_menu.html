@@ -1,0 +1,21 @@
+<div class="permissoes-menu-widget">
+    {% for secao in widget.secoes %}
+    <fieldset class="permissoes-menu-secao mb-3">
+        <legend class="form-label fw-semibold mb-2">{{ secao.rotulo }}</legend>
+        <div class="row g-2">
+            {% for item in secao.itens %}
+            <div class="col-md-4 col-lg-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox"
+                           name="{{ widget.name }}"
+                           value="{{ item.codigo }}"
+                           id="perm-menu-{{ item.codigo }}"
+                           {% if item.codigo in widget.selecionados %}checked{% endif %}>
+                    <label class="form-check-label" for="perm-menu-{{ item.codigo }}">{{ item.rotulo }}</label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </fieldset>
+    {% endfor %}
+</div>
