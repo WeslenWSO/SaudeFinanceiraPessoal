@@ -37,12 +37,19 @@ def tem_permissoes_configuradas(user: User | None) -> bool:
 
 def permissoes_para_formulario(usuario: Usuario) -> set[str]:
     """Valores iniciais dos checkboxes ao editar usuario.Usuario."""
+    from django.db.utils import OperationalError, ProgrammingError
+
     user = auth_user_de_usuario(usuario)
     if not user:
         return set(CODIGOS_MENU)
     user = usuario_login_canonico(user)
-    if tem_permissoes_configuradas(user):
-        return permissoes_salvas(user)
+    if not user:
+        return set()
+    try:
+        if tem_permissoes_configuradas(user):
+            return permissoes_salvas(user)
+    except (ProgrammingError, OperationalError):
+        return set(CODIGOS_MENU)
     # Permissões antigas da migração (sem marcar no formulário): começa vazio
     # para o admin escolher explicitamente o que liberar.
     return set()

@@ -1,10 +1,11 @@
 """Sincroniza usuario.Usuario (cadastro da empresa) com auth.User (login)."""
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 
 from empresa.models import UsuarioEmpresa
 
-from .auth_user import auth_user_de_usuario
+from .auth_user import auth_user_de_usuario, consolidar_auth_users_duplicados
 from .models import Usuario
 
 
@@ -29,16 +30,28 @@ def sincronizar_login_usuario(usuario: Usuario, senha: str | None = None) -> Use
             user.set_password(senha)
         else:
             user.set_unusable_password()
-        user.save()
-    else:
-        if user.username != username:
+        try:
+            user.save()
+        except IntegrityError:
+            user = auth_user_de_usuario(usuario)
+            if user is None:
+                raise
+
+    user = consolidar_auth_users_duplicados(user, login=username)
+    user.email = usuario.email or user.email
+    user.last_name = usuario.lastname or user.last_name
+    user.is_active = True
+    if user.username != username:
+        conflito = (
+            User.objects.filter(username__iexact=username)
+            .exclude(pk=user.pk)
+            .exists()
+        )
+        if not conflito:
             user.username = username
-        user.email = usuario.email or user.email
-        user.last_name = usuario.lastname or user.last_name
-        user.is_active = True
-        if senha:
-            user.set_password(senha)
-        user.save()
+    if senha:
+        user.set_password(senha)
+    user.save()
 
     if usuario.empresa_id:
         UsuarioEmpresa.objects.get_or_create(

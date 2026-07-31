@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .forms import UsuarioForm
 from .models import PermissaoMenuUsuario, Usuario
@@ -49,12 +49,28 @@ class UsuarioAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         senha = form.cleaned_data.get('senha') or None
-        auth_user = sincronizar_login_usuario(obj, senha)
+        try:
+            auth_user = sincronizar_login_usuario(obj, senha)
+        except Exception as exc:
+            messages.error(request, f'Erro ao sincronizar login: {exc}')
+            return
         codigos = form.cleaned_data.get('permissoes_menu')
         if codigos is None and hasattr(request.POST, 'getlist'):
             codigos = request.POST.getlist('permissoes_menu')
-        if auth_user is not None:
+        if auth_user is None:
+            messages.error(
+                request,
+                'Login nao sincronizado. Permissoes de menu nao foram salvas.',
+            )
+            return
+        try:
             salvar_permissoes_menu(obj, codigos or [], user=auth_user)
+            messages.info(
+                request,
+                f'Permissoes de menu salvas: {len(codigos or [])} item(ns).',
+            )
+        except Exception as exc:
+            messages.error(request, f'Erro ao salvar permissoes de menu: {exc}')
 
 
 @admin.register(PermissaoMenuUsuario)

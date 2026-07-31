@@ -5,7 +5,7 @@ from collections import defaultdict
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from usuario.auth_user import usuario_login_canonico
+from usuario.auth_user import consolidar_auth_users_duplicados, usuario_login_canonico
 from usuario.models import PermissaoMenuUsuario
 
 
@@ -51,22 +51,16 @@ class Command(BaseCommand):
             self.stdout.write(f'{canonico.username} (id={canonico.id}): já único.')
             return
 
-        movidos = 0
+        antes = PermissaoMenuUsuario.objects.filter(usuario=canonico).count()
         for dup in duplicados:
-            for perm in PermissaoMenuUsuario.objects.filter(usuario=dup):
-                _, created = PermissaoMenuUsuario.objects.get_or_create(
-                    usuario=canonico,
-                    codigo=perm.codigo,
-                )
-                if created:
-                    movidos += 1
-                perm.delete()
             self.stdout.write(
                 f'  duplicado id={dup.pk} username="{dup.username}" -> '
                 f'canonico id={canonico.pk} username="{canonico.username}"',
             )
+        consolidar_auth_users_duplicados(canonico, login=canonico.username)
+        depois = PermissaoMenuUsuario.objects.filter(usuario=canonico).count()
         self.stdout.write(
             self.style.SUCCESS(
-                f'{canonico.username}: {movidos} permissão(ões) consolidada(s).',
+                f'{canonico.username}: {max(0, depois - antes)} permissão(ões) consolidada(s).',
             ),
         )
