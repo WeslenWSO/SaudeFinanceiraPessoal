@@ -96,7 +96,7 @@ NFSE_DEFAULT_SORT_DIR = 'asc'
 
 # Colunas ordenáveis da listagem (chave data-col -> campo ORM)
 NFSE_SORT_FIELDS = {
-    'numero': 'numero_nota_int',
+    'numero': 'numero_nota',
     'data_emissao': 'data_emissao',
     'cnpj': 'cnpj_cpf',
     'cliente': 'cliente',
@@ -225,15 +225,13 @@ def _get_nfse_sort_from_request(request, filters):
 
 
 def _apply_nfse_sort(queryset, sort_col, sort_dir):
-    """Aplica order_by conforme coluna e direção; desempate por número da nota."""
-    queryset = queryset.annotate(
-        numero_nota_int=Cast('numero_nota', IntegerField())
-    )
+    """Aplica order_by conforme coluna e direção; desempate por número da nota (texto)."""
     field = NFSE_SORT_FIELDS[sort_col]
     prefix = '-' if sort_dir == 'desc' else ''
     order_fields = [f'{prefix}{field}']
     if sort_col != 'numero':
-        order_fields.append('numero_nota_int')
+        # numero_nota pode ser "4729-1" (NF segmentada) — não usar Cast para int no Postgres
+        order_fields.append('numero_nota')
     return queryset.order_by(*order_fields)
 
 
@@ -2689,10 +2687,8 @@ def export_excel(request):
     queryset = queryset.filter(data_emissao__gte=data_inicio)
     queryset = queryset.filter(data_emissao__lte=data_fim)
 
-    # Ordenar numericamente por número da nota
-    queryset = queryset.annotate(
-        numero_nota_int=Cast('numero_nota', IntegerField())
-    ).order_by('numero_nota_int')
+    # Ordenar por número da nota (texto — suporta "4729-1" segmentada)
+    queryset = queryset.order_by('numero_nota')
 
     # Criar workbook
     from openpyxl import Workbook
