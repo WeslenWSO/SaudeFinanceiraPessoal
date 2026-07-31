@@ -119,8 +119,12 @@ def mensagens_letreiro_usuario(user) -> list[dict]:
             f'{resp} · {emp} · {tarefa.titulo}{hora} — {prazo} '
             f'(comp. {tarefa.competencia_rotulo})'
         )
+        try:
+            url = reverse('agendador_tarefas:editar', args=[tarefa.pk])
+        except Exception:
+            url = ''
         mensagens.append({
             'texto': texto,
-            'url': reverse('agendador_tarefas:editar', args=[tarefa.pk]),
+            'url': url,
         })
     return mensagens

@@ -12,27 +12,27 @@ def _selecionar_empresa_unica(request, user):
     ).select_related('empresa')
     if usuario_empresas.count() != 1:
         return None
-    empresa = usuario_empresas.first().empresa
+    vinculo = usuario_empresas.first()
+    if not vinculo or not vinculo.empresa_id:
+        return None
+    empresa = vinculo.empresa
     request.session['empresa_id'] = empresa.id
-    request.session['empresa_nome'] = empresa.razao
-    request.session['regime_tributario'] = empresa.regime_tributario
+    request.session['empresa_nome'] = empresa.razao or empresa.nome_fantasia or ''
+    request.session['regime_tributario'] = getattr(empresa, 'regime_tributario', '') or ''
     return empresa
 
 
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request.POST)
-        
+
         if form.is_valid():
             username = form.cleaned_data['username'].strip()
             password = form.cleaned_data['password'].strip()
             from django.contrib.auth.models import User
 
-            try:
-                db_user = User.objects.get(username__iexact=username)
-                auth_username = db_user.username
-            except User.DoesNotExist:
-                auth_username = username
+            db_user = User.objects.filter(username__iexact=username).first()
+            auth_username = db_user.username if db_user else username
             user = authenticate(request, username=auth_username, password=password)
 
             if user is not None:

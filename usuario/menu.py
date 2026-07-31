@@ -106,11 +106,16 @@ def permissoes_menu_do_usuario(user: User | None) -> set[str]:
         return set()
     if user.is_superuser:
         return set(CODIGOS_MENU)
+    from django.db.utils import OperationalError, ProgrammingError
+
     from .models import PermissaoMenuUsuario
 
-    codigos = set(
-        PermissaoMenuUsuario.objects.filter(usuario=user).values_list('codigo', flat=True)
-    )
+    try:
+        codigos = set(
+            PermissaoMenuUsuario.objects.filter(usuario=user).values_list('codigo', flat=True)
+        )
+    except (ProgrammingError, OperationalError):
+        return set(CODIGOS_MENU)
     if not codigos:
         return set(CODIGOS_MENU)
     return codigos

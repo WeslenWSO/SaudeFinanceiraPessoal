@@ -57,4 +57,4 @@ class HandleSessionInterruptedMiddleware:
         try:
             return self.get_response(request)
         except SessionInterrupted:
-            return redirect('login')
+            return redirect('/login/')
