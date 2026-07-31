@@ -90,16 +90,29 @@
                         <div class="agenda-calendario-num">{{ dia.numero }}</div>
                         <div class="agenda-calendario-tarefas">
                             {% for t in dia.tarefas %}
-                            <a href="{% url 'agendador_tarefas:editar' t.pk %}"
-                               class="agenda-tarefa bg-{{ t.status_badge }}"
-                               title="{{ t.descricao }}">
-                                {% if t.horario_rotulo %}<span class="agenda-tarefa-hora">{{ t.horario_rotulo }}</span>{% endif %}
-                                <span class="agenda-tarefa-titulo">{{ t.titulo }}</span>
-                                <span class="agenda-tarefa-emp">
-                                    {% if t.is_geral %}Geral{% else %}{{ t.empresa_rotulo }}{% endif %}
-                                    · <span class="agenda-tarefa-resp">{{ t.responsavel|default:"—" }}</span>
-                                </span>
-                            </a>
+                            <div class="agenda-tarefa bg-{{ t.status_badge }}">
+                                <div class="agenda-tarefa-barra">
+                                    {% if t.status != 'concluido' %}
+                                    <form method="post" action="{% url 'agendador_tarefas:concluir' t.pk %}" class="agenda-tarefa-fechar-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="agenda-tarefa-fechar" title="Concluir tarefa" aria-label="Concluir tarefa">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                <a href="{% url 'agendador_tarefas:editar' t.pk %}"
+                                   class="agenda-tarefa-link"
+                                   title="{{ t.descricao }}">
+                                    {% if t.horario_rotulo %}<span class="agenda-tarefa-hora">{{ t.horario_rotulo }}</span>{% endif %}
+                                    <span class="agenda-tarefa-titulo">{{ t.titulo }}</span>
+                                    <span class="agenda-tarefa-emp">
+                                        {% if t.is_geral %}Geral{% else %}{{ t.empresa_rotulo }}{% endif %}
+                                        · <span class="agenda-tarefa-resp">{{ t.responsavel|default:"—" }}</span>
+                                    </span>
+                                </a>
+                            </div>
                             {% endfor %}
                         </div>
                         {% endif %}
@@ -147,19 +160,48 @@
 }
 .agenda-calendario-tarefas { display: flex; flex-direction: column; gap: 0.2rem; }
 .agenda-tarefa {
-    display: block;
+    position: relative;
     font-size: 0.68rem;
     line-height: 1.25;
-    padding: 0.2rem 0.35rem;
     border-radius: 4px;
-    text-decoration: none;
-    color: #1f2937;
     border-left: 3px solid rgba(0,0,0,0.15);
+    overflow: hidden;
 }
 .agenda-tarefa.bg-warning { background: #fef3c7; border-left-color: #f59e0b; }
 .agenda-tarefa.bg-success { background: #d1fae5; border-left-color: #10b981; }
 .agenda-tarefa.bg-info { background: #dbeafe; border-left-color: #3b82f6; }
-.agenda-tarefa:hover { filter: brightness(0.97); color: #111; }
+.agenda-tarefa-barra {
+    display: flex;
+    justify-content: flex-end;
+    min-height: 1.1rem;
+    padding: 0.1rem 0.15rem 0;
+}
+.agenda-tarefa-fechar-form { margin: 0; line-height: 1; }
+.agenda-tarefa-fechar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.65);
+    color: #047857;
+    cursor: pointer;
+    font-size: 0.62rem;
+}
+.agenda-tarefa-fechar:hover {
+    background: #10b981;
+    color: #fff;
+}
+.agenda-tarefa-link {
+    display: block;
+    padding: 0 0.35rem 0.2rem;
+    text-decoration: none;
+    color: #1f2937;
+}
+.agenda-tarefa-link:hover { filter: brightness(0.97); color: #111; }
 .agenda-tarefa-hora { font-weight: 700; display: block; }
 .agenda-tarefa-titulo { display: block; }
 .agenda-tarefa-emp { display: block; opacity: 0.85; font-size: 0.62rem; }

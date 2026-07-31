@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from empresa.models import Empresa
@@ -36,6 +37,17 @@ def _usuario_pode_tarefa(tarefa, empresa):
     if tarefa.empresa_id is None:
         return True
     return empresa is not None and tarefa.empresa_id == empresa.id
+
+
+def _redirect_voltar(request):
+    destino = (request.POST.get('next') or '').strip()
+    if destino and url_has_allowed_host_and_scheme(
+        destino,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(destino)
+    return redirect('agendador_tarefas:listar')
 
 
 def _filtros_get(request):
@@ -258,6 +270,28 @@ def tarefa_excluir(request, pk):
 
 @login_required
 @require_POST
+def tarefa_concluir(request, pk):
+    """Marca tarefa como concluída direto do calendário/lista."""
+    empresa = _empresa_sessao(request)
+    tarefa = get_object_or_404(TarefaAgendada, pk=pk)
+    if not _usuario_pode_tarefa(tarefa, empresa):
+        messages.error(request, 'Tarefa não disponível.')
+        return _redirect_voltar(request)
+
+    if tarefa.status == TarefaAgendada.STATUS_CONCLUIDO:
+        messages.info(request, f'"{tarefa.titulo}" já estava concluída.')
+        return _redirect_voltar(request)
+
+    tarefa.status = TarefaAgendada.STATUS_CONCLUIDO
+    tarefa.data_conclusao = timezone.localdate()
+    tarefa.concluido_por = request.user
+    tarefa.save(update_fields=['status', 'data_conclusao', 'concluido_por', 'atualizado_em'])
+    messages.success(request, f'"{tarefa.titulo}" concluída.')
+    return _redirect_voltar(request)
+
+
+@login_required
+@require_POST
 def tarefa_alterar_status(request, pk):
     empresa = _empresa_sessao(request)
     tarefa = get_object_or_404(TarefaAgendada, pk=pk)
@@ -279,4 +313,4 @@ def tarefa_alterar_status(request, pk):
         tarefa.concluido_por = None
     tarefa.save(update_fields=['status', 'data_conclusao', 'concluido_por', 'atualizado_em'])
     messages.success(request, f'Status de "{tarefa.titulo}" atualizado.')
-    return redirect('agendador_tarefas:listar')
+    return _redirect_voltar(request)
