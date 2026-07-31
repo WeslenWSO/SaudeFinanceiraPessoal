@@ -63,9 +63,9 @@ def _filtros_get(request):
 def _queryset_tarefas(empresa, mes, ano, status, q):
     qs = (
         TarefaAgendada.objects.filter(_escopo_tarefas(empresa))
-        .filter(data__month=mes, data__year=ano)
+        .filter(previsao_conclusao__month=mes, previsao_conclusao__year=ano)
         .select_related('criado_por', 'concluido_por', 'empresa')
-        .order_by('data', 'hora_inicio', 'titulo')
+        .order_by('previsao_conclusao', 'hora_inicio', 'titulo')
     )
     if status:
         qs = qs.filter(status=status)
@@ -82,7 +82,7 @@ def _montar_calendario(mes, ano, tarefas):
     semanas = cal_mod.monthcalendar(ano, mes)
     por_dia = defaultdict(list)
     for t in tarefas:
-        por_dia[t.data].append(t)
+        por_dia[t.previsao_conclusao].append(t)
 
     semanas_ctx = []
     for semana in semanas:
