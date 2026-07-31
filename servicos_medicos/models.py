@@ -40,8 +40,8 @@ class TabelaPreco(models.Model):
     convenio = models.ForeignKey(Convenio, on_delete=models.CASCADE, verbose_name='Convênio')
     cabecalho = models.ForeignKey('Cabecalho', on_delete=models.CASCADE, verbose_name='Cabeçalho', null=True, blank=True)
     codigo_servico = models.ForeignKey(ServicosMedicos, on_delete=models.CASCADE, verbose_name='Código do Serviço')
-    preco_apartamento = models.DecimalField(verbose_name='Preço Apartamento', max_digits=10, decimal_places=2)
-    preco_enfermaria = models.DecimalField(verbose_name='Preço Enfermaria', max_digits=10, decimal_places=2)
+    preco_apartamento = models.DecimalField(verbose_name='Preço sem Contraste', max_digits=10, decimal_places=2)
+    preco_enfermaria = models.DecimalField(verbose_name='Preço com Contraste', max_digits=10, decimal_places=2)
 
     class Meta:
         verbose_name = 'Tabela de Preço'

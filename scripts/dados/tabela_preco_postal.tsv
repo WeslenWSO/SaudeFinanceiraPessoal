@@ -1,0 +1,230 @@
+codigo	nome	valor
+40101010	ECG convencional de ate 12 derivacoes	38.67
+40801110	RX - Articulacao temporomandibular - bilateral	54.88
+40101029	ECG de alta resolucao	179.86
+40101037	Teste ergometrico computadorizado (inclui ECG basa	156.08
+40101045	Teste ergometrico convencional - 3 ou mais derivac	112.12
+40103161	EEG de rotina	213.55
+40103196	EEGQ quantitativo (mapeamento cerebral)	147.42
+40701018	Angiografia radioisotopica	522.54
+40701026	Cintilografia com hemacias marcadas	358.34
+40701034	Cintilografia do miocardio com duplo isotopo (perf	924.04
+40701042	Cintilografia do miocardio com FDG-18 F, em camara	334.66
+40701050	Cintilografia do miocardio necrose (infarto agudo)	439.45
+40701069	Servico 40701069	385.40
+40701077	Cintilografia do miocardio perfusao - repouso	273.82
+40701085	Cintilografia sincronizada das camaras cardiacas -	160.87
+40701093	Cintilografia sincronizada das camaras cardiacas -	289.50
+40701107	Fluxo sanguineo das extremidades	308.06
+40701115	Quantificacao de shunt da direita para a esquerda	286.32
+40701123	Quantificacao de shunt periferico	439.45
+40701131	Venografia radioisotopica	439.45
+40701140	Cintilografia do miocardio perfusao - estresse fis Cintilografia do miocardio perfusao - estresse far	264.78
+40702014	Cintilografia das glandulas salivares com ou sem e	249.88
+40702022	Cintilografia do figado e do bac0	356.98
+40702030	Servico 40702030	313.84
+40702049	Cintilografia do figado e vias biliares	586.70
+40702057	Cintilografia para deteccao de hemorragia digestor	197.55
+40702065	Cintilografia para deteccao de hemorragia digestor	160.81
+40702073	Cintilografia para determinacao do tempo de esvazi Cintilografia para estudo de transito esofagico (l	161.11
+40702081	Cintilografia para estudo de transito esofagico (s	281.70
+40702090	Cintilografia para pesquisa de diverticulo de Meck	187.99
+40702103	Servico 40702103	121.83
+40702111	Cintilografia para pesquisa de refluxo gastro-esof	255.09
+40703010	Fluxo sanguineo hepatico (qualitativo e quantitati Cintilografia da tirebide e/ou captacao (iodo - 12	255.09
+40703029	Cintilografia da tiredide e/ou captagao (iodo - 13	203.76
+40703037	Cintilografia da tireoide e/ou captacao (tecnecio	432.91
+40703045	Cintilografia das paratireoides	667.20
+40703053	Cintilografia de corpo inteiro para pesquisa de me	184.09
+40703061	Teste de estimulo com TsH recombinante	143.01
+40703070	Servico 40703070	129.15
+40703088	Teste de supressao da tireoide com T3	287.13
+40704017	Teste do perclorato	403.40
+40704025	Cintilografia renal dinarmica	251.51
+40704033	Cintilografia renal dinamica com diuretico Cintilografia renal estatica (quantitativa ou qual	233.34
+40704041	Cintilografia testicutar (escrotal)	54.88
+40801128	Servico 40801128	47.54
+40801136	Rx - Adenoides ou cavum	52.20
+40801144	Rx - Panoramica de mandibula (ortopantomografia)	45.06
+40801152	RX - Teleperfil em cefalostato - sem tracado	49.09
+40801160	RX - Teleperfil em cefalostato - com tracado RX - Arcada dentaria (por arcada)	45.09
+40801179	RX - Radiografia peri-apical	18.87
+40801187	Rx - Radiografia oclusal	23.04
+40801195	RX - Planigrafia linear de cranio ou sela turcica	104.41
+40801209	Rx - Incidencia adicional de cranio ou face	19.82
+40802019	Rx - Coluna cervical - 3 incidencias	49.96
+40802027	Servico 40802027	70.16
+40802035	Rx - Coluna cervical - 5 incidencias	54.19
+40802043	RX - Coluna dorsal - 2 incidencias	77.20
+40802051	Rx - Coluna dorsal - 4 incidencias	56.13
+40802060	Rx - Coluna ombo-sacra - 3 incidencias	77.20
+40802078	Rx - Coluna lombo-sacra - 5 incidencias	52.38
+40802086	RX - Coluna dorso-lombar para escoliose Rx - Sacro-coccix	71.12
+40802094	Rx - Coluna total para escoliose (telespondilograf	98.49
+40802108	Rx - Planigrafia de coluna vertebral (dois planos)	155.39
+40802116	Rx - Incidencia adicional de coluna	21.81
+40803015	RX - Esterno	52.29
+40803023	Servico 40803023	49.96
+40803031	RX - Articulacao esternoclavicular	52.94
+40803040	RX - Costelas - por hernitorax	50.35
+40803058	RX - Clavicula	52.29
+40803066	RX - Articulacao acromioclavicular RX - Omoplata ou escapula	48.79
+40803074	Servico 40803074	48.79
+40803082	RX - Articulacao escapuloumerat (ombro)	50.35
+40803090	RX- Braco	47.54
+40803104	Rx - Cotovelo	49.09
+40803112	RX - Antebraco	49.87
+40803120	RX - Punho	47.54
+40803139	RX - Mao ou quirodactilo	47.15
+40803147	RX - Maos e punhos para idade ossea	19.40
+40804011	Rx - Incidencia adicional de membro superior	49.36
+40804020	RX - Bacia RX - Articulacoes sacroiliacas	51.21
+40804038	RX - Articulacao coxofemoral (quadril)	52.94
+40804046	RX - Coxa	49.09
+40804054	RX - Joelho	51.51
+40804062	Servico 40804062	51.69
+40804070	RX - Patela	47.54
+40804089	RX - Perna RX - Articulacao tibiotarsica (tornozelo)	49.09
+40804097	RX - Pe ou pododactilo	47.54
+40804100	Servico 40804100	50.62
+40804119	RX - Calcaneo	68.97
+40808289	Mamotomia por estereotaxia (nao inclui o exame de	568.07
+40808297	Mamotomia por Us (nao inclui o exame de imagem)	558.89
+40808300	Mamotomia por RM (nao inclui o exame de imagem)	568.07
+40808319	Colocacao de clipes(s) pre QT neoadjuvante ern axil	259.37
+40808327	Servico 40808327	259.37
+40808335	Colocacao de clipes(s) pre QT neoadjuvante em mama	88.11
+40808343	Revisao de densitometria ossea por procedimento 5 Revisao de Mamografia por procedimento	88.11
+40808351	Revisao de Raio X por procedimento	28.24
+40808360	Laudo Evoiutivo de Mamografia por procedimento	88.11
+40808378	Laudo Evolutivo de Densitometria Ossea por procedi	88.11
+40808386	Laudo Evolutivo de Raio X por procedimento	28.24
+40809021	Sialografia (por glandula)	135.03
+40809030	Histerossalping0grafia	147.27
+40809048	Artrografia ou pneumoartrografia	147.27
+40809056	Fistulografia	98.34
+40809064	Colangiografia transcutanea	237.70
+40809072	Colangiopancreatografia retrograda	138.84
+40809080	Dacriocistografia	133.86
+40809102	Servico 40809102	279.21
+40809153	Puncao biopsia/aspirativa de drgao ou estrutura su Drenagem percutanea orientada por Rx (acrescentar	120.40
+40809161	Puncao biopsia/aspirativa de orgao ou estrutura su	120.40
+40809170	Puncao biopsia/aspirativa de orgao ou estrutura su	120.40
+40809188	Puncao biopsia/aspirativa de orgao ou estrutura su	120.40
+40809196	Puncao biopsia/aspirativa de orgao ou estrutura pr	827.73
+40809200	Pungao biopsia/aspirativa de orgao ou estrutura pr	827.73
+40809218	Puncao biopsia/aspirativa de orgao ou estrutura pr	827.73
+40809226	Puncao biopsia/aspirativa de 0orgao ou estrutura pr	827.73
+40810011	Mielografia segmentar (por segmento)	267.26
+40810020	Teste de oclusao de arteria carotida ou vertebral	723.15
+40810046	Avaliacao hemodinamica por cateterismo (aferimento	461.20
+40811018	Radioscopia diagnostica	118.85
+40812014	Aortografia abdominal por puncao translombar	357.21
+40812022	Angiografia por puncao	323.81
+40812030	Angiografia por cateterismo nao seletivo de grande	577.23
+40812049	Servico 40812049	541.85
+40812057	Angiografia por cateterismo seletivo de ramo prima	624.90
+40812065	Angiografia por cateterismo superseletivo de ramo	215.81
+40812073	Angiografia transoperatoria de posicionamento	215.81
+40812081	Flebografia por puncao venosa unilateral 3 Angiografia pos-operatoria de controle	311.66
+40812090	Servico 40812090	566.72
+40812103	Portografia trans-hepatica 0 Flebografia retrograda por cateterismo - unilatera	645.04
+40812111	Servico 40812111	548.11
+40812120	Esplenoportografia percutanea	418.65
+40812138	Linfangioadenografia unilateral	251.74
+40812146	Cavernosografia	307.67
+40814149	Paracentese orientada por RX ou US Farmaco-cavernosografia (dinamica)	176.33
+40901505	Us - Obstetrica: perfil biofisico fetal	255.75
+40901513	Servico 40901513	238.09
+40901521	Doppler colorido de arterias penianas (sem farmaco	207.89
+40901530	Uitrassonografia diagnostica - monocular Uitrassonografia biomicroscopica - monocular	155.17
+40901580	Us - Estudo sonografico dinamico das vias urinaria	461.89
+40901599	Us - Estudo sonografico dinamico das vias urinaria	461.89
+40901602	Doppler transcraniano	427.55
+40901610	Us - Cranio para crianca	154.74
+40901629	Servico 40901629	678.78
+40901688	Uus - Ecodopplercardiograma com analise do sincroni	270.68
+40901696	Us - Adicional de reconstrucao 3D - ECO Us - Ecodopplercardiograma com estresse fisico	552.51
+40901700	Ecodopplercardiograma sob estresse fisico ou farma	844.85
+40901718	Ecodopplercardiograma para ajuste de marca-passo	858.53
+40901726	Servico 40901726	427.55
+40901734	Us - Neurossonografia fetal	108.64
+40901742	US . Transretal Radial + US-Peca cirugica	300.41
+40901750	US - Prostata (via abdominal)	135.66
+40901769	Us - Aparelho urinario (rins, ureteres e bexiga)	136.21
+40901793	Servico 40901793	593.72
+40901815	Elastografia hepatica ultrassonica	645.38
+40901823	Us - Orgao ou estrutura isolada com contrate micro	645.38
+40901858	Us - Vascular com contraste microboihas	599.79
+40902013	Us - Pesguisa de endometriose	214.77
+40902021	Us - obstetrica: com amniocentese Us - Obstetrica 1o trimestre com puncao: biopsia o	349.32
+40902030	Servico 40902030	347.56
+40902048	Us - Prostata transretal com biopsia - ate 8 fragm Us - Prostata transretal com biopsia - mais de 8 f	429.25
+40902056	Us - Intra-operatorio	302.92
+40902064	Doppler colorido intra-operatorio	425.63
+40902072	Ecodopplercardiograma transoperatorio (transesofag	218.90
+40902080	Ecodopplercardiograma transoperatorio (transesofag	61.07
+40902110	Servico 40902110	279.21
+40902129	Drenagem percutanea orientada por Us (acrescentar	120.40
+40902137	Reducao de invaginacao intestinal por enema, orien	83.74
+40902145	Monitorizacao por Doppler transcraniano	1331.70
+40903010	Laudo Evolutivo de Ultrassonografia por procedimen Ecodopplercardiograma intracardiaco	120.40
+41001010	Servico 41001010	446.53
+41001028	TC - Cranio ou sela turcica ou orbitas	472.20
+41001036	TC - Face 0u seios da face TC -Mastoides ou orelhas	492.15
+41001044	TC - Articulacoes temporomandibulares	492.15
+41001052	TC - Dental (dentascan)	413.08
+41001060	TC - Pescoco (partes moles, laringe, tireoide, far	505.65
+41001079	TC - Torax	505.65
+41001087	Tc - Coracao - para avaliagao do escore de calcio	547.31
+41001095	TC - Abdome total (abdone superior, pelve e retrop	764.76
+41001109	Servico 41001109	505.65
+41001117	TC - Abdome superior	472.20
+41001125	TC - Coluna cervical ou dorsal ou lombo-sacra (ate Tc - Pelve ou bacia	400.56
+41101111	Servico 41101111	941.44
+41101120	RM - Pescoco (nasofaringe, orofaringe, laringe, tr RM - Torax (mediastino, pulmao, parede toracica)	990.68
+41101138	RM - Coracao - morfologico e funcional	990.68
+41101146	Rm - Coracao - morfologico e funcional + perfusao	1059.41
+41101154	RM - Coracao - morfologico e funcional + perfusao	1140.64
+41101170	RM - Abdome superior (figado, pancreas, baco, rins	990.68
+41101189	RM - Pelve (nao inclui articulacoes coxofemorais)	941.44
+41101197	RM - Fetal	990.68
+41101200	Servico 41101200	918.95
+41101219	RM - Penis	918.95
+41101227	RM - Bolsa escrotal	941.44
+41101235	RM - Coluna cervical ou dorsal ou lombar	267.83
+41101243	RM - Fluxo liquorico (como complementar)	990.68
+41101251	RM - Plexo braquial (desfiladeiro toracico) ou lom	941.44
+41101260	RM - Membro superior unilateral (nao inclui mao e	941.44
+41101278	RM - Mao (nao inclui punho)	941.33
+41101286	RM - Bacia (articulacoes sacroiliacas) RM - Coxa (unilateral)	941.44
+41101294	Servico 41101294	941.44
+41101308	RM - Perna (unilateral)	941.44
+41101316	RM - Pe (antepe) - nao inctui tornozelo	941.44
+41101332	Angio-RM de aorta toracica RM - Articular (por articulacao)	990.68
+41101340	Angio-RM de aorta abdominal	990.68
+41101359	Servico 41101359	941.44
+41101375	Hidro-RM (colangio-RM ou uro-RM ou mielo-RM ou sia	281.33
+41101383	Endoscopia virtual por RM - acrescentar ao exame d	267.83
+41101430	RM - Reconstrucao tridimensional - acrescentar ao RM - Avaliacao de ferro (coracao ou figado)	1059.41
+41101448	Servico 41101448	1040.49
+41101456	RM - Tractografia	347.07
+41101472	RM - Difusao por RM	1096.67
+41101480	RM - Planejamento	1574.75
+41101499	Angio-RM arterial pulmonar RM - Mama (bilateral)	941.44
+41101502	Angio-RM venosa pulmonar	941.44
+41101510	Angio-RM arterial de abdome superior	941.44
+41101529	Angio-RMvenosa de abdome superior	941.44
+41101537	Angio-RM arterial de cranio	941.44
+41101545	Angio-RM venosa de cranio	941.44
+41101553	Angio-RM arterial de membro inferior (unilateral)	941.44
+41101561	Angio-RM venosa de rmembro inferior (unilateral)	941.44
+41101570	Angio-RM arterial de membro superior (unilateral)	941.44
+41101588	Angio-RM venosa de membro superior (unilateral)	941.44
+41101596	Angio-RM arterial de pelve	941.44
+41101600	Angio-RM venosa de pelve	941.44
+41101618	Angio-RM arterial de pescoco	941.44
+41101626	Angio-RMvenosa de pescoco	941.44
+41101634	RM - Endorretal	1032.41
+41101642	RM - Endovaginal	1032.41
+41101650	RM - Neuronavegador	346.92

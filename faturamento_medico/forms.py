@@ -225,15 +225,15 @@ class ItemServicoForm(forms.ModelForm):
     )
     preco_apartamento = forms.DecimalField(
         required=False,
-        label='Preço Apartamento',
+        label='Preço sem Contraste',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'readonly': True, 'step': '0.01'}),
-        help_text='Preço para apartamento'
+        help_text='Valor do procedimento sem contraste'
     )
     preco_enfermaria = forms.DecimalField(
         required=False,
-        label='Preço Enfermaria',
+        label='Preço com Contraste',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'readonly': True, 'step': '0.01'}),
-        help_text='Preço para enfermaria'
+        help_text='Valor do procedimento com contraste'
     )
 
 

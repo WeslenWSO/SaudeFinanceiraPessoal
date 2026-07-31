@@ -23,6 +23,8 @@ class TabelaPrecoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['empresa'].disabled = True
+        self.fields['preco_apartamento'].label = 'Preço sem Contraste'
+        self.fields['preco_enfermaria'].label = 'Preço com Contraste'
         if self.instance and self.instance.empresa_id:
             self.fields['cabecalho'].queryset = Cabecalho.objects.filter(empresa_id=self.instance.empresa_id)
         elif self.initial.get('empresa'):
