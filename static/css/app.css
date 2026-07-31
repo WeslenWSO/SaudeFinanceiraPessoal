@@ -762,6 +762,116 @@ main.container {
   min-width: 6rem;
 }
 
+/* Lista de empresas — barra de filtros */
+.empresa-filters-panel {
+  padding: 1rem 1.25rem;
+}
+
+.empresa-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+
+.empresa-filters-search {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 18rem;
+  max-width: 36rem;
+  gap: 0.5rem;
+}
+
+.empresa-filters-search input[type="search"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0 0.85rem;
+  border: 1px solid var(--muted-border-color);
+  border-radius: var(--border-radius);
+  background: var(--pico-form-element-background-color, #fff);
+  font-size: 0.95rem;
+}
+
+.empresa-filters-search input[type="search"]:focus {
+  outline: none;
+  border-color: var(--pico-primary, #0d6efd);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+}
+
+.empresa-filters-search .btn {
+  flex-shrink: 0;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0 1.1rem;
+  white-space: nowrap;
+}
+
+.empresa-filters-per-page {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.empresa-filters-per-page label {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pico-muted-color);
+  white-space: nowrap;
+}
+
+.empresa-filters-per-page select {
+  min-width: 10.5rem;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0 2rem 0 0.75rem;
+  border: 1px solid var(--muted-border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--pico-form-element-background-color, #fff);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .empresa-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .empresa-filters-search {
+    max-width: none;
+  }
+
+  .empresa-filters-per-page {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
+  .empresa-filters-per-page select {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Lista de empresas — tabela zebrada */
+.table-wrap table.table-empresa-list tbody tr:nth-child(odd) td {
+  background-color: #f8f9fa;
+}
+
+.table-wrap table.table-empresa-list tbody tr:nth-child(even) td {
+  background-color: #fff;
+}
+
+.table-wrap table.table-empresa-list tbody tr:hover td {
+  background-color: #eef2f7;
+}
+
 .pagination-wrap {
   margin-top: 2rem;
   display: flex;
