@@ -3,13 +3,17 @@
 from django.contrib.auth.models import User
 from django.db import transaction
 
-from .menu import CODIGOS_MENU, MARCADOR_MENU_CONFIGURADO, auth_user_de_usuario
+from usuario.auth_user import auth_user_de_usuario, usuario_login_canonico
+from usuario.menu import CODIGOS_MENU, MARCADOR_MENU_CONFIGURADO
 from .models import PermissaoMenuUsuario, Usuario
 
 MARCADOR_CONFIGURADO = MARCADOR_MENU_CONFIGURADO
 
 
 def permissoes_salvas(user: User | None) -> set[str]:
+    if not user:
+        return set()
+    user = usuario_login_canonico(user)
     if not user:
         return set()
     return set(
@@ -20,6 +24,9 @@ def permissoes_salvas(user: User | None) -> set[str]:
 
 
 def tem_permissoes_configuradas(user: User | None) -> bool:
+    if not user:
+        return False
+    user = usuario_login_canonico(user)
     if not user:
         return False
     return PermissaoMenuUsuario.objects.filter(
@@ -48,6 +55,7 @@ def salvar_permissoes_menu(
 ) -> None:
     if user is None:
         user = auth_user_de_usuario(usuario)
+    user = usuario_login_canonico(user)
     if not user:
         return
 

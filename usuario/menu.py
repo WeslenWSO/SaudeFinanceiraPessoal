@@ -8,6 +8,10 @@ from typing import Any
 from django.contrib.auth.models import User
 from django.urls import reverse
 
+from .auth_user import auth_user_de_usuario as lookup_auth_user
+from .auth_user import usuario_login_canonico
+from .models import PermissaoMenuUsuario
+
 
 @dataclass
 class MenuItemDef:
@@ -96,10 +100,7 @@ ITENS_POR_CODIGO = {item.codigo: item for item in ITENS_MENU}
 
 
 def auth_user_de_usuario(usuario) -> User | None:
-    username = (getattr(usuario, 'usuario', None) or '').strip()
-    if not username:
-        return None
-    return User.objects.filter(username__iexact=username).first()
+    return lookup_auth_user(usuario)
 
 
 def permissoes_menu_do_usuario(user: User | None) -> set[str]:
@@ -109,18 +110,18 @@ def permissoes_menu_do_usuario(user: User | None) -> set[str]:
         return set(CODIGOS_MENU)
     from django.db.utils import OperationalError, ProgrammingError
 
-    from .models import PermissaoMenuUsuario
+    user = usuario_login_canonico(user)
+    if not user:
+        return set()
 
-    marcador = '__configurado__'
+    marcador = MARCADOR_MENU_CONFIGURADO
     try:
-        qs = PermissaoMenuUsuario.objects.filter(usuario=user)
-        if qs.filter(codigo=marcador).exists():
-            return set(
-                qs.exclude(codigo=marcador).values_list('codigo', flat=True)
-            )
+        qs = PermissaoMenuUsuario.objects.filter(usuario=user).exclude(codigo=marcador)
+        if PermissaoMenuUsuario.objects.filter(usuario=user, codigo=marcador).exists():
+            return set(qs.values_list('codigo', flat=True))
         if qs.exists():
             return set(qs.values_list('codigo', flat=True))
-        return set(CODIGOS_MENU)
+        return set()
     except (ProgrammingError, OperationalError):
         return set(CODIGOS_MENU)
 

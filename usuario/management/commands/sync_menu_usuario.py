@@ -3,6 +3,7 @@
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 
+from usuario.auth_user import auth_user_de_usuario, usuario_login_canonico
 from usuario.menu import CODIGOS_MENU
 from usuario.models import PermissaoMenuUsuario, Usuario
 from usuario.permissoes_menu import MARCADOR_CONFIGURADO, permissoes_salvas, salvar_permissoes_menu
@@ -20,9 +21,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         username = (options['username'] or '').strip()
-        user = User.objects.filter(username__iexact=username).first()
+        user = User.objects.filter(username__iexact=username).order_by('id').first()
         if not user:
             raise CommandError(f'Usuário de login "{username}" não encontrado.')
+        user = usuario_login_canonico(user)
 
         if not options.get('codigos'):
             perms = sorted(permissoes_salvas(user))
