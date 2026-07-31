@@ -1,10 +1,11 @@
+from django.contrib import messages
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views.generic.edit import UpdateView, CreateView
 
 from usuario.models import Usuario
 from usuario.forms import UsuarioForm
-from empresa.models import Empresa
+from usuario.auth_sync import sincronizar_login_usuario
 
 # Create your views here.
 def listaUsuario(request):
@@ -45,6 +46,16 @@ class UsuarioCreate(CreateView):
         context["titulo"] = 'Usuário'
         return context
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
+        messages.success(
+            self.request,
+            f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.',
+        )
+        return response
+
+
 class UsuarioUpdate(UpdateView):
     model = Usuario
     form_class = UsuarioForm
@@ -63,3 +74,10 @@ class UsuarioUpdate(UpdateView):
         context["descricao"] = 'Alterar Usuário'
         context["titulo"] = 'Usuário'
         return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        senha = form.cleaned_data.get('senha') or None
+        sincronizar_login_usuario(self.object, senha)
+        messages.success(self.request, f'Usuario "{self.object.usuario}" atualizado.')
+        return response

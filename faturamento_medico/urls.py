@@ -51,6 +51,7 @@ urlpatterns = [
     path('importar-unimed/', views.importar_unimed, name='importar_unimed'),
     path('importar-xml/', views.importar_xml, name='importar_xml'),
     path('importar-ris/', views.importar_ris, name='importar_ris'),
+    path('sincronizar-medcloud/', views.sincronizar_medcloud, name='sincronizar_medcloud'),
     path('importar-extrato-pagamento-bradesco/', views.importar_extrato_pagamento_bradesco, name='importar_extrato_pagamento_bradesco'),
     path('extrato-pagamento/', views.listar_extrato_pagamento, name='listar_extrato_pagamento'),
     path('extrato-pagamento/<int:pk>/baixar/', views.baixar_extrato_pagamento, name='baixar_extrato_pagamento'),

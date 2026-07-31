@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sincronizar MedCloud{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ titulo }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-cloud"></i>
+                        Integração com as APIs
+                        <a href="https://www.medcloud.link/documentacao-api-ris" target="_blank" rel="noopener">RIS</a>
+                        e
+                        <a href="https://www.medcloud.link/documentacao-api-his-medcloud" target="_blank" rel="noopener">HIS</a>.
+                        Configure usuário, senha, clínica e API Key no
+                        <a href="/admin/faturamento_medico/medcloudconfig/">admin MedCloud</a>
+                        (ou variáveis de ambiente no servidor).
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="data_inicio">Data inicial</label>
+                                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_hoje }}" required>
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="data_fim">Data final</label>
+                                <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_hoje }}" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="convenio">Convênio (opcional)</label>
+                            <select class="form-control" id="convenio" name="convenio">
+                                <option value="">Todos / conforme configuração</option>
+                                {% for c in convenios %}
+                                    <option value="{{ c.nome }}">{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Agendas: importa concluídos, cancelados, desistência e deletados, de todos os convênios.
+                                Laudos: apenas convênios com “exige laudo” no admin (inicialmente GEAP).
+                            </small>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="acao">Ação</label>
+                            <select class="form-control" id="acao" name="acao">
+                                <option value="ambos">Agendas (todos os status) + laudos (convênios marcados)</option>
+                                <option value="agendas">Somente agendas — todos convênios e status</option>
+                                <option value="laudos">Somente links de laudo (convênios com “exige laudo”, ex.: GEAP)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Sincronizar
+                        </button>
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary">Voltar</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

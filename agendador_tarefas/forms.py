@@ -1,6 +1,7 @@
 from django import forms
 
 from .models import TarefaAgendada
+from .usuarios_empresa import opcoes_responsavel_empresa
 
 _INPUT_DATA = forms.DateInput(
     format='%Y-%m-%d',
@@ -51,12 +52,11 @@ class TarefaAgendadaForm(forms.ModelForm):
             'competencia_mes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 12}),
             'competencia_ano': forms.NumberInput(attrs={'class': 'form-control', 'min': 2000, 'max': 2100}),
             'status': forms.Select(attrs={'class': 'form-select'}),
-            'responsavel': forms.TextInput(attrs={'class': 'form-control'}),
             'titulo': forms.TextInput(attrs={'class': 'form-control'}),
             'descricao': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, empresa=None, **kwargs):
         super().__init__(*args, **kwargs)
         for nome in ('data', 'previsao_conclusao', 'data_conclusao'):
             self.fields[nome].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
@@ -65,3 +65,23 @@ class TarefaAgendadaForm(forms.ModelForm):
             self.fields[nome].required = False
             self.fields[nome].input_formats = ['%H:%M', '%H:%M:%S']
             self.fields[nome].widget.format = '%H:%M'
+
+        empresa_id = getattr(empresa, 'id', None) if empresa else None
+        if not empresa_id and self.instance.pk and self.instance.empresa_id:
+            empresa_id = self.instance.empresa_id
+        valor_resp = ''
+        if self.is_bound:
+            valor_resp = (self.data.get('responsavel') or '').strip()
+        elif self.instance.pk:
+            valor_resp = (self.instance.responsavel or '').strip()
+        else:
+            valor_resp = (self.initial.get('responsavel') or '').strip()
+
+        self.fields['responsavel'] = forms.ChoiceField(
+            choices=opcoes_responsavel_empresa(empresa_id, valor_resp),
+            required=False,
+            label='Responsável',
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        if valor_resp:
+            self.fields['responsavel'].initial = valor_resp

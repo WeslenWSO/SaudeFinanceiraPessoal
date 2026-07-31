@@ -157,7 +157,7 @@ def tarefa_criar(request):
         'tarefa_geral': not empresa,
     }
     if request.method == 'POST':
-        form = TarefaAgendadaForm(request.POST)
+        form = TarefaAgendadaForm(request.POST, empresa=empresa)
         if form.is_valid():
             with transaction.atomic():
                 tarefa = form.save(commit=False)
@@ -177,7 +177,7 @@ def tarefa_criar(request):
             messages.success(request, f'Tarefa "{tarefa.titulo}" criada.')
             return redirect('agendador_tarefas:listar')
     else:
-        form = TarefaAgendadaForm(initial=initial)
+        form = TarefaAgendadaForm(initial=initial, empresa=empresa)
 
     return render(request, 'agendador_tarefas/form.html', {
         'title': 'Nova tarefa',
@@ -198,7 +198,7 @@ def tarefa_editar(request, pk):
         return redirect('agendador_tarefas:listar')
 
     if request.method == 'POST':
-        form = TarefaAgendadaForm(request.POST, instance=tarefa)
+        form = TarefaAgendadaForm(request.POST, instance=tarefa, empresa=empresa or tarefa.empresa)
         if form.is_valid():
             responsavel_anterior = tarefa.responsavel
             with transaction.atomic():
@@ -227,7 +227,11 @@ def tarefa_editar(request, pk):
             )
         messages.error(request, 'Não foi possível salvar. Verifique os campos destacados.')
     else:
-        form = TarefaAgendadaForm(instance=tarefa, initial={'tarefa_geral': tarefa.is_geral})
+        form = TarefaAgendadaForm(
+            instance=tarefa,
+            initial={'tarefa_geral': tarefa.is_geral},
+            empresa=empresa or tarefa.empresa,
+        )
 
     return render(request, 'agendador_tarefas/form.html', {
         'title': f'Editar — {tarefa.titulo}',

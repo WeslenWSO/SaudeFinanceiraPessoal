@@ -1,5 +1,56 @@
 from django.contrib import admin
-from .models import FaturamentoMedico
+from .models import (
+    FaturamentoMedico,
+    MedcloudConfig,
+    MedcloudConvenioParceiro,
+)
+from .medcloud.config import credenciais_da_empresa, gravar_api_key_his, gravar_senha_ris
+from .medcloud_admin_form import MedcloudConfigAdminForm
+
+
+class MedcloudConvenioParceiroInline(admin.TabularInline):
+    model = MedcloudConvenioParceiro
+    extra = 1
+    fields = ('convenio_nome', 'partner_id', 'exige_laudo')
+
+
+@admin.register(MedcloudConfig)
+class MedcloudConfigAdmin(admin.ModelAdmin):
+    form = MedcloudConfigAdminForm
+    list_display = ('empresa', 'ativo', 'ris_username', 'ris_clinic_id', 'credenciais_ris_ok', 'his_configurado')
+    list_filter = ('ativo',)
+    inlines = [MedcloudConvenioParceiroInline]
+    fieldsets = (
+        (None, {'fields': ('empresa', 'ativo')}),
+        ('RIS — Agendamentos', {
+            'fields': (
+                'ris_base_url', 'ris_username', 'ris_senha', 'ris_clinic_id',
+                'ris_lista_agendas_path',
+            ),
+        }),
+        ('HIS — Laudos', {
+            'fields': ('his_base_url', 'his_api_key'),
+        }),
+    )
+
+    def save_model(self, request, obj, form, change):
+        senha = form.cleaned_data.get('ris_senha')
+        if senha:
+            gravar_senha_ris(obj, senha)
+        api_key = form.cleaned_data.get('his_api_key')
+        if api_key:
+            gravar_api_key_his(obj, api_key)
+        super().save_model(request, obj, form, change)
+
+    @admin.display(boolean=True, description='RIS OK')
+    def credenciais_ris_ok(self, obj):
+        creds = credenciais_da_empresa(obj.empresa)
+        return bool(creds and creds.ris_username and creds.ris_password and creds.ris_clinic_id)
+
+    @admin.display(boolean=True, description='HIS OK')
+    def his_configurado(self, obj):
+        creds = credenciais_da_empresa(obj.empresa)
+        return bool(creds and creds.his_api_key)
 
 
 @admin.register(FaturamentoMedico)

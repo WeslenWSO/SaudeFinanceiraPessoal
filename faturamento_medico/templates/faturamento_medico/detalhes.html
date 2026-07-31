@@ -117,6 +117,26 @@
                                 <dt class="col-sm-2">Código Relatório:</dt>
                                 <dd class="col-sm-10">{{ faturamento.codigo_relatorio|default:"Não informado" }}</dd>
 
+                                {% if faturamento.link_laudo or faturamento.link_viewer or faturamento.link_fastshare %}
+                                <dt class="col-sm-2">Laudo MedCloud:</dt>
+                                <dd class="col-sm-10">
+                                    {% if faturamento.link_laudo %}
+                                        <a href="{{ faturamento.link_laudo }}" target="_blank" rel="noopener">Abrir laudo</a>
+                                    {% endif %}
+                                    {% if faturamento.link_viewer %}
+                                        {% if faturamento.link_laudo %} · {% endif %}
+                                        <a href="{{ faturamento.link_viewer }}" target="_blank" rel="noopener">Viewer</a>
+                                    {% endif %}
+                                    {% if faturamento.link_fastshare %}
+                                        {% if faturamento.link_laudo or faturamento.link_viewer %} · {% endif %}
+                                        <a href="{{ faturamento.link_fastshare }}" target="_blank" rel="noopener">FastShare</a>
+                                    {% endif %}
+                                    {% if faturamento.laudo_expires_at %}
+                                        <br><small class="text-muted">Expira: {{ faturamento.laudo_expires_at|date:"d/m/Y H:i" }}</small>
+                                    {% endif %}
+                                </dd>
+                                {% endif %}
+
                                 <dt class="col-sm-2">Código do Fechamento:</dt>
                                 <dd class="col-sm-10">{{ faturamento.codigo_fechamento|default:"Não informado" }}</dd>
                             </dl>

@@ -102,6 +102,16 @@ class FaturamentoMedico(models.Model):
     numero_guia_lancada = models.CharField(verbose_name='Número da Guia Lançada', max_length=50, blank=True, null=True)
     nota_fiscal = models.CharField(verbose_name='Nota Fiscal', max_length=50, blank=True, null=True)
     codigo_relatorio = models.CharField(verbose_name='Código Relatório', max_length=50, blank=True, null=True)
+    medcloud_schedule_id = models.BigIntegerField(
+        verbose_name='ID Agendamento MedCloud',
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    link_laudo = models.URLField(verbose_name='Link do Laudo', max_length=500, blank=True, null=True)
+    link_viewer = models.URLField(verbose_name='Link Viewer DICOM', max_length=500, blank=True, null=True)
+    link_fastshare = models.URLField(verbose_name='Link FastShare', max_length=500, blank=True, null=True)
+    laudo_expires_at = models.DateTimeField(verbose_name='Expiração do Link do Laudo', blank=True, null=True)
     agendado_via = models.CharField(verbose_name='Agendado Via', max_length=50, blank=True, null=True)
     data_fechamento = models.DateField(verbose_name='Data de Fechamento', blank=True, null=True)
     status = models.CharField(
@@ -597,6 +607,76 @@ class ExtratoPagamentoConvenio(models.Model):
 
     def __str__(self):
         return f'{self.convenio} — {self.competencia} — lote {self.lote} — R$ {self.valor_recebido}'
+
+
+class MedcloudConfig(models.Model):
+    """Credenciais MedCloud RIS/HIS por empresa."""
+
+    empresa = models.OneToOneField(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='medcloud_config',
+        verbose_name='Empresa',
+    )
+    ativo = models.BooleanField(verbose_name='Integração ativa', default=True)
+    ris_base_url = models.URLField(
+        verbose_name='URL base RIS',
+        max_length=255,
+        default='https://api.ris.medcloud.co',
+    )
+    ris_username = models.CharField(verbose_name='Usuário RIS', max_length=100, blank=True, default='')
+    ris_password_cifrada = models.TextField(verbose_name='Senha RIS (cifrada)', blank=True, default='')
+    ris_clinic_id = models.PositiveIntegerField(verbose_name='ID da clínica (clinicIdToAccess)', default=0)
+    ris_lista_agendas_path = models.CharField(
+        verbose_name='Path listagem de agendas',
+        max_length=255,
+        default='/schedules',
+        help_text='GET com query startDate, endDate, status, partnerId. Confirme com a MedCloud.',
+    )
+    his_base_url = models.URLField(
+        verbose_name='URL base HIS',
+        max_length=255,
+        default='https://his.medcloud.co/v1/his',
+    )
+    his_api_key_cifrada = models.TextField(verbose_name='API Key HIS (cifrada)', blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Configuração MedCloud'
+        verbose_name_plural = 'Configurações MedCloud'
+
+    def __str__(self):
+        return f'MedCloud — {self.empresa}'
+
+
+class MedcloudConvenioParceiro(models.Model):
+    """Mapeia convênio local → partnerId MedCloud e regras de laudo."""
+
+    config = models.ForeignKey(
+        MedcloudConfig,
+        on_delete=models.CASCADE,
+        related_name='convenios',
+        verbose_name='Configuração MedCloud',
+    )
+    convenio_nome = models.CharField(
+        verbose_name='Nome do convênio (faturamento)',
+        max_length=100,
+        help_text='Deve coincidir com o campo convênio do faturamento médico.',
+    )
+    partner_id = models.PositiveIntegerField(verbose_name='Partner ID MedCloud')
+    exige_laudo = models.BooleanField(
+        verbose_name='Exige laudo liberado',
+        default=True,
+        help_text='Convênios marcados entram na busca diária de links de laudo.',
+    )
+
+    class Meta:
+        verbose_name = 'Convênio MedCloud'
+        verbose_name_plural = 'Convênios MedCloud'
+        ordering = ['convenio_nome']
+        unique_together = [['config', 'convenio_nome']]
+
+    def __str__(self):
+        return f'{self.convenio_nome} (partner {self.partner_id})'
 
     @property
     def baixado(self) -> bool:

@@ -1,0 +1,363 @@
+{
+  "empresa": "Medicinarte",
+  "empresa_id": 16,
+  "sqlite_registros": 59707,
+  "postgres_registros": 58737,
+  "lanc_demo": [
+    {
+      "tipo": "Extrato bancário (Lancamento)",
+      "sqlite_qtd": 16,
+      "postgres_qtd": 16,
+      "diff_qtd": 0,
+      "sqlite_valor": 6183.01,
+      "postgres_valor": 6183.01,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Rateio (LancamentoRateio)",
+      "sqlite_qtd": 27,
+      "postgres_qtd": 27,
+      "diff_qtd": 0,
+      "sqlite_valor": 166519.16,
+      "postgres_valor": 166519.16,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Orçamento (LancamentoOrcamento)",
+      "sqlite_qtd": 0,
+      "postgres_qtd": 0,
+      "diff_qtd": 0,
+      "sqlite_valor": 0.0,
+      "postgres_valor": 0.0,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Contas a receber",
+      "sqlite_qtd": 4851,
+      "postgres_qtd": 4851,
+      "diff_qtd": 0,
+      "sqlite_valor": 4154840.69,
+      "postgres_valor": 4154840.69,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Contas a pagar",
+      "sqlite_qtd": 1,
+      "postgres_qtd": 1,
+      "diff_qtd": 0,
+      "sqlite_valor": 15029.78,
+      "postgres_valor": 15029.78,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Faturamento médico (guias)",
+      "sqlite_qtd": 14636,
+      "postgres_qtd": 14636,
+      "diff_qtd": 0,
+      "sqlite_valor": 12210973.22,
+      "postgres_valor": 12210973.22,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    },
+    {
+      "tipo": "Item serviço (procedimentos)",
+      "sqlite_qtd": 25041,
+      "postgres_qtd": 25041,
+      "diff_qtd": 0,
+      "sqlite_valor": 12210973.22,
+      "postgres_valor": 12210973.22,
+      "diff_valor": 0.0,
+      "status": "IGUAL"
+    }
+  ],
+  "compare_tables": [
+    {
+      "tabela": "contasapagar_contasapagar",
+      "sqlite": 50,
+      "postgres": 50,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "contasareceber_baixacontaareceber",
+      "sqlite": 184,
+      "postgres": 184,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "contasareceber_contaareceber",
+      "sqlite": 7427,
+      "postgres": 7427,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "emprestimos_emprestimo",
+      "sqlite": 21,
+      "postgres": 21,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "emprestimos_indicadorcalculosicoob",
+      "sqlite": 2,
+      "postgres": 2,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "emprestimos_parcelaemprestimo",
+      "sqlite": 941,
+      "postgres": 941,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "emprestimos_simulacaoquitacaoemprestimo",
+      "sqlite": 17,
+      "postgres": 17,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "extrato_banco",
+      "sqlite": 8,
+      "postgres": 8,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "extrato_conciliacao",
+      "sqlite": 69,
+      "postgres": 69,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "extrato_contabancaria",
+      "sqlite": 21,
+      "postgres": 21,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "extrato_extratoarquivo",
+      "sqlite": 15,
+      "postgres": 15,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "extrato_extratomovimento",
+      "sqlite": 323,
+      "postgres": 0,
+      "diff": -323,
+      "status": "SÓ SQLITE"
+    },
+    {
+      "tabela": "extrato_lancamento",
+      "sqlite": 1467,
+      "postgres": 1467,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "faturamento_medico_extratopagamentoconvenio",
+      "sqlite": 13,
+      "postgres": 13,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "faturamento_medico_faturamentomedico",
+      "sqlite": 14636,
+      "postgres": 14636,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "faturamento_medico_itemservico",
+      "sqlite": 25041,
+      "postgres": 25041,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "faturamento_medico_medcloudconfig",
+      "sqlite": 1,
+      "postgres": 0,
+      "diff": -1,
+      "status": "SÓ SQLITE"
+    },
+    {
+      "tabela": "faturamento_medico_medcloudconvenioparceiro",
+      "sqlite": 13,
+      "postgres": 0,
+      "diff": -13,
+      "status": "SÓ SQLITE"
+    },
+    {
+      "tabela": "notasfiscais_apuracaoperiodo",
+      "sqlite": 13,
+      "postgres": 13,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "notasfiscais_notafiscalservico",
+      "sqlite": 6946,
+      "postgres": 6946,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "planejamento_orcamentario_lancamentoorcamento",
+      "sqlite": 54,
+      "postgres": 0,
+      "diff": -54,
+      "status": "SÓ SQLITE"
+    },
+    {
+      "tabela": "regrarateio_lancamentorateio",
+      "sqlite": 27,
+      "postgres": 27,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "regrarateio_regrarateio",
+      "sqlite": 8,
+      "postgres": 8,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "regrarateio_regrarateioitem",
+      "sqlite": 12,
+      "postgres": 12,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "servicos_medicos_cabecalho",
+      "sqlite": 1,
+      "postgres": 1,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "servicos_medicos_convenio",
+      "sqlite": 8,
+      "postgres": 8,
+      "diff": 0,
+      "status": "IGUAL"
+    },
+    {
+      "tabela": "servicos_medicos_servicosmedicos",
+      "sqlite": 0,
+      "postgres": 383,
+      "diff": 383,
+      "status": "SÓ PG"
+    },
+    {
+      "tabela": "servicos_medicos_tabelapreco",
+      "sqlite": 0,
+      "postgres": 132,
+      "diff": 132,
+      "status": "SÓ PG"
+    }
+  ],
+  "samples_extrato_jul2026": [
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 67.53,
+      "documento": ""
+    },
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 244.8,
+      "documento": ""
+    },
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 808.0,
+      "documento": ""
+    },
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 1468.11,
+      "documento": ""
+    },
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 593.46,
+      "documento": ""
+    },
+    {
+      "origem": "SQLite",
+      "data": "2026-07-27",
+      "historico": "Recebimento vendas - Elo | CrÃ©dito",
+      "valor": 450.21,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 67.53,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 244.8,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 808.0,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 1468.11,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Dinheiro Guardado - Reserva Stone",
+      "valor": 593.46,
+      "documento": ""
+    },
+    {
+      "origem": "Postgres",
+      "data": "2026-07-27",
+      "historico": "Recebimento vendas - Elo | CrÃ©dito",
+      "valor": 450.21,
+      "documento": ""
+    }
+  ],
+  "gerado_em": "2026-07-30"
+}

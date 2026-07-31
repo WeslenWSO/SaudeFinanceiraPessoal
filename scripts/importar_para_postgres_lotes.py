@@ -50,8 +50,8 @@ APP_ORDER = [
     "regrarateio_lancamentos",
     "emprestimos",
     "OPCARTAO",
-    "faturamento_medico",
     "servicos_medicos",
+    "faturamento_medico",
     "fluxo_de_caixa",
     "relatoriorecebiveis",
     "planejamento_orcamentario",
@@ -139,6 +139,273 @@ print("extrato limpo")
     subprocess.check_call([sys.executable, "-c", code], env=env)
 
 
+def _limpar_contasapagar_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE contasapagar_contasapagar RESTART IDENTITY CASCADE
+        '''
+    )
+print("contasapagar limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_extrato_movimentos_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE extrato_extratomovimento RESTART IDENTITY CASCADE
+        '''
+    )
+print("extrato_movimentos limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_relatoriorecebiveis_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE relatoriorecebiveis_relatoriorecebiveismaquinacartao
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("relatoriorecebiveis limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_regraconciliacao_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from regraConciliacao.models import RegraConciliacao
+n = RegraConciliacao.objects.count()
+if n:
+    RegraConciliacao.objects.all().delete()
+print(f"regraConciliacao limpo ({n} registros)")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_regrarateio_lancamentos_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE regrarateio_lancamentorateio RESTART IDENTITY CASCADE
+        '''
+    )
+print("regrarateio_lancamentos limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_notasfiscais_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            notasfiscais_anexosimplesnacional,
+            notasfiscais_apuracaoperiodo,
+            notasfiscais_lognotafiscal,
+            notasfiscais_folhasalario,
+            notasfiscais_notafiscalservico
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("notasfiscais limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_notafiscalentrada_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            notafiscalentrada_notafiscalentradaitem,
+            notafiscalentrada_notafiscalentrada
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("notafiscalentrada limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_planejamento_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            planejamento_orcamentario_lancamentoorcamento,
+            planejamento_orcamentario_itemorcamento
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("planejamento_orcamentario limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_opcartao_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            OPCARTAO_itemfaturacartao,
+            OPCARTAO_faturacartaocredito,
+            OPCARTAO_cartaocredito,
+            OPCARTAO_opcartao
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("OPCARTAO limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_servicos_medicos_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            servicos_medicos_tabelapreco,
+            servicos_medicos_cabecalho,
+            servicos_medicos_servicosmedicos,
+            servicos_medicos_convenio
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("servicos_medicos limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_faturamento_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            faturamento_medico_itemservico,
+            faturamento_medico_extratopagamentoconvenio,
+            faturamento_medico_faturamentomedico,
+            faturamento_medico_lote
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("faturamento_medico limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_emprestimos_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            emprestimos_simulacaoquitacaoemprestimo,
+            emprestimos_parcelaemprestimo,
+            emprestimos_emprestimo,
+            emprestimos_indicadorcalculosicoob
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("emprestimos limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
+def _limpar_agendador_parcial(env: dict[str, str]) -> None:
+    code = """
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(
+        '''
+        TRUNCATE TABLE
+            agendador_tarefas_tarefaresponsavellog,
+            agendador_tarefas_tarefaagendada
+        RESTART IDENTITY CASCADE
+        '''
+    )
+print("agendador_tarefas limpo")
+"""
+    subprocess.check_call([sys.executable, "-c", code], env=env)
+
+
 def _limpar_dados_postgres(env: dict[str, str]) -> None:
     if _banco_ja_vazio(env):
         print("banco sem dados de negocio — pulando limpeza")
@@ -178,7 +445,20 @@ def main() -> int:
         action="store_true",
         help="Retoma importacao (nao apaga dados; pula apps ja concluidos).",
     )
+    parser.add_argument(
+        "--only",
+        action="append",
+        metavar="APP",
+        help="Importa apenas app(s) informado(s), ex.: --only agendador_tarefas",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=CHUNK_SIZE,
+        help=f"Registros por lote loaddata (padrao: {CHUNK_SIZE}).",
+    )
     args = parser.parse_args()
+    chunk_size = max(1, args.chunk_size)
 
     if not os.environ.get("DATABASE_URL"):
         print("Defina DATABASE_URL (External URL do financas-db no Render).", file=sys.stderr)
@@ -192,7 +472,15 @@ def main() -> int:
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
 
-    done_apps = _load_progress() if args.resume else set()
+    only_apps = set(args.only or [])
+    if only_apps:
+        unknown = only_apps - set(APP_ORDER)
+        if unknown:
+            print(f"Apps desconhecidos: {', '.join(sorted(unknown))}", file=sys.stderr)
+            return 1
+        print(f"modo --only: {', '.join(sorted(only_apps))}")
+
+    done_apps = _load_progress() if args.resume and not only_apps else set()
 
     print("migrate ...")
     subprocess.check_call(
@@ -200,7 +488,9 @@ def main() -> int:
         env=env,
     )
 
-    if args.resume:
+    if only_apps:
+        pass
+    elif args.resume:
         print(f"retomando — {len(done_apps)} apps ja importados")
     else:
         print("limpar dados ...")
@@ -237,6 +527,8 @@ def main() -> int:
 
     ordered_apps = [a for a in APP_ORDER if a in by_app]
     ordered_apps += sorted(set(by_app) - set(ordered_apps))
+    if only_apps:
+        ordered_apps = [a for a in ordered_apps if a in only_apps]
 
     print(f"Total registros: {len(rows)} em {len(by_app)} apps")
     tmpdir = Path(tempfile.mkdtemp(prefix="sfp_import_"))
@@ -251,12 +543,64 @@ def main() -> int:
                 print("limpando extrato parcial (se houver) ...")
                 _limpar_extrato_parcial(env)
 
-            if app == "contasareceber" and "contasareceber" not in done_apps:
+            if app == "contasareceber" and (only_apps or "contasareceber" not in done_apps):
                 print("limpando contasareceber parcial (se houver) ...")
                 _limpar_contasareceber_parcial(env)
 
+            if app == "contasapagar" and only_apps:
+                print("limpando contasapagar parcial (se houver) ...")
+                _limpar_contasapagar_parcial(env)
+
+            if app == "regraConciliacao" and only_apps:
+                print("limpando regraConciliacao parcial (se houver) ...")
+                _limpar_regraconciliacao_parcial(env)
+
+            if app == "regrarateio_lancamentos" and only_apps:
+                print("limpando regrarateio_lancamentos parcial (se houver) ...")
+                _limpar_regrarateio_lancamentos_parcial(env)
+
+            if app == "extrato_movimentos" and only_apps:
+                print("limpando extrato_movimentos parcial (se houver) ...")
+                _limpar_extrato_movimentos_parcial(env)
+
+            if app == "relatoriorecebiveis" and only_apps:
+                print("limpando relatoriorecebiveis parcial (se houver) ...")
+                _limpar_relatoriorecebiveis_parcial(env)
+
+            if app == "agendador_tarefas" and only_apps:
+                print("limpando agendador_tarefas parcial (se houver) ...")
+                _limpar_agendador_parcial(env)
+
+            if app == "emprestimos" and only_apps:
+                print("limpando emprestimos parcial (se houver) ...")
+                _limpar_emprestimos_parcial(env)
+
+            if app == "servicos_medicos" and only_apps:
+                print("limpando servicos_medicos parcial (se houver) ...")
+                _limpar_servicos_medicos_parcial(env)
+
+            if app == "faturamento_medico" and only_apps:
+                print("limpando faturamento_medico parcial (se houver) ...")
+                _limpar_faturamento_parcial(env)
+
+            if app == "notasfiscais" and only_apps:
+                print("limpando notasfiscais parcial (se houver) ...")
+                _limpar_notasfiscais_parcial(env)
+
+            if app == "notafiscalentrada" and only_apps:
+                print("limpando notafiscalentrada parcial (se houver) ...")
+                _limpar_notafiscalentrada_parcial(env)
+
+            if app == "planejamento_orcamentario" and only_apps:
+                print("limpando planejamento_orcamentario parcial (se houver) ...")
+                _limpar_planejamento_parcial(env)
+
+            if app == "OPCARTAO" and only_apps:
+                print("limpando OPCARTAO parcial (se houver) ...")
+                _limpar_opcartao_parcial(env)
+
             chunk = by_app[app]
-            parts = _chunks(chunk, CHUNK_SIZE)
+            parts = _chunks(chunk, chunk_size)
             print(f"loaddata {app} ({len(chunk)} registros, {len(parts)} lote(s)) ...")
 
             for idx, part in enumerate(parts, start=1):
@@ -268,14 +612,15 @@ def main() -> int:
                 _loaddata(path, env, label)
 
             done_apps.add(app)
-            _save_progress(done_apps)
+            if not only_apps:
+                _save_progress(done_apps)
             print(f"  ok: {app}")
     finally:
         for p in tmpdir.glob("*.json"):
             p.unlink(missing_ok=True)
         tmpdir.rmdir()
 
-    if PROGRESS_FILE.is_file():
+    if PROGRESS_FILE.is_file() and not only_apps:
         PROGRESS_FILE.unlink()
     print("Importacao por lotes concluida.")
     return 0

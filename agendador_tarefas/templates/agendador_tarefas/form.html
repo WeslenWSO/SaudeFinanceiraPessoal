@@ -73,6 +73,7 @@
                         <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável</label>
                         {{ form.responsavel }}
                         {% if form.responsavel.errors %}<div class="text-danger small">{{ form.responsavel.errors }}</div>{% endif %}
+                        <small class="text-muted d-block">Usuários com permissão na empresa selecionada.</small>
                     </div>
                     <div class="col-md-4">
                         <div class="form-check mt-4">

@@ -3524,6 +3524,90 @@ def importar_ris(request):
     return render(request, 'faturamento_medico/importar_ris.html', context)
 
 
+def sincronizar_medcloud(request):
+    """Importa agendas concluídas e/ou links de laudo via API MedCloud."""
+    empresa_id = request.session.get('empresa_id')
+    try:
+        empresa_id = int(empresa_id) if empresa_id is not None else None
+    except (TypeError, ValueError):
+        empresa_id = None
+
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa antes de sincronizar com a MedCloud.')
+        return redirect('faturamento_medico:ftlistar')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    hoje = timezone.localdate()
+    convenios = Convenio.objects.filter(empresa_id=empresa_id).order_by('nome')
+
+    if request.method == 'POST':
+        from faturamento_medico.medcloud.client import MedcloudAPIError
+        from faturamento_medico.medcloud.sync import (
+            sincronizar_agendas_concluidas,
+            sincronizar_links_laudos,
+        )
+
+        acao = (request.POST.get('acao') or 'ambos').strip()
+        convenio = (request.POST.get('convenio') or '').strip() or None
+
+        def _parse_data_campo(nome, padrao):
+            raw = (request.POST.get(nome) or '').strip()
+            if not raw:
+                return padrao
+            try:
+                return datetime.strptime(raw, '%Y-%m-%d').date()
+            except ValueError:
+                return padrao
+
+        data_inicio = _parse_data_campo('data_inicio', hoje)
+        data_fim = _parse_data_campo('data_fim', data_inicio)
+        if data_fim < data_inicio:
+            data_inicio, data_fim = data_fim, data_inicio
+
+        partes_msg = []
+        try:
+            if acao in ('agendas', 'ambos'):
+                stats = sincronizar_agendas_concluidas(
+                    empresa,
+                    data_inicio,
+                    data_fim,
+                    convenio_nome=convenio,
+                )
+                partes_msg.append(
+                    f'Agendas: {stats["listadas"]} listadas, '
+                    f'{stats.get("importadas", stats.get("concluidas", 0))} importadas, '
+                    f'{stats["criadas"]} criadas, {stats["atualizadas"]} atualizadas, '
+                    f'{stats["ignoradas"]} ignoradas.'
+                )
+            if acao in ('laudos', 'ambos'):
+                stats = sincronizar_links_laudos(
+                    empresa,
+                    data_inicio,
+                    data_fim,
+                    convenio_nome=convenio,
+                )
+                partes_msg.append(
+                    f'Laudos: {stats["atualizados"]} links gravados, '
+                    f'{stats["sem_laudo"]} ainda sem laudo, '
+                    f'{stats["pulados_link_valido"]} já com link válido.'
+                )
+            messages.success(request, 'Sincronização MedCloud concluída. ' + ' '.join(partes_msg))
+        except MedcloudAPIError as exc:
+            messages.error(request, f'MedCloud: {exc}')
+        except Exception as exc:
+            logger.exception('Erro na sincronização MedCloud')
+            messages.error(request, f'Erro na sincronização MedCloud: {exc}')
+
+        return redirect('faturamento_medico:sincronizar_medcloud')
+
+    context = {
+        'titulo': 'Sincronizar MedCloud (API)',
+        'convenios': convenios,
+        'data_hoje': hoje.isoformat(),
+    }
+    return render(request, 'faturamento_medico/sincronizar_medcloud.html', context)
+
+
 def toggle_conferencia_item(request, pk):
     """Marca/desmarca conferência de um item de serviço (AJAX)."""
     if request.method != 'POST':
