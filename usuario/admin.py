@@ -50,13 +50,11 @@ class UsuarioAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         senha = form.cleaned_data.get('senha') or None
         auth_user = sincronizar_login_usuario(obj, senha)
-        codigos = None
-        if 'permissoes_menu' in form.cleaned_data:
-            codigos = form.cleaned_data['permissoes_menu']
-        elif request.method == 'POST':
+        codigos = form.cleaned_data.get('permissoes_menu')
+        if codigos is None and hasattr(request.POST, 'getlist'):
             codigos = request.POST.getlist('permissoes_menu')
-        if codigos is not None:
-            salvar_permissoes_menu(obj, codigos, user=auth_user)
+        if auth_user is not None:
+            salvar_permissoes_menu(obj, codigos or [], user=auth_user)
 
 
 @admin.register(PermissaoMenuUsuario)

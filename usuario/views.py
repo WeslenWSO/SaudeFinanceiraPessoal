@@ -12,9 +12,21 @@ from usuario.permissoes_menu import salvar_permissoes_menu
 def _permissoes_menu_do_post(form, request):
     if 'permissoes_menu' in form.cleaned_data:
         return form.cleaned_data['permissoes_menu']
-    if request.method == 'POST':
+    if request.method == 'POST' and hasattr(request.POST, 'getlist'):
         return request.POST.getlist('permissoes_menu')
-    return None
+    return []
+
+
+def _salvar_permissoes_formulario(request, usuario, form, auth_user, *, criando=False):
+    codigos = _permissoes_menu_do_post(form, request)
+    if auth_user is None:
+        messages.error(
+            request,
+            'Nao foi possivel sincronizar o login deste usuario. Permissoes nao salvas.',
+        )
+        return
+    salvar_permissoes_menu(usuario, codigos, user=auth_user)
+    messages.info(request, f'Permissoes de menu salvas: {len(codigos)} item(ns).')
 
 # Create your views here.
 def listaUsuario(request):
@@ -58,13 +70,10 @@ class UsuarioCreate(CreateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         auth_user = sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
-        codigos = _permissoes_menu_do_post(form, self.request)
-        if codigos is not None:
-            salvar_permissoes_menu(self.object, codigos, user=auth_user)
+        _salvar_permissoes_formulario(self.request, self.object, form, auth_user, criando=True)
         messages.success(
             self.request,
-            f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.'
-            + (f' Permissoes de menu: {len(codigos)}.' if codigos is not None else ''),
+            f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.',
         )
         return response
 
@@ -92,11 +101,6 @@ class UsuarioUpdate(UpdateView):
         response = super().form_valid(form)
         senha = form.cleaned_data.get('senha') or None
         auth_user = sincronizar_login_usuario(self.object, senha)
-        codigos = _permissoes_menu_do_post(form, self.request)
-        if codigos is not None:
-            salvar_permissoes_menu(self.object, codigos, user=auth_user)
-        msg = f'Usuario "{self.object.usuario}" atualizado.'
-        if codigos is not None:
-            msg += f' Permissoes de menu: {len(codigos)}.'
-        messages.success(self.request, msg)
+        _salvar_permissoes_formulario(self.request, self.object, form, auth_user)
+        messages.success(self.request, f'Usuario "{self.object.usuario}" atualizado.')
         return response

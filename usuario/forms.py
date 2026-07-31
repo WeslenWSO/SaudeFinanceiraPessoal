@@ -12,15 +12,29 @@ class CheckboxPermissoesMenuWidget(forms.Widget):
         super().__init__(attrs)
         self.secoes = secoes or opcoes_permissao_por_secao()
 
+    def format_value(self, value):
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return list(value)
+        return [value]
+
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
-        selecionados = set(value or [])
+        selecionados = set(self.format_value(value))
         context['widget']['secoes'] = self.secoes
         context['widget']['selecionados'] = selecionados
         return context
 
     def value_from_datadict(self, data, files, name):
-        return data.getlist(name)
+        if hasattr(data, 'getlist'):
+            return data.getlist(name)
+        raw = data.get(name, [])
+        if isinstance(raw, list):
+            return raw
+        if raw:
+            return [raw]
+        return []
 
 
 class CheckboxPermissoesMenuField(forms.MultipleChoiceField):
@@ -75,15 +89,29 @@ class UsuarioForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['empresa'].disabled = True
         if self.instance.pk:
+            self.fields['empresa'].widget = forms.HiddenInput()
+            self.fields['empresa'].initial = self.instance.empresa_id
             from .permissoes_menu import permissoes_para_formulario
-            self.fields['permissoes_menu'].initial = list(permissoes_para_formulario(self.instance))
+            self.fields['permissoes_menu'].initial = sorted(
+                permissoes_para_formulario(self.instance)
+            )
         else:
-            self.fields['permissoes_menu'].initial = list(CODIGOS_MENU)
+            self.fields['permissoes_menu'].initial = sorted(CODIGOS_MENU)
 
     def clean(self):
         cleaned = super().clean()
+        if self.data:
+            if hasattr(self.data, 'getlist'):
+                enviados = self.data.getlist('permissoes_menu')
+            else:
+                raw = self.data.get('permissoes_menu', [])
+                enviados = raw if isinstance(raw, list) else ([raw] if raw else [])
+            cleaned['permissoes_menu'] = [
+                codigo for codigo in enviados if codigo in CODIGOS_MENU
+            ]
+        if self.instance.pk and self.instance.empresa_id:
+            cleaned['empresa'] = self.instance.empresa
         senha = cleaned.get('senha') or ''
         confirmar = cleaned.get('confirmar_senha') or ''
         criando = not self.instance.pk

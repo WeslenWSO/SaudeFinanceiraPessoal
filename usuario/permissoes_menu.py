@@ -40,11 +40,12 @@ def permissoes_para_formulario(usuario: Usuario) -> set[str]:
     user = auth_user_de_usuario(usuario)
     if not user:
         return set(CODIGOS_MENU)
-    if not tem_permissoes_configuradas(user):
-        if PermissaoMenuUsuario.objects.filter(usuario=user).exists():
-            return permissoes_salvas(user)
-        return set(CODIGOS_MENU)
-    return permissoes_salvas(user)
+    user = usuario_login_canonico(user)
+    if tem_permissoes_configuradas(user):
+        return permissoes_salvas(user)
+    # Permissões antigas da migração (sem marcar no formulário): começa vazio
+    # para o admin escolher explicitamente o que liberar.
+    return set()
 
 
 def salvar_permissoes_menu(
