@@ -8,6 +8,14 @@ from usuario.forms import UsuarioForm
 from usuario.auth_sync import sincronizar_login_usuario
 from usuario.permissoes_menu import salvar_permissoes_menu
 
+
+def _permissoes_menu_do_post(form, request):
+    if 'permissoes_menu' in form.cleaned_data:
+        return form.cleaned_data['permissoes_menu']
+    if request.method == 'POST':
+        return request.POST.getlist('permissoes_menu')
+    return None
+
 # Create your views here.
 def listaUsuario(request):
     print(request.POST)
@@ -50,15 +58,13 @@ class UsuarioCreate(CreateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         auth_user = sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
-        if 'permissoes_menu' in form.cleaned_data:
-            salvar_permissoes_menu(
-                self.object,
-                form.cleaned_data['permissoes_menu'],
-                user=auth_user,
-            )
+        codigos = _permissoes_menu_do_post(form, self.request)
+        if codigos is not None:
+            salvar_permissoes_menu(self.object, codigos, user=auth_user)
         messages.success(
             self.request,
-            f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.',
+            f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.'
+            + (f' Permissoes de menu: {len(codigos)}.' if codigos is not None else ''),
         )
         return response
 
@@ -86,11 +92,11 @@ class UsuarioUpdate(UpdateView):
         response = super().form_valid(form)
         senha = form.cleaned_data.get('senha') or None
         auth_user = sincronizar_login_usuario(self.object, senha)
-        if 'permissoes_menu' in form.cleaned_data:
-            salvar_permissoes_menu(
-                self.object,
-                form.cleaned_data['permissoes_menu'],
-                user=auth_user,
-            )
-        messages.success(self.request, f'Usuario "{self.object.usuario}" atualizado.')
+        codigos = _permissoes_menu_do_post(form, self.request)
+        if codigos is not None:
+            salvar_permissoes_menu(self.object, codigos, user=auth_user)
+        msg = f'Usuario "{self.object.usuario}" atualizado.'
+        if codigos is not None:
+            msg += f' Permissoes de menu: {len(codigos)}.'
+        messages.success(self.request, msg)
         return response
