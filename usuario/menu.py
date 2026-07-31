@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.contrib.auth.models import User
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 
 
 @dataclass
@@ -98,7 +98,7 @@ def auth_user_de_usuario(usuario) -> User | None:
     username = (getattr(usuario, 'usuario', None) or '').strip()
     if not username:
         return None
-    return User.objects.filter(username=username).first()
+    return User.objects.filter(username__iexact=username).first()
 
 
 def permissoes_menu_do_usuario(user: User | None) -> set[str]:
@@ -133,7 +133,7 @@ def _resolver_url(item: MenuItemDef) -> str:
     if item.url_name:
         try:
             return reverse(item.url_name)
-        except NoReverseMatch:
+        except Exception:
             return '#'
     return '#'
 

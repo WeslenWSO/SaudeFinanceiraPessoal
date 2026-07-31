@@ -26,10 +26,6 @@ from contasapagar.models import ContasaPagar
 
 logger = logging.getLogger(__name__)
 
-from django.template.loader import get_template
-from celery.bin.control import status
-get_template("extrato/lancamento_list.html")  # vai levantar TemplateDoesNotExist se o caminho estiver errado
-
 
 def extrair_cpf_mascarado(historico):
     """

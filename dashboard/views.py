@@ -64,7 +64,7 @@ def dashboard_inicio(request):
     """Painel principal: cards do mês, saldos por banco/sócio, formas de pagamento, categorias no ano e tabela diária."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        return redirect('selecao_empresa')
+        return redirect('empresa:lista')
 
     hoje = date.today()
     try:
@@ -331,7 +331,7 @@ def relatorio_mensal(request):
    # Obter empresa da sessão
    empresa_id = request.session.get('empresa_id')
    if not empresa_id:
-       return redirect('selecao_empresa')
+       return redirect('empresa:lista')
 
    # Nomes dos meses em português
    meses_pt = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -438,7 +438,7 @@ def resumo_fechamento(request):
     """
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        return redirect('selecao_empresa')
+        return redirect('empresa:lista')
 
     empresa_ctx = Empresa.objects.filter(pk=empresa_id).first()
     empresa_razao_social = (empresa_ctx.razao or '').strip() if empresa_ctx else ''
