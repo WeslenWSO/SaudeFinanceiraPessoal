@@ -13,8 +13,11 @@ from decimal import Decimal, InvalidOperation
 import uuid
 import logging
 import json
+import re
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, date, timedelta
+from difflib import SequenceMatcher
 from urllib.parse import urlencode
 from .models import (
     FaturamentoMedico, DocumentoAnexado, ItemServico, ServicoDisponivel, Lote,
@@ -905,6 +908,64 @@ def listar_cancelados(request):
     return render(request, 'faturamento_medico/listar_cancelados.html', context)
 
 
+FUZZY_NOME_MIN_RATIO = 0.90
+
+
+def _normalizar_nome_servico(texto):
+    """Uppercase, sem acentos e espaços extras — para comparar nomes de procedimento."""
+    if not texto:
+        return ''
+    t = unicodedata.normalize('NFKD', str(texto))
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    t = re.sub(r'\s+', ' ', t.upper().strip())
+    return t
+
+
+def _nome_base_procedimento(texto):
+    """Remove complemento entre parênteses (descrição longa no faturamento)."""
+    base = _normalizar_nome_servico(texto)
+    if '(' in base:
+        base = base.split('(', 1)[0].strip()
+    return base
+
+
+def _similaridade_nome_procedimento(a, b):
+    """
+    Similaridade 0–1 entre dois nomes de procedimento.
+    Compara texto completo e nome base (antes de parênteses).
+    """
+    candidatos_a = {_normalizar_nome_servico(a), _nome_base_procedimento(a)}
+    candidatos_b = {_normalizar_nome_servico(b), _nome_base_procedimento(b)}
+    candidatos_a.discard('')
+    candidatos_b.discard('')
+    if not candidatos_a or not candidatos_b:
+        return 0.0
+    melhor = 0.0
+    for na in candidatos_a:
+        for nb in candidatos_b:
+            if na == nb:
+                return 1.0
+            melhor = max(melhor, SequenceMatcher(None, na, nb).ratio())
+    return melhor
+
+
+def _buscar_tabela_por_nome_proximo(qs, descricao, min_ratio=FUZZY_NOME_MIN_RATIO):
+    """Melhor TabelaPreco cujo nome do serviço atinge similaridade mínima."""
+    if not (descricao or '').strip():
+        return None, 0.0
+    melhor_tabela = None
+    melhor_ratio = 0.0
+    for tabela in qs:
+        nome = tabela.codigo_servico.servicos or ''
+        ratio = _similaridade_nome_procedimento(descricao, nome)
+        if ratio > melhor_ratio:
+            melhor_ratio = ratio
+            melhor_tabela = tabela
+    if melhor_tabela is not None and melhor_ratio >= min_ratio:
+        return melhor_tabela, melhor_ratio
+    return None, melhor_ratio
+
+
 def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_servico, tipo_acomodacao, cache_precos):
     """
     Resolve preço da TabelaPreco para um item.
@@ -952,6 +1013,8 @@ def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_
         tabela = qs.filter(codigo_servico__servicos__iexact=desc).first()
     if tabela is None and desc:
         tabela = qs.filter(codigo_servico__servicos__icontains=desc[:80]).first()
+    if tabela is None and desc:
+        tabela, _ratio = _buscar_tabela_por_nome_proximo(qs, descricao_servico)
 
     if tabela is None:
         cache_precos[cache_key] = resultado
