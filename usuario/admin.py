@@ -49,8 +49,13 @@ class UsuarioAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         senha = form.cleaned_data.get('senha') or None
-        sincronizar_login_usuario(obj, senha)
-        salvar_permissoes_menu(obj, form.cleaned_data.get('permissoes_menu') or [])
+        auth_user = sincronizar_login_usuario(obj, senha)
+        if 'permissoes_menu' in form.cleaned_data:
+            salvar_permissoes_menu(
+                obj,
+                form.cleaned_data['permissoes_menu'],
+                user=auth_user,
+            )
 
 
 @admin.register(PermissaoMenuUsuario)

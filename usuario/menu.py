@@ -90,6 +90,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
 )
 
 CODIGOS_MENU = frozenset(item.codigo for item in ITENS_MENU)
+MARCADOR_MENU_CONFIGURADO = '__configurado__'
 SECOES_POR_CODIGO = {secao.codigo: secao for secao in SECOES_MENU}
 ITENS_POR_CODIGO = {item.codigo: item for item in ITENS_MENU}
 
@@ -110,15 +111,18 @@ def permissoes_menu_do_usuario(user: User | None) -> set[str]:
 
     from .models import PermissaoMenuUsuario
 
+    marcador = '__configurado__'
     try:
-        codigos = set(
-            PermissaoMenuUsuario.objects.filter(usuario=user).values_list('codigo', flat=True)
-        )
+        qs = PermissaoMenuUsuario.objects.filter(usuario=user)
+        if qs.filter(codigo=marcador).exists():
+            return set(
+                qs.exclude(codigo=marcador).values_list('codigo', flat=True)
+            )
+        if qs.exists():
+            return set(qs.values_list('codigo', flat=True))
+        return set(CODIGOS_MENU)
     except (ProgrammingError, OperationalError):
         return set(CODIGOS_MENU)
-    if not codigos:
-        return set(CODIGOS_MENU)
-    return codigos
 
 
 def usuario_pode_menu(user: User | None, codigo: str) -> bool:

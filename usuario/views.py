@@ -49,8 +49,13 @@ class UsuarioCreate(CreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
-        salvar_permissoes_menu(self.object, form.cleaned_data.get('permissoes_menu') or [])
+        auth_user = sincronizar_login_usuario(self.object, form.cleaned_data['senha'])
+        if 'permissoes_menu' in form.cleaned_data:
+            salvar_permissoes_menu(
+                self.object,
+                form.cleaned_data['permissoes_menu'],
+                user=auth_user,
+            )
         messages.success(
             self.request,
             f'Usuario "{self.object.usuario}" salvo. Login liberado em /login/.',
@@ -80,7 +85,12 @@ class UsuarioUpdate(UpdateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         senha = form.cleaned_data.get('senha') or None
-        sincronizar_login_usuario(self.object, senha)
-        salvar_permissoes_menu(self.object, form.cleaned_data.get('permissoes_menu') or [])
+        auth_user = sincronizar_login_usuario(self.object, senha)
+        if 'permissoes_menu' in form.cleaned_data:
+            salvar_permissoes_menu(
+                self.object,
+                form.cleaned_data['permissoes_menu'],
+                user=auth_user,
+            )
         messages.success(self.request, f'Usuario "{self.object.usuario}" atualizado.')
         return response
