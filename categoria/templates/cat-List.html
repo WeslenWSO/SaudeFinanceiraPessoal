@@ -19,8 +19,11 @@
     background-color: #fff !important;
   }
 </style>
-  <p>
+  <p class="d-flex flex-wrap gap-2 align-items-center">
     <a href="{% url 'categoria:cat-create' %}" role="button">Nova Categoria</a>
+    <a href="{% url 'categoria:copiar' %}" role="button" class="secondary">
+      <i class="fas fa-copy"></i> Copiar de outra empresa
+    </a>
   </p>
   {% if messages %}
     {% include 'parcial/_messages.html' %}

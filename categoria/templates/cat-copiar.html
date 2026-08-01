@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block nav_ %}
+  {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid py-3" style="max-width: 720px;">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="mb-0"><i class="fas fa-copy me-2 text-primary"></i>Copiar categorias</h3>
+      <small class="text-muted">Destino: <strong>{{ empresa_destino.razao }}</strong></small>
+    </div>
+    <a href="{% url 'categoria:catList' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+  </div>
+
+  {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+  <form method="post" class="card shadow-sm">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="mb-3">
+        <label for="empresa_origem" class="form-label fw-semibold">Empresa de origem</label>
+        <select name="empresa_origem" id="empresa_origem" class="form-select" required>
+          <option value="">— Selecione —</option>
+          {% for emp in empresas_origem %}
+          <option value="{{ emp.id }}" {% if empresa_origem_id == emp.id|stringformat:"s" %}selected{% endif %}>
+            {{ emp.razao }}{% if emp.nome_fantasia %} ({{ emp.nome_fantasia }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">As categorias serão copiadas para a empresa da sessão atual.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold d-block">O que copiar</label>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="modo" id="modoTodas" value="todas"
+                 {% if modo != 'grupo' %}checked{% endif %}>
+          <label class="form-check-label" for="modoTodas">Todas as categorias da empresa</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="modo" id="modoGrupo" value="grupo"
+                 {% if modo == 'grupo' %}checked{% endif %}>
+          <label class="form-check-label" for="modoGrupo">Somente um grupo</label>
+        </div>
+      </div>
+
+      <div class="mb-3" id="blocoGrupo" style="{% if modo != 'grupo' %}display:none;{% endif %}">
+        <label for="grupo" class="form-label fw-semibold">Grupo</label>
+        <select name="grupo" id="grupo" class="form-select">
+          <option value="">— Selecione a empresa primeiro —</option>
+        </select>
+        <div class="form-text">Usa o campo <em>Grupo</em> da categoria (categoria pai no Conta Azul).</div>
+      </div>
+
+      <div class="alert alert-light border small mb-0">
+        <strong>Regras da cópia:</strong>
+        <ul class="mb-0 mt-1">
+          <li>Copia nome, grupo, classificação, tipo e sintético</li>
+          <li>Não copia vínculo Conta Azul (<code>conta_azul_id</code>)</li>
+          <li>Ignora categorias que já existem no destino (mesmo nome + tipo + classificação)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card-footer d-flex gap-2 justify-content-end">
+      <a href="{% url 'categoria:catList' %}" class="btn btn-outline-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-copy me-1"></i>Copiar
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var selEmpresa = document.getElementById('empresa_origem');
+  var selGrupo = document.getElementById('grupo');
+  var blocoGrupo = document.getElementById('blocoGrupo');
+  var radios = document.querySelectorAll('input[name="modo"]');
+  var grupoInicial = {{ grupo_selecionado_json|safe }};
+
+  function modoAtual() {
+    var r = document.querySelector('input[name="modo"]:checked');
+    return r ? r.value : 'todas';
+  }
+
+  function atualizarVisibilidade() {
+    blocoGrupo.style.display = modoAtual() === 'grupo' ? '' : 'none';
+    if (modoAtual() === 'grupo') {
+      selGrupo.required = true;
+    } else {
+      selGrupo.required = false;
+    }
+  }
+
+  function carregarGrupos() {
+    var empresaId = selEmpresa.value;
+    selGrupo.innerHTML = '<option value="">Carregando…</option>';
+    if (!empresaId) {
+      selGrupo.innerHTML = '<option value="">— Selecione a empresa primeiro —</option>';
+      return;
+    }
+    fetch('{% url "categoria:grupos_empresa" %}?empresa_id=' + encodeURIComponent(empresaId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var grupos = data.grupos || [];
+        if (!grupos.length) {
+          selGrupo.innerHTML = '<option value="">Nenhum grupo nesta empresa</option>';
+          return;
+        }
+        var html = '<option value="">— Selecione o grupo —</option>';
+        grupos.forEach(function (g) {
+          var label = (g.rotulo || g.nome) + ' (' + g.qtd + ')';
+          var val = String(g.nome).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+          var sel = (grupoInicial && g.nome === grupoInicial) ? ' selected' : '';
+          html += '<option value="' + val + '"' + sel + '>' + label + '</option>';
+        });
+        selGrupo.innerHTML = html;
+      })
+      .catch(function () {
+        selGrupo.innerHTML = '<option value="">Erro ao carregar grupos</option>';
+      });
+  }
+
+  radios.forEach(function (r) {
+    r.addEventListener('change', atualizarVisibilidade);
+  });
+  selEmpresa.addEventListener('change', function () {
+    grupoInicial = '';
+    carregarGrupos();
+  });
+
+  atualizarVisibilidade();
+  if (selEmpresa.value) {
+    carregarGrupos();
+  }
+})();
+</script>
+{% endblock %}

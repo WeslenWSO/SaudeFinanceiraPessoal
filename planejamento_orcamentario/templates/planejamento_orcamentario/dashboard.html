@@ -38,6 +38,12 @@
         <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
             Mês atual
         </a>
+        <a href="?{{ periodo_ant_qs }}" class="btn btn-outline-secondary btn-sm" title="Mês anterior">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        <a href="?{{ periodo_prox_qs }}" class="btn btn-primary btn-sm" title="Próximo mês">
+            Próximo mês <i class="fas fa-chevron-right"></i>
+        </a>
     </div>
 </form>
 

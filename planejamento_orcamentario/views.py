@@ -68,6 +68,30 @@ def _qs_params(data_ini, data_fim):
     })
 
 
+def _periodo_mes_vizinho(data_ini: date, delta: int = 1) -> tuple[date, date]:
+    """Retorna o 1º e o último dia do mês deslocado a partir de data_ini."""
+    y, m = data_ini.year, data_ini.month
+    m += int(delta)
+    while m > 12:
+        m -= 12
+        y += 1
+    while m < 1:
+        m += 12
+        y -= 1
+    ini = date(y, m, 1)
+    fim = date(y, m, monthrange(y, m)[1])
+    return ini, fim
+
+
+def _periodo_nav_qs(data_ini: date) -> dict:
+    ant_ini, ant_fim = _periodo_mes_vizinho(data_ini, -1)
+    prox_ini, prox_fim = _periodo_mes_vizinho(data_ini, 1)
+    return {
+        'periodo_ant_qs': _qs_params(ant_ini, ant_fim),
+        'periodo_prox_qs': _qs_params(prox_ini, prox_fim),
+    }
+
+
 def _total_receitas_periodo(empresa, data_ini, data_fim):
     return (
         LancamentoOrcamento.objects.filter(
@@ -388,6 +412,7 @@ def dashboard(request):
         'periodo_qs': qs,
         'tabela_despesas': tabela_despesas,
         'grafico_torre': grafico_torre,
+        **_periodo_nav_qs(data_ini),
     })
 
 
@@ -603,6 +628,7 @@ def listar_tipo(request, tipo):
         'data_ini': data_ini,
         'data_fim': data_fim,
         'periodo_qs': qs,
+        **_periodo_nav_qs(data_ini),
     })
 
 

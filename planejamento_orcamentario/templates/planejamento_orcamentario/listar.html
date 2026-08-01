@@ -55,6 +55,16 @@
                     {{ data_ini|date:"d/m/Y" }} → {{ data_fim|date:"d/m/Y" }}
                 </span>
             </div>
+            <div class="col-auto">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Navegar mês">
+                    <a href="?{{ periodo_ant_qs }}" class="btn btn-outline-secondary" title="Mês anterior">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <a href="?{{ periodo_prox_qs }}" class="btn btn-outline-primary" title="Próximo mês">
+                        Próximo mês <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </form>
