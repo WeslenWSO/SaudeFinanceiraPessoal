@@ -42,6 +42,14 @@ class Categoria(models.Model):
             'classificação nem sintético desta categoria.'
         ),
     )
+
+    def save(self, *args, **kwargs):
+        if self.nome:
+            self.nome = self.nome.strip().upper()
+        if self.grupo:
+            self.grupo = self.grupo.strip().upper()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.nome} {self.classificacao}'
 

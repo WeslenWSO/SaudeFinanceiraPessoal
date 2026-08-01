@@ -6,6 +6,7 @@ a partir de uma data (inclusive).
 Uso:
   python scripts/importar_sqlite_empresa_periodo.py --empresa-id 19 --desde 2026-08-30
   python scripts/importar_sqlite_empresa_periodo.py --empresa "R S NOBRE" --desde 2026-08-30 --dry-run
+  python scripts/importar_sqlite_empresa_periodo.py --empresa-id 19 --only categoria.categoria
 """
 from __future__ import annotations
 
@@ -181,7 +182,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--empresa-id", type=int)
     parser.add_argument("--empresa", help="Parte do nome/razão social")
-    parser.add_argument("--desde", required=True, help="Data ISO YYYY-MM-DD")
+    parser.add_argument("--desde", default="1970-01-01", help="Data ISO YYYY-MM-DD (ignorada p/ categoria)")
+    parser.add_argument("--only", action="append", default=[], help="Modelo app.model (pode repetir)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -205,10 +207,16 @@ def main() -> int:
         return 1
 
     desde = date.fromisoformat(args.desde)
+    only = args.only or []
+    models = [m for m in MODELS_ORDER if not only or m in only]
+    if not models:
+        print("Nenhum modelo selecionado.", file=sys.stderr)
+        return 1
+
     config = {
         "empresa_id": empresa_id,
         "desde": desde.isoformat(),
-        "models": MODELS_ORDER,
+        "models": models,
         "date_fields": DATE_FIELDS,
     }
 
@@ -242,7 +250,7 @@ def main() -> int:
     print("\n=== Importando no PostgreSQL ===")
     env["PYTHONPATH"] = str(ROOT)
     subprocess.check_call(
-        [sys.executable, "-c", IMPORT_CODE, str(ROOT), str(tmpdir), json.dumps(MODELS_ORDER)],
+        [sys.executable, "-c", IMPORT_CODE, str(ROOT), str(tmpdir), json.dumps(models)],
         env=env,
         cwd=ROOT,
     )

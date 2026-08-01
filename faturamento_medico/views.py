@@ -239,6 +239,119 @@ def _horario_slot(faturamento):
     return ini, fim
 
 
+def _duracao_slot_minutos(ini, fim):
+    if ini is None or fim is None:
+        return 0
+    if fim <= ini:
+        return 0
+    return int(fim - ini)
+
+
+def _fmt_minutos_hhmm(total_minutos: int) -> str:
+    total_minutos = max(0, int(total_minutos or 0))
+    h, m = divmod(total_minutos, 60)
+    if h and m:
+        return f'{h}h {m:02d}min'
+    if h:
+        return f'{h}h'
+    return f'{m} min'
+
+
+def _chave_slot_paciente_maquina(linha: dict):
+    """
+    Agrupa por paciente + máquina + horário (não por exame).
+    Vários exames do mesmo paciente no mesmo slot contam 1 vez.
+    """
+    fat = linha.get('faturamento')
+    if not fat:
+        return None
+    ini, fim = _horario_slot(fat)
+    paciente = (getattr(fat, 'nome', None) or '').strip().upper()
+    maquina = (linha.get('maquina_codigo') or '').strip().upper()
+    data = getattr(fat, 'data', None)
+    if not paciente or not maquina or not data:
+        return None
+    if ini is None and fim is None:
+        horario_txt = (
+            f"{getattr(fat, 'horario_inicio', '') or ''} - "
+            f"{getattr(fat, 'horario_fim', '') or ''}"
+        ).strip(' -') or (getattr(fat, 'horario', None) or '').strip()
+        if not horario_txt:
+            return None
+        return (data, paciente, maquina, horario_txt)
+    return (data, paciente, maquina, ini, fim)
+
+
+def _resumo_slots_por_situacao(grid_linhas: list, situacao: str) -> dict:
+    """
+    1 slot por (paciente, máquina, horário) na situação informada
+    (MAQUINA_VAGA ou REUTILIZADA). Exames no mesmo slot não somam de novo.
+    """
+    slots = {}
+    for linha in grid_linhas:
+        if linha.get('situacao') != situacao:
+            continue
+        chave = _chave_slot_paciente_maquina(linha)
+        if not chave:
+            continue
+        if chave in slots:
+            slots[chave]['qtd_exames'] += 1
+            continue
+        fat = linha['faturamento']
+        ini, fim = _horario_slot(fat)
+        minutos = _duracao_slot_minutos(ini, fim)
+        if getattr(fat, 'horario_inicio', None) or getattr(fat, 'horario_fim', None):
+            horario_txt = f"{fat.horario_inicio or ''} - {fat.horario_fim or ''}".strip(' -')
+        else:
+            horario_txt = (fat.horario or '').strip()
+        slots[chave] = {
+            'data': fat.data,
+            'paciente': fat.nome or '-',
+            'maquina': linha.get('maquina') or '-',
+            'maquina_codigo': linha.get('maquina_codigo') or '',
+            'horario': horario_txt or '-',
+            'minutos': minutos,
+            'qtd_exames': 1,
+            'reutilizado_por': (linha.get('reutilizado_por') or '-') if situacao == 'REUTILIZADA' else '-',
+        }
+
+    itens = sorted(
+        slots.values(),
+        key=lambda s: (s['data'] or date.min, s['maquina'], s['horario'], s['paciente']),
+    )
+    total_min = sum(s['minutos'] for s in itens)
+    por_maquina = {}
+    for s in itens:
+        cod = s['maquina_codigo'] or s['maquina']
+        bucket = por_maquina.setdefault(
+            cod,
+            {'maquina': s['maquina'], 'slots': 0, 'minutos': 0},
+        )
+        bucket['slots'] += 1
+        bucket['minutos'] += s['minutos']
+
+    por_maquina_lista = [
+        {**v, 'minutos_fmt': _fmt_minutos_hhmm(v['minutos'])}
+        for v in sorted(por_maquina.values(), key=lambda x: x['maquina'])
+    ]
+
+    return {
+        'slots': itens,
+        'total_slots': len(itens),
+        'total_minutos': total_min,
+        'total_fmt': _fmt_minutos_hhmm(total_min),
+        'por_maquina': por_maquina_lista,
+    }
+
+
+def _resumo_maquinas_paradas(grid_linhas: list) -> dict:
+    return _resumo_slots_por_situacao(grid_linhas, 'MAQUINA_VAGA')
+
+
+def _resumo_horarios_reutilizados(grid_linhas: list) -> dict:
+    return _resumo_slots_por_situacao(grid_linhas, 'REUTILIZADA')
+
+
 # Modalidade → (chave da máquina, nome exibido)
 # CR (RIS) e RX representam a mesma máquina de Raio X
 MAQUINAS_POR_MODALIDADE = {
@@ -827,8 +940,6 @@ def listar_cancelados(request):
         ativos_por_data.setdefault(ativo.data, []).append(ativo)
 
     grid_linhas = []
-    total_vagas = 0
-    total_reutilizadas = 0
     for faturamento in faturamentos:
         candidatos = ativos_por_data.get(faturamento.data, [])
         itens = list(faturamento.itens_servico.all())
@@ -838,10 +949,6 @@ def listar_cancelados(request):
                 continue
             if maquina and (analise.get('maquina_codigo') or '') != maquina:
                 continue
-            if analise['situacao'] == 'MAQUINA_VAGA':
-                total_vagas += 1
-            elif analise['situacao'] == 'REUTILIZADA':
-                total_reutilizadas += 1
             grid_linhas.append({
                 'faturamento': faturamento,
                 'procedimento': faturamento.servico or '-',
@@ -858,10 +965,6 @@ def listar_cancelados(request):
                 continue
             if maquina and (analise.get('maquina_codigo') or '') != maquina:
                 continue
-            if analise['situacao'] == 'MAQUINA_VAGA':
-                total_vagas += 1
-            elif analise['situacao'] == 'REUTILIZADA':
-                total_reutilizadas += 1
             valor_item = item.total if item.total is not None else (item.valor or 0)
             grid_linhas.append({
                 'faturamento': faturamento,
@@ -871,6 +974,34 @@ def listar_cancelados(request):
                 'valor_fmt': _moeda_br(valor_item),
                 **analise,
             })
+
+    resumo_parada = _resumo_maquinas_paradas(grid_linhas)
+    resumo_reutilizado = _resumo_horarios_reutilizados(grid_linhas)
+
+    # Marca na grade o 1º exame de cada slot (vaga ou reutilizado)
+    vistos_slot = set()
+    for linha in grid_linhas:
+        situacao = linha.get('situacao')
+        linha['slot_unico'] = False
+        linha['minutos_slot'] = 0
+        linha['minutos_slot_fmt'] = ''
+        if situacao not in ('MAQUINA_VAGA', 'REUTILIZADA'):
+            continue
+        chave = _chave_slot_paciente_maquina(linha)
+        if not chave:
+            continue
+        chave_sit = (situacao, chave)
+        if chave_sit in vistos_slot:
+            continue
+        vistos_slot.add(chave_sit)
+        fat = linha['faturamento']
+        ini, fim = _horario_slot(fat)
+        linha['slot_unico'] = True
+        linha['minutos_slot'] = _duracao_slot_minutos(ini, fim)
+        linha['minutos_slot_fmt'] = _fmt_minutos_hhmm(linha['minutos_slot'])
+        # compat com template antigo
+        linha['minutos_parada'] = linha['minutos_slot'] if situacao == 'MAQUINA_VAGA' else 0
+        linha['minutos_parada_fmt'] = linha['minutos_slot_fmt'] if situacao == 'MAQUINA_VAGA' else ''
 
     convenios_disponiveis = []
     if empresa_id:
@@ -888,8 +1019,10 @@ def listar_cancelados(request):
     context = {
         'grid_linhas': grid_linhas,
         'total_procedimentos': len(grid_linhas),
-        'total_maquina_vaga': total_vagas,
-        'total_reutilizadas': total_reutilizadas,
+        'total_maquina_vaga': resumo_parada['total_slots'],
+        'total_reutilizadas': resumo_reutilizado['total_slots'],
+        'resumo_parada': resumo_parada,
+        'resumo_reutilizado': resumo_reutilizado,
         'valor_total': sum((linha['valor'] or 0) for linha in grid_linhas),
         'valor_total_fmt': _moeda_br(sum((linha['valor'] or 0) for linha in grid_linhas)),
         'convenios_disponiveis': convenios_disponiveis,

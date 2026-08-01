@@ -116,8 +116,19 @@
                             <div class="info-box">
                                 <span class="info-box-icon bg-warning"><i class="fas fa-desktop"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Máquina vaga</span>
+                                    <span class="info-box-text">Slots máquina vaga</span>
                                     <span class="info-box-number">{{ total_maquina_vaga }}</span>
+                                    <span class="info-box-text small">paciente + máquina + horário</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-dark"><i class="fas fa-clock"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Tempo máquina parada</span>
+                                    <span class="info-box-number">{{ resumo_parada.total_fmt }}</span>
+                                    <span class="info-box-text small">{{ resumo_parada.total_minutos }} min no total</span>
                                 </div>
                             </div>
                         </div>
@@ -125,21 +136,127 @@
                             <div class="info-box">
                                 <span class="info-box-icon bg-success"><i class="fas fa-exchange-alt"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Horário reutilizado</span>
+                                    <span class="info-box-text">Slots reutilizados</span>
                                     <span class="info-box-number">{{ total_reutilizadas }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-secondary"><i class="fas fa-dollar-sign"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Valor Total</span>
-                                    <span class="info-box-number">R$ {{ valor_total_fmt }}</span>
+                                    <span class="info-box-text small">{{ resumo_reutilizado.total_fmt }} · paciente + máquina + horário</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {% if resumo_parada.slots %}
+                    <div class="card mb-3 border-warning">
+                        <div class="card-header py-2 bg-warning-subtle">
+                            <strong><i class="fas fa-clock"></i> Horário de máquinas paradas</strong>
+                            <span class="text-muted small ms-1">
+                                — 1 vez por paciente + máquina + horário
+                            </span>
+                        </div>
+                        <div class="card-body py-2">
+                            {% if resumo_parada.por_maquina %}
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                {% for m in resumo_parada.por_maquina %}
+                                <span class="badge bg-secondary">
+                                    {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0 align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Paciente</th>
+                                            <th>Máquina</th>
+                                            <th>Horário</th>
+                                            <th class="text-end">Tempo parado</th>
+                                            <th class="text-end">Exames no slot</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in resumo_parada.slots %}
+                                        <tr>
+                                            <td>{{ s.data|date:"d/m/Y" }}</td>
+                                            <td>{{ s.paciente }}</td>
+                                            <td>{{ s.maquina }}</td>
+                                            <td>{{ s.horario }}</td>
+                                            <td class="text-end fw-semibold">{{ s.minutos }} min</td>
+                                            <td class="text-end">{{ s.qtd_exames }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                        <tr>
+                                            <th colspan="4">Total</th>
+                                            <th class="text-end">{{ resumo_parada.total_fmt }}</th>
+                                            <th></th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if resumo_reutilizado.slots %}
+                    <div class="card mb-3 border-success">
+                        <div class="card-header py-2 bg-success-subtle">
+                            <strong><i class="fas fa-exchange-alt"></i> Horários reutilizados</strong>
+                            <span class="text-muted small ms-1">
+                                — 1 vez por paciente + máquina + horário (exames no mesmo slot não somam)
+                            </span>
+                        </div>
+                        <div class="card-body py-2">
+                            {% if resumo_reutilizado.por_maquina %}
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                {% for m in resumo_reutilizado.por_maquina %}
+                                <span class="badge bg-success">
+                                    {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0 align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Paciente (cancelado)</th>
+                                            <th>Máquina</th>
+                                            <th>Horário</th>
+                                            <th>Reutilizado por</th>
+                                            <th class="text-end">Tempo do slot</th>
+                                            <th class="text-end">Exames no slot</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in resumo_reutilizado.slots %}
+                                        <tr>
+                                            <td>{{ s.data|date:"d/m/Y" }}</td>
+                                            <td>{{ s.paciente }}</td>
+                                            <td>{{ s.maquina }}</td>
+                                            <td>{{ s.horario }}</td>
+                                            <td class="small">{{ s.reutilizado_por }}</td>
+                                            <td class="text-end fw-semibold">{{ s.minutos }} min</td>
+                                            <td class="text-end">{{ s.qtd_exames }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                        <tr>
+                                            <th colspan="5">Total</th>
+                                            <th class="text-end">{{ resumo_reutilizado.total_fmt }}</th>
+                                            <th></th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-2 small text-muted">Valor total dos procedimentos listados: <strong>R$ {{ valor_total_fmt }}</strong></div>
 
                     {% if grid_linhas %}
                     <div class="table-responsive">
@@ -155,6 +272,7 @@
                                     <th class="grid-ris-th">STATUS</th>
                                     <th class="grid-ris-th">MOTIVO</th>
                                     <th class="grid-ris-th">HORÁRIO</th>
+                                    <th class="grid-ris-th">TEMPO DO SLOT</th>
                                     <th class="grid-ris-th">VAGA / MÁQUINA</th>
                                     <th class="grid-ris-th">AGENDA UTILIZADA NO HORÁRIO</th>
                                     <th class="grid-ris-th">VALOR</th>
@@ -179,6 +297,18 @@
                                             {{ linha.faturamento.horario_inicio|default:"" }}{% if linha.faturamento.horario_inicio and linha.faturamento.horario_fim %} - {% endif %}{{ linha.faturamento.horario_fim|default:"" }}
                                         {% else %}
                                             {{ linha.faturamento.horario|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if linha.situacao == 'MAQUINA_VAGA' or linha.situacao == 'REUTILIZADA' %}
+                                            {% if linha.slot_unico %}
+                                            <span class="badge {% if linha.situacao == 'REUTILIZADA' %}bg-success{% else %}bg-dark{% endif %}"
+                                                  title="Conta neste total (paciente + máquina + horário)">{{ linha.minutos_slot_fmt }}</span>
+                                            {% else %}
+                                            <span class="text-muted small" title="Mesmo paciente/máquina/horário — já contado no 1º exame">já no slot</span>
+                                            {% endif %}
+                                        {% else %}
+                                            —
                                         {% endif %}
                                     </td>
                                     <td class="text-center">
