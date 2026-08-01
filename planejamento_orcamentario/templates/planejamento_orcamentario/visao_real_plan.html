@@ -6,43 +6,117 @@
 {% block conteudo %}
 <div class="container-fluid px-0">
     <div class="card shadow-sm">
-        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-                <h3 class="card-title mb-0">
-                    <i class="fas fa-chart-pie text-primary"></i> Planejamento orçamentário
-                </h3>
-                <small class="text-muted">
-                    {{ empresa.razao|default:"" }} · {{ ano }}
-                    · valores planejados · após o resultado: parcelas de empréstimo
-                </small>
+        <div class="card-header">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-chart-pie text-primary"></i> Planejamento orçamentário
+                    </h3>
+                    <small class="text-muted">
+                        {{ empresa.razao|default:"" }} · {{ periodo_label }}
+                        · valores planejados · após o resultado: parcelas de empréstimo
+                    </small>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Dashboard
+                    </a>
+                    <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-file-invoice-dollar"></i> Empréstimos
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
+                        <i class="fas fa-search"></i> Filtrar categoria
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                </div>
             </div>
-            <div class="card-tools d-flex flex-wrap align-items-center gap-2">
-                <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-arrow-left"></i> Dashboard
-                </a>
-                <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-primary btn-sm">
-                    <i class="fas fa-file-invoice-dollar"></i> Empréstimos
-                </a>
-                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
-                    <i class="fas fa-search"></i> Filtrar
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
-                    <i class="fas fa-times"></i> Limpar
-                </button>
-                <form method="get" class="d-inline">
-                    <select name="ano" onchange="this.form.submit()" class="form-select form-select-sm">
+
+            <form method="get" id="formPeriodo" class="d-flex flex-wrap align-items-end gap-2 border-top pt-2">
+                <div>
+                    <label class="form-label small mb-0 text-muted">Modo</label>
+                    <select name="modo" id="selModo" class="form-select form-select-sm" style="width: auto;">
+                        <option value="ano" {% if modo == 'ano' %}selected{% endif %}>Ano</option>
+                        <option value="mes" {% if modo == 'mes' %}selected{% endif %}>Mês</option>
+                        <option value="periodo" {% if modo == 'periodo' %}selected{% endif %}>Período (até 12+ meses)</option>
+                    </select>
+                </div>
+
+                <div id="blocoAno" class="periodo-bloco" {% if modo != 'ano' %}style="display:none"{% endif %}>
+                    <label class="form-label small mb-0 text-muted">Ano</label>
+                    <select name="ano" class="form-select form-select-sm" style="width: auto;">
                         {% for ano_opcao in anos_disponiveis %}
                         <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
                         {% endfor %}
                     </select>
-                </form>
-            </div>
+                </div>
+
+                <div id="blocoMes" class="periodo-bloco d-flex flex-wrap gap-2" {% if modo != 'mes' %}style="display:none"{% endif %}>
+                    <div>
+                        <label class="form-label small mb-0 text-muted">Mês</label>
+                        <select name="mes" class="form-select form-select-sm" style="width: auto;">
+                            {% for num, nome in meses_opcoes %}
+                            <option value="{{ num }}" {% if num == mes %}selected{% endif %}>{{ nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-0 text-muted">Ano</label>
+                        <select name="ano" class="form-select form-select-sm campo-ano-mes" style="width: auto;">
+                            {% for ano_opcao in anos_disponiveis %}
+                            <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div id="blocoPeriodo" class="periodo-bloco d-flex flex-wrap align-items-end gap-2" {% if modo != 'periodo' %}style="display:none"{% endif %}>
+                    <div>
+                        <label class="form-label small mb-0 text-muted">De</label>
+                        <div class="input-group input-group-sm" style="width: auto;">
+                            <select name="mes_ini" class="form-select" style="width: 7.5rem;">
+                                {% for num, nome in meses_opcoes %}
+                                <option value="{{ num }}" {% if num == mes_ini %}selected{% endif %}>{{ nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="ano_ini" class="form-select" style="width: 5.5rem;">
+                                {% for ano_opcao in anos_disponiveis %}
+                                <option value="{{ ano_opcao }}" {% if ano_opcao == ano_ini %}selected{% endif %}>{{ ano_opcao }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-0 text-muted">Até</label>
+                        <div class="input-group input-group-sm" style="width: auto;">
+                            <select name="mes_fim" class="form-select" style="width: 7.5rem;">
+                                {% for num, nome in meses_opcoes %}
+                                <option value="{{ num }}" {% if num == mes_fim %}selected{% endif %}>{{ nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="ano_fim" class="form-select" style="width: 5.5rem;">
+                                {% for ano_opcao in anos_disponiveis %}
+                                <option value="{{ ano_opcao }}" {% if ano_opcao == ano_fim %}selected{% endif %}>{{ ano_opcao }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" name="atalho" value="12m" class="btn btn-outline-secondary btn-sm" title="12 meses a partir do início">
+                        12 meses
+                    </button>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Aplicar
+                </button>
+            </form>
         </div>
 
         {% if grafico_torre.tem_dados %}
         <div class="card-body border-bottom" id="blocoGraficoTorre">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
+                <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ periodo_label }}</strong>
                 <small class="text-muted">Valores planejados (orçamento)</small>
             </div>
             <div style="position: relative; height: 320px;">
@@ -56,10 +130,8 @@
                 <thead class="table-light">
                     <tr>
                         <th class="align-middle" style="min-width: 14rem;">Categoria</th>
-                        {% for mes in meses %}
-                        <th class="text-end">
-                            {% if mes == 1 %}Janeiro{% elif mes == 2 %}Fevereiro{% elif mes == 3 %}Março{% elif mes == 4 %}Abril{% elif mes == 5 %}Maio{% elif mes == 6 %}Junho{% elif mes == 7 %}Julho{% elif mes == 8 %}Agosto{% elif mes == 9 %}Setembro{% elif mes == 10 %}Outubro{% elif mes == 11 %}Novembro{% elif mes == 12 %}Dezembro{% endif %}
-                        </th>
+                        {% for col in colunas %}
+                        <th class="text-end" title="{{ col.rotulo_completo }}">{{ col.rotulo }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
@@ -83,6 +155,7 @@
         <div class="card-footer small text-muted">
             Valores = orçamento (planejado).
             Empréstimos = valor da parcela no mês de vencimento do contrato.
+            Período: ano, mês único ou intervalo (ex.: Ago/2026 → Jul/2027).
         </div>
     </div>
 </div>
@@ -134,6 +207,24 @@
 {% endif %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const selModo = document.getElementById('selModo');
+    const blocoAno = document.getElementById('blocoAno');
+    const blocoMes = document.getElementById('blocoMes');
+    const blocoPeriodo = document.getElementById('blocoPeriodo');
+
+    function syncModo() {
+        const m = selModo.value;
+        blocoAno.style.display = m === 'ano' ? '' : 'none';
+        blocoMes.style.display = m === 'mes' ? '' : 'none';
+        blocoPeriodo.style.display = m === 'periodo' ? '' : 'none';
+        // Evita enviar dois campos name=ano
+        blocoAno.querySelectorAll('select').forEach(el => { el.disabled = m !== 'ano'; });
+        blocoMes.querySelectorAll('select').forEach(el => { el.disabled = m !== 'mes'; });
+        blocoPeriodo.querySelectorAll('select').forEach(el => { el.disabled = m !== 'periodo'; });
+    }
+    selModo.addEventListener('change', syncModo);
+    syncModo();
+
     document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(function (tr) {
         var nome = (tr.querySelector('td') || {}).textContent || '';
         nome = nome.trim().toUpperCase();

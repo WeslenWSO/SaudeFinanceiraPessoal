@@ -746,28 +746,82 @@ def excluir(request, pk):
 @login_required
 def visao_real_plan(request):
     """
-    Visão anual do planejamento (só valores planejados por mês).
-    Após o RESULTADO, lista parcelas de empréstimo (valor da parcela por mês do contrato).
+    Visão do planejamento (só valores planejados por mês).
+    Período: ano cheio, um mês, ou intervalo (ex.: 08/2026–07/2027).
+    Após o RESULTADO, lista parcelas de empréstimo do período.
     """
-    from planejamento_orcamentario.services.montar_visao_real_plan import montar_visao_real_plan
+    from fluxo_de_caixa.services.montar_fluxo_mensal import MESES_NOME
+    from planejamento_orcamentario.services.montar_visao_real_plan import (
+        gerar_colunas,
+        montar_visao_real_plan,
+        rotulos_colunas,
+    )
 
     empresa = _empresa_sessao(request)
     if not empresa:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('accounts:login')
 
-    try:
-        ano = int(request.GET.get('ano') or date.today().year)
-    except (TypeError, ValueError):
-        ano = date.today().year
+    hoje = date.today()
+    modo = (request.GET.get('modo') or 'ano').strip().lower()
+    if modo not in ('ano', 'mes', 'periodo'):
+        modo = 'ano'
 
-    dados, grafico_torre = montar_visao_real_plan(empresa, ano)
+    def _int(name, default):
+        try:
+            return int(request.GET.get(name) or default)
+        except (TypeError, ValueError):
+            return default
+
+    ano = _int('ano', hoje.year)
+    mes = max(1, min(12, _int('mes', hoje.month)))
+    ano_ini = _int('ano_ini', hoje.year)
+    mes_ini = max(1, min(12, _int('mes_ini', 8 if hoje.month >= 8 else 1)))
+    ano_fim = _int('ano_fim', ano_ini + 1 if mes_ini > 1 else ano_ini)
+    mes_fim = max(1, min(12, _int('mes_fim', 7 if mes_ini == 8 else 12)))
+
+    # Atalho: 12 meses a partir do mês inicial
+    if modo == 'periodo' and request.GET.get('atalho') == '12m':
+        ano_fim, mes_fim = ano_ini, mes_ini
+        for _ in range(11):
+            mes_fim += 1
+            if mes_fim > 12:
+                mes_fim = 1
+                ano_fim += 1
+
+    colunas = gerar_colunas(
+        modo,
+        ano=ano,
+        mes=mes,
+        ano_ini=ano_ini,
+        mes_ini=mes_ini,
+        ano_fim=ano_fim,
+        mes_fim=mes_fim,
+    )
+    dados, grafico_torre = montar_visao_real_plan(empresa, colunas)
+    cab = rotulos_colunas(colunas)
+
+    if modo == 'mes':
+        periodo_label = f'{MESES_NOME[mes - 1]}/{ano}'
+    elif modo == 'periodo':
+        periodo_label = f'{cab[0]["rotulo"]} → {cab[-1]["rotulo"]} ({len(colunas)} meses)'
+    else:
+        periodo_label = str(ano)
+
     return render(request, 'planejamento_orcamentario/visao_real_plan.html', {
         'title': 'Planejamento orçamentário',
         'empresa': empresa,
+        'modo': modo,
         'ano': ano,
-        'anos_disponiveis': range(2020, date.today().year + 2),
-        'meses': list(range(1, 13)),
+        'mes': mes,
+        'ano_ini': ano_ini,
+        'mes_ini': mes_ini,
+        'ano_fim': ano_fim,
+        'mes_fim': mes_fim,
+        'anos_disponiveis': range(2020, hoje.year + 3),
+        'meses_opcoes': list(enumerate(MESES_NOME, start=1)),
+        'colunas': cab,
+        'periodo_label': periodo_label,
         'dados': dados,
         'grafico_torre': grafico_torre,
     })
