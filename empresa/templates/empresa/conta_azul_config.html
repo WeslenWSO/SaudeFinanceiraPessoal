@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-xl px-4 py-4">
+  {% include 'parcial/_messages.html' %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+      <h1 class="h3 mb-1"><i class="fas fa-cloud me-2 text-primary"></i>{{ descricao }}</h1>
+      <p class="text-muted small mb-0">{{ empresa.cnpj }} — integração OAuth por cliente</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'empresa:conta_azul_sincronizar' empresa.pk %}" class="btn btn-outline-primary btn-sm">Sincronizar dados</a>
+      <a href="{% url 'empresa:empresa_integracao' empresa.pk %}" class="btn btn-outline-secondary btn-sm">Outras integrações</a>
+      <a href="{% url 'empresa:empresa_detail' empresa.pk %}" class="btn btn-outline-secondary btn-sm">Voltar</a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">Status da conexão</div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            <li class="mb-2">
+              Credenciais:
+              {% if config.credenciais_preenchidas %}<span class="badge bg-success">OK</span>
+              {% else %}<span class="badge bg-secondary">Pendente</span>{% endif %}
+            </li>
+            <li class="mb-2">
+              OAuth:
+              {% if config.tem_refresh_token %}<span class="badge bg-success">Conectado</span>
+              {% else %}<span class="badge bg-warning text-dark">Não conectado</span>{% endif %}
+            </li>
+            <li class="mb-2">
+              Access token:
+              {% if config.token_valido %}<span class="badge bg-success">Válido</span>
+              {% elif config.tem_refresh_token %}<span class="badge bg-info">Renova sozinho (~1h)</span>
+              {% else %}<span class="badge bg-secondary">—</span>{% endif %}
+            </li>
+            {% if config.token_expira_em %}
+            <li class="small text-muted">Access token expira: {{ config.token_expira_em|date:"d/m/Y H:i" }}</li>
+            {% endif %}
+            {% if config.conectado_em %}
+            <li class="small text-muted">Conectado em: {{ config.conectado_em|date:"d/m/Y H:i" }}</li>
+            {% endif %}
+          </ul>
+
+          {% if config.tem_refresh_token and not config.token_valido %}
+          <div class="alert alert-info small py-2 mt-3 mb-0">
+            O access token expira a cada ~1 hora. O sistema <strong>renova automaticamente</strong> na sync/API.
+            Só clique em Reconectar se aparecer erro de sessão expirada.
+          </div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            {% if config.em_desenvolvimento %}
+            <a href="{% url 'empresa:conta_azul_oauth_iniciar' empresa.pk %}" class="btn btn-primary btn-sm">
+              {% if config.tem_refresh_token %}Reconectar{% else %}Conectar{% endif %} (modo DEV)
+            </a>
+            {% else %}
+            <a href="{% url 'empresa:conta_azul_oauth_iniciar' empresa.pk %}" class="btn btn-primary btn-sm">
+              {% if config.tem_refresh_token %}Reconectar{% else %}Conectar{% endif %} Conta Azul
+            </a>
+            {% endif %}
+            <form method="post" action="{% url 'empresa:conta_azul_testar' empresa.pk %}" class="d-inline">{% csrf_token %}
+              <button type="submit" class="btn btn-outline-success btn-sm">Testar API</button>
+            </form>
+            {% if config.tem_refresh_token %}
+            <form method="post" action="{% url 'empresa:conta_azul_desconectar' empresa.pk %}" class="d-inline">{% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">Desconectar</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if config.em_desenvolvimento and not config.tem_refresh_token %}
+      <div class="alert alert-info small py-2 mb-4">
+        <strong>Modo DEV:</strong> clique em <strong>Conectar (modo DEV)</strong> para abrir o assistente OAuth.
+        O redirect do portal é <code>{{ redirect_efetivo }}</code> — você colará a URL de volta aqui no sistema.
+      </div>
+      {% endif %}
+
+      <div class="card border-warning mb-4">
+        <div class="card-body small">
+          <strong>Redirect em uso (copie para o Portal Conta Azul)</strong>
+          <p class="mb-2 mt-2"><code class="user-select-all">{{ redirect_efetivo }}</code></p>
+          <p class="text-muted mb-0">
+            {% if config.em_desenvolvimento %}
+            Em <strong>Desenvolvimento</strong>, o portal Conta Azul aceita apenas
+            <code>https://www.contaazul.com</code>. Use o assistente DEV para colar o código após autorizar.
+            {% else %}
+            Erro <code>redirect_mismatch</code> = esta URL não está cadastrada <strong>igual</strong> no app do portal.
+            Em <strong>Produção</strong>, cadastre o callback do Render acima.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      {% if config.em_desenvolvimento %}
+      <div class="card border-primary mb-4">
+        <div class="card-body small">
+          <strong>Assistente OAuth DEV</strong>
+          <p class="mb-2 mt-1">Já autorizou no portal e tem a URL com <code>code=</code>?</p>
+          <a href="{% url 'empresa:conta_azul_oauth_dev' empresa.pk %}" class="btn btn-sm btn-outline-primary">
+            Abrir assistente e colar código
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold">Credenciais OAuth (por cliente)</div>
+        <div class="card-body">
+          <form method="post">{% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">{{ form.ativo.label }}</label>
+              {{ form.ativo }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ form.ambiente.label }}</label>
+              {{ form.ambiente }}
+              <div class="form-text">
+                {% if form.instance.em_desenvolvimento %}
+                <strong>Desenvolvimento:</strong> redirect padrão
+                <code>{{ form.instance.REDIRECT_DEV }}</code> — use o assistente OAuth DEV para conectar.
+                {% else %}
+                <strong>Produção (Render):</strong> redirect padrão
+                <code>{{ form.instance.REDIRECT_PROD }}</code> cadastrado no portal.
+                {% endif %}
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ form.client_id.label }}</label>
+              {{ form.client_id }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ form.client_secret.label }}</label>
+              {{ form.client_secret }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ form.redirect_uri.label }}</label>
+              {{ form.redirect_uri }}
+              <div class="form-text">Deixe vazio para usar o padrão do ambiente. Deve ser <strong>idêntico</strong> ao portal.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

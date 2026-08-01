@@ -20,10 +20,13 @@
 		{% endif %}
 		{% comment %} <h2>{% if formapgto %} Alteracao {%else %} Criar {%endif%} Cobranca</h2> {% endcomment %}
 	   {% for field in form %}
-		   {% if field.name == 'completed' %}
+		   {% if field.name == 'completed' or field.name == 'bloquear_sync_conta_azul' %}
 			   <p>
 				   {{ field.label_tag }}
 				   {{ field }}
+				   {% if field.help_text %}
+				   <small class="text-muted d-block">{{ field.help_text }}</small>
+				   {% endif %}
 			   </p>
 			   {% if field.errors %}
 				   <small class="error">{{ field.errors|striptags  }}</small> 

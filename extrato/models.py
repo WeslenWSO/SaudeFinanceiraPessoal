@@ -30,6 +30,13 @@ class ContaBancaria(models.Model):
     ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="contas")
+    conta_azul_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='ID Conta Azul',
+    )
     banco = models.ForeignKey(Banco, on_delete=models.PROTECT)
     agencia = models.CharField(max_length=20, blank=True, null=True)
     conta = models.CharField(max_length=30, blank=True, null=True)
@@ -48,6 +55,18 @@ class ContaBancaria(models.Model):
     )
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='CONTA_CORRENTE', verbose_name='Tipo')
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='A', verbose_name='Status')
+    saldo_conta_azul = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Saldo Conta Azul',
+    )
+    saldo_conta_azul_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Saldo Conta Azul atualizado em',
+    )
 
     # API Sicoob (extrato automático): número usado no parâmetro numeroContaCorrente (vide portal desenvolvedor).
     sicoob_numero_conta_corrente_api = models.CharField(
@@ -60,6 +79,13 @@ class ContaBancaria(models.Model):
 
     class Meta:
         unique_together = ("empresa", "banco", "agencia", "conta")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'conta_azul_id'],
+                condition=models.Q(conta_azul_id__gt=''),
+                name='conta_bancaria_conta_azul_unico',
+            ),
+        ]
 
     def __str__(self):
         base = f"{self.banco} {self.descricao} - {self.agencia}/{self.conta}".strip()

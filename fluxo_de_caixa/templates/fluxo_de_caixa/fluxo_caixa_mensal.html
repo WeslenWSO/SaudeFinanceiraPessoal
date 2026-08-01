@@ -1,424 +1,223 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static faturamento_extras %}
 
 {% block conteudo %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
-                        <h3 class="card-title mb-0">Fluxo de Caixa Mensal</h3>
-                        <small class="text-muted" id="subtituloFluxo">
-                        Alternar visualização: somente realizado ou realizado × planejado
-                    </small>
+                        <h3 class="card-title mb-0">Fluxo de Caixa</h3>
+                        <small class="text-muted">{{ empresa.razao|default:"" }} · {{ ano }}</small>
                     </div>
                     <div class="card-tools d-flex flex-wrap align-items-center gap-2">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Modo de visualização">
-                            <button type="button" class="btn btn-primary" id="btnModoSomenteReal"
-                                    title="Exibe apenas os valores realizados do fluxo">
-                                <i class="fas fa-eye"></i> Somente realizado
-                            </button>
-                            <button type="button" class="btn btn-outline-primary" id="btnModoComparacao"
-                                    title="Compara realizado × planejado do orçamento">
-                                <i class="fas fa-exchange-alt"></i> Realizado × Planejado
-                            </button>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="?ano={{ ano }}&modo=planilha"
+                               class="btn {% if modo != 'completo' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                <i class="fas fa-table"></i> Planilha
+                            </a>
+                            <a href="?ano={{ ano }}&modo=completo"
+                               class="btn {% if modo == 'completo' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                <i class="fas fa-exchange-alt"></i> Real × Plan.
+                            </a>
                         </div>
+                        {% if modo == 'completo' %}
                         <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
-                            <i class="fas fa-search"></i> Filtrar Categoria
+                            <i class="fas fa-search"></i> Filtrar
                         </button>
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
-                            <i class="fas fa-times"></i> Limpar Filtro
+                            <i class="fas fa-times"></i> Limpar
                         </button>
+                        {% endif %}
                         <form method="get" class="d-inline">
+                            {% if modo == 'completo' %}<input type="hidden" name="modo" value="completo">{% endif %}
                             <select name="ano" onchange="this.form.submit()" class="form-select form-select-sm">
                                 {% for ano_opcao in anos_disponiveis %}
-                                    <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
+                                <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
                                 {% endfor %}
                             </select>
                         </form>
                     </div>
                 </div>
-                <div class="card-body border-bottom" id="blocoGraficoTorre">
-                    {% if grafico_torre.tem_dados %}
+
+                {% if modo == 'completo' %}
+                {% include 'fluxo_de_caixa/_fluxo_completo.html' %}
+                {% else %}
+                {% if grafico_planilha.tem_dados %}
+                <div class="card-body border-bottom">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico de torre — {{ ano }}</strong>
-                        <small class="text-muted" id="graficoTorreLegenda">Barras sólidas = Realizado · Barras claras = Planejado</small>
+                        <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
+                        <small class="text-muted">Totais mensais da planilha (Conta Azul)</small>
                     </div>
-                    <div style="position: relative; height: 320px;">
-                        <canvas id="graficoTorreFluxo" aria-label="Gráfico de torre do fluxo de caixa"></canvas>
+                    <div style="position: relative; height: 340px;">
+                        <canvas id="graficoFluxoPlanilha" aria-label="Gráfico do fluxo de caixa"></canvas>
                     </div>
-                    {% else %}
-                    <div class="text-center text-muted py-3 small">
-                        Sem valores no ano para montar o gráfico de torre.
-                    </div>
-                    {% endif %}
                 </div>
-                <div class="card-body table-responsive p-0">
-                    <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle modo-somente-realizado">
-                        <thead class="table-light">
-                            <tr>
-                                <th rowspan="2" class="align-middle" style="min-width: 14rem;">Categoria</th>
-                                {% for mes in meses %}
-                                <th colspan="4" class="text-center th-mes" data-colspan-full="4" data-colspan-real="1">
-                                    {% if mes == 1 %}Janeiro{% elif mes == 2 %}Fevereiro{% elif mes == 3 %}Março{% elif mes == 4 %}Abril{% elif mes == 5 %}Maio{% elif mes == 6 %}Junho{% elif mes == 7 %}Julho{% elif mes == 8 %}Agosto{% elif mes == 9 %}Setembro{% elif mes == 10 %}Outubro{% elif mes == 11 %}Novembro{% elif mes == 12 %}Dezembro{% endif %}
-                                </th>
-                                {% endfor %}
-                            </tr>
-                            <tr>
-                                {% for mes in meses %}
-                                <th class="text-end small col-real" title="Valor realizado do fluxo">Real.</th>
-                                <th class="text-end small col-cmp" title="Valor planejado do orçamento">Plan.</th>
-                                <th class="text-end small col-cmp" title="% diferença (Real − Plan) / Plan">% Dif.</th>
-                                <th class="text-center small col-cmp" title="Flag de alerta">!</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for linha in dados %}
-                            <tr class="{% if linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% elif 'RD' in linha.categoria.nome or 'RI' in linha.categoria.nome or 'TOTAL GERAL' in linha.categoria.nome %}table-primary{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% endif %}"
-                                {% if linha.categoria.id %}data-categoria-id="{{ linha.categoria.id }}"{% endif %}>
-                                <td>
-                                    {% if linha.subtotal %}
-                                        <strong>{{ linha.categoria.nome }}</strong>
-                                    {% elif linha.grupo %}
-                                        <em><strong>{{ linha.categoria.nome }}</strong></em>
-                                    {% else %}
-                                        {{ linha.categoria.nome }}
-                                    {% endif %}
-                                </td>
-                                {% for cel in linha.valores %}
-                                <td class="text-end col-real {% if linha.subtotal %}fw-bold{% endif %}">
-                                    {{ cel.realizado|floatformat:2 }}
-                                </td>
-                                <td class="text-end col-cmp {% if linha.subtotal %}fw-bold{% endif %} {% if not cel.planejado %}text-muted{% endif %}">
-                                    {{ cel.planejado|floatformat:2 }}
-                                </td>
-                                <td class="text-end col-cmp {% if linha.subtotal %}fw-bold{% endif %}
-                                    {% if cel.tem_pct %}
-                                        {% if cel.pct > 0 %}text-danger{% elif cel.pct < 0 %}text-success{% endif %}
-                                    {% else %}text-muted{% endif %}">
-                                    {% if cel.tem_pct %}
-                                        {{ cel.pct|floatformat:1 }}%
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                                <td class="text-center col-cmp">
-                                    {% if cel.flag %}
-                                        {% if cel.flag_tipo == 'acima' %}
-                                        <span class="badge bg-danger" title="Realizado {{ cel.pct|floatformat:1 }}% acima do planejado">▲</span>
-                                        {% elif cel.flag_tipo == 'abaixo' %}
-                                        <span class="badge bg-warning text-dark" title="Realizado {{ cel.pct|floatformat:1 }}% abaixo do planejado">▼</span>
-                                        {% elif cel.flag_tipo == 'sem_previsto' %}
-                                        <span class="badge bg-secondary" title="Há realizado sem planejado no orçamento">?</span>
+                {% endif %}
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table id="tabelaFluxoPlanilha" class="table table-sm table-bordered mb-0 fluxo-planilha">
+                            <thead>
+                                <tr class="table-light">
+                                    <th class="col-grupo">GRUPO</th>
+                                    <th class="col-categoria">CATEGORIA</th>
+                                    {% for mc in meses_cab %}
+                                    <th class="text-end col-mes">{{ mc.rotulo }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in linhas %}
+                                <tr class="nivel-{{ linha.nivel }} bloco-{{ linha.bloco }}"
+                                    {% if linha.categoria_id %}data-categoria-id="{{ linha.categoria_id }}"{% endif %}>
+                                    <td class="col-grupo small fw-semibold text-muted">
+                                        {% if linha.grupo %}{{ linha.grupo }}{% endif %}
+                                    </td>
+                                    <td class="col-categoria{% if linha.indent %} ps-4{% endif %}">
+                                        {% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %}
+                                        <strong class="{% if linha.bloco == 'despesa' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% elif linha.bloco == 'investimento' %}text-investimento{% endif %}">{{ linha.categoria }}</strong>
+                                        {% elif linha.nivel == 'grupo' %}
+                                        <span class="fw-bold text-uppercase {% if linha.bloco == 'despesa' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% else %}text-investimento{% endif %}">{{ linha.categoria }}</span>
                                         {% else %}
-                                        <span class="badge bg-danger">!</span>
+                                        <span class="text-item">{{ linha.categoria }}</span>
                                         {% endif %}
-                                    {% elif cel.flag_tipo == 'ok' %}
-                                        <span class="text-success" title="Dentro da margem">●</span>
-                                    {% else %}
-                                        <span class="text-muted">·</span>
-                                    {% endif %}
-                                </td>
+                                    </td>
+                                    {% for val in linha.valores %}
+                                    <td class="text-end text-nowrap{% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %} fw-bold{% endif %}{% if linha.negativo %} text-despesa{% elif linha.bloco == 'receita' and val %} text-receita{% elif linha.bloco == 'resultado' %}{% if val < 0 %} text-despesa{% else %} text-resultado{% endif %}{% endif %}">
+                                        {% if val %}
+                                          {% if linha.negativo %}-R$ {{ val|moeda_br }}{% else %}R$ {{ val|moeda_br }}{% endif %}
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="14" class="text-center text-muted py-4">
+                                        Sem movimentação no ano. Sincronize o Conta Azul e confira se as categorias têm o campo <em>Grupo</em> preenchido.
+                                    </td>
+                                </tr>
                                 {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="card-footer small text-muted" id="legendaComparacao">
-                    <strong>Real.</strong> = lançamentos do fluxo ·
-                    <strong>Plan.</strong> = lançamentos do planejamento orçamentário (mesma categoria) ·
-                    <strong>% Dif.</strong> = (Real − Plan) / Plan × 100 ·
-                    Flag ▲/▼ se |%| ≥ {{ flag_pct_limite|floatformat:0 }}% ·
-                    <span class="badge bg-secondary">?</span> = realizado sem previsto
+                <div class="card-footer small text-muted">
+                    Fonte dos valores realizados: <strong>Conta Azul</strong>.
+                    <strong>Grupo</strong> = categoria pai no CA («Aparecer dentro da categoria»).
+                    Classificação pelo <strong>Tipo</strong> (R / D / I / L).
+                    Resultados: Receita − Despesas → − Investimento → − Distribuição de Lucro.
+                    Use o campo <strong>Grupo</strong> para subtotais dentro de cada tipo.
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <style>
-#tabelaFluxoMensal.modo-somente-realizado .col-cmp {
-    display: none !important;
-}
-#tabelaFluxoMensal.modo-somente-realizado .th-mes {
-    /* colspan ajustado via JS */
-}
-#legendaComparacao.d-none-force {
-    display: none !important;
-}
+.fluxo-planilha { font-size: 0.82rem; }
+.fluxo-planilha .col-grupo { min-width: 6.5rem; max-width: 7.5rem; vertical-align: top; }
+.fluxo-planilha .col-categoria { min-width: 16rem; max-width: 24rem; white-space: normal; }
+.fluxo-planilha .col-mes { min-width: 7.5rem; }
+.text-receita { color: #0d6efd !important; }
+.text-despesa { color: #dc3545 !important; }
+.text-investimento { color: #0d6efd !important; }
+.text-resultado { color: #198754 !important; }
+.fluxo-planilha tr.bloco-receita.nivel-subtotal td { background-color: #f0f7ff; border-top: 2px solid #0d6efd; }
+.fluxo-planilha tr.bloco-despesa.nivel-subtotal td { background-color: #fff5f5; border-top: 2px solid #dc3545; }
+.fluxo-planilha tr.bloco-investimento.nivel-subtotal td { background-color: #f0f7ff; border-top: 2px solid #0d6efd; }
+.fluxo-planilha tr.bloco-despesa.nivel-grupo td { background-color: #fff8f8; }
+.fluxo-planilha tr.bloco-receita.nivel-grupo td { background-color: #f8fbff; }
+.fluxo-planilha tr.bloco-investimento.nivel-grupo td { background-color: #f8fbff; }
+.fluxo-planilha tr.nivel-resultado td,
+.fluxo-planilha tr.nivel-total td { background-color: #e8f5e9; border-top: 2px solid #198754; }
+.fluxo-planilha tr.nivel-item td.col-categoria .text-item { color: #212529; font-style: italic; }
 </style>
 
-<!-- Modal de Seleção de Categoria -->
-<div class="modal fade" id="modalSelecionarCategoria" tabindex="-1" aria-labelledby="modalSelecionarCategoriaLabel" aria-hidden="true">
-   <div class="modal-dialog modal-lg">
-       <div class="modal-content">
-           <div class="modal-header">
-               <h5 class="modal-title" id="modalSelecionarCategoriaLabel">
-                   <i class="fas fa-search me-2"></i>Selecionar Categoria
-               </h5>
-               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-           </div>
-           <div class="modal-body">
-               <div class="mb-3">
-                   <label for="buscaCategoria" class="form-label">Digite para buscar categoria:</label>
-                   <input type="text" class="form-control" id="buscaCategoria" placeholder="Digite pelo menos 4 letras para buscar...">
-                   <div class="form-text">A busca começa automaticamente após 4 letras digitadas.</div>
-               </div>
-               <div id="resultadosBusca" class="mt-3" style="max-height: 300px; overflow-y: auto;"></div>
-           </div>
-           <div class="modal-footer">
-               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-               <button type="button" class="btn btn-primary" id="btnAplicarFiltro">Aplicar Filtro</button>
-           </div>
-       </div>
-   </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% if grafico_torre.tem_dados %}
+{% if modo == 'completo' %}
+{% include 'fluxo_de_caixa/_fluxo_completo_scripts.html' %}
+{% elif grafico_planilha.tem_dados %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
-  const el = document.getElementById('graficoTorreFluxo');
-  if (!el) return;
-
-  const labels = {{ grafico_torre.labels_json|safe }};
-  const receitasReal = {{ grafico_torre.receitas_real_json|safe }};
-  const receitasPlan = {{ grafico_torre.receitas_plan_json|safe }};
-  const despesasReal = {{ grafico_torre.despesas_real_json|safe }};
-  const despesasPlan = {{ grafico_torre.despesas_plan_json|safe }};
-  const resultadoReal = {{ grafico_torre.resultado_real_json|safe }};
-  const resultadoPlan = {{ grafico_torre.resultado_plan_json|safe }};
-
-  function fmtMoeda(v) {
-    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  }
-
-  const bar = function (label, data, color, dashed) {
-    return {
-      label: label,
-      data: data,
-      backgroundColor: color,
-      borderColor: color.replace('0.85', '1').replace('0.45', '1'),
-      borderWidth: dashed ? 2 : 1,
-      borderDash: dashed ? [6, 4] : [],
-      borderRadius: 3,
-      maxBarThickness: 28
-    };
-  };
-
-  window.graficoTorreFluxoChart = new Chart(el.getContext('2d'), {
+  var el = document.getElementById('graficoFluxoPlanilha');
+  if (!el || typeof Chart === 'undefined') return;
+  new Chart(el, {
     type: 'bar',
     data: {
-      labels: labels,
+      labels: {{ grafico_planilha.labels_json|safe }},
       datasets: [
-        bar('Receitas Real.', receitasReal, 'rgba(25, 135, 84, 0.85)', false),
-        bar('Receitas Plan.', receitasPlan, 'rgba(25, 135, 84, 0.35)', true),
-        bar('Despesas Real.', despesasReal, 'rgba(220, 53, 69, 0.85)', false),
-        bar('Despesas Plan.', despesasPlan, 'rgba(220, 53, 69, 0.35)', true),
-        bar('Resultado Real.', resultadoReal, 'rgba(13, 110, 253, 0.85)', false),
-        bar('Resultado Plan.', resultadoPlan, 'rgba(13, 110, 253, 0.35)', true)
-      ]
+        {
+          label: 'Receitas',
+          data: {{ grafico_planilha.receitas_json|safe }},
+          backgroundColor: 'rgba(13, 110, 253, 0.85)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          label: 'Despesas',
+          data: {{ grafico_planilha.despesas_json|safe }},
+          backgroundColor: 'rgba(220, 53, 69, 0.85)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          label: 'Investimento',
+          data: {{ grafico_planilha.investimento_json|safe }},
+          backgroundColor: 'rgba(255, 193, 7, 0.9)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          label: 'Dist. lucro',
+          data: {{ grafico_planilha.lucro_json|safe }},
+          backgroundColor: 'rgba(33, 37, 41, 0.75)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Resultado final',
+          data: {{ grafico_planilha.resultado_json|safe }},
+          borderColor: '#198754',
+          backgroundColor: 'rgba(25, 135, 84, 0.15)',
+          borderWidth: 3,
+          pointRadius: 4,
+          tension: 0.2,
+          fill: false,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: function (ctx) {
-              return (ctx.dataset.label || '') + ': ' + fmtMoeda(ctx.parsed.y);
-            }
-          }
-        }
+            label: function(ctx) {
+              var v = ctx.parsed.y || 0;
+              return ctx.dataset.label + ': R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            },
+          },
+        },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 11 } } },
         y: {
           beginAtZero: true,
           ticks: {
-            callback: function (value) {
-              return Number(value).toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-                maximumFractionDigits: 0
-              });
-            }
-          }
-        }
-      }
-    }
+            callback: function(v) {
+              return 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+            },
+          },
+        },
+      },
+    },
   });
 })();
 </script>
 {% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tabela = document.getElementById('tabelaFluxoMensal');
-    const btnReal = document.getElementById('btnModoSomenteReal');
-    const btnCmp = document.getElementById('btnModoComparacao');
-    const legenda = document.getElementById('legendaComparacao');
-    const legendaGrafico = document.getElementById('graficoTorreLegenda');
-    const KEY_MODO = 'fluxoCaixaMensalModo';
-
-    function aplicarModo(modo) {
-        const somenteReal = modo === 'realizado';
-        if (!tabela) return;
-
-        tabela.classList.toggle('modo-somente-realizado', somenteReal);
-        document.querySelectorAll('#tabelaFluxoMensal .th-mes').forEach(function(th) {
-            th.colSpan = somenteReal
-                ? parseInt(th.getAttribute('data-colspan-real') || '1', 10)
-                : parseInt(th.getAttribute('data-colspan-full') || '4', 10);
-        });
-
-        if (btnReal && btnCmp) {
-            btnReal.classList.toggle('btn-primary', somenteReal);
-            btnReal.classList.toggle('btn-outline-primary', !somenteReal);
-            btnCmp.classList.toggle('btn-primary', !somenteReal);
-            btnCmp.classList.toggle('btn-outline-primary', somenteReal);
-        }
-        if (legenda) legenda.classList.toggle('d-none', somenteReal);
-        if (legendaGrafico) {
-            legendaGrafico.textContent = somenteReal
-                ? 'Exibindo apenas valores realizados'
-                : 'Barras sólidas = Realizado · Barras claras = Planejado';
-        }
-
-        const chart = window.graficoTorreFluxoChart;
-        if (chart && chart.data && chart.data.datasets) {
-            chart.data.datasets.forEach(function(ds) {
-                const isPlan = (ds.label || '').indexOf('Plan') !== -1;
-                ds.hidden = somenteReal && isPlan;
-            });
-            chart.update();
-        }
-
-        try { localStorage.setItem(KEY_MODO, modo); } catch (e) {}
-    }
-
-    if (btnReal) btnReal.addEventListener('click', function() { aplicarModo('realizado'); });
-    if (btnCmp) btnCmp.addEventListener('click', function() { aplicarModo('comparacao'); });
-
-    let modoInicial = 'realizado';
-    try {
-        const salvo = localStorage.getItem(KEY_MODO);
-        if (salvo === 'comparacao' || salvo === 'realizado') modoInicial = salvo;
-    } catch (e) {}
-    aplicarModo(modoInicial);
-
-    const buscaInput = document.getElementById('buscaCategoria');
-    const resultadosDiv = document.getElementById('resultadosBusca');
-    const btnLimparFiltro = document.getElementById('btnLimparFiltro');
-    let timeoutId;
-    let categoriaSelecionada = null;
-
-   function buscarCategorias(termo) {
-       if (termo.length < 4) return;
-       fetch(`/fluxo_de_caixa/buscar_categorias/?q=${encodeURIComponent(termo)}`)
-           .then(response => response.json())
-           .then(data => mostrarResultados(data.categorias || []))
-           .catch(function() {
-               resultadosDiv.innerHTML = '<div class="alert alert-danger">Erro ao buscar categorias.</div>';
-           });
-   }
-
-   function mostrarResultados(categorias) {
-       if (!categorias.length) {
-           resultadosDiv.innerHTML = '<div class="alert alert-info">Nenhuma categoria encontrada.</div>';
-           return;
-       }
-       let html = '<div class="list-group">';
-       categorias.forEach(function(categoria) {
-           html += `
-               <button type="button" class="list-group-item list-group-item-action categoria-item"
-                       data-id="${categoria.id}" data-nome="${categoria.nome_completo}">
-                   <div class="d-flex w-100 justify-content-between">
-                       <h6 class="mb-1">${categoria.nome_completo}</h6>
-                       <small class="text-muted">${categoria.tipo_display}</small>
-                   </div>
-                   <small class="text-muted">${categoria.grupo || 'Sem grupo'}</small>
-               </button>`;
-       });
-       html += '</div>';
-       resultadosDiv.innerHTML = html;
-       document.querySelectorAll('.categoria-item').forEach(function(item) {
-           item.addEventListener('click', function() {
-               document.querySelectorAll('.categoria-item').forEach(function(el) { el.classList.remove('active'); });
-               this.classList.add('active');
-               categoriaSelecionada = { id: this.dataset.id, nome: this.dataset.nome };
-           });
-       });
-   }
-
-   buscaInput.addEventListener('input', function() {
-       const termo = this.value.trim();
-       clearTimeout(timeoutId);
-       if (termo.length >= 4) {
-           timeoutId = setTimeout(function() { buscarCategorias(termo); }, 300);
-       } else {
-           resultadosDiv.innerHTML = termo.length > 0
-               ? '<div class="alert alert-warning">Digite pelo menos 4 letras para buscar.</div>' : '';
-       }
-   });
-
-   document.getElementById('btnAplicarFiltro').addEventListener('click', function() {
-       if (!categoriaSelecionada) {
-           alert('Selecione uma categoria primeiro.');
-           return;
-       }
-       aplicarFiltroCategoria(categoriaSelecionada);
-       bootstrap.Modal.getInstance(document.getElementById('modalSelecionarCategoria')).hide();
-   });
-
-   function aplicarFiltroCategoria(cat) {
-       const linhas = document.querySelectorAll('tbody tr');
-       let encontrou = false;
-       linhas.forEach(function(linha) {
-           const id = linha.getAttribute('data-categoria-id');
-           const celula = linha.querySelector('td:first-child');
-           const texto = (celula && celula.textContent || '').toLowerCase().trim();
-           const isResumo = linha.classList.contains('table-info')
-               || linha.classList.contains('table-danger')
-               || linha.classList.contains('table-success')
-               || linha.classList.contains('table-warning')
-               || linha.classList.contains('table-primary')
-               || linha.classList.contains('table-secondary');
-           if (isResumo) {
-               linha.style.display = 'none';
-               return;
-           }
-           const match = (id && String(id) === String(cat.id))
-               || texto.includes((cat.nome || '').toLowerCase());
-           linha.style.display = match ? '' : 'none';
-           if (match) encontrou = true;
-       });
-       btnLimparFiltro.style.display = 'inline-block';
-       if (!encontrou) {
-           alert('Nenhuma linha encontrada para a categoria selecionada neste ano.');
-       }
-   }
-
-   function limparFiltro() {
-       document.querySelectorAll('tbody tr').forEach(function(linha) { linha.style.display = ''; });
-       btnLimparFiltro.style.display = 'none';
-       categoriaSelecionada = null;
-   }
-
-   btnLimparFiltro.addEventListener('click', limparFiltro);
-   document.getElementById('modalSelecionarCategoria').addEventListener('hidden.bs.modal', function() {
-       buscaInput.value = '';
-       resultadosDiv.innerHTML = '';
-       categoriaSelecionada = null;
-   });
-});
-</script>
 {% endblock %}

@@ -1,0 +1,15 @@
+<form method="get" class="d-flex flex-wrap align-items-end gap-2">
+  <div>
+    <label class="form-label small mb-0">Mês</label>
+    <select name="mes" class="form-select form-select-sm" style="min-width: 9rem;">
+      {% for n, nome in meses_opcoes %}
+      <option value="{{ n }}" {% if mes_ref == n %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="form-label small mb-0">Ano</label>
+    <input type="number" name="ano" class="form-control form-control-sm" style="width: 5.5rem;" min="2000" max="2100" value="{{ ano_ref }}">
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm">Atualizar</button>
+</form>

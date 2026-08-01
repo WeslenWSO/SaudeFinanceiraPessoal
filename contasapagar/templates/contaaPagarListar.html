@@ -299,135 +299,56 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Select all functionality
-    document.getElementById('select-all').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.conta-checkbox');
-        checkboxes.forEach(cb => cb.checked = this.checked);
-    });
+(function () {
+    function getCsrfToken() {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (el && el.value) return el.value;
+        const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
 
-    // Baixar selecionadas buttons
-    document.getElementById('baixar-selecionadas-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para baixar.');
+    function onClick(id, handler) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', handler);
+    }
+
+    function contasSelecionadas() {
+        return document.querySelectorAll('.conta-checkbox:checked');
+    }
+
+    function submitPost(action, extraFields) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = action;
+        const token = getCsrfToken();
+        if (!token) {
+            alert('Token de segurança não encontrado. Recarregue a página e tente novamente.');
             return;
         }
-        // Alterar action do formulário e submeter
-        const form = document.getElementById('contas-form');
-        form.action = '/contasapagar/baixar_selecionadas/';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = token;
+        form.appendChild(csrfInput);
+        (extraFields || []).forEach(function (f) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = f.name;
+            input.value = f.value;
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
         form.submit();
-    });
+    }
 
-    document.getElementById('baixar-selecionadas-bottom-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para baixar.');
-            return;
-        }
-        // Alterar action do formulário e submeter
-        const form = document.getElementById('contas-form');
-        form.action = '/contasapagar/baixar_selecionadas/';
-        form.submit();
-    });
+    window.excluirConta = function (id) {
+        if (!confirm('Tem certeza que deseja excluir esta conta?')) return;
+        submitPost('{% url "contasapagar:excluir" 0 %}'.replace('/0/', '/' + id + '/'));
+    };
 
-    // Desconciliar selecionadas buttons
-    document.getElementById('desconciliar-selecionadas-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para desconciliar.');
-            return;
-        }
-        if (confirm('Tem certeza que deseja desconciliar as contas selecionadas? Esta ação não pode ser desfeita.')) {
-            // Criar formulário dinâmico para POST
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/contasapagar/desconciliar/';
-
-            // Adicionar CSRF token
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            if (csrfToken) {
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = 'csrfmiddlewaretoken';
-                csrfInput.value = csrfToken.value;
-                form.appendChild(csrfInput);
-            }
-
-            // Adicionar contas selecionadas
-            checkedBoxes.forEach(checkbox => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'contas';
-                input.value = checkbox.value;
-                form.appendChild(input);
-            });
-
-            document.body.appendChild(form);
-            form.submit();
-        }
-    });
-
-    document.getElementById('desconciliar-selecionadas-bottom-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para desconciliar.');
-            return;
-        }
-        if (confirm('Tem certeza que deseja desconciliar as contas selecionadas? Esta ação não pode ser desfeita.')) {
-            // Criar formulário dinâmico para POST
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/contasapagar/desconciliar/';
-
-            // Adicionar CSRF token
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            if (csrfToken) {
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = 'csrfmiddlewaretoken';
-                csrfInput.value = csrfToken.value;
-                form.appendChild(csrfInput);
-            }
-
-            // Adicionar contas selecionadas
-            checkedBoxes.forEach(checkbox => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'contas';
-                input.value = checkbox.value;
-                form.appendChild(input);
-            });
-
-            document.body.appendChild(form);
-            form.submit();
-        }
-    });
-
-    // Escolher categoria buttons
-    document.getElementById('escolher-categoria-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para alterar categoria.');
-            return;
-        }
-        // Implementar modal de escolher categoria
-        alert('Funcionalidade de escolher categoria será implementada.');
-    });
-
-    document.getElementById('escolher-categoria-bottom-btn').addEventListener('click', function() {
-        const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Selecione pelo menos uma conta para alterar categoria.');
-            return;
-        }
-        // Implementar modal de escolher categoria
-        alert('Funcionalidade de escolher categoria será implementada.');
-    });
-
-    // Função para carregar detalhes no modal
-    window.carregarDetalhes = function(tipo, id, app) {
+    window.carregarDetalhes = function (tipo, id, app) {
         const modalBody = document.getElementById('modalDetalhesBody');
+        if (!modalBody) return;
         modalBody.innerHTML = `
             <div class="text-center">
                 <div class="spinner-border" role="status">
@@ -436,29 +357,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p>Carregando detalhes...</p>
             </div>
         `;
-
-        // Fazer requisição AJAX
         fetch(`/${app}/detalhes/${tipo}/${id}/`)
             .then(response => {
                 const contentType = response.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
                     return response.json();
-                } else {
-                    // Se não é JSON, provavelmente é HTML (login page ou erro)
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    // Verificar se é página de login
-                    return response.text().then(text => {
-                        if (text.includes('<html') || text.includes('<HTML')) {
-                            // Redirecionar para login
-                            window.location.href = '/accounts/login/';
-                            throw new Error('Sessão expirada. Redirecionando para login...');
-                        } else {
-                            throw new Error('Resposta inesperada do servidor');
-                        }
-                    });
                 }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text().then(text => {
+                    if (text.includes('<html') || text.includes('<HTML')) {
+                        window.location.href = '/accounts/login/';
+                        throw new Error('Sessão expirada. Redirecionando para login...');
+                    }
+                    throw new Error('Resposta inesperada do servidor');
+                });
             })
             .then(data => {
                 if (data.error) {
@@ -483,29 +397,61 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     };
 
-    // Função para excluir conta
-    window.excluirConta = function(id) {
-        if (confirm('Tem certeza que deseja excluir esta conta?')) {
-            // Criar formulário dinâmico para POST
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/contasapagar/excluir/${id}/`;
+    document.addEventListener('DOMContentLoaded', function () {
+        const selectAll = document.getElementById('select-all');
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                document.querySelectorAll('.conta-checkbox').forEach(cb => {
+                    cb.checked = selectAll.checked;
+                });
+            });
+        }
 
-            // Adicionar CSRF token
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            if (csrfToken) {
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = 'csrfmiddlewaretoken';
-                csrfInput.value = csrfToken.value;
-                form.appendChild(csrfInput);
+        function baixarSelecionadas() {
+            const checked = contasSelecionadas();
+            if (!checked.length) {
+                alert('Selecione pelo menos uma conta para baixar.');
+                return;
             }
-
-            document.body.appendChild(form);
+            const form = document.getElementById('contas-form');
+            if (!form) return;
+            form.action = '{% url "contasapagar:baixar_selecionadas" %}';
             form.submit();
         }
-    };
-});
+
+        function desconciliarSelecionadas() {
+            const checked = contasSelecionadas();
+            if (!checked.length) {
+                alert('Selecione pelo menos uma conta para desconciliar.');
+                return;
+            }
+            if (!confirm('Tem certeza que deseja desconciliar as contas selecionadas? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            const fields = Array.from(checked).map(cb => ({ name: 'contas', value: cb.value }));
+            submitPost('{% url "contasapagar:desconciliar" %}', fields);
+        }
+
+        onClick('baixar-selecionadas-btn', baixarSelecionadas);
+        onClick('baixar-selecionadas-bottom-btn', baixarSelecionadas);
+        onClick('desconciliar-selecionadas-btn', desconciliarSelecionadas);
+        onClick('desconciliar-selecionadas-bottom-btn', desconciliarSelecionadas);
+        onClick('escolher-categoria-btn', function () {
+            if (!contasSelecionadas().length) {
+                alert('Selecione pelo menos uma conta para alterar categoria.');
+                return;
+            }
+            alert('Funcionalidade de escolher categoria será implementada.');
+        });
+        onClick('escolher-categoria-bottom-btn', function () {
+            if (!contasSelecionadas().length) {
+                alert('Selecione pelo menos uma conta para alterar categoria.');
+                return;
+            }
+            alert('Funcionalidade de escolher categoria será implementada.');
+        });
+    });
+})();
 </script>
 
 {% endblock %}

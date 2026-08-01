@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <div>
+      <h1 class="h3 mb-1"><i class="fas fa-chart-pie me-2 text-primary"></i>Dashboard — Receitas / Despesas / Investimento / DL</h1>
+      <p class="text-muted small mb-0">{{ empresa.razao }}</p>
+    </div>
+    {% include 'dashboard/_dashboard_periodo.html' %}
+  </div>
+
+  {% include 'dashboard/_dashboard_ca_nav.html' with dashboard_ativo='por_tipo' %}
+
+  <p class="text-muted small mb-4">
+    Período: <strong>{{ titulo_mes }}</strong> · Fonte: Conta Azul · Classificação pelo tipo da categoria (R / D / I / L).
+  </p>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-success border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Receitas (R)</div>
+          <div class="fw-semibold text-success fs-5">R$ {{ dados.total_receitas|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-danger border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Despesas (D)</div>
+          <div class="fw-semibold text-danger fs-5">R$ {{ dados.total_despesas|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-warning border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Investimento (I)</div>
+          <div class="fw-semibold text-warning fs-5">R$ {{ dados.total_investimento|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-dark border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Distribuição de lucro (L)</div>
+          <div class="fw-semibold fs-5">R$ {{ dados.total_lucro|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4 bg-success bg-opacity-10">
+    <div class="card-body py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <div class="text-muted small">Resultado do período</div>
+        <div class="text-muted small">Receitas − Despesas − Investimento − Distribuição de lucro</div>
+      </div>
+      <div class="fs-4 fw-bold {% if dados.resultado >= 0 %}text-success{% else %}text-danger{% endif %}">
+        R$ {{ dados.resultado|floatformat:2 }}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2">Participação por tipo</div>
+        <div class="card-body">
+          <canvas id="chartTipo" height="260"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 text-success">Receitas por grupo</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Grupo</th><th class="text-center">Qtd</th><th class="text-end">Valor</th></tr>
+            </thead>
+            <tbody>
+              {% for g in dados.receitas_grupos %}
+              <tr>
+                <td>{{ g.nome }}</td>
+                <td class="text-center text-muted">{{ g.qtd }}</td>
+                <td class="text-end text-success">R$ {{ g.total|floatformat:2 }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center py-3">Sem receitas no período.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% for bloco in dados.blocos %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+      <span class="text-{{ bloco.cor }}">{{ bloco.rotulo }} ({{ bloco.codigo }})</span>
+      <span class="badge bg-{{ bloco.cor }} fs-6">R$ {{ bloco.total|floatformat:2 }}</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="row g-0">
+        <div class="col-md-5 border-end">
+          <div class="px-3 py-2 bg-light small fw-semibold">Por grupo</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr><th>Grupo</th><th class="text-center">Qtd</th><th class="text-end">Valor</th></tr>
+              </thead>
+              <tbody>
+                {% for g in bloco.grupos %}
+                <tr>
+                  <td>{{ g.nome }}</td>
+                  <td class="text-center text-muted">{{ g.qtd }}</td>
+                  <td class="text-end">R$ {{ g.total|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted text-center py-3">Sem lançamentos.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div class="px-3 py-2 bg-light small fw-semibold">Top categorias</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr><th>Categoria</th><th>Grupo</th><th class="text-end">Valor</th></tr>
+              </thead>
+              <tbody>
+                {% for c in bloco.categorias %}
+                <tr>
+                  <td class="small">{{ c.classificacao }} {{ c.nome }}</td>
+                  <td class="small text-muted">{{ c.grupo }}</td>
+                  <td class="text-end small">R$ {{ c.total|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted text-center py-3">Sem categorias.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var el = document.getElementById('chartTipo');
+  if (!el || typeof Chart === 'undefined') return;
+  var data = {{ dados.chart_tipo_data_json|safe }};
+  if (!data.some(function(v) { return v > 0; })) return;
+  new Chart(el, {
+    type: 'doughnut',
+    data: {
+      labels: {{ dados.chart_tipo_labels_json|safe }},
+      datasets: [{
+        data: data,
+        backgroundColor: {{ dados.chart_tipo_cores_json|safe }}
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+              var pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+              return ctx.label + ': R$ ' + ctx.raw.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

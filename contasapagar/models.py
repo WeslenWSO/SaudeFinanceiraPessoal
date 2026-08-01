@@ -33,6 +33,14 @@ class ContasaPagar(models.Model):
     desconto = models.DecimalField(verbose_name='Valor do Desconto',default=0, max_digits=12, decimal_places=2) 
     
     
+    conta_azul_parcela_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='ID parcela Conta Azul',
+    )
+
     obs = models.CharField(verbose_name='obs', max_length=250)
     rateio = models.ForeignKey(RegraRateio, verbose_name='Rateio', on_delete=models.DO_NOTHING, null=True, blank=True)
     nossonumero = models.CharField(verbose_name='Nosso Numero', max_length=15 )

@@ -1,0 +1,63 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% if grafico_torre.tem_dados %}
+<script>
+(function () {
+  const el = document.getElementById('graficoTorreFluxo');
+  if (!el) return;
+  new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: {{ grafico_torre.labels_json|safe }},
+      datasets: [
+        { label: 'Receitas Real.', data: {{ grafico_torre.receitas_real_json|safe }}, backgroundColor: 'rgba(25,135,84,0.85)' },
+        { label: 'Despesas Real.', data: {{ grafico_torre.despesas_real_json|safe }}, backgroundColor: 'rgba(220,53,69,0.85)' },
+        { label: 'Resultado Real.', data: {{ grafico_torre.resultado_real_json|safe }}, backgroundColor: 'rgba(13,110,253,0.85)' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+})();
+</script>
+{% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const buscaInput = document.getElementById('buscaCategoria');
+    const resultadosDiv = document.getElementById('resultadosBusca');
+    const btnLimpar = document.getElementById('btnLimparFiltro');
+    if (!buscaInput) return;
+    let categoriaSelecionada = null;
+    buscaInput.addEventListener('input', function() {
+        const termo = this.value.trim();
+        if (termo.length < 4) { resultadosDiv.innerHTML = ''; return; }
+        fetch('/fluxo_de_caixa/buscar_categorias/?q=' + encodeURIComponent(termo))
+            .then(r => r.json())
+            .then(data => {
+                const cats = data.categorias || [];
+                if (!cats.length) { resultadosDiv.innerHTML = '<div class="text-muted">Nenhuma categoria.</div>'; return; }
+                resultadosDiv.innerHTML = cats.map(c =>
+                    '<button type="button" class="list-group-item list-group-item-action cat-pick" data-id="' + c.id + '" data-nome="' + c.nome_completo + '">' + c.nome_completo + '</button>'
+                ).join('');
+                resultadosDiv.querySelectorAll('.cat-pick').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        categoriaSelecionada = { id: this.dataset.id, nome: this.dataset.nome };
+                        resultadosDiv.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                    });
+                });
+            });
+    });
+    document.getElementById('btnAplicarFiltro')?.addEventListener('click', function() {
+        if (!categoriaSelecionada) return;
+        document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(tr => {
+            const id = tr.getAttribute('data-categoria-id');
+            tr.style.display = (id && id === String(categoriaSelecionada.id)) ? '' : 'none';
+        });
+        if (btnLimpar) btnLimpar.style.display = 'inline-block';
+        bootstrap.Modal.getInstance(document.getElementById('modalSelecionarCategoria'))?.hide();
+    });
+    btnLimpar?.addEventListener('click', function() {
+        document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(tr => { tr.style.display = ''; });
+        this.style.display = 'none';
+    });
+});
+</script>

@@ -42,7 +42,8 @@ SECOES_MENU: tuple[MenuSecaoDef, ...] = (
 )
 
 ITENS_MENU: tuple[MenuItemDef, ...] = (
-    MenuItemDef('dashboard', 'Dashboard', 'fa-chart-line', url_name='dashboard:index'),
+    MenuItemDef('dashboard', 'Dashboard', 'fa-cloud', url_name='dashboard:index'),
+    MenuItemDef('dashboard_por_tipo', 'Dashboard — R/D/I/L', 'fa-chart-pie', 'relatorios', url_name='dashboard:por_tipo'),
     MenuItemDef('empresa', 'Empresa', 'fa-building', 'cadastro', url_name='empresa:lista'),
     MenuItemDef('fornecedor', 'Fornecedor', 'fa-truck', 'cadastro', url_name='fornecedor:fornList'),
     MenuItemDef('cliente', 'Cliente', 'fa-user-tie', 'cadastro', url_name='cliente:clieList'),
@@ -88,7 +89,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('por_categoria', 'Por Categoria', 'fa-tag', 'relatorios', url_hash='#'),
     MenuItemDef('por_socio', 'Por Sócio', 'fa-user-friends', 'relatorios', url_hash='#'),
     MenuItemDef('medcloud_ris', 'Medcloud RIS', 'fa-calendar-check', 'links_uteis', url_externa='https://ris.medcloud.co/calendar'),
-    MenuItemDef('conta_azul', 'Conta Azul', 'fa-cloud', 'links_uteis', url_externa='https://app.contaazul.com/'),
+    MenuItemDef('conta_azul_erp', 'Conta Azul (sistema)', 'fa-external-link-alt', 'links_uteis', url_externa='https://app.contaazul.com/'),
     MenuItemDef('cielo', 'Cielo', 'fa-credit-card', 'links_uteis', url_externa='https://minhaconta2.cielo.com.br/site/login'),
     MenuItemDef('stone', 'Stone', 'fa-gem', 'links_uteis', url_externa='https://conta.stone.com.br/login'),
 )

@@ -1,0 +1,283 @@
+{% if conta_azul %}
+<section class="{% if not conta_azul_dashboard %}mt-5 mb-4{% else %}mb-4{% endif %}">
+  {% if not conta_azul_dashboard %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h5 mb-0"><i class="fas fa-cloud me-2 text-primary"></i>Conta Azul</h2>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if conta_azul.config_url %}
+      <a href="{{ conta_azul.config_url }}" class="btn btn-outline-primary btn-sm">Configurar</a>
+      {% endif %}
+      {% if conta_azul.conectado %}
+      <form method="post" action="{% url 'dashboard:conta_azul_sync_rapido' %}" class="d-inline">{% csrf_token %}
+        <input type="hidden" name="mes" value="{{ mes_ref }}">
+        <input type="hidden" name="ano" value="{{ ano_ref }}">
+        <input type="hidden" name="redirect" value="conta_azul">
+        <button type="submit" class="btn btn-primary btn-sm">Sincronizar mês</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if conta_azul.conectado %}
+      <span class="badge bg-success"><i class="fas fa-link me-1"></i>Conectado</span>
+      {% elif conta_azul.credenciais_ok %}
+      <span class="badge bg-warning text-dark">OAuth pendente</span>
+      {% else %}
+      <span class="badge bg-secondary">Não configurado</span>
+      {% endif %}
+      {% if conta_azul.ambiente %}
+      <span class="badge bg-light text-dark border">{{ conta_azul.ambiente }}</span>
+      {% endif %}
+      {% if conta_azul.token_valido %}
+      <span class="badge bg-info text-dark">Token válido</span>
+      {% elif conta_azul.conectado %}
+      <span class="badge bg-warning text-dark">Token expirado (renovação automática)</span>
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if conta_azul.config_url %}
+      <a href="{{ conta_azul.config_url }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-cog me-1"></i>Configurar</a>
+      {% endif %}
+      {% if conta_azul.sync_completa_url %}
+      <a href="{{ conta_azul.sync_completa_url }}" class="btn btn-outline-secondary btn-sm">Sincronização avançada</a>
+      {% endif %}
+      {% if conta_azul.conectado %}
+      <form method="post" action="{% url 'dashboard:conta_azul_sync_rapido' %}" class="d-inline">{% csrf_token %}
+        <input type="hidden" name="mes" value="{{ mes_ref }}">
+        <input type="hidden" name="ano" value="{{ ano_ref }}">
+        <input type="hidden" name="redirect" value="conta_azul">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-sync me-1"></i>Sincronizar mês</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not conta_azul.credenciais_ok %}
+  <div class="alert alert-warning">Conta Azul não configurada para esta empresa. <a href="{{ conta_azul.config_url }}">Configurar credenciais OAuth</a></div>
+  {% elif not conta_azul.conectado %}
+  <div class="alert alert-info">Credenciais salvas, mas OAuth pendente. <a href="{{ conta_azul.config_url }}">Conectar Conta Azul</a> ou cole o código de autorização na tela de configuração.</div>
+  {% else %}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-success border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Receitas CA</div>
+          <div class="fw-semibold text-success">R$ {{ conta_azul.totais.receitas|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-danger border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Despesas CA</div>
+          <div class="fw-semibold text-danger">R$ {{ conta_azul.totais.despesas|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-info border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Transferências</div>
+          <div class="fw-semibold">R$ {{ conta_azul.totais.transferencias|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm border-start border-primary border-4 h-100">
+        <div class="card-body py-2">
+          <div class="text-muted small">Saldo contas (CA)</div>
+          <div class="fw-semibold text-primary">R$ {{ conta_azul.totais.saldo_contas_ca|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if conta_azul_dashboard and conta_azul.chart_categorias_data != '[]' %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="fw-semibold mb-3">Receitas por categoria (Conta Azul)</h6>
+      <div style="max-width: 420px; margin: 0 auto;">
+        <canvas id="caChartCategorias" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <ul class="nav nav-tabs" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ca-lanc" type="button">Lançamentos</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ca-cad" type="button">Cadastros</button></li>
+  </ul>
+  <div class="tab-content border border-top-0 rounded-bottom bg-white p-3 shadow-sm">
+    <div class="tab-pane fade show active" id="ca-lanc">
+      <h6 class="fw-semibold">Receitas</h6>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Venc.</th>
+              <th>Cliente</th>
+              <th>Descrição</th>
+              <th>Conta</th>
+              <th>Categoria</th>
+              <th>Forma pgto</th>
+              <th class="text-center">Conc.</th>
+              <th class="text-end">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in conta_azul.receitas %}
+            <tr>
+              <td class="small text-nowrap">{{ r.data_vencimento|date:"d/m" }}</td>
+              <td class="small">{{ r.cliente|truncatechars:28 }}</td>
+              <td class="small">{{ r.observacao|default:"—"|truncatechars:32 }}</td>
+              <td class="small">{{ r.conta_banco__descricao|default:"—"|truncatechars:20 }}</td>
+              <td class="small">{{ r.categoria__nome|default:"—"|truncatechars:20 }}</td>
+              <td class="small">{{ r.forma_pagamento__descricao|default:"—"|truncatechars:16 }}</td>
+              <td class="text-center">
+                <span class="badge bg-{{ r.conciliado_classe }}" title="{{ r.conciliado_titulo }}">{{ r.conciliado_rotulo }}</span>
+              </td>
+              <td class="text-end small text-nowrap">{{ r.valor_a_receber|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-muted small">Nenhuma receita importada neste período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="small text-muted mb-4">
+        <strong>Conc.:</strong>
+        <span class="badge bg-success">Sim</span> conciliado com extrato bancário ·
+        <span class="badge bg-info text-dark">CA</span> recebido/pago no Conta Azul ·
+        <span class="badge bg-secondary">Não</span> pendente
+      </p>
+      <h6 class="fw-semibold">Despesas</h6>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Venc.</th>
+              <th>Fornecedor</th>
+              <th>Descrição</th>
+              <th>Conta</th>
+              <th>Categoria</th>
+              <th>Forma pgto</th>
+              <th class="text-center">Conc.</th>
+              <th class="text-end">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in conta_azul.despesas %}
+            <tr>
+              <td class="small text-nowrap">{{ d.dtvenc|date:"d/m" }}</td>
+              <td class="small">{{ d.fornecedor__razao|default:"—"|truncatechars:28 }}</td>
+              <td class="small">{{ d.descricao|truncatechars:32 }}</td>
+              <td class="small">{{ d.conta_banco__descricao|default:"—"|truncatechars:20 }}</td>
+              <td class="small">{{ d.categoria__nome|default:"—"|truncatechars:20 }}</td>
+              <td class="small">{{ d.cobranca__descricao|default:"—"|truncatechars:16 }}</td>
+              <td class="text-center">
+                <span class="badge bg-{{ d.conciliado_classe }}" title="{{ d.conciliado_titulo }}">{{ d.conciliado_rotulo }}</span>
+              </td>
+              <td class="text-end small text-nowrap">{{ d.valorDoc|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-muted small">Nenhuma despesa importada.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <h6 class="fw-semibold">Transferências</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr><th>Data</th><th>Conta</th><th>Histórico</th><th class="text-end">Valor</th></tr></thead>
+          <tbody>
+            {% for t in conta_azul.transferencias %}
+            <tr>
+              <td class="small">{{ t.data|date:"d/m" }}</td>
+              <td class="small">{{ t.conta__descricao|default:"—"|truncatechars:20 }}</td>
+              <td class="small">{{ t.historico|truncatechars:40 }}</td>
+              <td class="text-end small">{{ t.valor|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted small">Nenhuma transferência.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="ca-cad">
+      {% if conta_azul.contas_display %}
+      <h6 class="fw-semibold mb-2">Saldos das contas (Conta Azul) — {{ conta_azul.contagens.contas }} conta(s)</h6>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Conta</th><th>Banco</th><th class="text-end">Saldo</th><th class="text-end">Atualizado</th></tr>
+          </thead>
+          <tbody>
+            {% for ct in conta_azul.contas_display %}
+            <tr>
+              <td>{{ ct.nome }}{% if not ct.ativo %} <span class="badge bg-secondary">inativa</span>{% endif %}</td>
+              <td class="text-muted small">{{ ct.banco }}</td>
+              <td class="text-end text-nowrap">{% if ct.saldo is not None %}R$ {{ ct.saldo|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-end text-muted small">{% if ct.saldo_em %}{{ ct.saldo_em|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="2">Total</th>
+              <th class="text-end">R$ {{ conta_azul.totais.saldo_contas_ca|floatformat:2 }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% endif %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <h6 class="fw-semibold">Categorias ({{ conta_azul.contagens.categorias }})</h6>
+          <ul class="list-group list-group-flush small">
+            {% for c in conta_azul.categorias %}<li class="list-group-item px-0">{{ c.nome }} <span class="text-muted">({{ c.tipo }})</span></li>{% empty %}<li class="list-group-item px-0 text-muted">—</li>{% endfor %}
+          </ul>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-semibold">Centros de custo ({{ conta_azul.contagens.centros_custo }})</h6>
+          <ul class="list-group list-group-flush small">
+            {% for cc in conta_azul.centros_custo %}<li class="list-group-item px-0">{{ cc.nome }}</li>{% empty %}<li class="list-group-item px-0 text-muted">—</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% if conta_azul.ultima_sync %}
+  <p class="small text-muted mt-2 mb-0">Última atualização da configuração: {{ conta_azul.ultima_sync|date:"d/m/Y H:i" }}</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if conta_azul_dashboard and conta_azul.conectado and conta_azul.chart_categorias_data != '[]' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var el = document.getElementById('caChartCategorias');
+  if (!el || typeof Chart === 'undefined') return;
+  new Chart(el, {
+    type: 'doughnut',
+    data: {
+      labels: {{ conta_azul.chart_categorias_labels|safe }},
+      datasets: [{
+        data: {{ conta_azul.chart_categorias_data|safe }},
+        backgroundColor: ['#198754', '#0d6efd', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#0dcaf0', '#6610f2', '#adb5bd']
+      }]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      maintainAspectRatio: true
+    }
+  });
+})();
+</script>
+{% endif %}

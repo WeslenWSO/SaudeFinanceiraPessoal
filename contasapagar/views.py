@@ -536,28 +536,30 @@ def excluir_conta_a_pagar(request, pk):
         messages.error(request, 'Empresa não encontrada na sessão.')
         return redirect('contasapagar:listaAPagar')
 
-    conta = get_object_or_404(ContasaPagar, pk=pk, empresa_id=empresa_id)
+    conta = ContasaPagar.objects.filter(pk=pk, empresa_id=empresa_id).first()
+    if not conta:
+        messages.error(request, 'Conta a pagar não encontrada nesta empresa.')
+        return redirect('contasapagar:listaAPagar')
 
-    # Verificar se a conta pode ser excluída (não está paga)
     if conta.status == 'pago':
         messages.error(request, 'Não é possível excluir uma conta já paga.')
         return redirect('contasapagar:listaAPagar')
 
+    descricao = (conta.descricao or f'#{conta.pk}').strip()
     try:
-        # Verificar se há movimentos relacionados no extrato
         from extrato.models import ExtratoMovimento
-        movimentos_relacionados = ExtratoMovimento.objects.filter(conta_pagar=conta)
-
-        if movimentos_relacionados.exists():
-            messages.error(request, 'Não é possível excluir uma conta que possui movimentos conciliados no extrato.')
+        if ExtratoMovimento.objects.filter(conta_pagar=conta).exists():
+            messages.error(
+                request,
+                'Não é possível excluir uma conta que possui movimentos no extrato. '
+                'Desconcilie antes de excluir.',
+            )
             return redirect('contasapagar:listaAPagar')
 
-        # Excluir a conta
         conta.delete()
-        messages.success(request, f'Conta a pagar "{conta.descricao}" excluída com sucesso.')
-
+        messages.success(request, f'Conta a pagar "{descricao}" excluída com sucesso.')
     except Exception as e:
-        messages.error(request, f'Erro ao excluir conta: {str(e)}')
+        messages.error(request, f'Erro ao excluir conta: {e}')
 
     return redirect('contasapagar:listaAPagar')
 

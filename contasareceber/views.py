@@ -23,7 +23,6 @@ from notasfiscais.models import NotaFiscalServico
 from socio.models import Socio
 from categoria.models import Categoria
 from extrato.models import ContaBancaria
-from billiard.util import PR_GET_PDEATHSIG
 import re
 import json
 # import Levenshtein  # Temporariamente desabilitado - módulo não instalado

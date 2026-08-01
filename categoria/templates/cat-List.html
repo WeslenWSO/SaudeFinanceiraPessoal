@@ -49,6 +49,7 @@
             <th>ID</th>
             <th>Nome</th>
             <th>Classificação</th>
+            <th>Conta Azul</th>
             <th>Sintético</th>
             <th>Editar</th>
             <th>Excluir</th>
@@ -60,6 +61,10 @@
             <td>{{ cat.id }}</td>
             <td>{{ cat.nome }}</td>
             <td>{{ cat.classificacao }}</td>
+            <td class="small">
+              {% if cat.conta_azul_id %}<span class="badge bg-info text-dark" title="{{ cat.conta_azul_id }}">CA</span>{% else %}—{% endif %}
+              {% if cat.bloquear_sync_conta_azul %}<span class="badge bg-secondary" title="Não altera na sync Conta Azul">🔒</span>{% endif %}
+            </td>
             <td>{{ cat.sintetico }}</td>
             <td><a href="{% url 'categoria:cat-update' cat.id %}" role="button" class="secondary"><i class="fa-solid fa-pen-to-square"></i></a></td>
             <td><a href="{% url 'categoria:cat-delete' cat.pk %}" role="button" class="contrast" onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"><i class="fas fa-trash"></i></a></td>

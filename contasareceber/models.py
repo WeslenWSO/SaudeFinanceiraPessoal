@@ -74,6 +74,14 @@ class ContaAReceber(models.Model):
     juros = models.DecimalField(verbose_name='Juros', max_digits=10, decimal_places=2, null=True, blank=True, default=0)
     tarifas = models.DecimalField(verbose_name='Tarifas', max_digits=10, decimal_places=2, null=True, blank=True, default=0)
 
+    conta_azul_parcela_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='ID parcela Conta Azul',
+    )
+
     # Status
     status = models.CharField(verbose_name='Status', max_length=20, choices=STATUS_CHOICES, default='pendente')
 

@@ -6,6 +6,13 @@ from fornecedor.cnpj_utils import limpar_cnpj, limpar_cep, limpar_telefone_br
 # Create your models here.
 class Fornecedor(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, verbose_name='Empresa', null=True, blank=True)
+    conta_azul_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='ID Conta Azul',
+    )
     razao = models.CharField(verbose_name='Razão social', max_length=200)
     codigo_externo = models.CharField(
         verbose_name='Código externo',
@@ -48,6 +55,11 @@ class Fornecedor(models.Model):
             models.UniqueConstraint(
                 fields=["empresa", "cnpj"],
                 name="fornecedor_unico_cnpj_por_empresa",
+            ),
+            models.UniqueConstraint(
+                fields=['empresa', 'conta_azul_id'],
+                condition=models.Q(conta_azul_id__gt=''),
+                name='fornecedor_conta_azul_unico',
             ),
         ]
 

@@ -1,0 +1,8 @@
+<nav class="nav nav-pills flex-wrap gap-1 mb-3 small">
+  <a class="nav-link py-1 px-2 {% if dashboard_ativo == 'geral' %}active{% endif %}" href="{% url 'dashboard:index' %}?mes={{ mes_ref }}&ano={{ ano_ref }}">
+    <i class="fas fa-cloud me-1"></i>Geral
+  </a>
+  <a class="nav-link py-1 px-2 {% if dashboard_ativo == 'por_tipo' %}active{% endif %}" href="{% url 'dashboard:por_tipo' %}?mes={{ mes_ref }}&ano={{ ano_ref }}">
+    <i class="fas fa-chart-pie me-1"></i>Receitas / Despesas / Inv. / DL
+  </a>
+</nav>

@@ -1,0 +1,12 @@
+<form method="get" class="d-flex flex-wrap align-items-end gap-2">
+  <input type="hidden" name="regime" value="{{ regime }}">
+  <div>
+    <label class="form-label small mb-0">De</label>
+    <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ data_inicio_str }}">
+  </div>
+  <div>
+    <label class="form-label small mb-0">Até</label>
+    <input type="date" name="data_fim" class="form-control form-control-sm" value="{{ data_fim_str }}">
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm">Atualizar</button>
+</form>

@@ -17,6 +17,17 @@ from .views import (
     empresa_sucesso,
     empresa_integracao,
 )
+from dashboard.conta_azul_views import (
+    conta_azul_config,
+    conta_azul_desconectar,
+    conta_azul_oauth_callback,
+    conta_azul_oauth_dev,
+    conta_azul_oauth_dev_captura,
+    conta_azul_oauth_iniciar,
+    conta_azul_sincronizar,
+    conta_azul_testar,
+    conta_azul_trocar_codigo,
+)
 
 app_name = 'empresa'
 
@@ -40,6 +51,15 @@ urlpatterns = [
     path('nova/', empresa_create, name='empresa_create'),
     path('<int:pk>/editar/', empresa_update, name='empresa_edit'),
     path('<int:pk>/configuracao-integracao/', empresa_integracao, name='empresa_integracao'),
+    path('<int:pk>/conta-azul/', conta_azul_config, name='conta_azul_config'),
+    path('<int:pk>/conta-azul/sincronizar/', conta_azul_sincronizar, name='conta_azul_sincronizar'),
+    path('<int:pk>/conta-azul/oauth/iniciar/', conta_azul_oauth_iniciar, name='conta_azul_oauth_iniciar'),
+    path('<int:pk>/conta-azul/oauth/dev/', conta_azul_oauth_dev, name='conta_azul_oauth_dev'),
+    path('conta-azul/oauth/dev/captura/', conta_azul_oauth_dev_captura, name='conta_azul_oauth_dev_captura'),
+    path('<int:pk>/conta-azul/desconectar/', conta_azul_desconectar, name='conta_azul_desconectar'),
+    path('<int:pk>/conta-azul/trocar-codigo/', conta_azul_trocar_codigo, name='conta_azul_trocar_codigo'),
+    path('<int:pk>/conta-azul/testar/', conta_azul_testar, name='conta_azul_testar'),
+    path('conta-azul/oauth/callback/', conta_azul_oauth_callback, name='conta_azul_oauth_callback'),
     path('<int:pk>/detalhe/', empresa_detail, name='empresa_detail'),
     path('<int:pk>/toggle-status/', empresa_toggle_status, name='empresa_toggle_status'),
     path('sucesso/', empresa_sucesso, name='empresa_sucesso'),

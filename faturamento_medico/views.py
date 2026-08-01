@@ -949,13 +949,88 @@ def _similaridade_nome_procedimento(a, b):
     return melhor
 
 
-def _buscar_tabela_por_nome_proximo(qs, descricao, min_ratio=FUZZY_NOME_MIN_RATIO):
+def _pool_precos_convenio(empresa_id, convenio_nome):
+    """Carrega tabela de preços do convênio uma vez (lookup por código/nome)."""
+    from servicos_medicos.models import TabelaPreco, Convenio
+
+    conv_key = (convenio_nome or '').strip().upper()
+    pool = {
+        'tabelas': [],
+        'por_codigo': {},
+        'por_nome': {},
+        'por_base': {},
+    }
+    if not empresa_id or not conv_key:
+        return pool
+
+    convenios = list(
+        Convenio.objects.filter(empresa_id=empresa_id).filter(
+            Q(nome__iexact=convenio_nome) | Q(nome__icontains=convenio_nome)
+        )
+    )
+    if not convenios:
+        convenios = [
+            c for c in Convenio.objects.filter(empresa_id=empresa_id)
+            if c.nome and c.nome.upper() in conv_key
+        ]
+    if not convenios:
+        return pool
+
+    tabelas = list(
+        TabelaPreco.objects.filter(
+            empresa_id=empresa_id,
+            convenio__in=convenios,
+        ).select_related('codigo_servico')
+    )
+    pool['tabelas'] = tabelas
+    for tabela in tabelas:
+        cod = (tabela.codigo_servico.codigo or '').strip().upper()
+        if cod:
+            pool['por_codigo'].setdefault(cod, tabela)
+        nome = tabela.codigo_servico.servicos or ''
+        nome_norm = _normalizar_nome_servico(nome)
+        if nome_norm:
+            pool['por_nome'].setdefault(nome_norm, tabela)
+        nome_base = _nome_base_procedimento(nome)
+        if nome_base:
+            pool['por_base'].setdefault(nome_base, tabela)
+    return pool
+
+
+def _get_pool_precos(cache_precos, empresa_id, convenio_nome):
+    conv_key = (convenio_nome or '').strip().upper()
+    pool_key = ('__pool__', empresa_id, conv_key)
+    if pool_key not in cache_precos:
+        cache_precos[pool_key] = _pool_precos_convenio(empresa_id, convenio_nome)
+    return cache_precos[pool_key]
+
+
+def _buscar_tabela_por_nome_proximo(pool, descricao, min_ratio=FUZZY_NOME_MIN_RATIO):
     """Melhor TabelaPreco cujo nome do serviço atinge similaridade mínima."""
     if not (descricao or '').strip():
         return None, 0.0
+
+    desc_norm = _normalizar_nome_servico(descricao)
+    desc_base = _nome_base_procedimento(descricao)
+    if desc_norm in pool['por_nome']:
+        return pool['por_nome'][desc_norm], 1.0
+    if desc_base in pool['por_base']:
+        return pool['por_base'][desc_base], 1.0
+
+    tokens = [t for t in re.split(r'\W+', desc_norm) if len(t) >= 4][:4]
+    candidatos = pool['tabelas']
+    if tokens:
+        filtrados = []
+        for tabela in candidatos:
+            nome = _normalizar_nome_servico(tabela.codigo_servico.servicos or '')
+            if any(tok in nome for tok in tokens):
+                filtrados.append(tabela)
+        if filtrados:
+            candidatos = filtrados[:120]
+
     melhor_tabela = None
     melhor_ratio = 0.0
-    for tabela in qs:
+    for tabela in candidatos:
         nome = tabela.codigo_servico.servicos or ''
         ratio = _similaridade_nome_procedimento(descricao, nome)
         if ratio > melhor_ratio:
@@ -966,12 +1041,34 @@ def _buscar_tabela_por_nome_proximo(qs, descricao, min_ratio=FUZZY_NOME_MIN_RATI
     return None, melhor_ratio
 
 
+def _buscar_tabela_por_nome_proximo_qs(qs, descricao, min_ratio=FUZZY_NOME_MIN_RATIO):
+    """Compatibilidade: usa pool montado a partir de queryset."""
+    pool = {
+        'tabelas': list(qs.select_related('codigo_servico')),
+        'por_codigo': {},
+        'por_nome': {},
+        'por_base': {},
+    }
+    for tabela in pool['tabelas']:
+        cod = (tabela.codigo_servico.codigo or '').strip().upper()
+        if cod:
+            pool['por_codigo'].setdefault(cod, tabela)
+        nome = tabela.codigo_servico.servicos or ''
+        nome_norm = _normalizar_nome_servico(nome)
+        if nome_norm:
+            pool['por_nome'].setdefault(nome_norm, tabela)
+        nome_base = _nome_base_procedimento(nome)
+        if nome_base:
+            pool['por_base'].setdefault(nome_base, tabela)
+    return _buscar_tabela_por_nome_proximo(pool, descricao, min_ratio)
+
+
 def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_servico, tipo_acomodacao, cache_precos):
     """
     Resolve preço da TabelaPreco para um item.
     Retorna (preco Decimal|None, codigo_encontrado, descricao_encontrada).
     """
-    from servicos_medicos.models import TabelaPreco, Convenio
+    from servicos_medicos.models import TabelaPreco
 
     conv_key = (convenio_nome or '').strip().upper()
     cod = (codigo_servico or '').strip().upper()
@@ -986,35 +1083,19 @@ def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_
         cache_precos[cache_key] = resultado
         return resultado
 
-    convenios = list(
-        Convenio.objects.filter(empresa_id=empresa_id).filter(
-            Q(nome__iexact=convenio_nome) | Q(nome__icontains=convenio_nome)
-        )
-    )
-    if not convenios:
-        # fallback: match parcial invertido (nome do fat contém nome cadastrado)
-        convenios = [
-            c for c in Convenio.objects.filter(empresa_id=empresa_id)
-            if c.nome and c.nome.upper() in conv_key
-        ]
-    if not convenios:
+    pool = _get_pool_precos(cache_precos, empresa_id, convenio_nome)
+    if not pool['tabelas']:
         cache_precos[cache_key] = resultado
         return resultado
 
-    qs = TabelaPreco.objects.filter(
-        empresa_id=empresa_id,
-        convenio__in=convenios,
-    ).select_related('codigo_servico')
-
     tabela = None
     if cod:
-        tabela = qs.filter(codigo_servico__codigo__iexact=cod).first()
+        tabela = pool['por_codigo'].get(cod)
     if tabela is None and desc:
-        tabela = qs.filter(codigo_servico__servicos__iexact=desc).first()
+        desc_norm = _normalizar_nome_servico(descricao_servico)
+        tabela = pool['por_nome'].get(desc_norm) or pool['por_base'].get(_nome_base_procedimento(descricao_servico))
     if tabela is None and desc:
-        tabela = qs.filter(codigo_servico__servicos__icontains=desc[:80]).first()
-    if tabela is None and desc:
-        tabela, _ratio = _buscar_tabela_por_nome_proximo(qs, descricao_servico)
+        tabela, _ratio = _buscar_tabela_por_nome_proximo(pool, descricao_servico)
 
     if tabela is None:
         cache_precos[cache_key] = resultado

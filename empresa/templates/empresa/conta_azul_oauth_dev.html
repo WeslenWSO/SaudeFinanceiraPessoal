@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-xl px-4 py-4" style="max-width: 760px;">
+  {% include 'parcial/_messages.html' %}
+
+  <div class="mb-4">
+    <h1 class="h3 mb-1"><i class="fas fa-plug me-2 text-primary"></i>{{ descricao }}</h1>
+    <p class="text-muted small mb-0">
+      Redirect do portal: <code>{{ redirect_efetivo }}</code>
+    </p>
+  </div>
+
+  <div class="alert alert-warning small">
+    <strong>O code some rápido?</strong> Use o <strong>modo popup local</strong> (recomendado) ou o bookmarklet abaixo.
+  </div>
+
+  <div class="card shadow-sm mb-4 border-primary">
+    <div class="card-header fw-semibold text-primary">Modo 1 — Popup local (recomendado)</div>
+    <div class="card-body small">
+      <ol class="mb-3 ps-3">
+        <li class="mb-2">Cadastre esta URL no <strong>Portal Conta Azul</strong> (redirect do app DEV):<br>
+          <code class="user-select-all d-inline-block mt-1 p-1 bg-light">{{ redirect_captura }}</code>
+        </li>
+        <li class="mb-2">Cole a mesma URL no campo <strong>Redirect URI</strong> da configuração e clique <strong>Salvar</strong>.</li>
+        <li>Clique no botão abaixo — após autorizar, abrirá um <strong>popup com o code</strong> automaticamente.</li>
+      </ol>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-popup-captura" data-url="{{ url_auth_captura }}">
+        <i class="fas fa-window-restore me-1"></i>Abrir autorização (popup com code)
+      </button>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">Modo 2 — Bookmarklet (redirect contaazul.com)</div>
+    <div class="card-body small">
+      <p class="mb-2">Se o portal só aceita <code>https://www.contaazul.com</code>:</p>
+      <ol class="mb-3 ps-3">
+        <li>Arraste o botão verde para a barra de favoritos do navegador.</li>
+        <li>Clique em <strong>Abrir autorização Conta Azul</strong> e autorize.</li>
+        <li>Na aba do Conta Azul (com <code>?code=</code> na URL), clique no favorito <strong>Ver code CA</strong>.</li>
+      </ol>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a href="{{ bookmarklet_href }}" class="btn btn-success btn-sm" onclick="alert('Arraste este botão para a barra de favoritos (não clique aqui).'); return false;">
+          Ver code CA
+        </a>
+        <a href="{{ url_auth }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+          Abrir autorização Conta Azul
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header fw-semibold">Colar code manualmente</div>
+    <div class="card-body">
+      <form method="post" id="form-oauth-dev">{% csrf_token %}
+        <textarea
+          name="oauth_callback"
+          id="oauth_callback"
+          class="form-control font-monospace small mb-2"
+          rows="3"
+          placeholder="URL com ?code=... ou só o code"
+        >{{ oauth_callback_valor }}</textarea>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-check me-1"></i>Conectar com este código
+          </button>
+          <a href="{% url 'empresa:conta_azul_config' empresa.pk %}" class="btn btn-outline-secondary">Configuração</a>
+          <a href="{% url 'empresa:conta_azul_oauth_iniciar' empresa.pk %}" class="btn btn-outline-primary btn-sm ms-auto">Gerar novo state</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalCode" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-key me-2"></i>Code Conta Azul</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Code capturado. Revise e clique em conectar.</p>
+        <label class="form-label fw-semibold">Code</label>
+        <textarea id="modal-code-valor" class="form-control font-monospace small mb-3" rows="4" readonly></textarea>
+        <input type="hidden" id="modal-state-valor" value="">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-outline-primary" id="btn-modal-copiar">Copiar code</button>
+        <button type="button" class="btn btn-success" id="btn-modal-conectar">Conectar agora</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var campo = document.getElementById('oauth_callback');
+  var modalEl = document.getElementById('modalCode');
+  var modalCode = document.getElementById('modal-code-valor');
+  var modalState = document.getElementById('modal-state-valor');
+  var modal = modalEl && window.bootstrap ? new bootstrap.Modal(modalEl) : null;
+
+  function extrairDaUrl(texto) {
+    try {
+      var bruto = (texto || '').trim();
+      if (!bruto) return { code: '', state: '' };
+      if (bruto.indexOf('://') >= 0 || bruto.indexOf('?') >= 0) {
+        var u = bruto.indexOf('://') >= 0 ? new URL(bruto) : new URL('https://x/' + bruto.replace(/^\?/, '?'));
+        return {
+          code: u.searchParams.get('code') || '',
+          state: u.searchParams.get('state') || ''
+        };
+      }
+      return { code: bruto, state: '' };
+    } catch (e) {
+      return { code: (texto || '').trim(), state: '' };
+    }
+  }
+
+  function mostrarPopupCode(code, state, urlCompleta) {
+    if (!code) return;
+    if (modalCode) modalCode.value = code;
+    if (modalState) modalState.value = state || '';
+    if (campo) campo.value = urlCompleta || code;
+    if (modal) modal.show();
+  }
+
+  window.addEventListener('message', function (ev) {
+    if (!ev.data || ev.data.type !== 'conta_azul_oauth_code') return;
+    mostrarPopupCode(ev.data.code, ev.data.state, ev.data.url);
+  });
+
+  var btnPopup = document.getElementById('btn-popup-captura');
+  if (btnPopup) {
+    btnPopup.addEventListener('click', function () {
+      var url = btnPopup.getAttribute('data-url');
+      if (url) window.open(url, 'conta_azul_oauth', 'width=520,height=720,scrollbars=yes');
+    });
+  }
+
+  var btnCopiar = document.getElementById('btn-modal-copiar');
+  if (btnCopiar && modalCode) {
+    btnCopiar.addEventListener('click', function () {
+      navigator.clipboard.writeText(modalCode.value).then(function () {
+        btnCopiar.textContent = 'Copiado!';
+        setTimeout(function () { btnCopiar.textContent = 'Copiar code'; }, 2000);
+      });
+    });
+  }
+
+  var btnConectar = document.getElementById('btn-modal-conectar');
+  var form = document.getElementById('form-oauth-dev');
+  if (btnConectar && form && campo) {
+    btnConectar.addEventListener('click', function () {
+      form.submit();
+    });
+  }
+
+  if (campo) {
+    campo.addEventListener('paste', function () {
+      setTimeout(function () {
+        var p = extrairDaUrl(campo.value);
+        if (p.code) mostrarPopupCode(p.code, p.state, campo.value);
+      }, 50);
+    });
+  }
+})();
+</script>
+{% endblock %}

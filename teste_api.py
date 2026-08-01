@@ -1,36 +1,19 @@
-from dashboard.conta_azul_api import calcular_dre, get_transacoes, buscar_contas_a_receber
-from datetime import datetime
+# Teste manual — informe CONTA_AZUL_* no .env e empresa_id
+import os
+import django
 
-# Testar a API
-hoje = datetime.now()
-data_inicio = hoje.replace(day=1).strftime('%Y-%m-%d')
-data_fim = hoje.strftime('%Y-%m-%d')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SaudeFinanceira.settings')
+django.setup()
 
-print("Testando API Conta Azul...")
-try:
-    dre_data = calcular_dre(data_inicio, data_fim)
-    print("DRE calculado com sucesso:")
-    print(dre_data)
-except Exception as e:
-    print(f"Erro ao calcular DRE: {e}")
+from empresa.models import Empresa
 
-try:
-    transacoes = get_transacoes(data_inicio, data_fim)
-    print("Transações obtidas:")
-    print(transacoes)
-except Exception as e:
-    print(f"Erro ao obter transações: {e}")
-
-try:
-    # Testar busca de contas a receber com filtros
-    filtros = {
-        'pagina': 1,
-        'tamanho_pagina': 10,
-        'data_vencimento_de': '2025-08-15',
-        'data_vencimento_ate': '2025-08-20'
-    }
-    contas_receber = buscar_contas_a_receber(filtros)
-    print("Contas a receber encontradas:")
-    print(contas_receber)
-except Exception as e:
-    print(f"Erro ao buscar contas a receber: {e}")
+empresa = Empresa.objects.first()
+if not empresa:
+    print('Nenhuma empresa no banco.')
+else:
+    from dashboard.conta_azul_api import calcular_dre
+    print(f'Testando empresa {empresa.pk}...')
+    try:
+        print(calcular_dre(empresa.pk, '2025-01-01', '2025-01-31'))
+    except Exception as e:
+        print(f'Erro: {e}')
