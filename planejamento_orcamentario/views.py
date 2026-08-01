@@ -6,6 +6,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.db.models import Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -119,7 +120,15 @@ def _url_listar_item(obj):
 
 
 def _salvar_e_gerar(obj, total_receitas=None):
-    obj.save()
+    try:
+        obj.save()
+    except IntegrityError as exc:
+        if '_pkey' in str(exc).lower() or 'duplicate key' in str(exc).lower():
+            raise IntegrityError(
+                'Conflito de ID no banco (sequência PostgreSQL desatualizada após importação). '
+                'Execute: python scripts/corrigir_sequencias_postgres.py'
+            ) from exc
+        raise
     n = obj.gerar_lancamentos(total_receitas=total_receitas)
     # Receita alterada → recalcula impostos/variáveis em % sobre receitas
     if obj.tipo == ItemOrcamento.TIPO_RECEITA:
@@ -621,12 +630,16 @@ def criar(request, tipo):
                 if obj.forma_calculo == ItemOrcamento.FORMA_PERCENTUAL
                 else None
             )
-            n = _salvar_e_gerar(obj, total_receitas=total_rec)
-            messages.success(
-                request,
-                f'Item “{obj.nome}” cadastrado com {n} lançamento{"s" if n != 1 else ""}.',
-            )
-            return redirect(_url_listar_item(obj))
+            try:
+                n = _salvar_e_gerar(obj, total_receitas=total_rec)
+            except IntegrityError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f'Item “{obj.nome}” cadastrado com {n} lançamento{"s" if n != 1 else ""}.',
+                )
+                return redirect(_url_listar_item(obj))
     else:
         initial = {}
         if tipo == ItemOrcamento.TIPO_IMPOSTO:
@@ -663,12 +676,16 @@ def editar(request, pk):
                 if obj.forma_calculo == ItemOrcamento.FORMA_PERCENTUAL
                 else None
             )
-            n = _salvar_e_gerar(obj, total_receitas=total_rec)
-            messages.success(
-                request,
-                f'Item “{obj.nome}” atualizado ({n} lançamento{"s" if n != 1 else ""}).',
-            )
-            return redirect(_url_listar_item(obj))
+            try:
+                n = _salvar_e_gerar(obj, total_receitas=total_rec)
+            except IntegrityError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f'Item “{obj.nome}” atualizado ({n} lançamento{"s" if n != 1 else ""}).',
+                )
+                return redirect(_url_listar_item(obj))
     else:
         form = ItemOrcamentoForm(instance=obj, tipo=tipo, empresa=empresa)
 

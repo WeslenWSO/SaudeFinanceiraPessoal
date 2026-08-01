@@ -267,6 +267,14 @@ def main() -> int:
         cwd=ROOT,
     )
 
+    print("\n=== Corrigindo sequências PostgreSQL ===")
+    env["PYTHONPATH"] = str(ROOT)
+    subprocess.check_call(
+        [sys.executable, str(ROOT / "scripts" / "corrigir_sequencias_postgres.py")],
+        env=env,
+        cwd=ROOT,
+    )
+
     print("\n=== Verificação final ===")
     pg2 = _counts(models, pg=True, env=env)
     for label in models:
