@@ -345,11 +345,180 @@ def _resumo_slots_por_situacao(grid_linhas: list, situacao: str) -> dict:
 
 
 def _resumo_maquinas_paradas(grid_linhas: list) -> dict:
-    return _resumo_slots_por_situacao(grid_linhas, 'MAQUINA_VAGA')
+    """
+    Calcula slots únicos (paciente+máquina+horário) e agrega a exibição
+    por dia + máquina: soma tempo parado e soma exames no slot.
+    """
+    base = _resumo_slots_por_situacao(grid_linhas, 'MAQUINA_VAGA')
+    por_dia = {}
+    for s in base['slots']:
+        data = s.get('data')
+        cod = s.get('maquina_codigo') or s.get('maquina') or ''
+        chave = (data, cod)
+        if chave not in por_dia:
+            por_dia[chave] = {
+                'data': data,
+                'maquina': s.get('maquina') or '-',
+                'maquina_codigo': cod,
+                'minutos': 0,
+                'qtd_exames': 0,
+                'slots': 0,
+            }
+        por_dia[chave]['minutos'] += int(s.get('minutos') or 0)
+        por_dia[chave]['qtd_exames'] += int(s.get('qtd_exames') or 0)
+        por_dia[chave]['slots'] += 1
+
+    por_dia_lista = sorted(
+        por_dia.values(),
+        key=lambda r: (r['data'] or date.min, r['maquina']),
+    )
+    for r in por_dia_lista:
+        r['minutos_fmt'] = _fmt_minutos_hhmm(r['minutos'])
+
+    # Totais por máquina a partir do mesmo recorte filtrado (dia+máquina)
+    por_maquina = {}
+    for r in por_dia_lista:
+        cod = r['maquina_codigo'] or r['maquina']
+        bucket = por_maquina.setdefault(
+            cod,
+            {'maquina': r['maquina'], 'maquina_codigo': cod, 'slots': 0, 'minutos': 0, 'qtd_exames': 0},
+        )
+        bucket['slots'] += r['slots']
+        bucket['minutos'] += r['minutos']
+        bucket['qtd_exames'] += r['qtd_exames']
+    por_maquina_lista = [
+        {**v, 'minutos_fmt': _fmt_minutos_hhmm(v['minutos'])}
+        for v in sorted(por_maquina.values(), key=lambda x: x['maquina'])
+    ]
+
+    return {
+        **base,
+        'slots': por_dia_lista,  # tabela agregada dia + máquina (já filtrada)
+        'slots_detalhe': base['slots'],
+        'por_maquina': por_maquina_lista,
+        'total_exames': sum(r['qtd_exames'] for r in por_dia_lista),
+    }
 
 
 def _resumo_horarios_reutilizados(grid_linhas: list) -> dict:
-    return _resumo_slots_por_situacao(grid_linhas, 'REUTILIZADA')
+    """
+    Horários reutilizados (respeita grid já filtrado):
+    - Conta só exames que ocuparam o lugar
+    - 1 slot = paciente + máquina + horário (vários exames no mesmo slot: 1 tempo)
+    - Exibição agregada: dia + máquina (sem paciente)
+    """
+    slots = {}
+    ids_uso_vistos = set()  # evita contar o mesmo agenda em várias linhas canceladas
+    for linha in grid_linhas:
+        if linha.get('situacao') != 'REUTILIZADA':
+            continue
+        maquina_nome = linha.get('maquina') or '-'
+        maquina_cod = (linha.get('maquina_codigo') or '').strip().upper()
+        for uso in linha.get('reutilizacoes') or []:
+            fat_uso = uso.get('faturamento')
+            id_uso = None
+            if fat_uso is not None:
+                ini, fim = _horario_slot(fat_uso)
+                data = getattr(fat_uso, 'data', None) or uso.get('data')
+                paciente = (getattr(fat_uso, 'nome', None) or uso.get('paciente') or '').strip()
+                if getattr(fat_uso, 'horario_inicio', None) or getattr(fat_uso, 'horario_fim', None):
+                    horario_txt = f"{fat_uso.horario_inicio or ''} - {fat_uso.horario_fim or ''}".strip(' -')
+                else:
+                    horario_txt = (getattr(fat_uso, 'horario', None) or uso.get('horario') or '').strip()
+                minutos = _duracao_slot_minutos(ini, fim)
+                id_uso = getattr(fat_uso, 'id', None) or uso.get('id')
+            else:
+                data = uso.get('data')
+                paciente = (uso.get('paciente') or '').strip()
+                horario_txt = (uso.get('horario') or '').strip()
+                ini = _parse_hora_minutos(horario_txt.split(' - ')[0] if ' - ' in horario_txt else horario_txt)
+                fim = _parse_hora_minutos(horario_txt.split(' - ')[1]) if ' - ' in horario_txt else None
+                minutos = _duracao_slot_minutos(ini, fim)
+                id_uso = uso.get('id')
+
+            if id_uso is not None:
+                if id_uso in ids_uso_vistos:
+                    continue
+                ids_uso_vistos.add(id_uso)
+
+            paciente_key = paciente.upper()
+            if not data or not paciente_key or not maquina_cod:
+                continue
+            if ini is not None or fim is not None:
+                chave = (data, paciente_key, maquina_cod, ini, fim)
+            else:
+                if not horario_txt:
+                    continue
+                chave = (data, paciente_key, maquina_cod, horario_txt)
+
+            if chave in slots:
+                slots[chave]['qtd_exames'] += 1
+                continue
+
+            slots[chave] = {
+                'data': data,
+                'maquina': uso.get('maquina') or maquina_nome,
+                'maquina_codigo': maquina_cod,
+                'horario': horario_txt or '-',
+                'minutos': minutos,
+                'qtd_exames': 1,
+            }
+
+    detalhe = sorted(
+        slots.values(),
+        key=lambda s: (s['data'] or date.min, s['maquina'], s['horario']),
+    )
+
+    # Agrega por dia + máquina (exibição)
+    por_dia = {}
+    for s in detalhe:
+        data = s.get('data')
+        cod = s.get('maquina_codigo') or s.get('maquina') or ''
+        chave = (data, cod)
+        if chave not in por_dia:
+            por_dia[chave] = {
+                'data': data,
+                'maquina': s.get('maquina') or '-',
+                'maquina_codigo': cod,
+                'minutos': 0,
+                'qtd_exames': 0,
+                'slots': 0,
+            }
+        por_dia[chave]['minutos'] += int(s.get('minutos') or 0)
+        por_dia[chave]['qtd_exames'] += int(s.get('qtd_exames') or 0)
+        por_dia[chave]['slots'] += 1
+
+    por_dia_lista = sorted(
+        por_dia.values(),
+        key=lambda r: (r['data'] or date.min, r['maquina']),
+    )
+    for r in por_dia_lista:
+        r['minutos_fmt'] = _fmt_minutos_hhmm(r['minutos'])
+
+    por_maquina = {}
+    for r in por_dia_lista:
+        cod = r['maquina_codigo'] or r['maquina']
+        bucket = por_maquina.setdefault(
+            cod,
+            {'maquina': r['maquina'], 'maquina_codigo': cod, 'slots': 0, 'minutos': 0, 'qtd_exames': 0},
+        )
+        bucket['slots'] += r['slots']
+        bucket['minutos'] += r['minutos']
+        bucket['qtd_exames'] += r['qtd_exames']
+
+    total_min = sum(r['minutos'] for r in por_dia_lista)
+    return {
+        'slots': por_dia_lista,
+        'slots_detalhe': detalhe,
+        'total_slots': len(detalhe),
+        'total_minutos': total_min,
+        'total_fmt': _fmt_minutos_hhmm(total_min),
+        'total_exames': sum(r['qtd_exames'] for r in por_dia_lista),
+        'por_maquina': [
+            {**v, 'minutos_fmt': _fmt_minutos_hhmm(v['minutos'])}
+            for v in sorted(por_maquina.values(), key=lambda x: x['maquina'])
+        ],
+    }
 
 
 # Modalidade → (chave da máquina, nome exibido)
@@ -975,46 +1144,106 @@ def listar_cancelados(request):
                 **analise,
             })
 
+    # Resumos só com linhas já filtradas (período, convênio, status, máquina, vaga…)
     resumo_parada = _resumo_maquinas_paradas(grid_linhas)
     resumo_reutilizado = _resumo_horarios_reutilizados(grid_linhas)
 
-    # Marca na grade o 1º exame de cada slot (vaga ou reutilizado)
+    # Marca na grade: vaga = 1º exame do slot cancelado; reutilizado = exames que ocuparam o lugar
     vistos_slot = set()
+    vistos_uso = set()
     for linha in grid_linhas:
         situacao = linha.get('situacao')
         linha['slot_unico'] = False
         linha['minutos_slot'] = 0
         linha['minutos_slot_fmt'] = ''
-        if situacao not in ('MAQUINA_VAGA', 'REUTILIZADA'):
+        if situacao == 'MAQUINA_VAGA':
+            chave = _chave_slot_paciente_maquina(linha)
+            if not chave or chave in vistos_slot:
+                continue
+            vistos_slot.add(chave)
+            fat = linha['faturamento']
+            ini, fim = _horario_slot(fat)
+            linha['slot_unico'] = True
+            linha['minutos_slot'] = _duracao_slot_minutos(ini, fim)
+            linha['minutos_slot_fmt'] = _fmt_minutos_hhmm(linha['minutos_slot'])
+            linha['minutos_parada'] = linha['minutos_slot']
+            linha['minutos_parada_fmt'] = linha['minutos_slot_fmt']
             continue
-        chave = _chave_slot_paciente_maquina(linha)
-        if not chave:
+        if situacao != 'REUTILIZADA':
             continue
-        chave_sit = (situacao, chave)
-        if chave_sit in vistos_slot:
-            continue
-        vistos_slot.add(chave_sit)
-        fat = linha['faturamento']
-        ini, fim = _horario_slot(fat)
-        linha['slot_unico'] = True
-        linha['minutos_slot'] = _duracao_slot_minutos(ini, fim)
-        linha['minutos_slot_fmt'] = _fmt_minutos_hhmm(linha['minutos_slot'])
-        # compat com template antigo
-        linha['minutos_parada'] = linha['minutos_slot'] if situacao == 'MAQUINA_VAGA' else 0
-        linha['minutos_parada_fmt'] = linha['minutos_slot_fmt'] if situacao == 'MAQUINA_VAGA' else ''
+        # Só marca tempo com base nos exames que usaram o horário (não nos cancelados)
+        minutos_novos = 0
+        for uso in linha.get('reutilizacoes') or []:
+            id_uso = uso.get('id')
+            if id_uso is None or id_uso in vistos_uso:
+                continue
+            vistos_uso.add(id_uso)
+            fat_uso = uso.get('faturamento')
+            if fat_uso is not None:
+                ini, fim = _horario_slot(fat_uso)
+            else:
+                ht = (uso.get('horario') or '').strip()
+                ini = _parse_hora_minutos(ht.split(' - ')[0] if ' - ' in ht else ht)
+                fim = _parse_hora_minutos(ht.split(' - ')[1]) if ' - ' in ht else None
+            minutos_novos += _duracao_slot_minutos(ini, fim)
+        if minutos_novos > 0:
+            linha['slot_unico'] = True
+            linha['minutos_slot'] = minutos_novos
+            linha['minutos_slot_fmt'] = _fmt_minutos_hhmm(minutos_novos)
 
     convenios_disponiveis = []
     if empresa_id:
         from servicos_medicos.models import Convenio
         convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
 
-    # Opções únicas de máquina para o filtro (chave → nome)
+    # Opções de máquina: mapa fixo + códigos presentes no resultado filtrado
     maquinas_opcoes = []
     vistos = set()
-    for chave, nome in MAQUINAS_POR_MODALIDADE.values():
+    for chave, nome_maq in MAQUINAS_POR_MODALIDADE.values():
         if chave not in vistos:
             vistos.add(chave)
-            maquinas_opcoes.append({'codigo': chave, 'nome': nome})
+            maquinas_opcoes.append({'codigo': chave, 'nome': nome_maq})
+    for linha in grid_linhas:
+        cod = (linha.get('maquina_codigo') or '').strip().upper()
+        if not cod or cod in vistos:
+            continue
+        vistos.add(cod)
+        maquinas_opcoes.append({
+            'codigo': cod,
+            'nome': linha.get('maquina') or f'Máquina {cod}',
+        })
+    maquinas_opcoes.sort(key=lambda m: m['nome'])
+
+    # Querystring base para badges (mantém filtros; troca só a máquina)
+    params_filtro = request.GET.copy()
+    if 'maquina' in params_filtro:
+        del params_filtro['maquina']
+    # Garante datas padrão na URL dos badges
+    params_filtro['data_inicio'] = data_inicio
+    params_filtro['data_fim'] = data_fim
+    qs_sem_maquina = params_filtro.urlencode()
+
+    partes_filtro = []
+    if data_inicio or data_fim:
+        partes_filtro.append(f'{data_inicio or "…"} → {data_fim or "…"}')
+    if nome:
+        partes_filtro.append(f'paciente: {nome}')
+    if status_agendamento:
+        partes_filtro.append(f'status: {status_agendamento}')
+    if maquina:
+        nome_m = next((m['nome'] for m in maquinas_opcoes if m['codigo'] == maquina), maquina)
+        partes_filtro.append(f'máquina: {nome_m}')
+    if situacao_vaga == 'MAQUINA_VAGA':
+        partes_filtro.append('só máquina vaga')
+    elif situacao_vaga == 'REUTILIZADA':
+        partes_filtro.append('só horário reutilizado')
+    convenios_sel = [c for c in convenios if c]
+    if convenios_sel:
+        if len(convenios_sel) <= 2:
+            partes_filtro.append('convênio: ' + ', '.join(convenios_sel))
+        else:
+            partes_filtro.append(f'{len(convenios_sel)} convênios')
+    filtros_rotulo = ' · '.join(partes_filtro) if partes_filtro else 'sem filtro extra'
 
     context = {
         'grid_linhas': grid_linhas,
@@ -1028,6 +1257,8 @@ def listar_cancelados(request):
         'convenios_disponiveis': convenios_disponiveis,
         'status_opcoes': ['Cancelado', 'Desistência', 'Deletado'],
         'maquinas_opcoes': maquinas_opcoes,
+        'qs_sem_maquina': qs_sem_maquina,
+        'filtros_rotulo': filtros_rotulo,
         'filtros': {
             'nome': nome,
             'data_inicio': data_inicio,
