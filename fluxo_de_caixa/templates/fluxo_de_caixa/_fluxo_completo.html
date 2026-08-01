@@ -31,12 +31,12 @@
         </thead>
         <tbody>
             {% for linha in dados %}
-            <tr class="{% if linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% endif %}"
+            <tr class="{% if linha.emprestimo_bloco %}table-danger{% elif linha.resultado_geral %}table-primary{% elif linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' or linha.categoria.nome == 'DESPESAS' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% elif linha.emprestimo %}{% endif %}"
                 {% if linha.categoria.id %}data-categoria-id="{{ linha.categoria.id }}"{% endif %}>
                 <td>
                     {% if linha.subtotal %}<strong>{{ linha.categoria.nome }}</strong>
                     {% elif linha.grupo %}<em><strong>{{ linha.categoria.nome }}</strong></em>
-                    {% else %}{{ linha.categoria.nome }}{% endif %}
+                    {% else %}{% if linha.emprestimo %}<span class="ps-2">{{ linha.categoria.nome }}</span>{% else %}{{ linha.categoria.nome }}{% endif %}{% endif %}
                 </td>
                 {% for cel in linha.valores %}
                 <td class="text-end {% if linha.subtotal %}fw-bold{% endif %}">{{ cel.realizado|floatformat:2 }}</td>
@@ -54,7 +54,9 @@
     </table>
 </div>
 <div class="card-footer small text-muted">
-    Real. = fluxo Conta Azul · Plan. = orçamento · Flag se |%| ≥ {{ flag_pct_limite|floatformat:0 }}%
+    Real. = fluxo Conta Azul · Plan. = orçamento
+    · Empréstimos: Plan. = valor da parcela (vencimento) · Real. = valor pago
+    · Flag se |%| ≥ {{ flag_pct_limite|floatformat:0 }}%
 </div>
 
 <!-- Modal filtro categoria -->

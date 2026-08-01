@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static faturamento_extras %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid px-0">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-exchange-alt text-primary"></i> Planejamento — Real × Plan.
+                </h3>
+                <small class="text-muted">
+                    {{ empresa.razao|default:"" }} · {{ ano }}
+                    · após o resultado: parcelas de empréstimo (contrato)
+                </small>
+            </div>
+            <div class="card-tools d-flex flex-wrap align-items-center gap-2">
+                <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Dashboard
+                </a>
+                <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-file-invoice-dollar"></i> Empréstimos
+                </a>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
+                    <i class="fas fa-search"></i> Filtrar
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
+                    <i class="fas fa-times"></i> Limpar
+                </button>
+                <form method="get" class="d-inline">
+                    <select name="ano" onchange="this.form.submit()" class="form-select form-select-sm">
+                        {% for ano_opcao in anos_disponiveis %}
+                        <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        {% include 'fluxo_de_caixa/_fluxo_completo.html' %}
+    </div>
+</div>
+
+<style>
+#tabelaFluxoMensal tr.table-emprestimo-hdr > td { background: #f8d7da !important; }
+#tabelaFluxoMensal tr.table-emprestimo-hdr > td:first-child { color: #842029; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(function (tr) {
+        var nome = (tr.querySelector('td') || {}).textContent || '';
+        nome = nome.trim().toUpperCase();
+        if (nome.indexOf('EMPRÉSTIMO') === 0 || nome.indexOf('EMPRESTIMO') === 0 || nome.indexOf('TOTAL EMPRÉSTIMO') === 0) {
+            tr.classList.add('table-emprestimo-hdr');
+        }
+    });
+});
+</script>
+{% include 'fluxo_de_caixa/_fluxo_completo_scripts.html' %}
+{% endblock %}
