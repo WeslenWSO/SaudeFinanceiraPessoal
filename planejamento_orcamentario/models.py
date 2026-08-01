@@ -15,6 +15,43 @@ def _add_months(d: date, months: int) -> date:
     return date(y, m, day)
 
 
+# Lucro Presumido — serviços (base 32%). Cálculo mensal para orçamento.
+PRESUNCAO_SERVICOS_PCT = Decimal('32')  # % da receita bruta
+IRPJ_ALIQUOTA_PCT = Decimal('15')
+IRPJ_ADICIONAL_PCT = Decimal('10')
+# Adicional trimestral: lucro presumido > R$ 60.000 → mensal ≈ R$ 20.000
+IRPJ_LIMITE_ADICIONAL_MENSAL = Decimal('20000')
+CSLL_ALIQUOTA_PCT = Decimal('9')
+
+
+def calcular_irpj_presumido_mensal(receita: Decimal) -> Decimal:
+    """
+    IRPJ Lucro Presumido (mensal):
+    base = receita × 32%
+    IRPJ = base × 15%
+    adicional = max(0, base − 20.000) × 10%
+    """
+    receita = receita or Decimal('0')
+    if receita <= 0:
+        return Decimal('0.00')
+    base = (receita * PRESUNCAO_SERVICOS_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    irpj = (base * IRPJ_ALIQUOTA_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    excedente = base - IRPJ_LIMITE_ADICIONAL_MENSAL
+    adicional = Decimal('0.00')
+    if excedente > 0:
+        adicional = (excedente * IRPJ_ADICIONAL_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    return (irpj + adicional).quantize(Decimal('0.01'))
+
+
+def calcular_csll_presumido_mensal(receita: Decimal) -> Decimal:
+    """CSLL Lucro Presumido (mensal): base = receita × 32%; CSLL = base × 9%."""
+    receita = receita or Decimal('0')
+    if receita <= 0:
+        return Decimal('0.00')
+    base = (receita * PRESUNCAO_SERVICOS_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    return (base * CSLL_ALIQUOTA_PCT / Decimal('100')).quantize(Decimal('0.01'))
+
+
 class ItemOrcamento(models.Model):
     """Item do planejamento orçamentário (receita, despesa ou imposto)."""
 
@@ -34,10 +71,20 @@ class ItemOrcamento(models.Model):
 
     FORMA_FIXO = 'fixo'
     FORMA_PERCENTUAL = 'percentual'
+    FORMA_PRESUMIDO_IRPJ = 'presumido_irpj'
+    FORMA_PRESUMIDO_CSLL = 'presumido_csll'
     FORMA_CHOICES = [
         (FORMA_FIXO, 'Valor fixo / previsto'),
         (FORMA_PERCENTUAL, '% sobre receitas'),
+        (FORMA_PRESUMIDO_IRPJ, 'Lucro Presumido — IRPJ (mensal)'),
+        (FORMA_PRESUMIDO_CSLL, 'Lucro Presumido — CSLL (mensal)'),
     ]
+
+    FORMAS_SOBRE_RECEITA = (
+        FORMA_PERCENTUAL,
+        FORMA_PRESUMIDO_IRPJ,
+        FORMA_PRESUMIDO_CSLL,
+    )
 
     empresa = models.ForeignKey(
         Empresa,
@@ -156,10 +203,17 @@ class ItemOrcamento(models.Model):
         }
         return meta.get(tipo, {'titulo': tipo, 'icone': 'fa-tag', 'cor': 'primary', 'ajuda': ''})
 
+    def usa_receitas(self) -> bool:
+        return self.forma_calculo in self.FORMAS_SOBRE_RECEITA
+
     def valor_estimado(self, total_receitas=None):
-        """Valor mensal estimado (para % usa total de receitas quando informado)."""
+        """Valor mensal estimado (para % / Presumido usa total de receitas quando informado)."""
+        base = total_receitas if total_receitas is not None else Decimal('0')
+        if self.forma_calculo == self.FORMA_PRESUMIDO_IRPJ:
+            return calcular_irpj_presumido_mensal(base)
+        if self.forma_calculo == self.FORMA_PRESUMIDO_CSLL:
+            return calcular_csll_presumido_mensal(base)
         if self.forma_calculo == self.FORMA_PERCENTUAL and (self.aliquota_pct or 0) > 0:
-            base = total_receitas if total_receitas is not None else Decimal('0')
             return (base * (self.aliquota_pct or Decimal('0')) / Decimal('100')).quantize(
                 Decimal('0.01')
             )
@@ -208,15 +262,15 @@ class ItemOrcamento(models.Model):
         if not self.data_inicio:
             return 0
         n = max(1, int(self.qtd_meses or 1))
-        usa_pct = (
-            self.forma_calculo == self.FORMA_PERCENTUAL
-            and (self.aliquota_pct or 0) > 0
+        usa_receitas = self.usa_receitas() and (
+            self.forma_calculo != self.FORMA_PERCENTUAL
+            or (self.aliquota_pct or 0) > 0
         )
-        valor_fixo = None if usa_pct else self.valor_estimado(total_receitas)
+        valor_fixo = None if usa_receitas else self.valor_estimado(total_receitas)
         criar = []
         for i in range(n):
             data_lanc = _add_months(self.data_inicio, i)
-            if usa_pct:
+            if usa_receitas:
                 base = self.total_receitas_no_mes(
                     self.empresa, data_lanc.year, data_lanc.month
                 )
@@ -241,11 +295,11 @@ class ItemOrcamento(models.Model):
 
     @classmethod
     def regenerar_percentuais(cls, empresa):
-        """Recalcula impostos/variáveis com % após alterar receitas."""
+        """Recalcula impostos/variáveis ligados a receitas (%, Presumido)."""
         qs = cls.objects.filter(
             empresa=empresa,
             ativo=True,
-            forma_calculo=cls.FORMA_PERCENTUAL,
+            forma_calculo__in=cls.FORMAS_SOBRE_RECEITA,
         )
         total = 0
         for it in qs:

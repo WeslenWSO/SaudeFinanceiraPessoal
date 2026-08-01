@@ -106,8 +106,21 @@ class ItemOrcamentoForm(forms.ModelForm):
             self.fields['valor_min'].required = False
             self.fields['valor_max'].required = False
 
-        # Impostos e variáveis: alíquota em destaque
-        if self.tipo in (ItemOrcamento.TIPO_IMPOSTO, ItemOrcamento.TIPO_VARIAVEL):
+        # Impostos e variáveis: alíquota / Presumido
+        if self.tipo == ItemOrcamento.TIPO_IMPOSTO:
+            self.fields['forma_calculo'].choices = ItemOrcamento.FORMA_CHOICES
+            self.fields['forma_calculo'].help_text = (
+                'Lucro Presumido (serviços): base 32% da receita. '
+                'IRPJ = 15% da base (+ adicional 10% se base mensal > R$ 20.000). '
+                'CSLL = 9% da base. Ou use % simples sobre receitas.'
+            )
+            self.fields['valor_min'].widget = forms.HiddenInput()
+            self.fields['valor_max'].widget = forms.HiddenInput()
+        elif self.tipo == ItemOrcamento.TIPO_VARIAVEL:
+            self.fields['forma_calculo'].choices = [
+                c for c in ItemOrcamento.FORMA_CHOICES
+                if c[0] in (ItemOrcamento.FORMA_FIXO, ItemOrcamento.FORMA_PERCENTUAL)
+            ]
             self.fields['forma_calculo'].help_text = (
                 'Use % sobre receitas para calcular a partir do total de receitas previstas.'
             )

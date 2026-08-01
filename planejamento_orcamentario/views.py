@@ -653,7 +653,7 @@ def criar(request, tipo):
                 obj.forma_calculo = ItemOrcamento.FORMA_FIXO
             total_rec = (
                 _total_receitas(empresa)
-                if obj.forma_calculo == ItemOrcamento.FORMA_PERCENTUAL
+                if obj.forma_calculo in ItemOrcamento.FORMAS_SOBRE_RECEITA
                 else None
             )
             try:
@@ -669,7 +669,7 @@ def criar(request, tipo):
     else:
         initial = {}
         if tipo == ItemOrcamento.TIPO_IMPOSTO:
-            initial['forma_calculo'] = ItemOrcamento.FORMA_PERCENTUAL
+            initial['forma_calculo'] = ItemOrcamento.FORMA_PRESUMIDO_IRPJ
         form = ItemOrcamentoForm(initial=initial, tipo=tipo, empresa=empresa)
 
     return render(request, 'planejamento_orcamentario/form.html', {
@@ -699,7 +699,7 @@ def editar(request, pk):
             obj = form.save(commit=False)
             total_rec = (
                 _total_receitas(empresa)
-                if obj.forma_calculo == ItemOrcamento.FORMA_PERCENTUAL
+                if obj.forma_calculo in ItemOrcamento.FORMAS_SOBRE_RECEITA
                 else None
             )
             try:

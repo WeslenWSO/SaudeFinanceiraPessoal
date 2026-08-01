@@ -130,14 +130,22 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if it.forma_calculo == 'percentual' %}
+                        {% if it.forma_calculo == 'presumido_irpj' %}
+                        <span class="badge bg-danger-subtle text-danger">Presumido IRPJ</span>
+                        {% elif it.forma_calculo == 'presumido_csll' %}
+                        <span class="badge bg-danger-subtle text-danger">Presumido CSLL</span>
+                        {% elif it.forma_calculo == 'percentual' %}
                         <span class="badge bg-danger-subtle text-danger">% sobre receitas</span>
                         {% else %}
                         <span class="badge bg-secondary-subtle text-secondary">Valor previsto</span>
                         {% endif %}
                     </td>
                     <td class="text-end">
-                        {% if it.forma_calculo == 'percentual' %}
+                        {% if it.forma_calculo == 'presumido_irpj' %}
+                        base 32% + 15% (+adic.)
+                        {% elif it.forma_calculo == 'presumido_csll' %}
+                        base 32% × 9%
+                        {% elif it.forma_calculo == 'percentual' %}
                         {{ it.aliquota_pct }}%
                         {% else %}
                         R$ {{ it.valor_mensal|moeda_br }}

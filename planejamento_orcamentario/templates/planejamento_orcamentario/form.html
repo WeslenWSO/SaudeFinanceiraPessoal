@@ -72,6 +72,17 @@
                 </div>
                 {% endif %}
 
+                <div class="col-12" id="boxPresumido" style="display:none;">
+                    <div class="alert alert-info small mb-0">
+                        <strong>Lucro Presumido — cálculo mensal (serviços)</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Base de cálculo = receita do mês × <strong>32%</strong></li>
+                            <li><strong>IRPJ</strong> = base × 15% (= 4,8% da receita) + adicional de 10% sobre a base que ultrapassar <strong>R$ 20.000</strong>/mês (equivalente ao adicional trimestral acima de R$ 60.000)</li>
+                            <li><strong>CSLL</strong> = base × 9% (= 2,88% da receita)</li>
+                        </ul>
+                    </div>
+                </div>
+
                 <div class="col-md-6" id="campoValorMensal">
                     <label class="form-label fw-semibold" for="{{ form.valor_mensal.id_for_label }}">Valor mensal previsto (R$)</label>
                     {{ form.valor_mensal }}
@@ -183,11 +194,18 @@
     const forma = document.getElementById('id_forma_calculo');
     const valor = document.getElementById('campoValorMensal');
     const aliq = document.getElementById('campoAliquota');
+    const boxPres = document.getElementById('boxPresumido');
     function sync() {
         if (!forma) return;
-        const pct = forma.value === 'percentual';
-        if (valor) valor.style.opacity = pct ? '0.45' : '1';
-        if (aliq) aliq.style.opacity = pct ? '1' : '0.45';
+        const v = forma.value;
+        const pct = v === 'percentual';
+        const presumido = v === 'presumido_irpj' || v === 'presumido_csll';
+        if (valor) valor.style.opacity = (pct || presumido) ? '0.45' : '1';
+        if (aliq) {
+            aliq.style.display = presumido ? 'none' : '';
+            aliq.style.opacity = pct ? '1' : '0.45';
+        }
+        if (boxPres) boxPres.style.display = presumido ? '' : 'none';
     }
     if (forma) {
         forma.addEventListener('change', sync);
