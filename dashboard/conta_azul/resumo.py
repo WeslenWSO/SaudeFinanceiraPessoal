@@ -18,6 +18,32 @@ from dashboard.conta_azul.config import config_da_empresa
 from extrato.models import ContaBancaria, ExtratoMovimento, Lancamento
 
 
+def montar_saldos_contas_positivos(empresa) -> dict:
+    """Contas Conta Azul com saldo > 0 + total (para o dashboard)."""
+    contas_qs = (
+        ContaBancaria.objects.filter(empresa=empresa)
+        .exclude(conta_azul_id='')
+        .filter(saldo_conta_azul__gt=0)
+        .select_related('banco')
+        .order_by('-saldo_conta_azul', 'descricao')
+    )
+    total = Decimal('0')
+    itens = []
+    for c in contas_qs:
+        saldo = c.saldo_conta_azul or Decimal('0')
+        total += saldo
+        itens.append(
+            {
+                'nome': c.descricao or str(c),
+                'banco': str(c.banco),
+                'ativo': c.status == 'A',
+                'saldo': saldo,
+                'saldo_em': c.saldo_conta_azul_em,
+            }
+        )
+    return {'itens': itens, 'total': total}
+
+
 def _cliente_exibicao(empresa, valor_cliente: str) -> str:
     nome = (valor_cliente or '').strip()
     if not nome:
@@ -214,28 +240,8 @@ def montar_resumo_conta_azul(empresa, data_inicio: date, data_fim: date) -> dict
     resumo['chart_categorias_labels'] = json.dumps(labels, ensure_ascii=False)
     resumo['chart_categorias_data'] = json.dumps(vals)
 
-    contas_qs = (
-        ContaBancaria.objects.filter(empresa=empresa)
-        .exclude(conta_azul_id='')
-        .filter(saldo_conta_azul__gt=0)
-        .select_related('banco')
-        .order_by('-saldo_conta_azul', 'descricao')
-    )
-    total_saldo_ca = Decimal('0')
-    contas_display = []
-    for c in contas_qs:
-        saldo = c.saldo_conta_azul or Decimal('0')
-        total_saldo_ca += saldo
-        contas_display.append(
-            {
-                'nome': c.descricao or str(c),
-                'banco': str(c.banco),
-                'ativo': c.status == 'A',
-                'saldo': saldo,
-                'saldo_em': c.saldo_conta_azul_em,
-            }
-        )
-    resumo['contas_display'] = contas_display
-    resumo['totais']['saldo_contas_ca'] = total_saldo_ca
+    saldos = montar_saldos_contas_positivos(empresa)
+    resumo['contas_display'] = saldos['itens']
+    resumo['totais']['saldo_contas_ca'] = saldos['total']
 
     return resumo

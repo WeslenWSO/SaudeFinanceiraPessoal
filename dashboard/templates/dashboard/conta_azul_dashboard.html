@@ -71,6 +71,51 @@
     </div>
   </div>
 
+  <div class="card border-0 shadow-sm mb-4" id="saldos-contas">
+    <div class="card-header fw-semibold py-2 bg-white border-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span><i class="fas fa-university me-1 text-primary"></i> Saldos das contas (Conta Azul)</span>
+      <span class="text-muted small fw-normal">somente saldo &gt; zero</span>
+    </div>
+    <div class="card-body pt-0">
+      {% if saldos_contas.itens %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Conta</th>
+              <th>Banco</th>
+              <th class="text-end">Saldo</th>
+              <th class="text-end">Data do saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ct in saldos_contas.itens %}
+            <tr>
+              <td>{{ ct.nome }}{% if not ct.ativo %} <span class="badge bg-secondary">inativa</span>{% endif %}</td>
+              <td class="text-muted small">{{ ct.banco }}</td>
+              <td class="text-end text-nowrap">R$ {{ ct.saldo|floatformat:2 }}</td>
+              <td class="text-end text-muted small">{% if ct.saldo_em %}{{ ct.saldo_em|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="2">Total ({{ saldos_contas.itens|length }} conta{{ saldos_contas.itens|length|pluralize:"s" }})</th>
+              <th class="text-end">R$ {{ saldos_contas.total|floatformat:2 }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">
+        Nenhuma conta com saldo maior que zero.
+        Sincronize os cadastros Conta Azul para atualizar os saldos.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
   <p class="small text-muted mb-0">
     <a href="{% url 'dashboard:por_tipo' %}">Receitas / Despesas / Inv. / DL</a>
     ·

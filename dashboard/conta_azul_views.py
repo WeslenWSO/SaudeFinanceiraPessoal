@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from dashboard.conta_azul.dashboards import montar_dashboard_por_tipo
-from dashboard.conta_azul.resumo import montar_resumo_conta_azul
+from dashboard.conta_azul.resumo import montar_resumo_conta_azul, montar_saldos_contas_positivos
 from dashboard.services.montar_visao_geral import REGIMES, montar_visao_geral
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
 from dashboard.conta_azul.config import gravar_tokens, limpar_tokens, obter_ou_criar_config
@@ -526,12 +526,14 @@ def conta_azul_dashboard(request):
         return redirect('empresa:lista')
 
     visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
+    saldos_contas = montar_saldos_contas_positivos(empresa)
     return render(
         request,
         'dashboard/conta_azul_dashboard.html',
         {
             'titulo': 'Dashboard',
             'visao': visao,
+            'saldos_contas': saldos_contas,
             'dashboard_ativo': 'geral',
             **ctx,
         },
