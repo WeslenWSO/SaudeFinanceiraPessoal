@@ -5,43 +5,168 @@
 
 {% block conteudo %}
 <style>
+  .cat-page { max-width: 100%; }
+  .cat-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .cat-actions a { text-decoration: none; }
+  .cat-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+  }
+  .cat-toolbar .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 12rem;
+    flex: 1 1 14rem;
+  }
+  .cat-toolbar .field-sm {
+    flex: 0 0 auto;
+    min-width: 8rem;
+  }
+  .cat-toolbar label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin: 0;
+  }
+  .cat-toolbar input[type="text"],
+  .cat-toolbar select {
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.9rem;
+  }
+  .cat-toolbar input[type="text"]:focus,
+  .cat-toolbar select:focus {
+    outline: none;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.2);
+  }
+  .cat-toolbar .btn-buscar {
+    min-height: 2.25rem;
+    padding: 0.35rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: #0d6efd;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cat-toolbar .btn-buscar:hover { background: #0b5ed7; }
+  .table-wrapper {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    overflow: auto;
+    background: #fff;
+  }
+  .table-wrapper table.table-categoria-list {
+    margin: 0;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
   .table-wrapper table thead tr th {
-    background-color: #000 !important;
+    background-color: #212529 !important;
     color: #fff !important;
-    border-color: #333;
+    border-color: #343a40;
+    white-space: nowrap;
+    padding: 0.65rem 0.75rem;
+    vertical-align: middle;
+  }
+  .table-wrapper table thead tr th a {
+    color: #fff !important;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .table-wrapper table thead tr th a:hover { color: #adb5bd !important; }
+  .table-wrapper table thead tr th .sort-icon {
+    opacity: 0.45;
+    font-size: 0.7rem;
+  }
+  .table-wrapper table thead tr th.is-sorted .sort-icon {
+    opacity: 1;
+    color: #ffc107;
   }
   .table-wrapper table.table-categoria-list tbody tr:nth-child(odd) td,
   .table-wrapper table.table-categoria-list tbody tr:nth-child(odd) {
-    background-color: #f2f2f2 !important;
+    background-color: #f8f9fa !important;
   }
   .table-wrapper table.table-categoria-list tbody tr:nth-child(even) td,
   .table-wrapper table.table-categoria-list tbody tr:nth-child(even) {
     background-color: #fff !important;
   }
+  .table-wrapper table.table-categoria-list tbody td {
+    padding: 0.55rem 0.75rem;
+    border-top: 1px solid #eee;
+    vertical-align: middle;
+  }
+  .table-wrapper table.table-categoria-list tbody tr:hover td {
+    background-color: #eef5ff !important;
+  }
+  .cat-pagination { margin-top: 1rem; }
+  .cat-pagination ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.5rem;
+  }
 </style>
-  <p class="d-flex flex-wrap gap-2 align-items-center">
+
+<div class="cat-page">
+  <div class="cat-actions">
     <a href="{% url 'categoria:cat-create' %}" role="button">Nova Categoria</a>
     <a href="{% url 'categoria:copiar' %}" role="button" class="secondary">
       <i class="fas fa-copy"></i> Copiar de outra empresa
     </a>
-  </p>
+  </div>
+
   {% if messages %}
     {% include 'parcial/_messages.html' %}
   {% endif %}
 
-  <form method="get" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
-    <input type="text" name="search" placeholder="Buscar por nome ou classificação" value="{{ request.GET.search }}">
-    <button type="submit">Buscar</button>
-    <label for="paginate_by">Itens por página:</label>
-    <select name="paginate_by" id="paginate_by" onchange="this.form.submit()">
-      <option value="5" {% if request.GET.paginate_by == '5' %}selected{% endif %}>5</option>
-      <option value="10" {% if request.GET.paginate_by == '10' %}selected{% endif %}>10</option>
-      <option value="20" {% if request.GET.paginate_by == '20' %}selected{% endif %}>20</option>
-      <option value="50" {% if request.GET.paginate_by == '50' or not request.GET.paginate_by %}selected{% endif %}>50</option>
-    </select>
-    {% for key, value in request.GET.items %}
-      {% if key != 'paginate_by' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
-    {% endfor %}
+  <form method="get" class="cat-toolbar">
+    <div class="field">
+      <label for="search">Buscar</label>
+      <input type="text" id="search" name="search"
+             placeholder="Nome, classificação ou grupo"
+             value="{{ search }}">
+    </div>
+    <div class="field field-sm">
+      <label for="paginate_by">Itens por página</label>
+      <select name="paginate_by" id="paginate_by" onchange="this.form.submit()">
+        <option value="5" {% if paginate_by == '5' %}selected{% endif %}>5</option>
+        <option value="10" {% if paginate_by == '10' %}selected{% endif %}>10</option>
+        <option value="20" {% if paginate_by == '20' %}selected{% endif %}>20</option>
+        <option value="50" {% if paginate_by == '50' or not paginate_by %}selected{% endif %}>50</option>
+      </select>
+    </div>
+    <input type="hidden" name="order" value="{{ order }}">
+    <input type="hidden" name="dir" value="{{ dir }}">
+    <div class="field-sm">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn-buscar">
+        <i class="fas fa-search"></i> Buscar
+      </button>
+    </div>
   </form>
 
   <article>
@@ -49,11 +174,18 @@
       <table class="table table-categoria-list">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Nome</th>
-            <th>Classificação</th>
-            <th>Conta Azul</th>
-            <th>Sintético</th>
+            {% for col_key, col_label in colunas %}
+            <th class="{% if order == col_key %}is-sorted{% endif %}">
+              <a href="?search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ col_key }}&dir={% if order == col_key and dir == 'asc' %}desc{% else %}asc{% endif %}">
+                {{ col_label }}
+                {% if order == col_key %}
+                  <i class="fas fa-sort-{% if dir == 'asc' %}up{% else %}down{% endif %} sort-icon"></i>
+                {% else %}
+                  <i class="fas fa-sort sort-icon"></i>
+                {% endif %}
+              </a>
+            </th>
+            {% endfor %}
             <th>Editar</th>
             <th>Excluir</th>
           </tr>
@@ -64,13 +196,19 @@
             <td>{{ cat.id }}</td>
             <td>{{ cat.nome }}</td>
             <td>{{ cat.classificacao }}</td>
+            <td class="small text-muted">{{ cat.grupo|default:"—" }}</td>
             <td class="small">
               {% if cat.conta_azul_id %}<span class="badge bg-info text-dark" title="{{ cat.conta_azul_id }}">CA</span>{% else %}—{% endif %}
               {% if cat.bloquear_sync_conta_azul %}<span class="badge bg-secondary" title="Não altera na sync Conta Azul">🔒</span>{% endif %}
             </td>
+            <td>{{ cat.get_tipo_display|default:cat.tipo }}</td>
             <td>{{ cat.sintetico }}</td>
             <td><a href="{% url 'categoria:cat-update' cat.id %}" role="button" class="secondary"><i class="fa-solid fa-pen-to-square"></i></a></td>
             <td><a href="{% url 'categoria:cat-delete' cat.pk %}" role="button" class="contrast" onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"><i class="fas fa-trash"></i></a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center text-muted py-4">Nenhuma categoria encontrada.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -79,25 +217,26 @@
   </article>
 
   {% if is_paginated %}
-  <nav aria-label="Paginação" style="margin-top: 1rem;">
-    <ul style="display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0;">
+  <nav class="cat-pagination" aria-label="Paginação">
+    <ul>
       {% if page_obj.has_previous %}
-        <li><a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Primeira</a></li>
-        <li><a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Anterior</a></li>
+        <li><a href="?page=1&search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ order }}&dir={{ dir }}" role="button" class="secondary">Primeira</a></li>
+        <li><a href="?page={{ page_obj.previous_page_number }}&search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ order }}&dir={{ dir }}" role="button" class="secondary">Anterior</a></li>
       {% endif %}
       {% for num in page_obj.paginator.page_range %}
         {% if page_obj.number == num %}
           <li><span role="button" aria-current="page">{{ num }}</span></li>
         {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-          <li><a href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">{{ num }}</a></li>
+          <li><a href="?page={{ num }}&search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ order }}&dir={{ dir }}" role="button" class="secondary">{{ num }}</a></li>
         {% endif %}
       {% endfor %}
       {% if page_obj.has_next %}
-        <li><a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Próxima</a></li>
-        <li><a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.paginate_by %}&paginate_by={{ request.GET.paginate_by }}{% endif %}" role="button" class="secondary">Última</a></li>
+        <li><a href="?page={{ page_obj.next_page_number }}&search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ order }}&dir={{ dir }}" role="button" class="secondary">Próxima</a></li>
+        <li><a href="?page={{ page_obj.paginator.num_pages }}&search={{ search|urlencode }}&paginate_by={{ paginate_by }}&order={{ order }}&dir={{ dir }}" role="button" class="secondary">Última</a></li>
       {% endif %}
     </ul>
     <p><small>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}. Total: {{ page_obj.paginator.count }} itens.</small></p>
   </nav>
   {% endif %}
+</div>
 {% endblock %}

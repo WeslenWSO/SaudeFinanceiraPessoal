@@ -187,6 +187,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # Sync Conta Azul / OneDrive: evita OperationalError "database is locked"
+        'OPTIONS': {
+            'timeout': 60,
+        },
     }
 }
 

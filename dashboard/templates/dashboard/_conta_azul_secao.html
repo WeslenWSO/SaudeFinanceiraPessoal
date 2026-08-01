@@ -208,32 +208,42 @@
       </div>
     </div>
     <div class="tab-pane fade" id="ca-cad">
+      <h6 class="fw-semibold mb-2">
+        Saldos das contas (Conta Azul)
+        <span class="text-muted fw-normal small">— só saldo &gt; zero</span>
+      </h6>
       {% if conta_azul.contas_display %}
-      <h6 class="fw-semibold mb-2">Saldos das contas (Conta Azul) — {{ conta_azul.contagens.contas }} conta(s)</h6>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
-            <tr><th>Conta</th><th>Banco</th><th class="text-end">Saldo</th><th class="text-end">Atualizado</th></tr>
+            <tr>
+              <th>Conta</th>
+              <th>Banco</th>
+              <th class="text-end">Saldo</th>
+              <th class="text-end">Data do saldo</th>
+            </tr>
           </thead>
           <tbody>
             {% for ct in conta_azul.contas_display %}
             <tr>
               <td>{{ ct.nome }}{% if not ct.ativo %} <span class="badge bg-secondary">inativa</span>{% endif %}</td>
               <td class="text-muted small">{{ ct.banco }}</td>
-              <td class="text-end text-nowrap">{% if ct.saldo is not None %}R$ {{ ct.saldo|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-end text-nowrap">R$ {{ ct.saldo|floatformat:2 }}</td>
               <td class="text-end text-muted small">{% if ct.saldo_em %}{{ ct.saldo_em|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
           <tfoot class="table-light">
             <tr>
-              <th colspan="2">Total</th>
+              <th colspan="2">Total ({{ conta_azul.contas_display|length }} conta{{ conta_azul.contas_display|length|pluralize:"s" }})</th>
               <th class="text-end">R$ {{ conta_azul.totais.saldo_contas_ca|floatformat:2 }}</th>
               <th></th>
             </tr>
           </tfoot>
         </table>
       </div>
+      {% else %}
+      <p class="text-muted small mb-4">Nenhuma conta com saldo maior que zero.</p>
       {% endif %}
       <div class="row g-3">
         <div class="col-md-6">

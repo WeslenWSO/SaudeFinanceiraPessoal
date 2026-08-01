@@ -25,6 +25,16 @@ class CatList(ListView):
     paginate_by = 10  # if pagination is desired
     template_name = "cat-List.html"
 
+    SORT_FIELDS = {
+        'id': 'id',
+        'nome': 'nome',
+        'classificacao': 'classificacao',
+        'grupo': 'grupo',
+        'tipo': 'tipo',
+        'sintetico': 'sintetico',
+        'conta_azul': 'conta_azul_id',
+    }
+
     def get_paginate_by(self, queryset):
         return self.request.GET.get('paginate_by', 50)
 
@@ -39,16 +49,41 @@ class CatList(ListView):
         if search_query:
             qs = qs.filter(
                 models.Q(nome__icontains=search_query) |
-                models.Q(classificacao__icontains=search_query)
+                models.Q(classificacao__icontains=search_query) |
+                models.Q(grupo__icontains=search_query)
             )
 
-        qs = qs.order_by("classificacao")
+        order = (self.request.GET.get('order') or 'classificacao').strip().lower()
+        direction = (self.request.GET.get('dir') or 'asc').strip().lower()
+        field = self.SORT_FIELDS.get(order, 'classificacao')
+        if direction == 'desc':
+            field = f'-{field}'
+        qs = qs.order_by(field, 'id')
         return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["descricao"] = 'Lista de Categoria'
         context["now"] = timezone.now()
+        order = (self.request.GET.get('order') or 'classificacao').strip().lower()
+        direction = (self.request.GET.get('dir') or 'asc').strip().lower()
+        if order not in self.SORT_FIELDS:
+            order = 'classificacao'
+        if direction not in ('asc', 'desc'):
+            direction = 'asc'
+        context['order'] = order
+        context['dir'] = direction
+        context['search'] = self.request.GET.get('search', '')
+        context['paginate_by'] = self.request.GET.get('paginate_by', '50')
+        context['colunas'] = [
+            ('id', 'ID'),
+            ('nome', 'Nome'),
+            ('classificacao', 'Classificação'),
+            ('grupo', 'Grupo'),
+            ('conta_azul', 'Conta Azul'),
+            ('tipo', 'Tipo'),
+            ('sintetico', 'Sintético'),
+        ]
         return context
     
 class CatUpdate(UpdateView):
@@ -71,7 +106,7 @@ class CatUpdate(UpdateView):
         return qs
 
     def form_valid(self, form):
-        messages.success(self.request, "The task was updated successfully.")
+        messages.success(self.request, "Categoria atualizada com sucesso.")
         return super(CatUpdate,self).form_valid(form)
 
     def get_context_data(self, **kwargs):
@@ -108,7 +143,7 @@ class CatCreate(CreateView):
 
     def form_valid(self, form):
         form.instance.user = self.request.user
-        messages.success(self.request, "The task was created successfully.")
+        messages.success(self.request, "Categoria criada com sucesso.")
         return super(CatCreate,self).form_valid(form)
 
 

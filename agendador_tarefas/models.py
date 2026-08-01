@@ -181,10 +181,55 @@ def registrar_passagem_responsavel(
     novo = (responsavel_novo or '').strip()
     if ant == novo:
         return None
-    return TarefaResponsavelLog.objects.create(
+    obs = (observacao or '').strip()
+    log = TarefaResponsavelLog.objects.create(
         tarefa=tarefa,
         responsavel_anterior=ant,
         responsavel_novo=novo,
         alterado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
-        observacao=(observacao or '').strip(),
+        observacao=obs,
     )
+    if ant and novo:
+        texto = f'Responsável alterado: {ant} → {novo}.'
+    elif novo:
+        texto = f'Responsável definido: {novo}.'
+    else:
+        texto = f'Responsável removido (antes: {ant}).'
+    if obs and obs.lower() not in ('atribuição inicial', 'atribuicao inicial'):
+        texto = f'{texto} {obs}'
+    TarefaTramite.objects.create(
+        tarefa=tarefa,
+        autor=usuario if getattr(usuario, 'is_authenticated', False) else None,
+        texto=texto,
+    )
+    return log
+
+
+class TarefaTramite(models.Model):
+    """Anotações / trâmites da tarefa (passagem de plantão, andamento, etc.)."""
+
+    tarefa = models.ForeignKey(
+        TarefaAgendada,
+        on_delete=models.CASCADE,
+        related_name='tramites',
+        verbose_name='Tarefa',
+    )
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tramites_tarefa',
+        verbose_name='Autor',
+    )
+    texto = models.TextField(verbose_name='Trâmite')
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name='Quando')
+
+    class Meta:
+        verbose_name = 'Trâmite da tarefa'
+        verbose_name_plural = 'Trâmites das tarefas'
+        ordering = ['criado_em']
+
+    def __str__(self):
+        trecho = (self.texto or '')[:60]
+        return f'{self.tarefa_id}: {trecho}'

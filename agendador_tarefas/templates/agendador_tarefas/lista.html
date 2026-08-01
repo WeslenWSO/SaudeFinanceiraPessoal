@@ -96,6 +96,17 @@
                         <td>{{ t.responsavel|default:"—" }}</td>
                         <td class="text-end text-nowrap">
                             <div class="btn-group btn-group-sm">
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        title="Trâmites"
+                                        data-tramites-btn
+                                        data-tarefa-id="{{ t.pk }}"
+                                        data-tarefa-titulo="{{ t.titulo }}">
+                                    <i class="fas fa-comments"></i>
+                                    {% if t.tramites_count %}
+                                    <span class="badge bg-secondary tramites-count">{{ t.tramites_count }}</span>
+                                    {% endif %}
+                                </button>
                                 <a href="{% url 'agendador_tarefas:editar' t.pk %}" class="btn btn-outline-primary" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -119,4 +130,6 @@
         </div>
     </div>
 </div>
+
+{% include 'agendador_tarefas/_modal_tramites.html' %}
 {% endblock %}

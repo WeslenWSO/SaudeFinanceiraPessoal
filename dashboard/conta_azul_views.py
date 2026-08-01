@@ -6,7 +6,7 @@ from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError
+from django.db import IntegrityError, OperationalError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -343,6 +343,14 @@ def conta_azul_sincronizar(request, pk):
                 f'Conflito ao gravar dados (conta/categoria duplicada). '
                 f'Detalhe: {exc}. Tente sincronizar só cadastros primeiro.',
             )
+        except OperationalError as exc:
+            messages.error(
+                request,
+                'Banco SQLite ocupado (database is locked). '
+                'Feche outras abas/terminais usando o sistema, pause a sync do OneDrive '
+                'na pasta do projeto e tente de novo em alguns segundos. '
+                f'Detalhe: {exc}',
+            )
         except ContaAzulAPIError as exc:
             messages.error(request, f'Erro na sincronização: {exc}')
         return redirect('empresa:conta_azul_sincronizar', pk=pk)
@@ -398,6 +406,13 @@ def conta_azul_sincronizar_dashboard(request):
         )
         nivel, texto = mensagem_resultado_sync(stats)
         getattr(messages, nivel)(request, texto)
+    except OperationalError as exc:
+        messages.error(
+            request,
+            'Banco SQLite ocupado (database is locked). '
+            'Feche outras abas do sistema / pause o OneDrive e tente novamente. '
+            f'Detalhe: {exc}',
+        )
     except ContaAzulAPIError as exc:
         messages.error(request, f'Erro: {exc}')
     from django.urls import reverse

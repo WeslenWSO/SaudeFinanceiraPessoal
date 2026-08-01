@@ -1,0 +1,178 @@
+{# Modal de trâmites da tarefa — incluir uma vez na página da lista/calendário #}
+<div class="modal fade" id="modalTramitesTarefa" tabindex="-1" aria-labelledby="modalTramitesTarefaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="modalTramitesTarefaLabel">
+                    <i class="fas fa-comments me-1"></i> Trâmites
+                    <small class="text-muted fw-normal d-block" id="modalTramitesTitulo" style="font-size:0.85rem;"></small>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalTramitesLista" class="mb-3" style="max-height:280px; overflow-y:auto;">
+                    <p class="text-muted small mb-0">Carregando…</p>
+                </div>
+                <form id="formTramiteTarefa">
+                    {% csrf_token %}
+                    <label class="form-label small mb-1" for="tramiteTexto">Novo trâmite</label>
+                    <textarea id="tramiteTexto" name="texto" class="form-control form-control-sm" rows="3"
+                              placeholder="Ex.: Emily parou às 12h — guias lançadas até 28/07&#10;Weslen (tarde) lançou até 31/07" required></textarea>
+                    <div id="tramiteErro" class="text-danger small mt-1 d-none"></div>
+                    <div class="d-flex justify-content-end gap-2 mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" id="btnSalvarTramite">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modalEl = document.getElementById('modalTramitesTarefa');
+    if (!modalEl) return;
+
+    var tarefaIdAtual = null;
+    var listaEl = document.getElementById('modalTramitesLista');
+    var tituloEl = document.getElementById('modalTramitesTitulo');
+    var formEl = document.getElementById('formTramiteTarefa');
+    var textoEl = document.getElementById('tramiteTexto');
+    var erroEl = document.getElementById('tramiteErro');
+    var btnSalvar = document.getElementById('btnSalvarTramite');
+    var csrfInput = formEl.querySelector('[name=csrfmiddlewaretoken]');
+
+    function urlListar(id) {
+        return '{% url "agendador_tarefas:tramites" 0 %}'.replace('/0/', '/' + id + '/');
+    }
+    function urlAdicionar(id) {
+        return '{% url "agendador_tarefas:tramite_adicionar" 0 %}'.replace('/0/', '/' + id + '/');
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function renderLista(tramites) {
+        if (!tramites || !tramites.length) {
+            listaEl.innerHTML = '<p class="text-muted small mb-0">Nenhum trâmite ainda. Escreva o andamento abaixo.</p>';
+            return;
+        }
+        var html = '<ul class="list-unstyled mb-0">';
+        tramites.forEach(function (t) {
+            html += '<li class="border-bottom py-2">'
+                + '<div class="d-flex justify-content-between gap-2 small text-muted">'
+                + '<strong class="text-body">' + escapeHtml(t.autor) + '</strong>'
+                + '<span>' + escapeHtml(t.criado_em) + '</span>'
+                + '</div>'
+                + '<div class="mt-1" style="white-space:pre-wrap;">' + escapeHtml(t.texto) + '</div>'
+                + '</li>';
+        });
+        html += '</ul>';
+        listaEl.innerHTML = html;
+        listaEl.scrollTop = listaEl.scrollHeight;
+    }
+
+    function atualizarBadge(tarefaId, count) {
+        var btn = document.querySelector('[data-tramites-btn][data-tarefa-id="' + tarefaId + '"]');
+        if (!btn) return;
+        var badge = btn.querySelector('.tramites-count');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'badge bg-secondary tramites-count ms-1';
+                btn.appendChild(badge);
+            }
+            badge.textContent = String(count);
+            badge.classList.remove('d-none');
+        } else if (badge) {
+            badge.classList.add('d-none');
+        }
+    }
+
+    function abrirModal(tarefaId, titulo) {
+        tarefaIdAtual = tarefaId;
+        tituloEl.textContent = titulo || '';
+        textoEl.value = '';
+        erroEl.classList.add('d-none');
+        listaEl.innerHTML = '<p class="text-muted small mb-0">Carregando…</p>';
+
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        fetch(urlListar(tarefaId), { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) {
+                    listaEl.innerHTML = '<p class="text-danger small mb-0">' + escapeHtml(data.erro || 'Erro ao carregar.') + '</p>';
+                    return;
+                }
+                if (data.titulo) tituloEl.textContent = data.titulo;
+                renderLista(data.tramites);
+            })
+            .catch(function () {
+                listaEl.innerHTML = '<p class="text-danger small mb-0">Falha ao carregar trâmites.</p>';
+            });
+    }
+
+    document.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('[data-tramites-btn]');
+        if (!btn) return;
+        ev.preventDefault();
+        abrirModal(btn.getAttribute('data-tarefa-id'), btn.getAttribute('data-tarefa-titulo') || '');
+    });
+
+    formEl.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        if (!tarefaIdAtual) return;
+        var texto = (textoEl.value || '').trim();
+        if (!texto) {
+            erroEl.textContent = 'Escreva o trâmite.';
+            erroEl.classList.remove('d-none');
+            return;
+        }
+        erroEl.classList.add('d-none');
+        btnSalvar.disabled = true;
+
+        var body = new FormData();
+        body.append('texto', texto);
+        body.append('csrfmiddlewaretoken', csrfInput ? csrfInput.value : '');
+
+        fetch(urlAdicionar(tarefaIdAtual), {
+            method: 'POST',
+            body: body,
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) { return r.json().then(function (data) { return { okHttp: r.ok, data: data }; }); })
+            .then(function (res) {
+                if (!res.data.ok) {
+                    erroEl.textContent = res.data.erro || 'Não foi possível salvar.';
+                    erroEl.classList.remove('d-none');
+                    return;
+                }
+                textoEl.value = '';
+                // Recarrega lista completa para manter ordem
+                return fetch(urlListar(tarefaIdAtual), { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ok) renderLista(data.tramites);
+                        atualizarBadge(tarefaIdAtual, res.data.tramites_count || (data.tramites || []).length);
+                    });
+            })
+            .catch(function () {
+                erroEl.textContent = 'Falha ao salvar o trâmite.';
+                erroEl.classList.remove('d-none');
+            })
+            .finally(function () {
+                btnSalvar.disabled = false;
+            });
+    });
+})();
+</script>

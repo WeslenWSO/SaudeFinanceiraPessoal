@@ -3,13 +3,35 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Callable, TypeVar
 
-from django.db import IntegrityError
+from django.db import IntegrityError, OperationalError, connection
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+
+T = TypeVar('T')
+
+
+def _com_retry_sqlite(fn: Callable[[], T], *, tentativas: int = 6) -> T:
+    """Repete em 'database is locked' (SQLite + OneDrive / sync longo)."""
+    ultimo: Exception | None = None
+    for i in range(tentativas):
+        try:
+            return fn()
+        except OperationalError as exc:
+            ultimo = exc
+            if 'locked' not in str(exc).lower():
+                raise
+            try:
+                connection.close()
+            except Exception:
+                pass
+            time.sleep(0.4 * (i + 1))
+    assert ultimo is not None
+    raise ultimo
 
 from categoria.models import Categoria, CentroCusto
 from cliente.models import Cliente
@@ -979,31 +1001,34 @@ def sincronizar_conta_azul(
     data_ate: date | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    client = ContaAzulClient.para_empresa(empresa)
-    resultado: dict[str, Any] = {}
-    if cadastros:
-        resultado['categorias'] = importar_categorias(empresa, client, dry_run=dry_run)
-        resultado['centros_custo'] = importar_centros_custo(empresa, client, dry_run=dry_run)
-        resultado['contas'] = importar_contas_financeiras(empresa, client, dry_run=dry_run)
-        resultado['clientes'] = importar_clientes(empresa, client, dry_run=dry_run)
-        resultado['fornecedores'] = importar_fornecedores(empresa, client, dry_run=dry_run)
-    if data_de and data_ate:
-        if receitas:
-            resultado['receitas'] = importar_receitas(
-                empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
-            )
-        if despesas:
-            resultado['despesas'] = importar_despesas(
-                empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
-            )
-        if transferencias:
-            resultado['transferencias'] = importar_transferencias(
-                empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
-            )
-    cfg = getattr(empresa, 'conta_azul_config', None)
-    if cfg and not dry_run:
-        cfg.save(update_fields=['atualizado_em'])
-    return resultado
+    def _rodar() -> dict[str, Any]:
+        client = ContaAzulClient.para_empresa(empresa)
+        resultado: dict[str, Any] = {}
+        if cadastros:
+            resultado['categorias'] = importar_categorias(empresa, client, dry_run=dry_run)
+            resultado['centros_custo'] = importar_centros_custo(empresa, client, dry_run=dry_run)
+            resultado['contas'] = importar_contas_financeiras(empresa, client, dry_run=dry_run)
+            resultado['clientes'] = importar_clientes(empresa, client, dry_run=dry_run)
+            resultado['fornecedores'] = importar_fornecedores(empresa, client, dry_run=dry_run)
+        if data_de and data_ate:
+            if receitas:
+                resultado['receitas'] = importar_receitas(
+                    empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
+                )
+            if despesas:
+                resultado['despesas'] = importar_despesas(
+                    empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
+                )
+            if transferencias:
+                resultado['transferencias'] = importar_transferencias(
+                    empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
+                )
+        cfg = getattr(empresa, 'conta_azul_config', None)
+        if cfg and not dry_run:
+            cfg.save(update_fields=['atualizado_em'])
+        return resultado
+
+    return _com_retry_sqlite(_rodar)
 
 
 def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:

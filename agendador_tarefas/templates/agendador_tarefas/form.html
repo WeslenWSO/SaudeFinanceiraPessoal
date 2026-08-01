@@ -6,11 +6,26 @@
 
 {% block conteudo %}
 <div class="container-fluid">
-    <div class="mb-3">
-        <h3 class="mb-0">{{ title }}</h3>
-        <small class="text-muted">
-            {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }}{% else %}Tarefa geral (sem empresa){% endif %}
-        </small>
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0">{{ title }}</h3>
+            <small class="text-muted">
+                {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }}{% else %}Tarefa geral (sem empresa){% endif %}
+            </small>
+        </div>
+        {% if tarefa %}
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                title="Trâmites"
+                data-tramites-btn
+                data-tarefa-id="{{ tarefa.pk }}"
+                data-tarefa-titulo="{{ tarefa.titulo }}">
+            <i class="fas fa-comments"></i> Trâmites
+            {% if tramites %}
+            <span class="badge bg-secondary tramites-count">{{ tramites|length }}</span>
+            {% endif %}
+        </button>
+        {% endif %}
     </div>
 
     {% include 'parcial/_messages.html' %}
@@ -103,6 +118,45 @@
         </div>
     </div>
 
+    {% if tarefa %}
+    <div class="card mt-3">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <strong><i class="fas fa-comments"></i> Trâmites desta tarefa</strong>
+            <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-tramites-btn
+                    data-tarefa-id="{{ tarefa.pk }}"
+                    data-tarefa-titulo="{{ tarefa.titulo }}">
+                <i class="fas fa-plus"></i> Novo trâmite
+            </button>
+        </div>
+        <div class="card-body py-2">
+            {% if tramites %}
+            <ul class="list-unstyled mb-0">
+                {% for t in tramites %}
+                <li class="border-bottom py-2">
+                    <div class="d-flex justify-content-between gap-2 small text-muted">
+                        <strong class="text-body">
+                            {% if t.autor %}
+                                {{ t.autor.get_full_name|default:t.autor.username }}
+                            {% else %}—{% endif %}
+                        </strong>
+                        <span>{{ t.criado_em|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <div class="mt-1" style="white-space:pre-wrap;">{{ t.texto }}</div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted small mb-0">
+                Nenhum trâmite ainda. Use <strong>Novo trâmite</strong> para registrar o andamento
+                (ex.: Emily parou às 12h — guias até 28/07).
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     {% if tarefa and logs_responsavel %}
     <div class="card mt-3">
         <div class="card-header py-2">
@@ -139,4 +193,8 @@
     </div>
     {% endif %}
 </div>
+
+{% if tarefa %}
+{% include 'agendador_tarefas/_modal_tramites.html' %}
+{% endif %}
 {% endblock %}

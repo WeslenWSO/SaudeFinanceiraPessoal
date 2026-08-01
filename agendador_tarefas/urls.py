@@ -11,4 +11,6 @@ urlpatterns = [
     path('<int:pk>/excluir/', views.tarefa_excluir, name='excluir'),
     path('<int:pk>/concluir/', views.tarefa_concluir, name='concluir'),
     path('<int:pk>/status/', views.tarefa_alterar_status, name='alterar_status'),
+    path('<int:pk>/tramites/', views.tarefa_tramites_listar, name='tramites'),
+    path('<int:pk>/tramites/adicionar/', views.tarefa_tramite_adicionar, name='tramite_adicionar'),
 ]

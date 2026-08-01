@@ -5,17 +5,19 @@ from collections import defaultdict
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from empresa.models import Empresa
 
 from .forms import TarefaAgendadaForm
-from .models import TarefaAgendada, registrar_passagem_responsavel
+from .models import TarefaAgendada, TarefaTramite, registrar_passagem_responsavel
+from .usuarios_empresa import rotulo_responsavel
 
 
 def _empresa_sessao(request):
@@ -77,6 +79,7 @@ def _queryset_tarefas(empresa, mes, ano, status, q):
         TarefaAgendada.objects.filter(_escopo_tarefas(empresa))
         .filter(previsao_conclusao__month=mes, previsao_conclusao__year=ano)
         .select_related('criado_por', 'concluido_por', 'empresa')
+        .annotate(tramites_count=Count('tramites'))
         .order_by('previsao_conclusao', 'hora_inicio', 'titulo')
     )
     if status:
@@ -88,6 +91,18 @@ def _queryset_tarefas(empresa, mes, ano, status, q):
             | Q(responsavel__icontains=q)
         )
     return qs
+
+
+def _tramite_payload(tramite: TarefaTramite) -> dict:
+    autor = ''
+    if tramite.autor_id:
+        autor = rotulo_responsavel(tramite.autor)
+    return {
+        'id': tramite.pk,
+        'texto': tramite.texto,
+        'autor': autor or '—',
+        'criado_em': timezone.localtime(tramite.criado_em).strftime('%d/%m/%Y %H:%M'),
+    }
 
 
 def _montar_calendario(mes, ano, tarefas):
@@ -202,7 +217,10 @@ def tarefa_criar(request):
 def tarefa_editar(request, pk):
     empresa = _empresa_sessao(request)
     tarefa = get_object_or_404(
-        TarefaAgendada.objects.prefetch_related('logs_responsavel__alterado_por'),
+        TarefaAgendada.objects.prefetch_related(
+            'logs_responsavel__alterado_por',
+            'tramites__autor',
+        ),
         pk=pk,
     )
     if not _usuario_pode_tarefa(tarefa, empresa):
@@ -251,6 +269,7 @@ def tarefa_editar(request, pk):
         'empresa': empresa,
         'tarefa': tarefa,
         'logs_responsavel': tarefa.logs_responsavel.all(),
+        'tramites': tarefa.tramites.all(),
     })
 
 
@@ -314,3 +333,47 @@ def tarefa_alterar_status(request, pk):
     tarefa.save(update_fields=['status', 'data_conclusao', 'concluido_por', 'atualizado_em'])
     messages.success(request, f'Status de "{tarefa.titulo}" atualizado.')
     return _redirect_voltar(request)
+
+
+@login_required
+@require_GET
+def tarefa_tramites_listar(request, pk):
+    empresa = _empresa_sessao(request)
+    tarefa = get_object_or_404(TarefaAgendada, pk=pk)
+    if not _usuario_pode_tarefa(tarefa, empresa):
+        return JsonResponse({'ok': False, 'erro': 'Tarefa não disponível.'}, status=403)
+
+    itens = [
+        _tramite_payload(t)
+        for t in tarefa.tramites.select_related('autor').order_by('criado_em')
+    ]
+    return JsonResponse({
+        'ok': True,
+        'tarefa_id': tarefa.pk,
+        'titulo': tarefa.titulo,
+        'tramites': itens,
+    })
+
+
+@login_required
+@require_http_methods(['POST'])
+def tarefa_tramite_adicionar(request, pk):
+    empresa = _empresa_sessao(request)
+    tarefa = get_object_or_404(TarefaAgendada, pk=pk)
+    if not _usuario_pode_tarefa(tarefa, empresa):
+        return JsonResponse({'ok': False, 'erro': 'Tarefa não disponível.'}, status=403)
+
+    texto = (request.POST.get('texto') or '').strip()
+    if not texto:
+        return JsonResponse({'ok': False, 'erro': 'Escreva o trâmite.'}, status=400)
+
+    tramite = TarefaTramite.objects.create(
+        tarefa=tarefa,
+        autor=request.user,
+        texto=texto,
+    )
+    return JsonResponse({
+        'ok': True,
+        'tramite': _tramite_payload(tramite),
+        'tramites_count': tarefa.tramites.count(),
+    })

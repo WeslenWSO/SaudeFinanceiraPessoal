@@ -217,15 +217,15 @@ def montar_resumo_conta_azul(empresa, data_inicio: date, data_fim: date) -> dict
     contas_qs = (
         ContaBancaria.objects.filter(empresa=empresa)
         .exclude(conta_azul_id='')
+        .filter(saldo_conta_azul__gt=0)
         .select_related('banco')
-        .order_by('descricao')[:20]
+        .order_by('-saldo_conta_azul', 'descricao')
     )
     total_saldo_ca = Decimal('0')
     contas_display = []
     for c in contas_qs:
-        saldo = c.saldo_conta_azul
-        if saldo is not None:
-            total_saldo_ca += saldo
+        saldo = c.saldo_conta_azul or Decimal('0')
+        total_saldo_ca += saldo
         contas_display.append(
             {
                 'nome': c.descricao or str(c),
