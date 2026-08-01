@@ -216,6 +216,42 @@ def _parse_hora_minutos(valor):
     return hora * 60 + minuto
 
 
+def _parse_data_filtro(valor) -> date | None:
+    """
+    Converte string de filtro em date (YYYY-MM-DD ou DD/MM/YYYY).
+    Rejeita ano fora de 2000-2100. Corrige 0206-07-29 -> 2026-07-29
+    (ano 206 no filtro liberava todo o historico desde 2023).
+    """
+    if isinstance(valor, datetime):
+        valor = valor.date()
+    if isinstance(valor, date):
+        return valor if 2000 <= valor.year <= 2100 else None
+    texto = (valor or '').strip()
+    if not texto:
+        return None
+    # 0206-MM-DD (ano 206) -> 2026-MM-DD (digitos 0,2,0,6 -> 2,0,2,6)
+    m = re.match(r'^0(\d)(\d)(\d)-(\d{2})-(\d{2})$', texto)
+    if m:
+        texto = f'2{m.group(2)}{m.group(1)}{m.group(3)}-{m.group(4)}-{m.group(5)}'
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+        try:
+            d = datetime.strptime(texto, fmt).date()
+        except ValueError:
+            continue
+        if 2000 <= d.year <= 2100:
+            return d
+        return None
+    return None
+
+
+def _periodo_filtro_padrao(hoje: date | None = None) -> tuple[date, date]:
+    hoje = hoje or date.today()
+    ini = hoje.replace(day=1)
+    proximo = hoje.replace(day=28) + timedelta(days=4)
+    fim = proximo - timedelta(days=proximo.day)
+    return ini, fim
+
+
 def _intervalos_sobrepoem(ini_a, fim_a, ini_b, fim_b):
     if None in (ini_a, fim_a, ini_b, fim_b):
         return False
@@ -1061,26 +1097,28 @@ def listar_cancelados(request):
     faturamentos = faturamentos.filter(_q_status_agendamento_cancelados())
 
     nome = request.GET.get('nome')
-    data_inicio = request.GET.get('data_inicio')
-    data_fim = request.GET.get('data_fim')
     convenios = request.GET.getlist('convenio')
     status_agendamento = request.GET.get('status_agendamento')
     situacao_vaga = (request.GET.get('situacao_vaga') or '').strip()
     maquina = (request.GET.get('maquina') or '').strip().upper()
 
     hoje = date.today()
-    if not data_inicio:
-        data_inicio = hoje.replace(day=1).strftime('%Y-%m-%d')
-    if not data_fim:
-        proximo_mes = hoje.replace(day=28) + timedelta(days=4)
-        data_fim = (proximo_mes - timedelta(days=proximo_mes.day)).strftime('%Y-%m-%d')
+    di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+    di = _parse_data_filtro(request.GET.get('data_inicio'))
+    df = _parse_data_filtro(request.GET.get('data_fim'))
+    if di is None:
+        di = di_padrao
+    if df is None:
+        df = df_padrao
+    if di > df:
+        di, df = df, di
+    data_inicio = di.isoformat()
+    data_fim = df.isoformat()
 
     if nome:
         faturamentos = faturamentos.filter(Q(nome__icontains=nome))
-    if data_inicio:
-        faturamentos = faturamentos.filter(data__gte=data_inicio)
-    if data_fim:
-        faturamentos = faturamentos.filter(data__lte=data_fim)
+    # Sempre aplica período (date objects — evita ano 0206 / string inválida)
+    faturamentos = faturamentos.filter(data__gte=di, data__lte=df)
     if convenios:
         q_objects = Q()
         for conv in convenios:
@@ -1214,18 +1252,25 @@ def listar_cancelados(request):
         })
     maquinas_opcoes.sort(key=lambda m: m['nome'])
 
-    # Querystring base para badges (mantém filtros; troca só a máquina)
-    params_filtro = request.GET.copy()
-    if 'maquina' in params_filtro:
-        del params_filtro['maquina']
-    # Garante datas padrão na URL dos badges
-    params_filtro['data_inicio'] = data_inicio
-    params_filtro['data_fim'] = data_fim
-    qs_sem_maquina = params_filtro.urlencode()
+    # Querystring limpa para badges (evita datas duplicadas/corrompidas na URL)
+    params_filtro = {
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+    }
+    if nome:
+        params_filtro['nome'] = nome
+    if status_agendamento:
+        params_filtro['status_agendamento'] = status_agendamento
+    if situacao_vaga:
+        params_filtro['situacao_vaga'] = situacao_vaga
+    convenios_sel = [c for c in convenios if c]
+    if convenios_sel:
+        params_filtro['convenio'] = convenios_sel
+    qs_sem_maquina = urlencode(params_filtro, doseq=True)
 
-    partes_filtro = []
-    if data_inicio or data_fim:
-        partes_filtro.append(f'{data_inicio or "…"} → {data_fim or "…"}')
+    partes_filtro = [
+        f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+    ]
     if nome:
         partes_filtro.append(f'paciente: {nome}')
     if status_agendamento:
@@ -1237,13 +1282,12 @@ def listar_cancelados(request):
         partes_filtro.append('só máquina vaga')
     elif situacao_vaga == 'REUTILIZADA':
         partes_filtro.append('só horário reutilizado')
-    convenios_sel = [c for c in convenios if c]
     if convenios_sel:
         if len(convenios_sel) <= 2:
             partes_filtro.append('convênio: ' + ', '.join(convenios_sel))
         else:
             partes_filtro.append(f'{len(convenios_sel)} convênios')
-    filtros_rotulo = ' · '.join(partes_filtro) if partes_filtro else 'sem filtro extra'
+    filtros_rotulo = ' · '.join(partes_filtro)
 
     context = {
         'grid_linhas': grid_linhas,
