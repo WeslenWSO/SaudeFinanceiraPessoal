@@ -9,11 +9,11 @@
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h3 class="card-title mb-0">
-                    <i class="fas fa-exchange-alt text-primary"></i> Planejamento — Real × Plan.
+                    <i class="fas fa-chart-pie text-primary"></i> Planejamento orçamentário
                 </h3>
                 <small class="text-muted">
                     {{ empresa.razao|default:"" }} · {{ ano }}
-                    · após o resultado: parcelas de empréstimo (contrato)
+                    · valores planejados · após o resultado: parcelas de empréstimo
                 </small>
             </div>
             <div class="card-tools d-flex flex-wrap align-items-center gap-2">
@@ -39,16 +39,101 @@
             </div>
         </div>
 
-        {% include 'fluxo_de_caixa/_fluxo_completo.html' %}
+        {% if grafico_torre.tem_dados %}
+        <div class="card-body border-bottom" id="blocoGraficoTorre">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
+                <small class="text-muted">Valores planejados (orçamento)</small>
+            </div>
+            <div style="position: relative; height: 320px;">
+                <canvas id="graficoTorreFluxo" aria-label="Gráfico do planejamento"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card-body table-responsive p-0">
+            <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="align-middle" style="min-width: 14rem;">Categoria</th>
+                        {% for mes in meses %}
+                        <th class="text-end">
+                            {% if mes == 1 %}Janeiro{% elif mes == 2 %}Fevereiro{% elif mes == 3 %}Março{% elif mes == 4 %}Abril{% elif mes == 5 %}Maio{% elif mes == 6 %}Junho{% elif mes == 7 %}Julho{% elif mes == 8 %}Agosto{% elif mes == 9 %}Setembro{% elif mes == 10 %}Outubro{% elif mes == 11 %}Novembro{% elif mes == 12 %}Dezembro{% endif %}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in dados %}
+                    <tr class="{% if linha.emprestimo_bloco %}table-danger{% elif linha.resultado_geral %}table-primary{% elif linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' or linha.categoria.nome == 'DESPESAS' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% endif %}"
+                        {% if linha.categoria.id %}data-categoria-id="{{ linha.categoria.id }}"{% endif %}>
+                        <td>
+                            {% if linha.subtotal %}<strong>{{ linha.categoria.nome }}</strong>
+                            {% elif linha.grupo %}<em><strong>{{ linha.categoria.nome }}</strong></em>
+                            {% else %}{% if linha.emprestimo %}<span class="ps-2">{{ linha.categoria.nome }}</span>{% else %}{{ linha.categoria.nome }}{% endif %}{% endif %}
+                        </td>
+                        {% for cel in linha.valores %}
+                        <td class="text-end {% if linha.subtotal %}fw-bold{% endif %}">{{ cel.planejado|floatformat:2 }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer small text-muted">
+            Valores = orçamento (planejado).
+            Empréstimos = valor da parcela no mês de vencimento do contrato.
+        </div>
     </div>
+</div>
+
+<!-- Modal filtro categoria -->
+<div class="modal fade" id="modalSelecionarCategoria" tabindex="-1">
+   <div class="modal-dialog modal-lg">
+       <div class="modal-content">
+           <div class="modal-header">
+               <h5 class="modal-title"><i class="fas fa-search me-2"></i>Filtrar categoria</h5>
+               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+           </div>
+           <div class="modal-body">
+               <input type="text" class="form-control" id="buscaCategoria" placeholder="Digite 4+ letras...">
+               <div id="resultadosBusca" class="mt-3" style="max-height: 300px; overflow-y: auto;"></div>
+           </div>
+           <div class="modal-footer">
+               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+               <button type="button" class="btn btn-primary" id="btnAplicarFiltro">Aplicar</button>
+           </div>
+       </div>
+   </div>
 </div>
 
 <style>
 #tabelaFluxoMensal tr.table-emprestimo-hdr > td { background: #f8d7da !important; }
 #tabelaFluxoMensal tr.table-emprestimo-hdr > td:first-child { color: #842029; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% if grafico_torre.tem_dados %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
+  const el = document.getElementById('graficoTorreFluxo');
+  if (!el) return;
+  new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: {{ grafico_torre.labels_json|safe }},
+      datasets: [
+        { label: 'Receitas Plan.', data: {{ grafico_torre.receitas_plan_json|safe }}, backgroundColor: 'rgba(25,135,84,0.85)' },
+        { label: 'Despesas Plan.', data: {{ grafico_torre.despesas_plan_json|safe }}, backgroundColor: 'rgba(220,53,69,0.85)' },
+        { label: 'Resultado Plan.', data: {{ grafico_torre.resultado_plan_json|safe }}, backgroundColor: 'rgba(13,110,253,0.85)' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+})();
+</script>
+{% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(function (tr) {
         var nome = (tr.querySelector('td') || {}).textContent || '';
         nome = nome.trim().toUpperCase();
@@ -56,7 +141,45 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.classList.add('table-emprestimo-hdr');
         }
     });
+
+    const buscaInput = document.getElementById('buscaCategoria');
+    const resultadosDiv = document.getElementById('resultadosBusca');
+    const btnLimpar = document.getElementById('btnLimparFiltro');
+    if (!buscaInput) return;
+    let categoriaSelecionada = null;
+    buscaInput.addEventListener('input', function() {
+        const termo = this.value.trim();
+        if (termo.length < 4) { resultadosDiv.innerHTML = ''; return; }
+        fetch('/fluxo_de_caixa/buscar_categorias/?q=' + encodeURIComponent(termo))
+            .then(r => r.json())
+            .then(data => {
+                const cats = data.categorias || [];
+                if (!cats.length) { resultadosDiv.innerHTML = '<div class="text-muted">Nenhuma categoria.</div>'; return; }
+                resultadosDiv.innerHTML = cats.map(c =>
+                    '<button type="button" class="list-group-item list-group-item-action cat-pick" data-id="' + c.id + '" data-nome="' + c.nome_completo + '">' + c.nome_completo + '</button>'
+                ).join('');
+                resultadosDiv.querySelectorAll('.cat-pick').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        categoriaSelecionada = { id: this.dataset.id, nome: this.dataset.nome };
+                        resultadosDiv.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                    });
+                });
+            });
+    });
+    document.getElementById('btnAplicarFiltro')?.addEventListener('click', function() {
+        if (!categoriaSelecionada) return;
+        document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(tr => {
+            const id = tr.getAttribute('data-categoria-id');
+            tr.style.display = (id && id === String(categoriaSelecionada.id)) ? '' : 'none';
+        });
+        if (btnLimpar) btnLimpar.style.display = 'inline-block';
+        bootstrap.Modal.getInstance(document.getElementById('modalSelecionarCategoria'))?.hide();
+    });
+    btnLimpar?.addEventListener('click', function() {
+        document.querySelectorAll('#tabelaFluxoMensal tbody tr').forEach(tr => { tr.style.display = ''; });
+        this.style.display = 'none';
+    });
 });
 </script>
-{% include 'fluxo_de_caixa/_fluxo_completo_scripts.html' %}
 {% endblock %}

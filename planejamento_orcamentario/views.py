@@ -746,10 +746,9 @@ def excluir(request, pk):
 @login_required
 def visao_real_plan(request):
     """
-    Mesma estrutura do Fluxo de Caixa Real × Plan., exclusiva do planejamento.
+    Visão anual do planejamento (só valores planejados por mês).
     Após o RESULTADO, lista parcelas de empréstimo (valor da parcela por mês do contrato).
     """
-    from fluxo_de_caixa.services.montar_fluxo_mensal import FLAG_PCT_LIMITE
     from planejamento_orcamentario.services.montar_visao_real_plan import montar_visao_real_plan
 
     empresa = _empresa_sessao(request)
@@ -764,12 +763,11 @@ def visao_real_plan(request):
 
     dados, grafico_torre = montar_visao_real_plan(empresa, ano)
     return render(request, 'planejamento_orcamentario/visao_real_plan.html', {
-        'title': 'Planejamento — Real × Plan.',
+        'title': 'Planejamento orçamentário',
         'empresa': empresa,
         'ano': ano,
         'anos_disponiveis': range(2020, date.today().year + 2),
         'meses': list(range(1, 13)),
         'dados': dados,
         'grafico_torre': grafico_torre,
-        'flag_pct_limite': float(FLAG_PCT_LIMITE),
     })
