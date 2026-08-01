@@ -580,6 +580,95 @@ def _maquina_por_modalidade(modalidade):
     return cod, f'Máquina {cod}'
 
 
+def _normalizar_texto_filtro(texto: str) -> str:
+    t = unicodedata.normalize('NFKD', (texto or ''))
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r'\s+', ' ', t.upper().strip())
+
+
+def _resolver_codigos_maquina(valor: str) -> set[str]:
+    """
+    Resolve filtro de máquina por código (MR, US…) ou nome
+    ('Máquina de Ressonância', 'ressonancia', etc.).
+    """
+    bruto = (valor or '').strip()
+    if not bruto:
+        return set()
+    up = bruto.upper().strip()
+    norm = _normalizar_texto_filtro(bruto)
+    # Remove prefixo comum "MAQUINA DE/DA"
+    norm_limpo = re.sub(r'^MAQUINA\s+(DE\s+|DA\s+)?', '', norm).strip()
+
+    codigos: set[str] = set()
+    # Código direto (MR, US, RX…)
+    for chave, nome in MAQUINAS_POR_MODALIDADE.values():
+        if up == chave or norm == chave:
+            codigos.add(chave)
+    if up in MAQUINAS_POR_MODALIDADE:
+        chave, _ = MAQUINAS_POR_MODALIDADE[up]
+        codigos.add(chave)
+    if codigos:
+        return codigos
+
+    # Por nome / trecho do nome
+    for chave, nome in dict(MAQUINAS_POR_MODALIDADE.values()).items():
+        nome_n = _normalizar_texto_filtro(nome)
+        nome_n_limpo = re.sub(r'^MAQUINA\s+(DE\s+|DA\s+)?', '', nome_n).strip()
+        if (
+            norm == nome_n
+            or norm_limpo == nome_n_limpo
+            or (norm_limpo and norm_limpo in nome_n)
+            or (nome_n_limpo and nome_n_limpo in norm)
+            or (norm_limpo and nome_n_limpo.startswith(norm_limpo))
+            or (norm_limpo and norm_limpo in nome_n_limpo)
+        ):
+            codigos.add(chave)
+
+    # Aliases frequentes
+    aliases = {
+        'RESSONANCIA': 'MR',
+        'RM': 'MR',
+        'MRI': 'MR',
+        'ULTRASSOM': 'US',
+        'ULTRA SOM': 'US',
+        'TOMOGRAFIA': 'CT',
+        'TOMO': 'CT',
+        'RAIO X': 'RX',
+        'RAIOX': 'RX',
+        'RX': 'RX',
+        'MAMOGRAFIA': 'MG',
+        'MAMO': 'MG',
+        'EEG': 'EG',
+        'ELETROENCEFALOGRAMA': 'EG',
+    }
+    if norm_limpo in aliases:
+        codigos.add(aliases[norm_limpo])
+    for alias, chave in aliases.items():
+        if alias in norm_limpo or norm_limpo in alias:
+            codigos.add(chave)
+
+    return codigos
+
+
+def _parece_filtro_maquina(texto: str) -> bool:
+    """True se o texto do campo paciente parece nome/código de máquina."""
+    n = _normalizar_texto_filtro(texto)
+    if not n:
+        return False
+    if n.startswith('MAQUINA'):
+        return True
+    if _resolver_codigos_maquina(texto):
+        # Evita confundir nome de paciente curto com código US/MR isolado
+        if len(n) <= 3 and n.isalpha():
+            return n in {c for c, _ in MAQUINAS_POR_MODALIDADE.values()} | set(MAQUINAS_POR_MODALIDADE)
+        return 'MAQUINA' in n or any(
+            p in n for p in (
+                'RESSON', 'ULTRA', 'TOMO', 'RAIO', 'MAMO', 'ELETRO', 'EEG',
+            )
+        )
+    return False
+
+
 def _chaves_maquina_do_faturamento(faturamento):
     """Conjunto de chaves de máquina presentes nos itens do faturamento."""
     chaves = set()
@@ -1096,11 +1185,20 @@ def listar_cancelados(request):
 
     faturamentos = faturamentos.filter(_q_status_agendamento_cancelados())
 
-    nome = request.GET.get('nome')
+    nome = (request.GET.get('nome') or '').strip()
     convenios = request.GET.getlist('convenio')
     status_agendamento = request.GET.get('status_agendamento')
     situacao_vaga = (request.GET.get('situacao_vaga') or '').strip()
-    maquina = (request.GET.get('maquina') or '').strip().upper()
+    maquina_raw = (request.GET.get('maquina') or '').strip()
+
+    # Campo "Paciente" preenchido com nome de máquina (erro comum) → usa como filtro de máquina
+    if nome and not maquina_raw and _parece_filtro_maquina(nome):
+        maquina_raw = nome
+        nome = ''
+
+    codigos_maquina = _resolver_codigos_maquina(maquina_raw)
+    # Código canônico para o <select> (primeiro do conjunto)
+    maquina = next(iter(sorted(codigos_maquina)), '') if codigos_maquina else ''
 
     hoje = date.today()
     di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
@@ -1146,6 +1244,11 @@ def listar_cancelados(request):
     for ativo in ativos_qs:
         ativos_por_data.setdefault(ativo.data, []).append(ativo)
 
+    def _passa_filtro_maquina(analise: dict) -> bool:
+        if not codigos_maquina:
+            return True
+        return (analise.get('maquina_codigo') or '').strip().upper() in codigos_maquina
+
     grid_linhas = []
     for faturamento in faturamentos:
         candidatos = ativos_por_data.get(faturamento.data, [])
@@ -1154,7 +1257,7 @@ def listar_cancelados(request):
             analise = _analisar_vaga_maquina(faturamento, '-', candidatos)
             if situacao_vaga and analise['situacao'] != situacao_vaga:
                 continue
-            if maquina and (analise.get('maquina_codigo') or '') != maquina:
+            if not _passa_filtro_maquina(analise):
                 continue
             grid_linhas.append({
                 'faturamento': faturamento,
@@ -1170,7 +1273,7 @@ def listar_cancelados(request):
             analise = _analisar_vaga_maquina(faturamento, modalidade, candidatos)
             if situacao_vaga and analise['situacao'] != situacao_vaga:
                 continue
-            if maquina and (analise.get('maquina_codigo') or '') != maquina:
+            if not _passa_filtro_maquina(analise):
                 continue
             valor_item = item.total if item.total is not None else (item.valor or 0)
             grid_linhas.append({

@@ -55,15 +55,20 @@
                     <form method="GET" class="mb-4">
                         <div class="row g-2">
                             <div class="col-md-2">
-                                <input type="text" name="nome" class="form-control" placeholder="Paciente" value="{{ filtros.nome|default:'' }}">
+                                <label class="form-label small mb-0 text-muted">Paciente</label>
+                                <input type="text" name="nome" class="form-control" placeholder="Nome do paciente"
+                                       value="{{ filtros.nome|default:'' }}">
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label small mb-0 text-muted">Data início</label>
                                 <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label small mb-0 text-muted">Data fim</label>
                                 <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label small mb-0 text-muted">Status</label>
                                 <select name="status_agendamento" class="form-select">
                                     <option value="">Todos os status</option>
                                     {% for st in status_opcoes %}
@@ -72,11 +77,12 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <select name="maquina" class="form-select">
+                                <label class="form-label small mb-0 text-muted">Máquina</label>
+                                <select name="maquina" class="form-select" id="filtroMaquina">
                                     <option value="">Máquina (todas)</option>
                                     {% for m in maquinas_opcoes %}
                                     <option value="{{ m.codigo }}" {% if filtros.maquina == m.codigo %}selected{% endif %}>
-                                        {{ m.codigo }} — {{ m.nome }}
+                                        {{ m.nome }}
                                     </option>
                                     {% endfor %}
                                 </select>
