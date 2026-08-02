@@ -473,6 +473,16 @@ LOGGING = {
         },
     },
     "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "OPCARTAO": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "SaudeFinanceira.openfinanceSicoob": {
             "handlers": ["console"],
             "level": "DEBUG",

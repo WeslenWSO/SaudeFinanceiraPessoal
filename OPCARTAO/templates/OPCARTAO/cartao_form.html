@@ -12,17 +12,25 @@
           {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
           <form method="post" novalidate>
             {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors|striptags }}</div>
+            {% endif %}
             {% for field in form %}
-            <div class="mb-3">
+            <div class="mb-3{% if field.name == 'ativo' %} form-check{% endif %}">
+              {% if field.name == 'ativo' %}
+              {{ field }}
+              <label for="{{ field.id_for_label }}" class="form-check-label">{{ field.label }}</label>
+              {% else %}
               <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
               {{ field }}
+              {% endif %}
               {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
               {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
             </div>
             {% endfor %}
             <div class="d-flex gap-2">
               <button type="submit" class="btn btn-primary">Salvar</button>
-              <a href="{% url 'opcartao:cartao_listar' %}" class="btn btn-secondary">Cancelar</a>
+              <a href="{% url 'opcartao:cartao_listar' %}" class="btn btn-outline-primary">Cancelar</a>
             </div>
           </form>
         </div>

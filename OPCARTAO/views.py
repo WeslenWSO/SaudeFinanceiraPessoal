@@ -1,7 +1,10 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q, Sum
+from django.db.utils import DatabaseError, IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 
 from empresa.models import Empresa, UsuarioEmpresa
@@ -14,11 +17,20 @@ from .models import CartaoCredito, FaturaCartaoCredito, ItemFaturaCartao
 from .sicredi_pdf import parse_fatura_sicredi_pdf
 from .sicoob_pdf import parse_fatura_sicoob_pdf
 
+logger = logging.getLogger(__name__)
+
 
 def _empresa_da_sessao(request):
     empresa_id = request.session.get('empresa_id')
-    if empresa_id:
-        return Empresa.objects.get(id=empresa_id)
+    if empresa_id not in (None, ''):
+        try:
+            empresa_id = int(empresa_id)
+        except (TypeError, ValueError) as exc:
+            raise Empresa.DoesNotExist from exc
+        empresa = Empresa.objects.filter(id=empresa_id).first()
+        if empresa is None:
+            raise Empresa.DoesNotExist
+        return empresa
     usuario_empresa = UsuarioEmpresa.objects.filter(usuario=request.user, ativo=True).first()
     if not usuario_empresa:
         usuario_empresa = UsuarioEmpresa.objects.filter(usuario=request.user).first()
@@ -68,11 +80,19 @@ def cartao_novo(request):
     if request.method == 'POST':
         form = CartaoCreditoForm(request.POST)
         if form.is_valid():
-            cartao = form.save(commit=False)
-            cartao.empresa = empresa
-            cartao.save()
-            messages.success(request, 'Cartão cadastrado com sucesso.')
-            return redirect('opcartao:cartao_listar')
+            try:
+                cartao = form.save(commit=False)
+                cartao.empresa = empresa
+                cartao.save()
+            except (DatabaseError, IntegrityError) as exc:
+                logger.exception('Falha ao salvar cartão (empresa=%s): %s', empresa.pk, exc)
+                messages.error(
+                    request,
+                    'Não foi possível salvar o cartão. Verifique os dados e tente novamente.',
+                )
+            else:
+                messages.success(request, 'Cartão cadastrado com sucesso.')
+                return redirect('opcartao:cartao_listar')
     else:
         form = CartaoCreditoForm()
 
@@ -91,9 +111,17 @@ def cartao_editar(request, pk):
     if request.method == 'POST':
         form = CartaoCreditoForm(request.POST, instance=cartao)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Cartão atualizado.')
-            return redirect('opcartao:cartao_listar')
+            try:
+                form.save()
+            except (DatabaseError, IntegrityError) as exc:
+                logger.exception('Falha ao atualizar cartão pk=%s: %s', pk, exc)
+                messages.error(
+                    request,
+                    'Não foi possível atualizar o cartão. Verifique os dados e tente novamente.',
+                )
+            else:
+                messages.success(request, 'Cartão atualizado.')
+                return redirect('opcartao:cartao_listar')
     else:
         form = CartaoCreditoForm(instance=cartao)
 
@@ -256,15 +284,31 @@ def fatura_detalhe(request, pk):
     grupos_cartao = agrupar_itens_por_cartao(fatura)
     itens_list = list(itens)
     resumo_fornecedor = resumir_por_fornecedor(itens_list)
-    parcelas_futuras = resumir_parcelas_futuras(itens_list)
+    parcelas_futuras = resumir_parcelas_futuras(itens_list, fatura=fatura)
     total_lancamentos_compras = sum(r['qtd'] for r in resumo_fornecedor)
     exibir_cartao_parcelas = any(l['cartao_final'] for l in parcelas_futuras['linhas'])
+
+    mes_param = (request.GET.get('mes') or '').strip()
+    mes_selecionado = None
+    if mes_param == 'todas':
+        mes_selecionado = None
+    elif mes_param:
+        mes_selecionado = next(
+            (m for m in parcelas_futuras['meses'] if m['chave'] == mes_param),
+            None,
+        )
+    elif parcelas_futuras['meses']:
+        # Padrão: primeiro mês futuro (próxima fatura)
+        mes_selecionado = parcelas_futuras['meses'][0]
+
     return render(request, 'OPCARTAO/fatura_detalhe.html', {
         'fatura': fatura,
         'itens': itens,
         'grupos_cartao': grupos_cartao,
         'resumo_fornecedor': resumo_fornecedor,
         'parcelas_futuras': parcelas_futuras,
+        'mes_selecionado': mes_selecionado,
+        'mes_param': mes_param or (mes_selecionado['chave'] if mes_selecionado else 'todas'),
         'exibir_cartao_parcelas': exibir_cartao_parcelas,
         'total_lancamentos_compras': total_lancamentos_compras,
         'totais': totais,

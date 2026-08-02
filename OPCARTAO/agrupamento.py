@@ -2,11 +2,18 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from decimal import Decimal
+
+from dateutil.relativedelta import relativedelta
 
 from .categorias import categoria_efetiva
 
 _RE_PARCELA = re.compile(r'^(\d{1,2})/(\d{1,2})$')
+_MESES_CURTO = (
+    '', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+)
 
 
 def _enriquecer_categoria(item) -> None:
@@ -125,9 +132,38 @@ def _parse_parcela(parcela: str) -> tuple[int, int] | None:
     return atual, total
 
 
-def resumir_parcelas_futuras(itens) -> dict:
-    """Lançamentos parcelados com parcelas ainda a vencer nas próximas faturas."""
+def _base_vencimento_fatura(fatura) -> date:
+    """Próxima fatura após a atual — base para projetar meses das parcelas."""
+    if fatura is not None and getattr(fatura, 'vencimento', None):
+        return fatura.vencimento
+    hoje = date.today()
+    dia = 1
+    cartao = getattr(fatura, 'cartao', None) if fatura is not None else None
+    if cartao and getattr(cartao, 'dia_vencimento_fatura', None):
+        dia = int(cartao.dia_vencimento_fatura)
+    try:
+        return date(hoje.year, hoje.month, min(dia, 28))
+    except ValueError:
+        return hoje
+
+
+def _rotulo_mes(d: date) -> str:
+    return f'{_MESES_CURTO[d.month]}/{d.year}'
+
+
+def _fmt_parcela(atual: int, total: int) -> str:
+    return f'{atual:02d}/{total:02d}'
+
+
+def resumir_parcelas_futuras(itens, fatura=None) -> dict:
+    """Lançamentos parcelados com parcelas ainda a vencer nas próximas faturas.
+
+    Também projeta cada parcela restante mês a mês (ex.: 02/10, 03/10…).
+    """
     linhas: list[dict] = []
+    por_mes: dict[str, dict] = {}
+
+    base = _base_vencimento_fatura(fatura)
 
     for item in itens:
         if item.tipo != 'compra':
@@ -158,11 +194,41 @@ def resumir_parcelas_futuras(itens) -> dict:
             'cartao_final': item.cartao_final,
         })
 
+        for offset in range(1, restantes + 1):
+            venc = base + relativedelta(months=offset)
+            chave = f'{venc.year:04d}-{venc.month:02d}'
+            parcela_no_mes = atual + offset
+            if chave not in por_mes:
+                por_mes[chave] = {
+                    'chave': chave,
+                    'rotulo': _rotulo_mes(venc),
+                    'vencimento': venc,
+                    'linhas': [],
+                    'total': Decimal('0'),
+                    'qtd': 0,
+                }
+            por_mes[chave]['linhas'].append({
+                'descricao': item.descricao,
+                'data': item.data,
+                'parcela': _fmt_parcela(parcela_no_mes, total),
+                'parcela_atual': parcela_no_mes,
+                'parcela_total': total,
+                'valor_parcela': item.valor,
+                'cartao_final': item.cartao_final,
+            })
+            por_mes[chave]['total'] += item.valor
+            por_mes[chave]['qtd'] += 1
+
     linhas.sort(key=lambda x: (-x['total_futuro'], x['descricao']))
+    meses = [por_mes[k] for k in sorted(por_mes.keys())]
+    for mes in meses:
+        mes['linhas'].sort(key=lambda x: (-x['valor_parcela'], x['descricao']))
+
     total_futuro = sum((l['total_futuro'] for l in linhas), Decimal('0'))
     total_parcelas = sum(l['parcelas_restantes'] for l in linhas)
     return {
         'linhas': linhas,
+        'meses': meses,
         'total_futuro': total_futuro,
         'total_parcelas': total_parcelas,
         'qtd_compras': len(linhas),

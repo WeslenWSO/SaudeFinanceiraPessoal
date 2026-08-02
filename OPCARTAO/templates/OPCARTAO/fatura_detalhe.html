@@ -200,7 +200,7 @@
   {% endif %}
 
   {% if parcelas_futuras.linhas %}
-  <div class="card mb-4">
+  <div class="card mb-4" id="parcelas-futuras">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
         <strong>Parcelas futuras</strong>
@@ -208,8 +208,76 @@
       </div>
       <div class="fw-bold text-warning">Total futuro: R$ {{ parcelas_futuras.total_futuro|floatformat:2 }}</div>
     </div>
+    {% if parcelas_futuras.meses %}
+    <div class="card-body border-bottom py-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="small text-muted me-1">Ver por mês:</span>
+        <div class="d-flex flex-wrap gap-1" role="group" aria-label="Parcelas por mês">
+          {% for m in parcelas_futuras.meses %}
+          <a href="?mes={{ m.chave }}#parcelas-futuras"
+             class="btn btn-sm {% if mes_param == m.chave %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            {{ m.rotulo }}
+            <span class="ms-1 {% if mes_param == m.chave %}opacity-75{% else %}text-muted{% endif %}">
+              R$ {{ m.total|floatformat:2 }}
+            </span>
+          </a>
+          {% endfor %}
+          <a href="?mes=todas#parcelas-futuras"
+             class="btn btn-sm {% if mes_param == 'todas' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+            Todas
+          </a>
+        </div>
+      </div>
+      {% if mes_selecionado %}
+      <div class="small text-muted mt-2">
+        Fatura de <strong>{{ mes_selecionado.rotulo }}</strong>
+        {% if mes_selecionado.vencimento %}
+          (venc. {{ mes_selecionado.vencimento|date:"d/m/Y" }})
+        {% endif %}
+        · {{ mes_selecionado.qtd }} parcela{{ mes_selecionado.qtd|pluralize:"s" }}
+        · total do mês
+        <strong class="text-warning">R$ {{ mes_selecionado.total|floatformat:2 }}</strong>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="card-body p-0">
       <div class="table-responsive">
+        {% if mes_selecionado %}
+        <table class="table table-sm mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Data compra</th>
+              {% if exibir_cartao_parcelas %}<th>Cartão</th>{% endif %}
+              <th class="text-center">Parcela</th>
+              <th class="text-end">Valor parcela</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in mes_selecionado.linhas %}
+            <tr>
+              <td>{{ p.descricao }}</td>
+              <td>{{ p.data|date:"d/m/Y"|default:"—" }}</td>
+              {% if exibir_cartao_parcelas %}
+              <td>{% if p.cartao_final %}final {{ p.cartao_final }}{% else %}—{% endif %}</td>
+              {% endif %}
+              <td class="text-center"><span class="badge text-bg-light border">{{ p.parcela }}</span></td>
+              <td class="text-end fw-semibold">R$ {{ p.valor_parcela|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light fw-bold">
+              <td colspan="{% if exibir_cartao_parcelas %}3{% else %}2{% endif %}">
+                {{ mes_selecionado.qtd }} parcela{{ mes_selecionado.qtd|pluralize:"s" }} em {{ mes_selecionado.rotulo }}
+              </td>
+              <td></td>
+              <td class="text-end text-warning">R$ {{ mes_selecionado.total|floatformat:2 }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        {% else %}
         <table class="table table-sm mb-0 align-middle">
           <thead>
             <tr>
@@ -250,6 +318,7 @@
             </tr>
           </tfoot>
         </table>
+        {% endif %}
       </div>
     </div>
   </div>
