@@ -1,34 +1,35 @@
 {% extends 'base.html' %}
 {% load static faturamento_extras %}
 
-{% block main_container_class %}container-fluid{% endblock %}
+{% block main_container_class %}container-fluid px-1 px-sm-2 px-lg-3{% endblock %}
 
 {% block conteudo %}
-<div class="container-fluid px-0">
+{% include 'fluxo_de_caixa/_fluxo_responsivo.html' %}
+<div class="fluxo-resp-wrap">
     <div class="card shadow-sm">
         <div class="card-header">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
-                <div>
+                <div class="me-auto">
                     <h3 class="card-title mb-0">
                         <i class="fas fa-chart-pie text-primary"></i> Planejamento orçamentário
                     </h3>
-                    <small class="text-muted">
+                    <small class="text-muted text-break">
                         {{ empresa.razao|default:"" }} · {{ periodo_label }}
-                        · valores planejados · após o resultado: parcelas de empréstimo
+                        <span class="d-none d-md-inline">· valores planejados · parcelas de empréstimo</span>
                     </small>
                 </div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="fluxo-toolbar fluxo-hide-xs-text">
                     <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left"></i> Dashboard
+                        <i class="fas fa-arrow-left"></i> <span class="fluxo-btn-label">Dashboard</span>
                     </a>
                     <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-file-invoice-dollar"></i> Empréstimos
+                        <i class="fas fa-file-invoice-dollar"></i> <span class="fluxo-btn-label">Empréstimos</span>
                     </a>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
-                        <i class="fas fa-search"></i> Filtrar categoria
+                        <i class="fas fa-search"></i> <span class="fluxo-btn-label">Filtrar</span>
                     </button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
-                        <i class="fas fa-times"></i> Limpar
+                        <i class="fas fa-times"></i> <span class="fluxo-btn-label">Limpar</span>
                     </button>
                 </div>
             </div>
@@ -117,21 +118,25 @@
         <div class="card-body border-bottom" id="blocoGraficoTorre">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ periodo_label }}</strong>
-                <small class="text-muted">Receita, Despesas e Resultados planejados</small>
+                <small class="text-muted d-none d-md-inline">Receita, Despesas e Resultados planejados</small>
             </div>
-            <div style="position: relative; height: 320px;">
+            <div class="fluxo-chart-box">
                 <canvas id="graficoTorreFluxo" aria-label="Gráfico do planejamento"></canvas>
             </div>
         </div>
         {% endif %}
 
-        <div class="card-body table-responsive p-0">
-            <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle">
+        <div class="card-body p-0">
+            <div class="fluxo-table-scroll">
+            <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle fluxo-sticky-table">
                 <thead class="table-light">
                     <tr>
-                        <th class="align-middle" style="min-width: 14rem;">Categoria</th>
+                        <th class="align-middle sticky-col">Categoria</th>
                         {% for col in colunas %}
-                        <th class="text-end" title="{{ col.rotulo_completo }}">{{ col.rotulo }}</th>
+                        <th class="text-end" title="{{ col.rotulo_completo }}">
+                            <span class="d-none d-md-inline">{{ col.rotulo }}</span>
+                            <span class="d-md-none">{{ col.mes }}/{{ col.ano|stringformat:"d"|slice:"2:" }}</span>
+                        </th>
                         {% endfor %}
                     </tr>
                 </thead>
@@ -139,7 +144,7 @@
                     {% for linha in dados %}
                     <tr class="{% if linha.emprestimo_bloco %}table-danger{% elif linha.resultado_geral %}table-primary{% elif linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' or linha.categoria.nome == 'DESPESAS' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% endif %}"
                         {% if linha.categoria.id %}data-categoria-id="{{ linha.categoria.id }}"{% endif %}>
-                        <td>
+                        <td class="sticky-col">
                             {% if linha.subtotal %}<strong>{{ linha.categoria.nome }}</strong>
                             {% elif linha.grupo %}<em><strong>{{ linha.categoria.nome }}</strong></em>
                             {% else %}{% if linha.emprestimo %}<span class="ps-2">{{ linha.categoria.nome }}</span>{% else %}{{ linha.categoria.nome }}{% endif %}{% endif %}
@@ -151,11 +156,14 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         <div class="card-footer small text-muted">
             Valores = orçamento (planejado).
-            Empréstimos = valor da parcela no mês de vencimento do contrato.
-            Período: ano, mês único ou intervalo (ex.: Ago/2026 → Jul/2027).
+            <span class="d-none d-md-inline">
+            Empréstimos = parcela no vencimento.
+            Período: ano, mês ou intervalo (ex.: Ago/2026 → Jul/2027).
+            </span>
         </div>
     </div>
 </div>
@@ -232,7 +240,14 @@
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: window.innerWidth < 576 ? 10 : 14,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            padding: window.innerWidth < 576 ? 6 : 12,
+          }
+        },
         tooltip: {
           callbacks: {
             label: function (ctx) {
@@ -243,8 +258,18 @@
         }
       },
       scales: {
+        x: {
+          ticks: {
+            maxRotation: window.innerWidth < 768 ? 60 : 0,
+            minRotation: window.innerWidth < 768 ? 45 : 0,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            autoSkip: true,
+            maxTicksLimit: window.innerWidth < 576 ? 6 : 12,
+          }
+        },
         y: {
           ticks: {
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
             callback: function (v) {
               return 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
             }

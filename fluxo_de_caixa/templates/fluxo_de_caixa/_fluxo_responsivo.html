@@ -1,0 +1,227 @@
+{# Estilos e helpers responsivos (celular / tablet) para fluxo e planejamento #}
+<style>
+/* Área útil sem estourar a tela */
+.fluxo-resp-wrap {
+  max-width: 100%;
+  overflow-x: clip;
+}
+.fluxo-resp-wrap .card {
+  border-radius: 0.5rem;
+}
+@media (max-width: 767.98px) {
+  .fluxo-resp-wrap .card {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  .fluxo-resp-wrap .card-header,
+  .fluxo-resp-wrap .card-footer {
+    padding: 0.65rem 0.75rem;
+  }
+  .fluxo-resp-wrap .card-title {
+    font-size: 1.1rem;
+  }
+}
+
+/* Toolbar empilha no mobile */
+.fluxo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fluxo-toolbar .btn,
+.fluxo-toolbar .form-select {
+  min-height: 2rem;
+}
+@media (max-width: 575.98px) {
+  .fluxo-toolbar {
+    width: 100%;
+  }
+  .fluxo-toolbar .btn-group {
+    width: 100%;
+  }
+  .fluxo-toolbar .btn-group .btn {
+    flex: 1 1 auto;
+  }
+  .fluxo-hide-xs-text .fluxo-btn-label {
+    display: none;
+  }
+}
+
+/* Gráfico: altura por breakpoint */
+.fluxo-chart-box {
+  position: relative;
+  width: 100%;
+  height: 340px;
+}
+@media (max-width: 991.98px) {
+  .fluxo-chart-box { height: 280px; }
+}
+@media (max-width: 575.98px) {
+  .fluxo-chart-box { height: 220px; }
+}
+
+/* Scroll horizontal com coluna fixa */
+.fluxo-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+  position: relative;
+}
+.fluxo-table-scroll::after {
+  content: '⟵ deslize para ver os meses ⟶';
+  display: none;
+  position: sticky;
+  left: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 100%;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #6c757d;
+  background: linear-gradient(transparent, rgba(255,255,255,0.95));
+  padding: 0.35rem 0.5rem;
+  pointer-events: none;
+}
+@media (max-width: 991.98px) {
+  .fluxo-table-scroll::after { display: block; }
+}
+
+/* Sticky: 1ª coluna (categoria) — planilha usa 2ª quando há GRUPO */
+.fluxo-sticky-table {
+  margin-bottom: 0;
+}
+.fluxo-sticky-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f9fa;
+}
+.fluxo-sticky-table .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+}
+.fluxo-sticky-table thead th.sticky-col {
+  z-index: 3;
+  background: #f8f9fa;
+}
+.fluxo-sticky-table .sticky-col-2 {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+}
+@media (min-width: 576px) {
+  .fluxo-sticky-table.has-grupo .sticky-col-2 {
+    left: 5.5rem;
+  }
+  .fluxo-sticky-table.has-grupo .sticky-col-grupo {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+    box-shadow: none;
+  }
+  .fluxo-sticky-table.has-grupo thead th.sticky-col-grupo {
+    z-index: 3;
+    background: #f8f9fa;
+  }
+  .fluxo-sticky-table.has-grupo thead th.sticky-col-2 {
+    z-index: 3;
+    background: #f8f9fa;
+  }
+}
+.fluxo-sticky-table tr.table-danger > .sticky-col,
+.fluxo-sticky-table tr.table-danger > .sticky-col-2,
+.fluxo-sticky-table tr.bloco-emprestimo > .sticky-col-grupo,
+.fluxo-sticky-table tr.bloco-emprestimo > .sticky-col-2 { background: #f8d7da; }
+.fluxo-sticky-table tr.table-primary > .sticky-col,
+.fluxo-sticky-table tr.table-primary > .sticky-col-2,
+.fluxo-sticky-table tr.nivel-resultado > .sticky-col-grupo,
+.fluxo-sticky-table tr.nivel-resultado > .sticky-col-2,
+.fluxo-sticky-table tr.nivel-total > .sticky-col-grupo,
+.fluxo-sticky-table tr.nivel-total > .sticky-col-2 { background: #e8f5e9; }
+.fluxo-sticky-table tr.table-info > .sticky-col,
+.fluxo-sticky-table tr.table-info > .sticky-col-2,
+.fluxo-sticky-table tr.bloco-receita.nivel-subtotal > .sticky-col-grupo,
+.fluxo-sticky-table tr.bloco-receita.nivel-subtotal > .sticky-col-2 { background: #f0f7ff; }
+.fluxo-sticky-table tr.table-success > .sticky-col,
+.fluxo-sticky-table tr.table-success > .sticky-col-2 { background: #d1e7dd; }
+.fluxo-sticky-table tr.table-secondary > .sticky-col,
+.fluxo-sticky-table tr.table-secondary > .sticky-col-2 { background: #e9ecef; }
+.fluxo-sticky-table tr.table-warning > .sticky-col,
+.fluxo-sticky-table tr.table-warning > .sticky-col-2 { background: #fff3cd; }
+.fluxo-sticky-table tr.bloco-despesa.nivel-subtotal > .sticky-col-grupo,
+.fluxo-sticky-table tr.bloco-despesa.nivel-subtotal > .sticky-col-2 { background: #fff5f5; }
+.fluxo-sticky-table tr.bloco-investimento.nivel-subtotal > .sticky-col-grupo,
+.fluxo-sticky-table tr.bloco-investimento.nivel-subtotal > .sticky-col-2 { background: #f0f7ff; }
+.fluxo-sticky-table tr.bloco-emprestimo.nivel-grupo > .sticky-col-grupo,
+.fluxo-sticky-table tr.bloco-emprestimo.nivel-grupo > .sticky-col-2 { background: #fff0f1; }
+
+/* Planilha: tipografia e colunas */
+.fluxo-planilha { font-size: 0.82rem; }
+.fluxo-planilha .col-grupo { min-width: 5.5rem; max-width: 6.5rem; vertical-align: top; }
+.fluxo-planilha .col-categoria { min-width: 11rem; max-width: 20rem; white-space: normal; }
+.fluxo-planilha .col-mes { min-width: 6.5rem; }
+@media (max-width: 767.98px) {
+  .fluxo-planilha { font-size: 0.72rem; }
+  .fluxo-planilha .col-categoria { min-width: 9rem; max-width: 12rem; }
+  .fluxo-planilha .col-mes { min-width: 5.25rem; }
+  .fluxo-planilha .col-grupo { display: none; }
+  .fluxo-sticky-table.has-grupo .sticky-col-2 { left: 0 !important; }
+}
+@media (max-width: 575.98px) {
+  .fluxo-planilha .col-categoria { min-width: 7.5rem; max-width: 9.5rem; }
+  .fluxo-planilha .col-mes { min-width: 4.75rem; }
+}
+
+/* Real × Plan / planejamento */
+#tabelaFluxoMensal { font-size: 0.82rem; }
+#tabelaFluxoMensal th:first-child,
+#tabelaFluxoMensal td:first-child {
+  min-width: 10rem;
+  max-width: 16rem;
+  white-space: normal;
+}
+@media (max-width: 767.98px) {
+  #tabelaFluxoMensal { font-size: 0.72rem; }
+  #tabelaFluxoMensal th:first-child,
+  #tabelaFluxoMensal td:first-child {
+    min-width: 7.5rem;
+    max-width: 9.5rem;
+  }
+}
+
+/* Filtro de período (planejamento) */
+#formPeriodo .form-select,
+#formPeriodo .input-group {
+  max-width: 100%;
+}
+@media (max-width: 575.98px) {
+  #formPeriodo {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  #formPeriodo .periodo-bloco,
+  #formPeriodo > div {
+    width: 100%;
+  }
+  #formPeriodo .form-select,
+  #formPeriodo .input-group {
+    width: 100% !important;
+  }
+  #formPeriodo .input-group .form-select {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  #formPeriodo .btn {
+    width: 100%;
+  }
+}
+</style>

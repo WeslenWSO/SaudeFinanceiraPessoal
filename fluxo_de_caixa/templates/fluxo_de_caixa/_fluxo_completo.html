@@ -2,21 +2,23 @@
     {% if grafico_torre.tem_dados %}
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
-        <small class="text-muted">Receita, Despesas e Resultados · barras sólidas = Real · claras = Plan.</small>
+        <small class="text-muted d-none d-md-inline">Receita, Despesas e Resultados · barras sólidas = Real · claras = Plan.</small>
     </div>
-    <div style="position: relative; height: 320px;">
+    <div class="fluxo-chart-box">
         <canvas id="graficoTorreFluxo" aria-label="Gráfico de torre do fluxo de caixa"></canvas>
     </div>
     {% endif %}
 </div>
-<div class="card-body table-responsive p-0">
-    <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle">
+<div class="card-body p-0">
+    <div class="fluxo-table-scroll">
+    <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle fluxo-sticky-table">
         <thead class="table-light">
             <tr>
-                <th rowspan="2" class="align-middle" style="min-width: 14rem;">Categoria</th>
+                <th rowspan="2" class="align-middle sticky-col">Categoria</th>
                 {% for mes in meses %}
                 <th colspan="4" class="text-center">
-                    {% if mes == 1 %}Janeiro{% elif mes == 2 %}Fevereiro{% elif mes == 3 %}Março{% elif mes == 4 %}Abril{% elif mes == 5 %}Maio{% elif mes == 6 %}Junho{% elif mes == 7 %}Julho{% elif mes == 8 %}Agosto{% elif mes == 9 %}Setembro{% elif mes == 10 %}Outubro{% elif mes == 11 %}Novembro{% elif mes == 12 %}Dezembro{% endif %}
+                    <span class="d-none d-lg-inline">{% if mes == 1 %}Janeiro{% elif mes == 2 %}Fevereiro{% elif mes == 3 %}Março{% elif mes == 4 %}Abril{% elif mes == 5 %}Maio{% elif mes == 6 %}Junho{% elif mes == 7 %}Julho{% elif mes == 8 %}Agosto{% elif mes == 9 %}Setembro{% elif mes == 10 %}Outubro{% elif mes == 11 %}Novembro{% elif mes == 12 %}Dezembro{% endif %}</span>
+                    <span class="d-lg-none">{% if mes == 1 %}Jan{% elif mes == 2 %}Fev{% elif mes == 3 %}Mar{% elif mes == 4 %}Abr{% elif mes == 5 %}Mai{% elif mes == 6 %}Jun{% elif mes == 7 %}Jul{% elif mes == 8 %}Ago{% elif mes == 9 %}Set{% elif mes == 10 %}Out{% elif mes == 11 %}Nov{% elif mes == 12 %}Dez{% endif %}</span>
                 </th>
                 {% endfor %}
             </tr>
@@ -24,8 +26,8 @@
                 {% for mes in meses %}
                 <th class="text-end small">Real.</th>
                 <th class="text-end small">Plan.</th>
-                <th class="text-end small">% Dif.</th>
-                <th class="text-center small">!</th>
+                <th class="text-end small d-none d-md-table-cell">% Dif.</th>
+                <th class="text-center small d-none d-md-table-cell">!</th>
                 {% endfor %}
             </tr>
         </thead>
@@ -33,7 +35,7 @@
             {% for linha in dados %}
             <tr class="{% if linha.emprestimo_bloco %}table-danger{% elif linha.resultado_geral %}table-primary{% elif linha.subtotal %}{% if linha.categoria.nome == 'RECEITA' %}table-info{% elif linha.categoria.nome == 'DESPESA' or linha.categoria.nome == 'DESPESAS' %}table-danger{% elif linha.categoria.nome == 'INVESTIMENTO' %}table-success{% elif 'FATURAMENTO' in linha.categoria.nome %}table-warning{% else %}table-primary{% endif %}{% elif linha.grupo %}table-secondary{% elif linha.emprestimo %}{% endif %}"
                 {% if linha.categoria.id %}data-categoria-id="{{ linha.categoria.id }}"{% endif %}>
-                <td>
+                <td class="sticky-col">
                     {% if linha.subtotal %}<strong>{{ linha.categoria.nome }}</strong>
                     {% elif linha.grupo %}<em><strong>{{ linha.categoria.nome }}</strong></em>
                     {% else %}{% if linha.emprestimo %}<span class="ps-2">{{ linha.categoria.nome }}</span>{% else %}{{ linha.categoria.nome }}{% endif %}{% endif %}
@@ -41,10 +43,10 @@
                 {% for cel in linha.valores %}
                 <td class="text-end {% if linha.subtotal %}fw-bold{% endif %}">{{ cel.realizado|floatformat:2 }}</td>
                 <td class="text-end {% if linha.subtotal %}fw-bold{% endif %}">{{ cel.planejado|floatformat:2 }}</td>
-                <td class="text-end {% if linha.subtotal %}fw-bold{% endif %}">
+                <td class="text-end d-none d-md-table-cell {% if linha.subtotal %}fw-bold{% endif %}">
                     {% if cel.tem_pct %}{{ cel.pct|floatformat:1 }}%{% else %}—{% endif %}
                 </td>
-                <td class="text-center">
+                <td class="text-center d-none d-md-table-cell">
                     {% if cel.flag %}<span class="badge bg-danger">!</span>{% else %}<span class="text-muted">·</span>{% endif %}
                 </td>
                 {% endfor %}
@@ -52,11 +54,14 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 <div class="card-footer small text-muted">
-    Real. = fluxo Conta Azul · Plan. = orçamento
-    · Empréstimos: Plan. = valor da parcela (vencimento) · Real. = valor pago
+    Real. = Conta Azul · Plan. = orçamento
+    <span class="d-none d-md-inline">
+    · Empréstimos: Plan. = parcela · Real. = pago
     · Flag se |%| ≥ {{ flag_pct_limite|floatformat:0 }}%
+    </span>
 </div>
 
 <!-- Modal filtro categoria -->

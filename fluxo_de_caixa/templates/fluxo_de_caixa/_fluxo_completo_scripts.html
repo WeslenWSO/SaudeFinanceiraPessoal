@@ -23,7 +23,30 @@
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } } }
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: window.innerWidth < 576 ? 10 : 14,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            padding: window.innerWidth < 576 ? 6 : 12,
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: window.innerWidth < 768 ? 60 : 0,
+            minRotation: window.innerWidth < 768 ? 45 : 0,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            autoSkip: true,
+            maxTicksLimit: window.innerWidth < 576 ? 6 : 12,
+          }
+        },
+        y: {
+          ticks: { font: { size: window.innerWidth < 576 ? 9 : 11 } }
+        }
+      }
     }
   });
 })();

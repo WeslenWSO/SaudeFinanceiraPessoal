@@ -1,38 +1,39 @@
 {% extends 'base.html' %}
 {% load static faturamento_extras %}
 
+{% block main_container_class %}container-fluid px-1 px-sm-2 px-lg-3{% endblock %}
+
 {% block conteudo %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
+{% include 'fluxo_de_caixa/_fluxo_responsivo.html' %}
+<div class="fluxo-resp-wrap">
             <div class="card shadow-sm">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
+                    <div class="me-auto">
                         <h3 class="card-title mb-0">Fluxo de Caixa</h3>
-                        <small class="text-muted">{{ empresa.razao|default:"" }} · {{ ano }}</small>
+                        <small class="text-muted text-break">{{ empresa.razao|default:"" }} · {{ ano }}</small>
                     </div>
-                    <div class="card-tools d-flex flex-wrap align-items-center gap-2">
+                    <div class="fluxo-toolbar fluxo-hide-xs-text">
                         <div class="btn-group btn-group-sm" role="group">
                             <a href="?ano={{ ano }}&modo=planilha"
                                class="btn {% if modo != 'completo' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-                                <i class="fas fa-table"></i> Planilha
+                                <i class="fas fa-table"></i> <span class="fluxo-btn-label">Planilha</span>
                             </a>
                             <a href="?ano={{ ano }}&modo=completo"
                                class="btn {% if modo == 'completo' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-                                <i class="fas fa-exchange-alt"></i> Real × Plan.
+                                <i class="fas fa-exchange-alt"></i> <span class="fluxo-btn-label">Real × Plan.</span>
                             </a>
                         </div>
                         {% if modo == 'completo' %}
                         <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
-                            <i class="fas fa-search"></i> Filtrar
+                            <i class="fas fa-search"></i> <span class="fluxo-btn-label">Filtrar</span>
                         </button>
                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimparFiltro" style="display: none;">
-                            <i class="fas fa-times"></i> Limpar
+                            <i class="fas fa-times"></i> <span class="fluxo-btn-label">Limpar</span>
                         </button>
                         {% endif %}
                         <form method="get" class="d-inline">
                             {% if modo == 'completo' %}<input type="hidden" name="modo" value="completo">{% endif %}
-                            <select name="ano" onchange="this.form.submit()" class="form-select form-select-sm">
+                            <select name="ano" onchange="this.form.submit()" class="form-select form-select-sm" aria-label="Ano">
                                 {% for ano_opcao in anos_disponiveis %}
                                 <option value="{{ ano_opcao }}" {% if ano_opcao == ano %}selected{% endif %}>{{ ano_opcao }}</option>
                                 {% endfor %}
@@ -48,22 +49,25 @@
                 <div class="card-body border-bottom">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
-                        <small class="text-muted">Totais mensais da planilha (Conta Azul)</small>
+                        <small class="text-muted d-none d-md-inline">Totais mensais da planilha (Conta Azul)</small>
                     </div>
-                    <div style="position: relative; height: 340px;">
+                    <div class="fluxo-chart-box">
                         <canvas id="graficoFluxoPlanilha" aria-label="Gráfico do fluxo de caixa"></canvas>
                     </div>
                 </div>
                 {% endif %}
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table id="tabelaFluxoPlanilha" class="table table-sm table-bordered mb-0 fluxo-planilha">
+                    <div class="fluxo-table-scroll">
+                        <table id="tabelaFluxoPlanilha" class="table table-sm table-bordered mb-0 fluxo-planilha fluxo-sticky-table has-grupo">
                             <thead>
                                 <tr class="table-light">
-                                    <th class="col-grupo">GRUPO</th>
-                                    <th class="col-categoria">CATEGORIA</th>
+                                    <th class="col-grupo sticky-col-grupo">GRUPO</th>
+                                    <th class="col-categoria sticky-col-2">CATEGORIA</th>
                                     {% for mc in meses_cab %}
-                                    <th class="text-end col-mes">{{ mc.rotulo }}</th>
+                                    <th class="text-end col-mes">
+                                        <span class="d-none d-md-inline">{{ mc.rotulo }}</span>
+                                        <span class="d-md-none">{{ mc.numero }}/{{ ano|stringformat:"d"|slice:"2:" }}</span>
+                                    </th>
                                     {% endfor %}
                                 </tr>
                             </thead>
@@ -71,10 +75,10 @@
                                 {% for linha in linhas %}
                                 <tr class="nivel-{{ linha.nivel }} bloco-{{ linha.bloco }}"
                                     {% if linha.categoria_id %}data-categoria-id="{{ linha.categoria_id }}"{% endif %}>
-                                    <td class="col-grupo small fw-semibold text-muted">
+                                    <td class="col-grupo sticky-col-grupo small fw-semibold text-muted">
                                         {% if linha.grupo %}{{ linha.grupo }}{% endif %}
                                     </td>
-                                    <td class="col-categoria{% if linha.indent %} ps-4{% endif %}">
+                                    <td class="col-categoria sticky-col-2{% if linha.indent %} ps-3 ps-md-4{% endif %}">
                                         {% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %}
                                         <strong class="{% if linha.bloco == 'despesa' or linha.bloco == 'emprestimo' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% elif linha.bloco == 'investimento' %}text-investimento{% endif %}">{{ linha.categoria }}</strong>
                                         {% elif linha.nivel == 'grupo' %}
@@ -103,24 +107,18 @@
                     </div>
                 </div>
                 <div class="card-footer small text-muted">
-                    Fonte dos valores realizados: <strong>Conta Azul</strong>.
-                    <strong>Grupo</strong> = categoria pai no CA («Aparecer dentro da categoria»).
-                    Classificação pelo <strong>Tipo</strong> (R / D / I / L).
-                    Resultados: Receita − Despesas → − Investimento → − Distribuição de Lucro → − Empréstimos (parcelas).
-                    Empréstimos: valor da parcela no mês de vencimento do contrato.
-                    Use o campo <strong>Grupo</strong> para subtotais dentro de cada tipo.
+                    Fonte: <strong>Conta Azul</strong>.
+                    <span class="d-none d-md-inline">
+                    <strong>Grupo</strong> = categoria pai no CA.
+                    Tipo R / D / I / L.
+                    Resultados: Receita − Despesas → − Investimento → − Dist. Lucro → − Empréstimos.
+                    </span>
                 </div>
                 {% endif %}
             </div>
-        </div>
-    </div>
 </div>
 
 <style>
-.fluxo-planilha { font-size: 0.82rem; }
-.fluxo-planilha .col-grupo { min-width: 6.5rem; max-width: 7.5rem; vertical-align: top; }
-.fluxo-planilha .col-categoria { min-width: 16rem; max-width: 24rem; white-space: normal; }
-.fluxo-planilha .col-mes { min-width: 7.5rem; }
 .text-receita { color: #0d6efd !important; }
 .text-despesa { color: #dc3545 !important; }
 .text-investimento { color: #0d6efd !important; }
@@ -217,7 +215,14 @@
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: window.innerWidth < 576 ? 10 : 14,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            padding: window.innerWidth < 576 ? 8 : 12,
+          },
+        },
         tooltip: {
           callbacks: {
             label: function(ctx) {
@@ -228,9 +233,19 @@
         },
       },
       scales: {
+        x: {
+          ticks: {
+            maxRotation: window.innerWidth < 768 ? 60 : 0,
+            minRotation: window.innerWidth < 768 ? 45 : 0,
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
+            autoSkip: true,
+            maxTicksLimit: window.innerWidth < 576 ? 6 : 12,
+          },
+        },
         y: {
           beginAtZero: true,
           ticks: {
+            font: { size: window.innerWidth < 576 ? 9 : 11 },
             callback: function(v) {
               return 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
             },
