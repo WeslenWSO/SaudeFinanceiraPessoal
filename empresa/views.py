@@ -548,11 +548,11 @@ def selecionar_empresa_ajax(request):
         request.session['empresa_id'] = empresa_id
         request.session['empresa_nome'] = usuario_empresa.empresa.razao
         request.session['regime_tributario'] = usuario_empresa.empresa.regime_tributario
-          
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Empresa {usuario_empresa.empresa.razao} selecionada com sucesso!',
+            'redirect_url': reverse('dashboard:index'),
             'empresa': {
                 'id': usuario_empresa.empresa.id,
                 'razao': usuario_empresa.empresa.razao,
@@ -591,9 +591,8 @@ def selecionar_empresa(request, empresa_id):
         
         messages.success(request, f'Empresa {usuario_empresa.empresa.razao} selecionada com sucesso!')
         
-        # Redireciona para a página anterior ou para o dashboard
-        next_url = request.GET.get('next', 'dashboard:index')
-        return redirect(next_url)
+        # Sempre vai para o dashboard (início) após escolher a empresa
+        return redirect('dashboard:index')
         
     except UsuarioEmpresa.DoesNotExist:
         messages.error(request, 'Empresa não encontrada ou acesso negado.')

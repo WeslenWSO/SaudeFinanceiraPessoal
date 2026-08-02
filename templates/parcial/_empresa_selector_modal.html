@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(function(data) {
       if (data.success) {
         dialog.close();
-        setTimeout(function() { window.location.reload(); }, 500);
+        window.location.href = data.redirect_url || '{% url "dashboard:index" %}';
       } else {
         alert(data.message || 'Erro ao selecionar.');
       }
