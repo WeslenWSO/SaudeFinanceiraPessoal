@@ -219,7 +219,7 @@ def fatura_importar(request):
             def _s(val, n):
                 return (str(val or ''))[:n]
 
-            try:
+            def _gravar_fatura():
                 with transaction.atomic():
                     fatura = FaturaCartaoCredito.objects.create(
                         empresa=empresa,
@@ -254,7 +254,35 @@ def fatura_importar(request):
                         for item in dados['itens']
                     ]
                     ItemFaturaCartao.objects.bulk_create(itens)
-            except (DatabaseError, IntegrityError) as exc:
+                    return fatura
+
+            try:
+                fatura = _gravar_fatura()
+            except IntegrityError as exc:
+                # Sequences desatualizadas após importação de dados com IDs explícitos
+                if 'duplicate key' in str(exc).lower() or 'unique constraint' in str(exc).lower():
+                    logger.warning('Sequence OPCARTAO desatualizada; corrigindo e tentando de novo: %s', exc)
+                    try:
+                        from django.core.management import call_command
+                        call_command('fix_opcartao_sequences')
+                        fatura = _gravar_fatura()
+                    except Exception as exc2:
+                        logger.exception('Falha ao regravar fatura após fix de sequence: %s', exc2)
+                        messages.error(
+                            request,
+                            'Erro ao salvar a fatura (conflito de ID). '
+                            'Peça para rodar: python manage.py fix_opcartao_sequences',
+                        )
+                        return render(request, 'OPCARTAO/fatura_importar.html', {'form': form})
+                else:
+                    logger.exception('Falha ao gravar fatura importada: %s', exc)
+                    messages.error(
+                        request,
+                        'Erro ao salvar a fatura no banco. Tente novamente. '
+                        f'Detalhe: {exc.__class__.__name__}',
+                    )
+                    return render(request, 'OPCARTAO/fatura_importar.html', {'form': form})
+            except DatabaseError as exc:
                 logger.exception('Falha ao gravar fatura importada: %s', exc)
                 messages.error(
                     request,
