@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Planejamento — {{ periodo_label }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 9pt;
+            color: #212529;
+            margin: 12mm;
+        }
+        h1 { font-size: 14pt; margin: 0 0 4px; }
+        .meta { color: #555; margin-bottom: 12px; font-size: 9pt; }
+        .no-print { margin-bottom: 12px; }
+        .no-print button, .no-print a {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #f8f9fa;
+            text-decoration: none;
+            color: #212529;
+            cursor: pointer;
+        }
+        .no-print button.primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 3px 4px;
+            vertical-align: middle;
+        }
+        th {
+            background: #f1f3f5;
+            font-size: 8pt;
+            text-align: right;
+        }
+        th:first-child, td:first-child {
+            text-align: left;
+            width: 22%;
+            word-wrap: break-word;
+        }
+        td { text-align: right; font-variant-numeric: tabular-nums; }
+        tr.subtotal td { font-weight: bold; background: #e7f1ff; }
+        tr.emprestimo td { background: #f8d7da; font-weight: bold; }
+        tr.resultado-geral td { background: #cfe2ff; font-weight: bold; }
+        tr.grupo td { background: #e9ecef; font-weight: bold; }
+        @page { size: A4 landscape; margin: 8mm; }
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button type="button" class="primary" onclick="window.print()">
+            Imprimir / Salvar como PDF
+        </button>
+        <a href="{% url 'planejamento_orcamentario:visao_real_plan' %}?{{ periodo_qs }}">Voltar à visão</a>
+    </div>
+
+    <h1>Planejamento orçamentário</h1>
+    <div class="meta">
+        <div><strong>{{ empresa.razao|default:empresa.nome_fantasia }}</strong></div>
+        <div>Período: {{ periodo_label }} · Valores planejados</div>
+        <div>Gerado em: {{ gerado_em|date:"d/m/Y H:i" }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Categoria</th>
+                {% for col in colunas %}
+                <th>{{ col.rotulo }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in dados %}
+            <tr class="{% if linha.emprestimo_bloco %}emprestimo{% elif linha.resultado_geral %}resultado-geral{% elif linha.subtotal %}subtotal{% elif linha.grupo %}grupo{% endif %}">
+                <td>{{ linha.categoria.nome }}</td>
+                {% for cel in linha.valores %}
+                <td>{{ cel.planejado|floatformat:2 }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+    window.addEventListener('load', function () {
+        if (new URLSearchParams(location.search).get('autoprint') === '1') {
+            setTimeout(function () { window.print(); }, 350);
+        }
+    });
+    </script>
+</body>
+</html>

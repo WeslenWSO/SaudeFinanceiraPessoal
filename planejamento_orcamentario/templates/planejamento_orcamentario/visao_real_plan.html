@@ -25,6 +25,15 @@
                     <a href="{% url 'emprestimos:listar' %}" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-file-invoice-dollar"></i> <span class="fluxo-btn-label">Empréstimos</span>
                     </a>
+                    <a href="{% url 'planejamento_orcamentario:visao_real_plan_excel' %}?{{ periodo_qs }}"
+                       class="btn btn-success btn-sm" title="Exportar Excel com o filtro atual">
+                        <i class="fas fa-file-excel"></i> <span class="fluxo-btn-label">Excel</span>
+                    </a>
+                    <a href="{% url 'planejamento_orcamentario:visao_real_plan_pdf' %}?{{ periodo_qs }}&autoprint=1"
+                       class="btn btn-danger btn-sm" target="_blank" rel="noopener"
+                       title="Abrir para imprimir / Salvar como PDF">
+                        <i class="fas fa-file-pdf"></i> <span class="fluxo-btn-label">PDF</span>
+                    </a>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSelecionarCategoria">
                         <i class="fas fa-search"></i> <span class="fluxo-btn-label">Filtrar</span>
                     </button>

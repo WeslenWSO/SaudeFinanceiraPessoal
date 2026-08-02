@@ -743,24 +743,13 @@ def excluir(request, pk):
     return redirect('planejamento_orcamentario:listar_tipo', tipo=tipo)
 
 
-@login_required
-def visao_real_plan(request):
-    """
-    Visão do planejamento (só valores planejados por mês).
-    Período: ano cheio, um mês, ou intervalo (ex.: 08/2026–07/2027).
-    Após o RESULTADO, lista parcelas de empréstimo do período.
-    """
+def _params_periodo_visao(request) -> dict:
+    """Lê filtros da visão anual (ano / mês / período)."""
     from fluxo_de_caixa.services.montar_fluxo_mensal import MESES_NOME
     from planejamento_orcamentario.services.montar_visao_real_plan import (
         gerar_colunas,
-        montar_visao_real_plan,
         rotulos_colunas,
     )
-
-    empresa = _empresa_sessao(request)
-    if not empresa:
-        messages.error(request, 'Selecione uma empresa.')
-        return redirect('accounts:login')
 
     hoje = date.today()
     modo = (request.GET.get('modo') or 'ano').strip().lower()
@@ -780,7 +769,6 @@ def visao_real_plan(request):
     ano_fim = _int('ano_fim', ano_ini + 1 if mes_ini > 1 else ano_ini)
     mes_fim = max(1, min(12, _int('mes_fim', 7 if mes_ini == 8 else 12)))
 
-    # Atalho: 12 meses a partir do mês inicial
     if modo == 'periodo' and request.GET.get('atalho') == '12m':
         ano_fim, mes_fim = ano_ini, mes_ini
         for _ in range(11):
@@ -798,7 +786,6 @@ def visao_real_plan(request):
         ano_fim=ano_fim,
         mes_fim=mes_fim,
     )
-    dados, grafico_torre = montar_visao_real_plan(empresa, colunas)
     cab = rotulos_colunas(colunas)
 
     if modo == 'mes':
@@ -808,9 +795,21 @@ def visao_real_plan(request):
     else:
         periodo_label = str(ano)
 
-    return render(request, 'planejamento_orcamentario/visao_real_plan.html', {
-        'title': 'Planejamento orçamentário',
-        'empresa': empresa,
+    qs_params = {'modo': modo}
+    if modo == 'ano':
+        qs_params['ano'] = ano
+    elif modo == 'mes':
+        qs_params['ano'] = ano
+        qs_params['mes'] = mes
+    else:
+        qs_params.update({
+            'ano_ini': ano_ini,
+            'mes_ini': mes_ini,
+            'ano_fim': ano_fim,
+            'mes_fim': mes_fim,
+        })
+
+    return {
         'modo': modo,
         'ano': ano,
         'mes': mes,
@@ -818,10 +817,179 @@ def visao_real_plan(request):
         'mes_ini': mes_ini,
         'ano_fim': ano_fim,
         'mes_fim': mes_fim,
-        'anos_disponiveis': range(2020, hoje.year + 3),
-        'meses_opcoes': list(enumerate(MESES_NOME, start=1)),
-        'colunas': cab,
+        'colunas': colunas,
+        'cab': cab,
         'periodo_label': periodo_label,
+        'periodo_qs': urlencode(qs_params),
+        'meses_opcoes': list(enumerate(MESES_NOME, start=1)),
+        'anos_disponiveis': range(2020, hoje.year + 3),
+    }
+
+
+@login_required
+def visao_real_plan(request):
+    """
+    Visão do planejamento (só valores planejados por mês).
+    Período: ano cheio, um mês, ou intervalo (ex.: 08/2026–07/2027).
+    Após o RESULTADO, lista parcelas de empréstimo do período.
+    """
+    from planejamento_orcamentario.services.montar_visao_real_plan import montar_visao_real_plan
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    p = _params_periodo_visao(request)
+    dados, grafico_torre = montar_visao_real_plan(empresa, p['colunas'])
+
+    return render(request, 'planejamento_orcamentario/visao_real_plan.html', {
+        'title': 'Planejamento orçamentário',
+        'empresa': empresa,
+        'modo': p['modo'],
+        'ano': p['ano'],
+        'mes': p['mes'],
+        'ano_ini': p['ano_ini'],
+        'mes_ini': p['mes_ini'],
+        'ano_fim': p['ano_fim'],
+        'mes_fim': p['mes_fim'],
+        'anos_disponiveis': p['anos_disponiveis'],
+        'meses_opcoes': p['meses_opcoes'],
+        'colunas': p['cab'],
+        'periodo_label': p['periodo_label'],
+        'periodo_qs': p['periodo_qs'],
         'dados': dados,
         'grafico_torre': grafico_torre,
+    })
+
+
+@login_required
+def visao_real_plan_excel(request):
+    """Excel da visão anual com os mesmos filtros da tela."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    from planejamento_orcamentario.services.montar_visao_real_plan import montar_visao_real_plan
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    p = _params_periodo_visao(request)
+    dados, _grafico = montar_visao_real_plan(empresa, p['colunas'])
+    cab = p['cab']
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Planejamento'
+
+    header_fill = PatternFill('solid', fgColor='212529')
+    header_font = Font(bold=True, color='FFFFFF')
+    emp_fill = PatternFill('solid', fgColor='F8D7DA')
+    res_fill = PatternFill('solid', fgColor='CFE2FF')
+    tot_fill = PatternFill('solid', fgColor='D1E7DD')
+    grupo_fill = PatternFill('solid', fgColor='E9ECEF')
+    money_fmt = '#,##0.00'
+    thin = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+    right = Alignment(horizontal='right', vertical='center')
+    left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    empresa_nome = getattr(empresa, 'nome_fantasia', None) or getattr(empresa, 'razao', '') or str(empresa)
+    ws['A1'] = 'Planejamento orçamentário — Visão anual (planejado)'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A2'] = f'Empresa: {empresa_nome}'
+    ws['A3'] = f'Período: {p["periodo_label"]}'
+    ws['A4'] = f'Gerado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+
+    row = 6
+    headers = ['Categoria'] + [c['rotulo'] for c in cab]
+    for col_i, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col_i, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin
+
+    for linha in dados:
+        row += 1
+        nome = (linha.get('categoria') or {}).get('nome') or ''
+        ws.cell(row=row, column=1, value=nome).alignment = left
+        ws.cell(row=row, column=1).border = thin
+        for i, cel in enumerate(linha.get('valores') or [], start=2):
+            val = float(cel.get('planejado') or 0)
+            cell = ws.cell(row=row, column=i, value=val)
+            cell.number_format = money_fmt
+            cell.alignment = right
+            cell.border = thin
+
+        fill = None
+        if linha.get('emprestimo_bloco'):
+            fill = emp_fill
+        elif linha.get('resultado_geral') or linha.get('subtotal'):
+            fill = res_fill if linha.get('resultado_geral') or (linha.get('categoria') or {}).get('tipo') in (
+                'resultado', 'total',
+            ) else tot_fill
+        elif linha.get('grupo'):
+            fill = grupo_fill
+        if fill:
+            for col_i in range(1, len(headers) + 1):
+                ws.cell(row=row, column=col_i).fill = fill
+            ws.cell(row=row, column=1).font = Font(bold=True)
+
+    ws.column_dimensions['A'].width = 48
+    for col_i in range(2, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(col_i)].width = 12
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    slug = (
+        p['periodo_label']
+        .replace(' ', '_')
+        .replace('/', '-')
+        .replace('→', '-')
+        .replace('(', '')
+        .replace(')', '')
+    )
+    filename = f'planejamento_{slug}.xlsx'
+    resp = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@login_required
+def visao_real_plan_pdf(request):
+    """
+    Página para impressão / Salvar como PDF, com os mesmos filtros da tela.
+    Abre o diálogo de impressão do navegador (escolha «Salvar como PDF»).
+    """
+    from planejamento_orcamentario.services.montar_visao_real_plan import montar_visao_real_plan
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    p = _params_periodo_visao(request)
+    dados, _grafico = montar_visao_real_plan(empresa, p['colunas'])
+
+    return render(request, 'planejamento_orcamentario/visao_real_plan_pdf.html', {
+        'empresa': empresa,
+        'colunas': p['cab'],
+        'periodo_label': p['periodo_label'],
+        'dados': dados,
+        'gerado_em': datetime.now(),
+        'periodo_qs': p['periodo_qs'],
     })
