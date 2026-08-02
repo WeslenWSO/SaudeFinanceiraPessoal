@@ -19,6 +19,9 @@ _RE_DATA_INICIO = re.compile(r'^(\d{2}/\d{2})\s+')
 _RE_DATA_VALOR = re.compile(r'^(\d{2}/\d{2})\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})$')
 _RE_PARCELA = re.compile(r'\b(\d{2}/\d{2})\b')
 _RE_FINAL_CARTAO = re.compile(r'^\((\d{4})\)$')
+_RE_GASTOS = re.compile(r'^GASTOS DE\s+(.+?)(?:\s+\((\d{4})\))\s*$', re.I)
+_RE_GASTOS_SEM_FINAL = re.compile(r'^GASTOS DE\s+(.+)$', re.I)
+_RE_TIMESTAMP = re.compile(r'^\d{2}/\d{2}/\d{4}')
 
 
 def _fold(s: str) -> str:
@@ -26,6 +29,10 @@ def _fold(s: str) -> str:
         return ''
     d = unicodedata.normalize('NFKD', s)
     return ''.join(c for c in d if unicodedata.category(c) != 'Mn').lower()
+
+
+def _clip(s: str, n: int) -> str:
+    return (s or '')[:n]
 
 
 def _parse_moeda(txt: str) -> Decimal:
@@ -47,10 +54,13 @@ def _parse_data_dd_mm(txt: str, vencimento: date | None) -> date | None:
     if not m:
         return None
     dia, mes = int(m.group(1)), int(m.group(2))
-    if not vencimento:
-        return date(date.today().year, mes, dia)
-    ano = vencimento.year - 1 if mes > vencimento.month else vencimento.year
-    return date(ano, mes, dia)
+    try:
+        if not vencimento:
+            return date(date.today().year, mes, dia)
+        ano = vencimento.year - 1 if mes > vencimento.month else vencimento.year
+        return date(ano, mes, dia)
+    except ValueError:
+        return None
 
 
 def _classificar(descricao: str, valor: Decimal) -> str:
@@ -105,22 +115,28 @@ def _split_descricao_parcela_cidade(meio: str) -> tuple[str, str, str]:
     else:
         descricao = meio
 
-    return descricao[:255], parcela, cidade[:80]
+    return _clip(descricao, 255), parcela, _clip(cidade, 80)
 
 
 def _linha_ignorar(linha: str) -> bool:
     l = _fold(linha)
     if not linha:
         return True
+    if _RE_TIMESTAMP.match(linha):
+        return True
+    if 'internet banking' in l or 'sicoob |' in l:
+        return True
     if linha.startswith('SICOOB') or linha.startswith('SISTEMA DE COOPERATIVAS'):
+        return True
+    if 'sisbr' in l:
         return True
     if linha.startswith('PLATAFORMA DE SERVI'):
         return True
-    if 'EXTRATO DE CART' in linha.upper()[:40]:
+    if 'extrato de fatura' in l or 'extrato de cart' in l:
         return True
     if linha.startswith('Cliente:') or linha.startswith('Conta Cart'):
         return True
-    if linha.startswith('Fatura de '):
+    if l.startswith('fatura de '):
         return True
     if l.startswith('movimentos'):
         return True
@@ -184,25 +200,32 @@ def _montar_item(
         return None
     valor = _parse_moeda(valor_txt)
     meio_completo = ' '.join(x for x in (prefixo, meio) if x).strip()
-    descricao, parcela, cidade = _split_descricao_parcela_cidade(meio_completo)
+    # Remove lixo de câmbio embutido na descrição (U$ / V.DOL)
+    meio_limpo = re.sub(
+        r'\s*R\$\s*[\d.,]+\s+U\$\s*[\d.,]+\s+V\.?DOL\s*[\d.,]+',
+        '',
+        meio_completo,
+        flags=re.I,
+    ).strip() or meio_completo
+    descricao, parcela, cidade = _split_descricao_parcela_cidade(meio_limpo)
     if not descricao and not prefixo:
-        descricao = meio_completo[:255]
-    tipo = _classificar(descricao or meio_completo, valor)
+        descricao = _clip(meio_limpo, 255)
+    tipo = _classificar(descricao or meio_limpo, valor)
     categoria = ''
     if tipo == 'compra':
-        categoria = inferir_categoria(descricao or meio_completo)
+        categoria = _clip(inferir_categoria(descricao or meio_limpo), 30)
     return {
         'data': data,
         'hora': '',
         'cidade': cidade,
         'tipo_compra': '',
-        'descricao': descricao or meio_completo[:255],
-        'parcela': parcela,
+        'descricao': descricao or _clip(meio_limpo, 255),
+        'parcela': _clip(parcela, 10),
         'categoria': categoria,
         'valor': valor,
         'tipo': tipo,
-        'cartao_portador': portador,
-        'cartao_final': final_cartao,
+        'cartao_portador': _clip(portador, 120),
+        'cartao_final': _clip(final_cartao, 8),
     }
 
 
@@ -217,6 +240,14 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
     m_cli = re.search(r'Cliente:\s*(.+)', blob)
     if m_cli:
         titular = m_cli.group(1).strip()
+    if not titular:
+        m_tit = re.search(
+            r'EXTRATO DE FATURA[^\n]*\n([A-Z0-9ÁÉÍÓÚÂÊÔÃÕÇ][^\n]{2,80})\nConta Cart',
+            blob,
+            re.I,
+        )
+        if m_tit:
+            titular = m_tit.group(1).strip()
 
     conta_cartao = ''
     m_conta = re.search(r'Conta Cart[aã]o:\s*(\d+)', blob, re.I)
@@ -224,9 +255,13 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
         conta_cartao = m_conta.group(1).strip()
 
     referencia = ''
-    m_ref = re.search(r'Fatura de\s+(\w+)', blob, re.I)
+    m_ref = re.search(
+        r'Fatura de\s+([A-Za-zÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç]+)\s+Vencimento',
+        blob,
+        re.I,
+    )
     if m_ref:
-        referencia = m_ref.group(1).capitalize()
+        referencia = m_ref.group(1).strip().capitalize()
 
     vencimento = None
     m_venc = re.search(r'Vencimento:\s*(\d{2}/\d{2}/\d{4})', blob, re.I)
@@ -239,31 +274,54 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
     if m_tot:
         total_fatura = _parse_moeda(m_tot.group(1))
 
-    bandeira = 'Mastercard' if 'mastercard' in _fold(blob) else ''
-    cartao_final = ''
+    bandeira = ''
+    blob_fold = _fold(blob)
+    if 'visa' in blob_fold:
+        bandeira = 'Visa'
+    elif 'mastercard' in blob_fold or 'master card' in blob_fold:
+        bandeira = 'Mastercard'
 
+    cartao_final = ''
     itens: list[dict[str, Any]] = []
     cartoes_resumo: list[dict[str, Any]] = []
     portador = ''
     final_cartao = ''
-    pendente = ''
+    pendente_data = ''
+    pendente_meio = ''
     aguardando_continuacao = False
 
-    def _append_item(data_txt: str, meio: str, valor_txt: str, prefixo: str = '') -> None:
-        nonlocal aguardando_continuacao
+    def _flush_pendente_com_valor(valor_txt: str) -> None:
+        nonlocal pendente_data, pendente_meio, aguardando_continuacao
+        if not pendente_data:
+            return
+        item = _montar_item(
+            pendente_data, pendente_meio, valor_txt,
+            vencimento=vencimento,
+            portador=portador,
+            final_cartao=final_cartao,
+        )
+        if item:
+            itens.append(item)
+            aguardando_continuacao = _cidade_incompleta(item.get('cidade', ''))
+        pendente_data = ''
+        pendente_meio = ''
+
+    def _append_item(data_txt: str, meio: str, valor_txt: str) -> None:
+        nonlocal aguardando_continuacao, pendente_data, pendente_meio
+        # Se havia descrição pendente de outra data, descarta (evita misturar compras)
+        pendente_data = ''
+        pendente_meio = ''
         item = _montar_item(
             data_txt, meio, valor_txt,
             vencimento=vencimento,
             portador=portador,
             final_cartao=final_cartao,
-            prefixo=prefixo,
         )
         if item:
             itens.append(item)
             aguardando_continuacao = (
-                bool(prefixo)
-                or not (item.get('descricao') or '').strip()
-                or (bool(prefixo) and _cidade_incompleta(item.get('cidade', '')))
+                not (item.get('descricao') or '').strip()
+                or _cidade_incompleta(item.get('cidade', ''))
             )
 
     for linha in blob.splitlines():
@@ -280,13 +338,19 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
             })
             continue
 
-        if _linha_ignorar(linha):
+        m_gastos = _RE_GASTOS.match(linha) or _RE_GASTOS_SEM_FINAL.match(linha)
+        if m_gastos:
+            portador = m_gastos.group(1).strip()
+            if m_gastos.lastindex and m_gastos.lastindex >= 2 and m_gastos.group(2):
+                final_cartao = m_gastos.group(2)
+                if not cartao_final:
+                    cartao_final = final_cartao
+            pendente_data = ''
+            pendente_meio = ''
+            aguardando_continuacao = False
             continue
 
-        if linha.startswith('GASTOS DE '):
-            portador = linha.replace('GASTOS DE ', '').strip()
-            pendente = ''
-            aguardando_continuacao = False
+        if _linha_ignorar(linha):
             continue
 
         m_final = _RE_FINAL_CARTAO.match(linha)
@@ -294,25 +358,35 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
             final_cartao = m_final.group(1)
             if not cartao_final:
                 cartao_final = final_cartao
-            pendente = ''
+            pendente_data = ''
+            pendente_meio = ''
             aguardando_continuacao = False
             continue
+
+        # Continuação de compra internacional (R$ ... U$ ... valor)
+        if pendente_data and not _RE_DATA_INICIO.match(linha):
+            m_val = _RE_VALOR_FIM.search(linha)
+            if m_val:
+                extra = linha[:m_val.start()].strip()
+                if extra:
+                    pendente_meio = f'{pendente_meio} {extra}'.strip()
+                _flush_pendente_com_valor(m_val.group(1))
+                continue
 
         if aguardando_continuacao and itens and not _RE_DATA_INICIO.match(linha):
             ultimo = itens[-1]
             if _cidade_incompleta(ultimo.get('cidade', '')):
-                ultimo['cidade'] = f"{ultimo['cidade']} {linha}".strip()[:80]
+                ultimo['cidade'] = _clip(f"{ultimo['cidade']} {linha}".strip(), 80)
                 aguardando_continuacao = _cidade_incompleta(ultimo.get('cidade', ''))
             else:
-                ultimo['descricao'] = f"{ultimo['descricao']} {linha}".strip()[:255]
-                aguardando_continuacao = True
+                ultimo['descricao'] = _clip(f"{ultimo['descricao']} {linha}".strip(), 255)
+                aguardando_continuacao = False
             continue
 
         m_dv = _RE_DATA_VALOR.match(linha)
         if m_dv:
             aguardando_continuacao = False
-            _append_item(m_dv.group(1), '', m_dv.group(2), prefixo=pendente)
-            pendente = ''
+            _append_item(m_dv.group(1), '', m_dv.group(2))
             continue
 
         m_ini = _RE_DATA_INICIO.match(linha)
@@ -321,26 +395,31 @@ def parse_fatura_sicoob_pdf(arquivo) -> dict[str, Any]:
             if m_val:
                 aguardando_continuacao = False
                 meio = linha[m_ini.end():m_val.start()].strip()
-                _append_item(m_ini.group(1), meio, m_val.group(1), prefixo=pendente)
-                pendente = ''
+                _append_item(m_ini.group(1), meio, m_val.group(1))
                 continue
-            resto = linha[m_ini.end():].strip()
-            pendente = f'{pendente} {resto}'.strip() if pendente else resto
+            # Linha de data sem valor: guarda para juntar com a próxima (ex.: OPENAI)
+            pendente_data = m_ini.group(1)
+            pendente_meio = linha[m_ini.end():].strip()
+            aguardando_continuacao = False
             continue
 
-        if pendente:
-            pendente = f'{pendente} {linha}'.strip()
-        else:
-            pendente = linha
+        # Sem data: só acumula se já há compra incompleta
+        if pendente_data:
+            pendente_meio = f'{pendente_meio} {linha}'.strip()
+            m_val = _RE_VALOR_FIM.search(pendente_meio)
+            if m_val:
+                pendente_meio = pendente_meio[:m_val.start()].strip()
+                _flush_pendente_com_valor(m_val.group(1))
+            continue
 
     return {
         'banco': 'Sicoob',
-        'titular': titular,
-        'conta_cartao': conta_cartao,
-        'bandeira': bandeira,
-        'cartao_final': cartao_final,
+        'titular': _clip(titular, 120),
+        'conta_cartao': _clip(conta_cartao, 30),
+        'bandeira': _clip(bandeira, 30),
+        'cartao_final': _clip(cartao_final, 8),
         'cartoes_resumo': cartoes_resumo,
-        'referencia_mes': referencia,
+        'referencia_mes': _clip(referencia, 30),
         'vencimento': vencimento,
         'total_fatura': total_fatura,
         'itens': itens,
@@ -367,7 +446,7 @@ def _parse_perfil_consumo(blob: str) -> list[dict[str, Any]]:
         m = re.match(r'^(.+?)\s+([\d.,]+)\s+([\d.,]+)$', l)
         if m:
             perfil.append({
-                'tipo': m.group(1).strip(),
+                'tipo': m.group(1).strip()[:80],
                 'percentual': float(_parse_moeda(m.group(2))),
                 'valor': float(_parse_moeda(m.group(3))),
             })

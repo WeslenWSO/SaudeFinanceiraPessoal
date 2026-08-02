@@ -216,40 +216,52 @@ def fatura_importar(request):
             if cartao and cartao.bandeira:
                 bandeira = cartao.get_bandeira_display()
 
-            with transaction.atomic():
-                fatura = FaturaCartaoCredito.objects.create(
-                    empresa=empresa,
-                    cartao=cartao,
-                    banco=banco,
-                    titular=dados.get('titular', ''),
-                    bandeira=bandeira,
-                    cartao_final=cartao_final,
-                    referencia_mes=dados.get('referencia_mes', ''),
-                    vencimento=vencimento,
-                    total_fatura=dados.get('total_fatura'),
-                    arquivo_nome=arquivo.name,
-                    perfil_consumo=dados.get('perfil_consumo') or [],
-                    conta_cartao=dados.get('conta_cartao', ''),
-                    cartoes_resumo=dados.get('cartoes_resumo') or [],
-                )
-                itens = [
-                    ItemFaturaCartao(
-                        fatura=fatura,
-                        data=item.get('data'),
-                        hora=item.get('hora', ''),
-                        cartao_portador=item.get('cartao_portador', ''),
-                        cartao_final=item.get('cartao_final', '') or cartao_final,
-                        cidade=item.get('cidade', ''),
-                        tipo_compra=item.get('tipo_compra', ''),
-                        descricao=item.get('descricao', ''),
-                        parcela=item.get('parcela', ''),
-                        categoria=item.get('categoria', ''),
-                        valor=item.get('valor'),
-                        tipo=item.get('tipo', 'compra'),
+            def _s(val, n):
+                return (str(val or ''))[:n]
+
+            try:
+                with transaction.atomic():
+                    fatura = FaturaCartaoCredito.objects.create(
+                        empresa=empresa,
+                        cartao=cartao,
+                        banco=banco,
+                        titular=_s(dados.get('titular', ''), 120),
+                        bandeira=_s(bandeira, 30),
+                        cartao_final=_s(cartao_final, 8),
+                        referencia_mes=_s(dados.get('referencia_mes', ''), 30),
+                        vencimento=vencimento,
+                        total_fatura=dados.get('total_fatura') or 0,
+                        arquivo_nome=_s(arquivo.name, 255),
+                        perfil_consumo=dados.get('perfil_consumo') or [],
+                        conta_cartao=_s(dados.get('conta_cartao', ''), 30),
+                        cartoes_resumo=dados.get('cartoes_resumo') or [],
                     )
-                    for item in dados['itens']
-                ]
-                ItemFaturaCartao.objects.bulk_create(itens)
+                    itens = [
+                        ItemFaturaCartao(
+                            fatura=fatura,
+                            data=item.get('data'),
+                            hora=_s(item.get('hora', ''), 8),
+                            cartao_portador=_s(item.get('cartao_portador', ''), 120),
+                            cartao_final=_s(item.get('cartao_final', '') or cartao_final, 8),
+                            cidade=_s(item.get('cidade', ''), 80),
+                            tipo_compra=_s(item.get('tipo_compra', ''), 20),
+                            descricao=_s(item.get('descricao', ''), 255),
+                            parcela=_s(item.get('parcela', ''), 10),
+                            categoria=_s(item.get('categoria', ''), 30),
+                            valor=item.get('valor') or 0,
+                            tipo=_s(item.get('tipo', 'compra'), 20) or 'compra',
+                        )
+                        for item in dados['itens']
+                    ]
+                    ItemFaturaCartao.objects.bulk_create(itens)
+            except (DatabaseError, IntegrityError) as exc:
+                logger.exception('Falha ao gravar fatura importada: %s', exc)
+                messages.error(
+                    request,
+                    'Erro ao salvar a fatura no banco. Tente novamente. '
+                    f'Detalhe: {exc.__class__.__name__}',
+                )
+                return render(request, 'OPCARTAO/fatura_importar.html', {'form': form})
 
             messages.success(
                 request,
