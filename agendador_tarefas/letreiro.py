@@ -55,7 +55,13 @@ def _filtro_responsavel(user):
 
 
 def tarefas_vencendo_queryset(user):
-    """Pendentes com previsão até 2 dias à frente (inclui vencidas)."""
+    """
+    Pendentes com previsão até 2 dias à frente (inclui vencidas).
+
+    - Usuário saude / superuser: vê todas (incluindo tarefas gerais sem empresa).
+    - Demais usuários: só tarefas da empresa a que têm acesso E das quais
+      são responsáveis. Agendas sem empresa (Geral) não aparecem.
+    """
     if not user or not user.is_authenticated:
         return TarefaAgendada.objects.none()
 
@@ -80,15 +86,13 @@ def tarefas_vencendo_queryset(user):
     filtro_resp = _filtro_responsavel(user)
     empresa_ids = _empresa_ids_usuario(user)
 
-    filtro_acesso = Q(empresa__isnull=True)
-    if empresa_ids:
-        filtro_acesso |= Q(empresa_id__in=empresa_ids)
+    # Sem empresa vinculada ou sem nome de responsável → não mostra nada
+    if not empresa_ids or filtro_resp is None:
+        return TarefaAgendada.objects.none()
 
-    filtro_final = filtro_acesso
-    if filtro_resp is not None:
-        filtro_final |= filtro_resp
-
-    return base.filter(filtro_final)
+    return base.filter(
+        Q(empresa_id__in=empresa_ids) & filtro_resp
+    )
 
 
 def _rotulo_prazo(hoje, previsao) -> str:

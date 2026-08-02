@@ -65,6 +65,59 @@ NOVAS = [
         ],
     ),
     (
+        "3.4.1 CUSTO COM O SERVICOS",
+        "3.4.1",
+        [
+            "COMPRA DE PRODUTOS PARA REVENDA",
+            "AULA DE ZUMBA",
+        ],
+    ),
+    (
+        "3.4.2 DESPESAS ADMINISTRATIVAS",
+        "3.4.2",
+        [
+            "EQUIPAMENTOS",
+            "ESTORNO DE ALUNO",
+        ],
+    ),
+    (
+        "3.4.3 DESPESAS COM PESSOAL",
+        "3.4.3",
+        [
+            "RESCISÃO",
+            "FGTS DE RESCISAO",
+            "UNIFORME",
+            "ADIANTAMENTO DE FUNCIONARIO",
+            "DIARIAS - LIMPEZA",
+        ],
+    ),
+    (
+        "3.4.4 DESPESAS FINANCEIRAS",
+        "3.4.4",
+        [
+            "TARIFAS BANCÁRIAS",
+            "TAXAS DE CARTÃO",
+            "MULTAS E JUROS",
+            "FATURA DO CARTAO DE CREDITO",
+        ],
+    ),
+    (
+        "3.4.5 IMPOSTOS",
+        "3.4.5",
+        [
+            "TAXAS MUNICIPAIS",
+            "TAXAS FEDERAIS",
+        ],
+    ),
+    (
+        "3.4.6 DESPESAS COM A DIRETORIA",
+        "3.4.6",
+        [
+            "VIAGEM",
+            "ESTADIA",
+        ],
+    ),
+    (
         "3.2.2 DESPESAS ADMINISTRATIVAS",
         "3.2.2",
         [
