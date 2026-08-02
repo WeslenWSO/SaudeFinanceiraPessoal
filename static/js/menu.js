@@ -1,10 +1,5 @@
 /**
- * SmartNav - Menu dropdown profissional (SmartMenus-like)
- * Vanilla JS, sem jQuery
- * - Hover: delay open 120ms, delay close 250ms
- * - Teclado: Enter/Espaço abre/fecha, ESC fecha
- * - Clique fora fecha
- * - Mobile: tap abre/fecha
+ * SmartNav — desktop hover + mobile/tablet drawer estilo app
  */
 
 (function () {
@@ -23,16 +18,17 @@
     if (!nav) return;
 
     const toggler = document.getElementById('smart-nav-toggler');
-    // Mobile: menu sempre começa retraído; desktop: sem efeito
+    const backdrop = document.getElementById('smart-nav-backdrop');
+    const menu = document.getElementById('smart-nav-menu');
+
     nav.classList.remove('is-mobile-open');
+    document.body.classList.remove('smart-nav-drawer-open');
     if (toggler) {
       toggler.setAttribute('aria-expanded', 'false');
       toggler.setAttribute('aria-label', 'Abrir menu');
     }
-
-    // Ao carregar a página: se for mobile, garantir menu fechado (evita flash aberto)
-    if (isMobile()) {
-      nav.classList.remove('is-mobile-open');
+    if (backdrop) {
+      backdrop.hidden = true;
     }
 
     const triggers = nav.querySelectorAll('.smart-nav-trigger');
@@ -40,18 +36,31 @@
     const menuItems = nav.querySelectorAll('.smart-nav-has-dropdown');
 
     function setMobileOpen(open) {
+      var icon = toggler ? toggler.querySelector('.smart-nav-toggler-fa') : null;
       if (open) {
         nav.classList.add('is-mobile-open');
+        document.body.classList.add('smart-nav-drawer-open');
         if (toggler) {
           toggler.setAttribute('aria-expanded', 'true');
           toggler.setAttribute('aria-label', 'Fechar menu');
         }
+        if (icon) {
+          icon.classList.remove('fa-bars');
+          icon.classList.add('fa-times');
+        }
+        if (backdrop) backdrop.hidden = false;
       } else {
         nav.classList.remove('is-mobile-open');
+        document.body.classList.remove('smart-nav-drawer-open');
         if (toggler) {
           toggler.setAttribute('aria-expanded', 'false');
           toggler.setAttribute('aria-label', 'Abrir menu');
         }
+        if (icon) {
+          icon.classList.remove('fa-times');
+          icon.classList.add('fa-bars');
+        }
+        if (backdrop) backdrop.hidden = true;
         closeAll();
       }
     }
@@ -62,6 +71,7 @@
 
     var togglerHandledByTouch = false;
     function handleTogglerTap() {
+      if (!isMobile()) return;
       setMobileOpen(!isMobileOpen());
     }
 
@@ -76,13 +86,23 @@
         handleTogglerTap();
       });
       toggler.addEventListener('touchend', function (e) {
+        if (!isMobile()) return;
         e.preventDefault();
         togglerHandledByTouch = true;
         handleTogglerTap();
       }, { passive: false });
     }
 
-    // Ao redimensionar para desktop, fechar o menu para não ficar fixo
+    if (backdrop) {
+      backdrop.addEventListener('click', function () {
+        if (isMobile() && isMobileOpen()) setMobileOpen(false);
+      });
+      backdrop.addEventListener('touchend', function (e) {
+        e.preventDefault();
+        if (isMobile() && isMobileOpen()) setMobileOpen(false);
+      }, { passive: false });
+    }
+
     window.addEventListener('resize', function () {
       if (!isMobile() && isMobileOpen()) {
         setMobileOpen(false);
@@ -106,10 +126,11 @@
 
     function openDropdown(trigger, dropdown) {
       clearTimers();
+      // No mobile permite vários? Fecha outros para focar um
       closeAll();
       dropdown.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
-      currentOpen = { trigger, dropdown };
+      currentOpen = { trigger: trigger, dropdown: dropdown };
     }
 
     function closeDropdown(trigger, dropdown) {
@@ -142,37 +163,11 @@
       }
     }
 
-    function handleTriggerLeave(item) {
-      if (isMobile()) return;
-      const trigger = item.querySelector('.smart-nav-trigger');
-      const dropdown = item.querySelector('.smart-nav-dropdown');
-      if (!dropdown) return;
-
-      closeTimer = setTimeout(function () {
-        closeDropdown(trigger, dropdown);
-        closeTimer = null;
-      }, CLOSE_DELAY);
-    }
-
-    function handleDropdownEnter(item) {
-      if (isMobile()) return;
-      clearTimers();
-    }
-
-    function handleDropdownLeave(item) {
-      if (isMobile()) return;
-      const trigger = item.querySelector('.smart-nav-trigger');
-      const dropdown = item.querySelector('.smart-nav-dropdown');
-      handleTriggerLeave(item);
-    }
-
-    // Eventos por item (trigger + dropdown)
     menuItems.forEach(function (item) {
       const trigger = item.querySelector('.smart-nav-trigger');
       const dropdown = item.querySelector('.smart-nav-dropdown');
       if (!trigger || !dropdown) return;
 
-      // Mouse enter no item (trigger ou dropdown) - abrir após delay
       item.addEventListener('mouseenter', function () {
         if (isMobile()) return;
         clearTimers();
@@ -182,7 +177,6 @@
         }, OPEN_DELAY);
       });
 
-      // Mouse leave no item - fechar após delay
       item.addEventListener('mouseleave', function () {
         if (isMobile()) return;
         closeTimer = setTimeout(function () {
@@ -191,7 +185,6 @@
         }, CLOSE_DELAY);
       });
 
-      // Teclado: Enter / Espaço no trigger
       trigger.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -203,23 +196,19 @@
         }
       });
 
-      // Clique: desktop = preventDefault (não navega), mobile = toggle
       trigger.addEventListener('click', function (e) {
+        e.preventDefault();
         if (isMobile()) {
-          e.preventDefault();
           if (dropdown.classList.contains('is-open')) {
             closeDropdown(trigger, dropdown);
           } else {
             closeAll();
             openDropdown(trigger, dropdown);
           }
-        } else {
-          e.preventDefault();
         }
       });
     });
 
-    // ESC fecha qualquer dropdown e, no mobile, o painel do menu
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         clearTimers();
@@ -230,25 +219,23 @@
       }
     });
 
-    // Clique fora fecha dropdowns e, no mobile, o painel do menu
     document.addEventListener('click', function (e) {
-      if (!nav.contains(e.target)) {
+      if (!nav.contains(e.target) && !(backdrop && backdrop.contains(e.target))) {
         clearTimers();
         closeAll();
-        if (isMobile() && isMobileOpen()) {
-          setMobileOpen(false);
-        }
       }
     });
 
-    // Fechar menu mobile ao clicar em um link (navegação)
-    nav.querySelectorAll('.smart-nav-link').forEach(function (link) {
-      link.addEventListener('click', function () {
-        if (isMobile() && isMobileOpen()) {
-          setMobileOpen(false);
-        }
+    // Fechar drawer ao navegar
+    if (menu) {
+      menu.querySelectorAll('a.smart-nav-link, a.smart-nav-trigger-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+          if (isMobile() && isMobileOpen()) {
+            setMobileOpen(false);
+          }
+        });
       });
-    });
+    }
   }
 
   if (document.readyState === 'loading') {

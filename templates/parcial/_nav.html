@@ -1,22 +1,47 @@
 {% load menu_tags %}
 {% montar_menu_nav_tag as menu_nav %}
 <style id="smart-nav-critical">
-  /* Crítico: desktop = esconder botão; mobile = menu fechado até JS */
+  /* Evita flash: no mobile o drawer começa fora da tela */
   @media (min-width: 992px) {
-    #smart-nav .smart-nav-toggler { display: none !important; visibility: hidden !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; }
+    #smart-nav .smart-nav-toggler { display: none !important; }
+    #smart-nav .smart-nav-backdrop { display: none !important; }
+    #smart-nav .smart-nav-drawer-head { display: none !important; }
   }
   @media (max-width: 991px) {
-    #smart-nav .smart-nav-menu { display: none !important; }
-    #smart-nav.is-mobile-open .smart-nav-menu { display: flex !important; }
+    #smart-nav .smart-nav-menu {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: min(86vw, 320px) !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      transform: translateX(-105%) !important;
+      z-index: 1050 !important;
+      background: #fff !important;
+      display: flex !important;
+      flex-direction: column !important;
+      margin: 0 !important;
+      overflow-y: auto !important;
+    }
+    #smart-nav.is-mobile-open .smart-nav-menu {
+      transform: translateX(0) !important;
+    }
   }
 </style>
 <nav id="smart-nav" class="smart-nav" role="navigation" aria-label="Menu principal">
+  <div class="smart-nav-backdrop" id="smart-nav-backdrop" hidden></div>
   <div class="smart-nav-inner">
     <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">Saúde Financeira</a>
     <button type="button" class="smart-nav-toggler" aria-label="Abrir menu" aria-expanded="false" aria-controls="smart-nav-menu" id="smart-nav-toggler">
       <i class="fas fa-bars smart-nav-toggler-fa" aria-hidden="true"></i>
     </button>
     <ul class="smart-nav-menu" id="smart-nav-menu" role="menubar">
+      <li class="smart-nav-drawer-head" aria-hidden="true">
+        <p class="smart-nav-drawer-head-title">Menu</p>
+        <p class="smart-nav-drawer-head-name">
+          {% if request.session.empresa_nome %}{{ request.session.empresa_nome }}{% else %}Saúde Financeira{% endif %}
+        </p>
+      </li>
       {% for link in menu_nav.links %}
       <li class="smart-nav-item">
         <a href="{{ link.href }}" class="smart-nav-trigger-link"><i class="fas {{ link.icon }} smart-nav-icon"></i> {{ link.rotulo }}</a>

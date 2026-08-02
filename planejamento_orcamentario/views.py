@@ -865,10 +865,11 @@ def visao_real_plan(request):
 
 @login_required
 def visao_real_plan_excel(request):
-    """Excel da visão anual com os mesmos filtros da tela."""
+    """Excel da visão anual com os mesmos filtros da tela (+ gráfico no final)."""
     from io import BytesIO
 
     from openpyxl import Workbook
+    from openpyxl.chart import BarChart, Reference
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
@@ -880,7 +881,7 @@ def visao_real_plan_excel(request):
         return redirect('accounts:login')
 
     p = _params_periodo_visao(request)
-    dados, _grafico = montar_visao_real_plan(empresa, p['colunas'])
+    dados, grafico = montar_visao_real_plan(empresa, p['colunas'])
     cab = p['cab']
 
     wb = Workbook()
@@ -949,6 +950,75 @@ def visao_real_plan_excel(request):
     for col_i in range(2, len(headers) + 1):
         ws.column_dimensions[get_column_letter(col_i)].width = 12
 
+    # ----- Dados do gráfico + gráfico no final -----
+    labels = json.loads(grafico.get('labels_json') or '[]')
+    series_defs = [
+        ('Receita', json.loads(grafico.get('receitas_plan_json') or '[]'), '0D6EFD'),
+        ('Despesas', json.loads(grafico.get('despesas_plan_json') or '[]'), 'FD7E14'),
+        ('Resultado (R−D)', json.loads(grafico.get('resultado_rd_json') or '[]'), '20C997'),
+        ('Resultado (após DL)', json.loads(grafico.get('resultado_final_json') or '[]'), '198754'),
+        ('Resultado Geral', json.loads(grafico.get('resultado_geral_json') or '[]'), 'DC3545'),
+    ]
+
+    chart_start = row + 3
+    ws.cell(row=chart_start, column=1, value=f'Gráfico — {p["periodo_label"]}').font = Font(bold=True, size=12)
+
+    data_header_row = chart_start + 1
+    chart_headers = ['Mês'] + [s[0] for s in series_defs]
+    for col_i, h in enumerate(chart_headers, start=1):
+        cell = ws.cell(row=data_header_row, column=col_i, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin
+
+    n_meses = len(labels)
+    for i in range(n_meses):
+        r = data_header_row + 1 + i
+        ws.cell(row=r, column=1, value=labels[i]).border = thin
+        for col_i, (_nome, vals, _cor) in enumerate(series_defs, start=2):
+            val = float(vals[i]) if i < len(vals) else 0.0
+            cell = ws.cell(row=r, column=col_i, value=val)
+            cell.number_format = money_fmt
+            cell.border = thin
+            cell.alignment = right
+
+    data_end_row = data_header_row + n_meses
+    if n_meses > 0 and grafico.get('tem_dados'):
+        chart = BarChart()
+        chart.type = 'col'
+        chart.grouping = 'clustered'
+        chart.title = f'Planejamento — {p["periodo_label"]}'
+        chart.y_axis.title = 'R$'
+        chart.x_axis.title = None
+        chart.style = 10
+        chart.height = 12
+        chart.width = 22
+        chart.legend.position = 'b'
+
+        data_ref = Reference(
+            ws,
+            min_col=2,
+            min_row=data_header_row,
+            max_col=1 + len(series_defs),
+            max_row=data_end_row,
+        )
+        cats_ref = Reference(ws, min_col=1, min_row=data_header_row + 1, max_row=data_end_row)
+        chart.add_data(data_ref, titles_from_data=True)
+        chart.set_categories(cats_ref)
+
+        # Cores das séries (Receita, Despesas, resultados…)
+        for idx, (_nome, _vals, cor) in enumerate(series_defs):
+            if idx >= len(chart.series):
+                break
+            try:
+                chart.series[idx].graphicalProperties.solidFill = cor
+            except Exception:
+                pass
+
+        chart_anchor = f'A{data_end_row + 2}'
+        ws.add_chart(chart, chart_anchor)
+
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -983,13 +1053,14 @@ def visao_real_plan_pdf(request):
         return redirect('accounts:login')
 
     p = _params_periodo_visao(request)
-    dados, _grafico = montar_visao_real_plan(empresa, p['colunas'])
+    dados, grafico_torre = montar_visao_real_plan(empresa, p['colunas'])
 
     return render(request, 'planejamento_orcamentario/visao_real_plan_pdf.html', {
         'empresa': empresa,
         'colunas': p['cab'],
         'periodo_label': p['periodo_label'],
         'dados': dados,
+        'grafico_torre': grafico_torre,
         'gerado_em': datetime.now(),
         'periodo_qs': p['periodo_qs'],
     })
