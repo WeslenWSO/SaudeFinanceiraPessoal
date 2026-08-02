@@ -22,7 +22,6 @@ from empresa.models import Empresa
 EMPRESA_ID = 19
 
 NOVAS = [
-    # grupo, classificacao, nomes
     (
         "3.3.1 DESPESAS ADMINISTRATIVAS",
         "3.3.1",
@@ -35,15 +34,68 @@ NOVAS = [
             "MANUTENÇÃO DE EQUIPAMENTOS",
             "LIMPEZA E HIGIENIZAÇÃO (PRODUTOS/SERVIÇOS)",
             "MARKETING E PROPAGANDA (REDES SOCIAIS/PANFLETOS)",
+            "ROYALTIES",
+            "FUNDO DE PROPAGANDA",
+            "GÁS",
         ],
     ),
     (
-        "3.4 IMPOSTOS DA FOLHA",
-        "3.4",
+        "3.3.2 IMPOSTOS DA FOLHA",
+        "3.3.2",
         [
             "INSS",
             "FGTS",
+            "FGTS CONSIGNADO",
             "IRRF (0561)",
+            "IRRF ALUGUEL",
+        ],
+    ),
+    (
+        "3.3.3 DESPESAS DE FOLHA",
+        "3.3.3",
+        [
+            "FÉRIAS",
+        ],
+    ),
+    (
+        "3.3.4 DESPESAS PARCELAMENTOS",
+        "3.3.4",
+        [
+            "IMPOSTOS PARCELADO",
+        ],
+    ),
+    (
+        "3.2.2 DESPESAS ADMINISTRATIVAS",
+        "3.2.2",
+        [
+            "ALUGUEL ESTACIONAMENTO",
+            "HONORARIO ADVOCACIA",
+            "LICENCA DE SOFTWARE",
+            "SEGURANCA DO TRABALHO",
+            "ECAD",
+            "SEGURANCA VIGIA",
+        ],
+    ),
+    (
+        "3.2.3 DESPESAS COM PESSOAL",
+        "3.2.3",
+        [
+            "PENSAO ALIMENTICIA",
+            "ESTAGIARIA",
+        ],
+    ),
+    (
+        "3.2.4 DESPESAS FINANCEIRA",
+        "3.2.4",
+        [
+            "TAXAS FIXAS - PAGOTE - PARC SUBSC/INT",
+        ],
+    ),
+    (
+        "3.2.5 DESPESAS E TAXAS E IMPOSTO",
+        "3.2.5",
+        [
+            "TAXAS CREF",
         ],
     ),
 ]
@@ -62,6 +114,8 @@ def main() -> int:
     criadas = 0
     existentes = 0
     for grupo, classificacao, nomes in NOVAS:
+        if not nomes:
+            continue
         grupo_u = _upper(grupo)
         class_u = _upper(classificacao)
         for nome in nomes:

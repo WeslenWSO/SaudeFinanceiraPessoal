@@ -76,17 +76,17 @@
                                     </td>
                                     <td class="col-categoria{% if linha.indent %} ps-4{% endif %}">
                                         {% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %}
-                                        <strong class="{% if linha.bloco == 'despesa' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% elif linha.bloco == 'investimento' %}text-investimento{% endif %}">{{ linha.categoria }}</strong>
+                                        <strong class="{% if linha.bloco == 'despesa' or linha.bloco == 'emprestimo' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% elif linha.bloco == 'investimento' %}text-investimento{% endif %}">{{ linha.categoria }}</strong>
                                         {% elif linha.nivel == 'grupo' %}
-                                        <span class="fw-bold text-uppercase {% if linha.bloco == 'despesa' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% else %}text-investimento{% endif %}">{{ linha.categoria }}</span>
+                                        <span class="fw-bold text-uppercase {% if linha.bloco == 'despesa' or linha.bloco == 'emprestimo' %}text-despesa{% elif linha.bloco == 'receita' %}text-receita{% else %}text-investimento{% endif %}">{{ linha.categoria }}</span>
                                         {% else %}
                                         <span class="text-item">{{ linha.categoria }}</span>
                                         {% endif %}
                                     </td>
                                     {% for val in linha.valores %}
-                                    <td class="text-end text-nowrap{% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %} fw-bold{% endif %}{% if linha.negativo %} text-despesa{% elif linha.bloco == 'receita' and val %} text-receita{% elif linha.bloco == 'resultado' %}{% if val < 0 %} text-despesa{% else %} text-resultado{% endif %}{% endif %}">
+                                    <td class="text-end text-nowrap{% if linha.nivel == 'subtotal' or linha.nivel == 'total' or linha.nivel == 'resultado' %} fw-bold{% endif %}{% if linha.negativo or linha.bloco == 'emprestimo' %} text-despesa{% elif linha.bloco == 'receita' and val %} text-receita{% elif linha.bloco == 'resultado' %}{% if val < 0 %} text-despesa{% else %} text-resultado{% endif %}{% endif %}">
                                         {% if val %}
-                                          {% if linha.negativo %}-R$ {{ val|moeda_br }}{% else %}R$ {{ val|moeda_br }}{% endif %}
+                                          {% if linha.negativo or linha.bloco == 'emprestimo' %}-R$ {{ val|moeda_br }}{% else %}R$ {{ val|moeda_br }}{% endif %}
                                         {% else %}—{% endif %}
                                     </td>
                                     {% endfor %}
@@ -106,7 +106,8 @@
                     Fonte dos valores realizados: <strong>Conta Azul</strong>.
                     <strong>Grupo</strong> = categoria pai no CA («Aparecer dentro da categoria»).
                     Classificação pelo <strong>Tipo</strong> (R / D / I / L).
-                    Resultados: Receita − Despesas → − Investimento → − Distribuição de Lucro.
+                    Resultados: Receita − Despesas → − Investimento → − Distribuição de Lucro → − Empréstimos (parcelas).
+                    Empréstimos: valor da parcela no mês de vencimento do contrato.
                     Use o campo <strong>Grupo</strong> para subtotais dentro de cada tipo.
                 </div>
                 {% endif %}
@@ -127,6 +128,8 @@
 .fluxo-planilha tr.bloco-receita.nivel-subtotal td { background-color: #f0f7ff; border-top: 2px solid #0d6efd; }
 .fluxo-planilha tr.bloco-despesa.nivel-subtotal td { background-color: #fff5f5; border-top: 2px solid #dc3545; }
 .fluxo-planilha tr.bloco-investimento.nivel-subtotal td { background-color: #f0f7ff; border-top: 2px solid #0d6efd; }
+.fluxo-planilha tr.bloco-emprestimo.nivel-subtotal td { background-color: #f8d7da; border-top: 2px solid #842029; }
+.fluxo-planilha tr.bloco-emprestimo.nivel-grupo td { background-color: #fff0f1; }
 .fluxo-planilha tr.bloco-despesa.nivel-grupo td { background-color: #fff8f8; }
 .fluxo-planilha tr.bloco-receita.nivel-grupo td { background-color: #f8fbff; }
 .fluxo-planilha tr.bloco-investimento.nivel-grupo td { background-color: #f8fbff; }
@@ -177,11 +180,30 @@
           order: 2,
         },
         {
+          label: 'Empréstimos',
+          data: {{ grafico_planilha.emprestimos_json|safe }},
+          backgroundColor: 'rgba(132, 32, 41, 0.85)',
+          borderRadius: 4,
+          order: 2,
+        },
+        {
           type: 'line',
-          label: 'Resultado final',
+          label: 'Resultado (após DL)',
           data: {{ grafico_planilha.resultado_json|safe }},
           borderColor: '#198754',
           backgroundColor: 'rgba(25, 135, 84, 0.15)',
+          borderWidth: 3,
+          pointRadius: 4,
+          tension: 0.2,
+          fill: false,
+          order: 1,
+        },
+        {
+          type: 'line',
+          label: 'Resultado Geral',
+          data: {{ grafico_planilha.resultado_geral_json|safe }},
+          borderColor: '#842029',
+          backgroundColor: 'rgba(132, 32, 41, 0.1)',
           borderWidth: 3,
           pointRadius: 4,
           tension: 0.2,

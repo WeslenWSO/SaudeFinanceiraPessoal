@@ -6,11 +6,12 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import Prefetch, Q, Sum
 
 from categoria.models import Categoria
 from contasapagar.models import ContasaPagar
 from contasareceber.models import ContaAReceber
+from emprestimos.models import Emprestimo, ParcelaEmprestimo
 from notasfiscais.models import NotaFiscalServico
 from planejamento_orcamentario.models import LancamentoOrcamento
 
@@ -268,6 +269,120 @@ def _linha_resultado(
     return _linha_planilha(categoria=categoria, valores=valores, nivel=nivel, bloco='resultado')
 
 
+def _bloco_emprestimos_planilha(empresa, ano: int) -> tuple[list[dict], list[Decimal]]:
+    """
+    Parcelas de empréstimo no ano (data_vencimento):
+    valor do mês = valor_pago se pago/quitado, senão valor_parcela do contrato.
+    """
+    n = 12
+    emprestimos = (
+        Emprestimo.objects.filter(empresa=empresa)
+        .select_related('banco')
+        .prefetch_related(
+            Prefetch(
+                'parcelas',
+                queryset=ParcelaEmprestimo.objects.filter(
+                    data_vencimento__year=ano,
+                ).order_by('numero'),
+            )
+        )
+        .order_by('banco__nome', 'numero_contrato')
+    )
+
+    por_banco: dict[str, list[tuple[str, list[Decimal]]]] = defaultdict(list)
+    total_mes = _zeros(n)
+
+    for emp in emprestimos:
+        parcelas = list(emp.parcelas.all())
+        if not parcelas:
+            continue
+        vals = _zeros(n)
+        for p in parcelas:
+            if not p.data_vencimento or p.data_vencimento.year != ano:
+                continue
+            m = p.data_vencimento.month
+            if p.status in ('paga', 'quitada') or (p.valor_pago or 0) > 0:
+                vals[m - 1] += (
+                    p.valor_pago if p.valor_pago is not None else (p.valor_parcela or Decimal('0'))
+                )
+            else:
+                vals[m - 1] += p.valor_parcela or Decimal('0')
+        if not _tem_movimento(vals):
+            continue
+
+        banco_nome = ''
+        if emp.banco_id:
+            banco_nome = (emp.banco.nome or '').strip()
+        if not banco_nome:
+            banco_nome = (emp.cooperativa or '').strip() or 'Sem banco'
+
+        rotulo = f'EMPRÉSTIMO CTR {emp.numero_contrato}'.strip()
+        if emp.cliente and emp.cliente.strip() and emp.cliente.strip().upper() not in rotulo.upper():
+            rotulo = f'{emp.cliente.strip()} — CTR {emp.numero_contrato}'
+
+        por_banco[banco_nome].append((rotulo, vals))
+        total_mes = _somar_listas(total_mes, vals)
+
+    linhas: list[dict] = []
+    if not por_banco:
+        linhas.append(
+            _linha_planilha(
+                grupo='EMPR.',
+                categoria='EMPRÉSTIMOS (parcelas do contrato)',
+                valores=total_mes,
+                nivel='subtotal',
+                bloco='emprestimo',
+            )
+        )
+        return linhas, total_mes
+
+    linhas.append(
+        _linha_planilha(
+            grupo='EMPR.',
+            categoria='EMPRÉSTIMOS — da empresa e pagamento da empresa',
+            valores=total_mes,
+            nivel='subtotal',
+            bloco='emprestimo',
+        )
+    )
+    for banco_nome in sorted(por_banco.keys(), key=lambda s: s.upper()):
+        contratos = por_banco[banco_nome]
+        vals_banco = _zeros(n)
+        for _rotulo, vals in contratos:
+            vals_banco = _somar_listas(vals_banco, vals)
+        linhas.append(
+            _linha_planilha(
+                grupo='EMPR.',
+                categoria=banco_nome,
+                valores=vals_banco,
+                nivel='grupo',
+                bloco='emprestimo',
+            )
+        )
+        for rotulo, vals in contratos:
+            if _tem_movimento(vals):
+                linhas.append(
+                    _linha_planilha(
+                        categoria=rotulo,
+                        valores=vals,
+                        nivel='item',
+                        indent=1,
+                        bloco='emprestimo',
+                    )
+                )
+
+    linhas.append(
+        _linha_planilha(
+            grupo='EMPR.',
+            categoria='TOTAL EMPRÉSTIMOS (parcelas)',
+            valores=total_mes,
+            nivel='subtotal',
+            bloco='emprestimo',
+        )
+    )
+    return linhas, total_mes
+
+
 def montar_linhas_planilha(empresa, ano: int) -> list[dict]:
     meses = range(1, 13)
     n = len(list(meses))
@@ -329,12 +444,29 @@ def montar_linhas_planilha(empresa, ano: int) -> list[dict]:
     )
     linhas.extend(_bloco_categorias_planilha(lucro_cats, mapa_lucro, meses, bloco='lucro'))
 
-    # 7. Resultado final
+    # 7. Resultado após distribuição
+    resultado_pos_dl = [
+        total_rec[i] - total_desp[i] - total_inv[i] - total_dl[i] for i in range(n)
+    ]
     linhas.append(
-        _linha_resultado(
-            total_rec, total_desp, total_inv=total_inv, total_dl=total_dl,
+        _linha_planilha(
             categoria='RESULTADO (Receita − Despesas − Investimento − Distribuição de Lucro)',
+            valores=resultado_pos_dl,
             nivel='total',
+            bloco='resultado',
+        )
+    )
+
+    # 8. Empréstimos (parcelas) + Resultado Geral
+    emp_linhas, total_emp = _bloco_emprestimos_planilha(empresa, ano)
+    linhas.extend(emp_linhas)
+    resultado_geral = [resultado_pos_dl[i] - total_emp[i] for i in range(n)]
+    linhas.append(
+        _linha_planilha(
+            categoria='RESULTADO GERAL (após empréstimos)',
+            valores=resultado_geral,
+            nivel='total',
+            bloco='resultado',
         )
     )
 
@@ -368,8 +500,21 @@ def montar_grafico_planilha(linhas: list[dict], ano: int) -> dict:
         nivel='total',
     )
     resultado_rd = _valores_linha_planilha(linhas, 'RESULTADO (Receita − Despesas)', nivel='resultado')
+    emprestimos = _valores_linha_planilha(
+        linhas, 'TOTAL EMPRÉSTIMOS (parcelas)', nivel='subtotal',
+    )
+    if not any(emprestimos):
+        emprestimos = _valores_linha_planilha(
+            linhas, 'EMPRÉSTIMOS (parcelas do contrato)', nivel='subtotal',
+        )
+    resultado_geral = _valores_linha_planilha(
+        linhas, 'RESULTADO GERAL (após empréstimos)', nivel='total',
+    )
 
-    series = receitas + despesas + investimento + lucro + resultado + resultado_rd
+    series = (
+        receitas + despesas + investimento + lucro + resultado
+        + resultado_rd + emprestimos + resultado_geral
+    )
     return {
         'labels_json': json.dumps(labels, ensure_ascii=False),
         'receitas_json': json.dumps(receitas),
@@ -378,8 +523,131 @@ def montar_grafico_planilha(linhas: list[dict], ano: int) -> dict:
         'lucro_json': json.dumps(lucro),
         'resultado_json': json.dumps(resultado),
         'resultado_rd_json': json.dumps(resultado_rd),
+        'emprestimos_json': json.dumps(emprestimos),
+        'resultado_geral_json': json.dumps(resultado_geral),
         'tem_dados': any(v != 0 for v in series),
     }
+
+
+def _bloco_emprestimos_completo(empresa, ano: int) -> tuple[list[dict], dict]:
+    """
+    Empréstimos Real × Plan. para o modo completo:
+    - Plan. = valor_parcela (vencimento no mês)
+    - Real. = valor_pago (ou parcela se paga/quitada)
+    """
+    n = 12
+    emprestimos = (
+        Emprestimo.objects.filter(empresa=empresa)
+        .select_related('banco')
+        .prefetch_related(
+            Prefetch(
+                'parcelas',
+                queryset=ParcelaEmprestimo.objects.filter(
+                    data_vencimento__year=ano,
+                ).order_by('numero'),
+            )
+        )
+        .order_by('banco__nome', 'numero_contrato')
+    )
+
+    por_banco: dict[str, list] = defaultdict(list)
+    total_real = _zeros(n)
+    total_plan = _zeros(n)
+
+    def _tem_cmp(valores):
+        return any(
+            (c.get('realizado') or 0) != 0 or (c.get('planejado') or 0) != 0
+            for c in valores
+        )
+
+    for emp in emprestimos:
+        parcelas = list(emp.parcelas.all())
+        if not parcelas:
+            continue
+        real_mes = _zeros(n)
+        plan_mes = _zeros(n)
+        for p in parcelas:
+            if not p.data_vencimento or p.data_vencimento.year != ano:
+                continue
+            m = p.data_vencimento.month
+            valor_plan = p.valor_parcela or Decimal('0')
+            plan_mes[m - 1] += valor_plan
+            if p.status in ('paga', 'quitada') or (p.valor_pago or 0) > 0:
+                real_mes[m - 1] += (
+                    p.valor_pago if p.valor_pago is not None else valor_plan
+                )
+
+        if not any(v != 0 for v in plan_mes) and not any(v != 0 for v in real_mes):
+            continue
+
+        banco_nome = ''
+        if emp.banco_id:
+            banco_nome = (emp.banco.nome or '').strip()
+        if not banco_nome:
+            banco_nome = (emp.cooperativa or '').strip() or 'Sem banco'
+
+        rotulo = f'EMPRÉSTIMO CTR {emp.numero_contrato}'.strip()
+        if emp.cliente and emp.cliente.strip() and emp.cliente.strip().upper() not in rotulo.upper():
+            rotulo = f'{emp.cliente.strip()} — CTR {emp.numero_contrato}'
+
+        valores = [_celula_cmp(real_mes[i], plan_mes[i]) for i in range(n)]
+        por_banco[banco_nome].append({
+            'categoria': {'nome': rotulo, 'tipo': 'emprestimo'},
+            'valores': valores,
+            'subtotal': False,
+            'emprestimo': True,
+        })
+        for i in range(n):
+            total_real[i] += real_mes[i]
+            total_plan[i] += plan_mes[i]
+
+    linhas: list[dict] = []
+    if not por_banco:
+        total = {
+            'categoria': {'nome': 'EMPRÉSTIMOS (parcelas do contrato)', 'tipo': 'emprestimo'},
+            'valores': [_celula_cmp(0, 0) for _ in range(n)],
+            'subtotal': True,
+            'emprestimo_bloco': True,
+        }
+        return [total], total
+
+    linhas.append({
+        'categoria': {
+            'nome': 'EMPRÉSTIMOS — da empresa e pagamento da empresa',
+            'tipo': 'emprestimo',
+        },
+        'valores': [_celula_cmp(total_real[i], total_plan[i]) for i in range(n)],
+        'subtotal': True,
+        'emprestimo_bloco': True,
+    })
+
+    for banco_nome in sorted(por_banco.keys(), key=lambda s: s.upper()):
+        contratos = por_banco[banco_nome]
+        banco_real = _zeros(n)
+        banco_plan = _zeros(n)
+        for c in contratos:
+            for i, cel in enumerate(c['valores']):
+                banco_real[i] += Decimal(str(cel.get('realizado') or 0))
+                banco_plan[i] += Decimal(str(cel.get('planejado') or 0))
+        linhas.append({
+            'categoria': {'nome': banco_nome, 'tipo': 'grupo'},
+            'valores': [_celula_cmp(banco_real[i], banco_plan[i]) for i in range(n)],
+            'subtotal': False,
+            'grupo': True,
+            'emprestimo': True,
+        })
+        for c in contratos:
+            if _tem_cmp(c['valores']):
+                linhas.append(c)
+
+    total = {
+        'categoria': {'nome': 'TOTAL EMPRÉSTIMOS (parcelas)', 'tipo': 'emprestimo'},
+        'valores': [_celula_cmp(total_real[i], total_plan[i]) for i in range(n)],
+        'subtotal': True,
+        'emprestimo_bloco': True,
+    }
+    linhas.append(total)
+    return linhas, total
 
 
 def montar_dados_completos(empresa, ano: int) -> tuple[list[dict], dict]:
@@ -507,6 +775,27 @@ def montar_dados_completos(empresa, ano: int) -> tuple[list[dict], dict]:
         total_geral['valores'].append(_celula_cmp(ri['realizado'] - dl['realizado'], ri['planejado'] - dl['planejado']))
     dados.append(total_geral)
 
+    # Empréstimos (Real × Plan.) + Resultado Geral
+    emp_linhas, emp_total = _bloco_emprestimos_completo(empresa, ano)
+    dados.extend(emp_linhas)
+
+    resultado_geral = {
+        'categoria': {'nome': 'RESULTADO GERAL (após empréstimos)', 'tipo': 'total'},
+        'valores': [],
+        'subtotal': True,
+        'resultado_geral': True,
+    }
+    for i in range(12):
+        r = total_geral['valores'][i]
+        e = emp_total['valores'][i]
+        resultado_geral['valores'].append(
+            _celula_cmp(
+                Decimal(str(r.get('realizado') or 0)) - Decimal(str(e.get('realizado') or 0)),
+                Decimal(str(r.get('planejado') or 0)) - Decimal(str(e.get('planejado') or 0)),
+            )
+        )
+    dados.append(resultado_geral)
+
     labels = [f'{MESES_CURTO[m - 1]}/{ano}' for m in meses]
 
     def _serie(linha, chave):
@@ -520,12 +809,18 @@ def montar_dados_completos(empresa, ano: int) -> tuple[list[dict], dict]:
         'despesas_plan_json': json.dumps(_serie(despesa_total, 'planejado')),
         'resultado_real_json': json.dumps(_serie(total_geral, 'realizado')),
         'resultado_plan_json': json.dumps(_serie(total_geral, 'planejado')),
+        'resultado_geral_real_json': json.dumps(_serie(resultado_geral, 'realizado')),
+        'resultado_geral_plan_json': json.dumps(_serie(resultado_geral, 'planejado')),
+        'emprestimos_real_json': json.dumps(_serie(emp_total, 'realizado')),
+        'emprestimos_plan_json': json.dumps(_serie(emp_total, 'planejado')),
         'tem_dados': any(
             v != 0
             for serie in (
                 _serie(receita_total, 'realizado'),
                 _serie(despesa_total, 'realizado'),
                 _serie(total_geral, 'realizado'),
+                _serie(emp_total, 'planejado'),
+                _serie(resultado_geral, 'realizado'),
             )
             for v in serie
         ),

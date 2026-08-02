@@ -475,22 +475,22 @@ def montar_visao_real_plan(empresa, colunas: list[tuple[int, int]]) -> tuple[lis
     def _serie(linha, chave):
         return [float(cel.get(chave) or 0) for cel in linha['valores']]
 
+    res_rd = _serie(rd_linha, 'planejado')
+    res_final = _serie(total_geral, 'planejado')
+    res_geral = _serie(geral, 'planejado')
+
     grafico_torre = {
         'labels_json': json.dumps(labels, ensure_ascii=False),
-        'receitas_real_json': json.dumps(_serie(receita_total, 'realizado')),
         'receitas_plan_json': json.dumps(_serie(receita_total, 'planejado')),
-        'despesas_real_json': json.dumps(_serie(despesa_total, 'realizado')),
         'despesas_plan_json': json.dumps(_serie(despesa_total, 'planejado')),
-        'resultado_real_json': json.dumps(_serie(total_geral, 'realizado')),
-        'resultado_plan_json': json.dumps(_serie(total_geral, 'planejado')),
+        'resultado_rd_json': json.dumps(res_rd),
+        'resultado_final_json': json.dumps(res_final),
+        'resultado_geral_json': json.dumps(res_geral),
+        # legado (compat)
+        'resultado_plan_json': json.dumps(res_final),
         'tem_dados': any(
             v != 0
-            for serie in (
-                _serie(receita_total, 'planejado'),
-                _serie(despesa_total, 'planejado'),
-                _serie(total_geral, 'planejado'),
-                _serie(emp_total, 'planejado'),
-            )
+            for serie in (res_rd, res_final, res_geral, _serie(emp_total, 'planejado'))
             for v in serie
         ),
     }
