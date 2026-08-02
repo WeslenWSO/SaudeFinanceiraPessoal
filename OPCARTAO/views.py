@@ -20,6 +20,22 @@ from .sicoob_pdf import parse_fatura_sicoob_pdf
 logger = logging.getLogger(__name__)
 
 
+def _reset_opcartao_sequences() -> None:
+    """Alinha sequences Postgres com MAX(id) das tabelas OPCARTAO."""
+    from django.core.management.color import no_style
+    from django.db import connection
+
+    from .models import CartaoCredito, Opcartao
+
+    models = [ItemFaturaCartao, FaturaCartaoCredito, CartaoCredito, Opcartao]
+    sqls = connection.ops.sequence_reset_sql(no_style(), models)
+    if not sqls:
+        return
+    with connection.cursor() as cur:
+        for sql in sqls:
+            cur.execute(sql)
+
+
 def _empresa_da_sessao(request):
     empresa_id = request.session.get('empresa_id')
     if empresa_id not in (None, ''):
@@ -263,8 +279,7 @@ def fatura_importar(request):
                 if 'duplicate key' in str(exc).lower() or 'unique constraint' in str(exc).lower():
                     logger.warning('Sequence OPCARTAO desatualizada; corrigindo e tentando de novo: %s', exc)
                     try:
-                        from django.core.management import call_command
-                        call_command('fix_opcartao_sequences')
+                        _reset_opcartao_sequences()
                         fatura = _gravar_fatura()
                     except Exception as exc2:
                         logger.exception('Falha ao regravar fatura após fix de sequence: %s', exc2)
