@@ -490,7 +490,14 @@ def montar_visao_real_plan(empresa, colunas: list[tuple[int, int]]) -> tuple[lis
         'resultado_plan_json': json.dumps(res_final),
         'tem_dados': any(
             v != 0
-            for serie in (res_rd, res_final, res_geral, _serie(emp_total, 'planejado'))
+            for serie in (
+                _serie(receita_total, 'planejado'),
+                _serie(despesa_total, 'planejado'),
+                res_rd,
+                res_final,
+                res_geral,
+                _serie(emp_total, 'planejado'),
+            )
             for v in serie
         ),
     }

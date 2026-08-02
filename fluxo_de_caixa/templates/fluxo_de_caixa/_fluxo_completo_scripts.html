@@ -9,9 +9,13 @@
     data: {
       labels: {{ grafico_torre.labels_json|safe }},
       datasets: [
-        { label: 'Resultado (após DL) Real.', data: {{ grafico_torre.resultado_real_json|safe }}, backgroundColor: 'rgba(13,110,253,0.85)' },
-        { label: 'Resultado (após DL) Plan.', data: {{ grafico_torre.resultado_plan_json|safe }}, backgroundColor: 'rgba(13,110,253,0.35)' },
-        { label: 'Resultado Geral Real.', data: {{ grafico_torre.resultado_geral_real_json|safe }}, backgroundColor: 'rgba(132,32,41,0.85)' },
+        { label: 'Receita Real.', data: {{ grafico_torre.receitas_real_json|safe }}, backgroundColor: 'rgba(13,110,253,0.9)' },
+        { label: 'Receita Plan.', data: {{ grafico_torre.receitas_plan_json|safe }}, backgroundColor: 'rgba(13,110,253,0.35)' },
+        { label: 'Despesas Real.', data: {{ grafico_torre.despesas_real_json|safe }}, backgroundColor: 'rgba(253,126,20,0.9)' },
+        { label: 'Despesas Plan.', data: {{ grafico_torre.despesas_plan_json|safe }}, backgroundColor: 'rgba(253,126,20,0.35)' },
+        { label: 'Resultado (após DL) Real.', data: {{ grafico_torre.resultado_real_json|safe }}, backgroundColor: 'rgba(25,135,84,0.9)' },
+        { label: 'Resultado (após DL) Plan.', data: {{ grafico_torre.resultado_plan_json|safe }}, backgroundColor: 'rgba(25,135,84,0.35)' },
+        { label: 'Resultado Geral Real.', data: {{ grafico_torre.resultado_geral_real_json|safe }}, backgroundColor: 'rgba(132,32,41,0.9)' },
         { label: 'Resultado Geral Plan.', data: {{ grafico_torre.resultado_geral_plan_json|safe }}, backgroundColor: 'rgba(132,32,41,0.35)' },
       ]
     },
