@@ -1574,9 +1574,44 @@ def _buscar_tabela_por_nome_proximo_qs(qs, descricao, min_ratio=FUZZY_NOME_MIN_R
     return _buscar_tabela_por_nome_proximo(pool, descricao, min_ratio)
 
 
-def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_servico, tipo_acomodacao, cache_precos):
+def _item_usa_contraste(com_contraste, descricao_servico, tipo_acomodacao=None):
+    """
+    Define se o preço da tabela deve ser o com contraste (preco_enfermaria).
+    Prioridade: flag do item > texto do procedimento > legado apartamento/enfermaria.
+    """
+    if com_contraste is not None:
+        return bool(com_contraste)
+    desc = (descricao_servico or '').lower()
+    if any(m in desc for m in ('com contraste', 'c/ contraste', 'c/contraste')):
+        return True
+    if any(m in desc for m in ('sem contraste', 's/ contraste', 's/contraste')):
+        return False
+    tipo = (tipo_acomodacao or '').strip().lower()
+    if tipo == 'apartamento':
+        return False
+    if tipo == 'enfermaria':
+        return True
+    return False
+
+
+def _preco_tabela_para_item(tabela, com_contraste, descricao_servico, tipo_acomodacao=None):
+    usa_contraste = _item_usa_contraste(com_contraste, descricao_servico, tipo_acomodacao)
+    return tabela.preco_enfermaria if usa_contraste else tabela.preco_apartamento
+
+
+def _resolver_preco_tabela(
+    empresa_id,
+    convenio_nome,
+    codigo_servico,
+    descricao_servico,
+    tipo_acomodacao,
+    cache_precos,
+    *,
+    com_contraste=None,
+):
     """
     Resolve preço da TabelaPreco para um item.
+    preco_apartamento = sem contraste; preco_enfermaria = com contraste.
     Retorna (preco Decimal|None, codigo_encontrado, descricao_encontrada).
     """
     from servicos_medicos.models import TabelaPreco
@@ -1584,8 +1619,8 @@ def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_
     conv_key = (convenio_nome or '').strip().upper()
     cod = (codigo_servico or '').strip().upper()
     desc = (descricao_servico or '').strip().upper()
-    usa_apto = (tipo_acomodacao or '').strip().lower() == 'apartamento'
-    cache_key = (conv_key, cod, desc, usa_apto)
+    usa_contraste = _item_usa_contraste(com_contraste, descricao_servico, tipo_acomodacao)
+    cache_key = (conv_key, cod, desc, usa_contraste)
     if cache_key in cache_precos:
         return cache_precos[cache_key]
 
@@ -1612,7 +1647,7 @@ def _resolver_preco_tabela(empresa_id, convenio_nome, codigo_servico, descricao_
         cache_precos[cache_key] = resultado
         return resultado
 
-    preco = tabela.preco_apartamento if usa_apto else tabela.preco_enfermaria
+    preco = _preco_tabela_para_item(tabela, com_contraste, descricao_servico, tipo_acomodacao)
     resultado = (
         Decimal(str(preco or 0)),
         (tabela.codigo_servico.codigo or ''),
@@ -1681,6 +1716,7 @@ def verificar_corrigir_precos(request):
                     item.servico,
                     fat.apartamento_enfermaria,
                     cache_precos,
+                    com_contraste=item.com_contraste,
                 )
                 if preco is None:
                     sem_preco += 1
@@ -1747,6 +1783,7 @@ def verificar_corrigir_precos(request):
                     item.servico,
                     fat.apartamento_enfermaria,
                     cache_precos,
+                    com_contraste=item.com_contraste,
                 )
                 if preco is None:
                     situacao = 'SEM PRECO'

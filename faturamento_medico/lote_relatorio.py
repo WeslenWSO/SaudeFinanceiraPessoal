@@ -35,6 +35,19 @@ def _validar_acesso_lote(lote_id, empresa_id):
     return lote
 
 
+def _modalidade_item(faturamento, item=None):
+    if item and item.modalidade:
+        return item.modalidade
+    obs = faturamento.observacao or ''
+    if 'Modalidade:' in obs:
+        for parte in obs.splitlines():
+            if parte.strip().lower().startswith('modalidade:'):
+                valor = parte.split(':', 1)[-1].strip()
+                if valor:
+                    return valor
+    return '-'
+
+
 def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
     lote = _validar_acesso_lote(lote_id, empresa_id)
     empresa = Empresa.objects.get(id=empresa_id)
@@ -43,7 +56,7 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
     items = (
         ItemServico.objects.filter(faturamento__in=faturamentos)
         .select_related('faturamento')
-        .order_by('faturamento__guia', 'faturamento__data', 'faturamento__nome', 'id')
+        .order_by('faturamento__data', 'faturamento__nome', 'faturamento__guia', 'id')
     )
 
     periodo_inicio = faturamentos.aggregate(min_data=Min('data'))['min_data']
@@ -51,24 +64,22 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
     total_geral = Decimal('0')
 
     if layout == 'publico':
-        grouped_items = OrderedDict()
+        linhas = []
         for item in items:
             fat = item.faturamento
-            chave = (fat.guia or '-', fat.nome or 'Sem Nome')
-            if chave not in grouped_items:
-                grouped_items[chave] = {
-                    'guia': fat.guia or '-',
-                    'carteirinha': fat.carteirinha or '-',
-                    'beneficiario': fat.nome or '-',
-                    'data': fat.data,
-                    'itens': [],
-                    'subtotal': Decimal('0'),
-                }
-            grouped_items[chave]['itens'].append(item)
-            sub = item.total or Decimal('0')
-            grouped_items[chave]['subtotal'] += sub
-            total_geral += sub
-        grouped_rows = list(grouped_items.values())
+            valor_item = item.total if item.total is not None else (item.valor or Decimal('0'))
+            linhas.append({
+                'data': fat.data,
+                'paciente': fat.nome or '-',
+                'nome_associado': fat.nome_associado or fat.nome or '-',
+                'guia': fat.guia or '-',
+                'procedimento': item.servico or '-',
+                'modalidade': _modalidade_item(fat, item),
+                'com_contraste': item.com_contraste,
+                'valor': valor_item,
+            })
+            total_geral += valor_item
+        grouped_rows = linhas
     else:
         grouped_items = OrderedDict()
         for item in items:
@@ -84,6 +95,7 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
         'periodo_inicio': periodo_inicio,
         'periodo_fim': periodo_fim,
         'grouped_items': grouped_rows if layout == 'publico' else grouped_items,
+        'linhas': grouped_rows if layout == 'publico' else [],
         'total_geral': total_geral,
         'data_emissao_relatorio': timezone.now().date(),
         'layout': layout,

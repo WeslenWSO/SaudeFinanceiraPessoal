@@ -51,31 +51,33 @@
             margin: 12px 0;
         }
         th, td {
-            border: 1px solid #000;
-            padding: 4px 5px;
+            border: 1px solid #dee2e6;
+            padding: 6px 8px;
             text-align: left;
-            vertical-align: top;
+            vertical-align: middle;
         }
-        th {
-            background: #e8e8e8;
+        thead th {
+            background: #343a40;
+            color: #fff;
             font-weight: bold;
             font-size: 9px;
             text-transform: uppercase;
+            white-space: nowrap;
+        }
+        tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        td.center, th.center {
+            text-align: center;
         }
         td.num, th.num {
             text-align: right;
             white-space: nowrap;
         }
-        td.center, th.center {
-            text-align: center;
-        }
-        tr.subtotal-guia td {
-            font-weight: bold;
-            background: #f5f5f5;
-        }
         tfoot td {
             font-weight: bold;
-            background: #e8e8e8;
+            background: #e9ecef;
+            border-top: 2px solid #343a40;
         }
         .signature {
             margin-top: 36px;
@@ -120,53 +122,37 @@
     <table>
         <thead>
             <tr>
-                <th class="center" style="width: 3%;">Nº</th>
-                <th style="width: 8%;">Guia</th>
-                <th style="width: 9%;">Carteirinha</th>
-                <th style="width: 16%;">Beneficiário</th>
-                <th class="center" style="width: 7%;">Data</th>
-                <th class="center" style="width: 7%;">Código</th>
-                <th style="width: 22%;">Procedimento</th>
-                <th class="center" style="width: 5%;">Porte</th>
-                <th class="center" style="width: 4%;">Qtd</th>
-                <th class="num" style="width: 8%;">Vlr Unit.</th>
-                <th class="num" style="width: 8%;">Total</th>
+                <th class="center">Data</th>
+                <th>Paciente</th>
+                <th>Nome Associado</th>
+                <th class="center">Número da Guia</th>
+                <th>Procedimento</th>
+                <th class="center">Modalidade</th>
+                <th class="center">Contraste</th>
+                <th class="num">Valor</th>
             </tr>
         </thead>
         <tbody>
-            {% for grupo in grouped_items %}
-                {% for item in grupo.itens %}
+            {% for linha in linhas %}
             <tr>
-                {% if forloop.first %}
-                <td class="center" rowspan="{{ grupo.itens|length|add:1 }}">{{ forloop.parentloop.counter }}</td>
-                <td rowspan="{{ grupo.itens|length|add:1 }}">{{ grupo.guia }}</td>
-                <td rowspan="{{ grupo.itens|length|add:1 }}">{{ grupo.carteirinha }}</td>
-                <td rowspan="{{ grupo.itens|length|add:1 }}">{{ grupo.beneficiario }}</td>
-                <td class="center" rowspan="{{ grupo.itens|length|add:1 }}">
-                    {% if grupo.data %}{{ grupo.data|date:"d/m/Y" }}{% else %}—{% endif %}
-                </td>
-                {% endif %}
-                <td class="center">{{ item.codigo_servico|default:"-" }}</td>
-                <td>{{ item.servico|default:"-" }}</td>
-                <td class="center">{{ item.porte|default:"-" }}</td>
-                <td class="center">{{ item.qt|default:0 }}</td>
-                <td class="num">R$ {{ item.valor|floatformat:2 }}</td>
-                <td class="num">R$ {{ item.total|floatformat:2 }}</td>
-            </tr>
-                {% endfor %}
-            <tr class="subtotal-guia">
-                <td colspan="5" style="text-align: right;">Subtotal guia {{ grupo.guia }}:</td>
-                <td class="num">R$ {{ grupo.subtotal|floatformat:2 }}</td>
+                <td class="center">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                <td>{{ linha.paciente }}</td>
+                <td>{{ linha.nome_associado }}</td>
+                <td class="center">{{ linha.guia }}</td>
+                <td>{{ linha.procedimento }}</td>
+                <td class="center">{{ linha.modalidade }}</td>
+                <td class="center">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                <td class="num">R$ {{ linha.valor|floatformat:2 }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="11" class="center">Nenhum procedimento encontrado neste lote.</td>
+                <td colspan="8" class="center">Nenhum procedimento encontrado neste lote.</td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="10" style="text-align: right;">TOTAL GERAL:</td>
+                <td colspan="7" class="num">TOTAL GERAL:</td>
                 <td class="num">R$ {{ total_geral|floatformat:2 }}</td>
             </tr>
         </tfoot>
