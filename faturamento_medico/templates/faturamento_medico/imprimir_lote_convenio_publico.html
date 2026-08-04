@@ -3,96 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Convênio — Lote {{ lote.id }}</title>
+    <title>Controle de Exames — Lote {{ lote.id }}</title>
     <style>
         @page {
             size: landscape;
-            margin: 12mm;
+            margin: 10mm;
         }
+        * { box-sizing: border-box; }
         body {
-            font-family: Arial, Helvetica, sans-serif;
-            margin: 16px;
-            line-height: 1.35;
-            font-size: 10px;
-            color: #111;
+            font-family: Calibri, Arial, Helvetica, sans-serif;
+            margin: 12px 16px;
+            font-size: 11px;
+            color: #000;
         }
-        .header {
+        .top-banner {
+            background: #1f3864;
+            color: #fff;
             text-align: center;
-            margin-bottom: 16px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 12px;
-        }
-        .header h1 {
-            margin: 0 0 6px;
-            font-size: 16px;
-            letter-spacing: 0.04em;
-        }
-        .header h2 {
-            margin: 0 0 8px;
+            padding: 8px 12px;
             font-size: 13px;
-            font-weight: normal;
+            font-weight: bold;
+            letter-spacing: 0.03em;
+            margin-bottom: 0;
         }
-        .header p {
-            margin: 2px 0;
+        .titulo-relatorio {
+            text-align: center;
+            margin: 14px 0 4px;
+        }
+        .titulo-relatorio h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .titulo-relatorio h2 {
+            margin: 6px 0 0;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .meta-lote {
+            text-align: center;
             font-size: 10px;
+            color: #333;
+            margin-bottom: 10px;
         }
-        .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px 24px;
-            max-width: 720px;
-            margin: 10px auto 0;
-            text-align: left;
-            font-size: 10px;
-        }
-        table {
+        table.dados {
             width: 100%;
             border-collapse: collapse;
-            margin: 12px 0;
+            margin-bottom: 18px;
         }
-        th, td {
-            border: 1px solid #dee2e6;
-            padding: 6px 8px;
-            text-align: left;
+        table.dados th,
+        table.dados td {
+            border: 1px solid #8eaadb;
+            padding: 5px 7px;
             vertical-align: middle;
         }
-        thead th {
-            background: #343a40;
-            color: #fff;
+        table.dados thead th {
+            background: #bdd7ee;
+            color: #000;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 10px;
             text-transform: uppercase;
-            white-space: nowrap;
-        }
-        tbody tr:nth-child(even) {
-            background: #f8f9fa;
-        }
-        td.center, th.center {
             text-align: center;
         }
-        td.num, th.num {
+        table.dados tbody td {
+            background: #fff;
+        }
+        table.dados td.col-data,
+        table.dados td.col-modalidade,
+        table.dados th.col-data,
+        table.dados th.col-modalidade {
+            text-align: center;
+            white-space: nowrap;
+        }
+        table.dados td.col-valor,
+        table.dados th.col-valor {
             text-align: right;
             white-space: nowrap;
         }
-        tfoot td {
+        table.resumo {
+            width: 100%;
+            max-width: 520px;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        table.resumo th,
+        table.resumo td {
+            border: 1px solid #8eaadb;
+            padding: 6px 10px;
+        }
+        table.resumo thead th {
+            background: #bdd7ee;
+            text-align: center;
             font-weight: bold;
-            background: #e9ecef;
-            border-top: 2px solid #343a40;
+            text-transform: uppercase;
         }
-        .signature {
-            margin-top: 36px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+        table.resumo td.label {
+            text-align: left;
+            font-weight: bold;
+            background: #fff;
         }
-        .signature-box {
-            border-top: 1px solid #000;
-            padding-top: 8px;
-            min-height: 48px;
+        table.resumo td.qtd,
+        table.resumo td.valor {
+            text-align: center;
+            width: 100px;
         }
-        .signature-box p {
-            margin: 4px 0;
-            font-size: 10px;
+        table.resumo tr.total-qtd td {
+            font-weight: bold;
+            background: #f2f2f2;
+        }
+        table.resumo tr.total-valor td {
+            font-weight: bold;
+            background: #e2efda;
+        }
+        .secao-resumo {
+            margin-top: 12px;
+            page-break-inside: avoid;
         }
         @media print {
             body { margin: 0; }
@@ -101,77 +128,78 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>RELATÓRIO DE PROCEDIMENTOS REALIZADOS</h1>
-        <h2>{{ empresa.razao }}</h2>
-        <p><strong>CNPJ:</strong> {{ empresa.cnpj }}</p>
-        <div class="meta-grid">
-            <p><strong>Convênio:</strong> {{ convenio_nome|default:"—" }}</p>
-            <p><strong>Lote:</strong> {{ lote.id }}</p>
-            <p><strong>Período:</strong>
-                {% if periodo_inicio and periodo_fim %}
-                    {{ periodo_inicio|date:"d/m/Y" }} a {{ periodo_fim|date:"d/m/Y" }}
-                {% else %}
-                    Não definido
-                {% endif %}
-            </p>
-            <p><strong>Emissão do relatório:</strong> {{ data_emissao_relatorio|date:"d/m/Y" }}</p>
-        </div>
-    </div>
+    <div class="top-banner">{{ empresa.razao }}</div>
 
-    <table>
+    <div class="titulo-relatorio">
+        <h1>Controle de Exames — {{ convenio_nome|default:"Convênio" }}</h1>
+        <h2>Mês de referência: {{ mes_referencia|default:"—" }}</h2>
+    </div>
+    <p class="meta-lote">
+        Lote {{ lote.id }}
+        {% if periodo_inicio and periodo_fim %}
+            · Período {{ periodo_inicio|date:"d/m/Y" }} a {{ periodo_fim|date:"d/m/Y" }}
+        {% endif %}
+        · Emissão {{ data_emissao_relatorio|date:"d/m/Y" }}
+    </p>
+
+    <table class="dados">
         <thead>
             <tr>
-                <th class="center">Data</th>
+                <th class="col-data">Data</th>
                 <th>Paciente</th>
                 <th>Nome Associado</th>
-                <th class="center">Número da Guia</th>
                 <th>Procedimento</th>
-                <th class="center">Modalidade</th>
-                <th class="center">Contraste</th>
-                <th class="num">Valor</th>
+                <th class="col-modalidade">Modalidade</th>
+                <th class="col-valor">Valor</th>
             </tr>
         </thead>
         <tbody>
             {% for linha in linhas %}
             <tr>
-                <td class="center">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                <td class="col-data">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                 <td>{{ linha.paciente }}</td>
                 <td>{{ linha.nome_associado }}</td>
-                <td class="center">{{ linha.guia }}</td>
                 <td>{{ linha.procedimento }}</td>
-                <td class="center">{{ linha.modalidade }}</td>
-                <td class="center">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                <td class="num">R$ {{ linha.valor|floatformat:2 }}</td>
+                <td class="col-modalidade">{{ linha.modalidade }}</td>
+                <td class="col-valor">R$ {{ linha.valor|floatformat:2 }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8" class="center">Nenhum procedimento encontrado neste lote.</td>
+                <td colspan="6" class="col-data">Nenhum procedimento encontrado neste lote.</td>
             </tr>
             {% endfor %}
         </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="7" class="num">TOTAL GERAL:</td>
-                <td class="num">R$ {{ total_geral|floatformat:2 }}</td>
-            </tr>
-        </tfoot>
     </table>
 
-    <div class="signature">
-        <div class="signature-box">
-            <p><strong>Prestador de serviços</strong></p>
-            <p>{{ empresa.razao }}</p>
-            <p>CNPJ: {{ empresa.cnpj }}</p>
-        </div>
-        <div class="signature-box">
-            <p><strong>Convênio / Órgão</strong></p>
-            <p>{{ convenio_nome|default:"—" }}</p>
-            <p>Carimbo e assinatura</p>
-        </div>
+    {% if resumo_publico %}
+    <div class="secao-resumo">
+        <table class="resumo">
+            <thead>
+                <tr>
+                    <th colspan="2">Resumo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resumo_publico.modalidades %}
+                <tr>
+                    <td class="label">{{ item.label }}</td>
+                    <td class="qtd">{{ item.quantidade }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-qtd">
+                    <td class="label">Quantidade total</td>
+                    <td class="qtd">{{ resumo_publico.quantidade_total }}</td>
+                </tr>
+                <tr class="total-valor">
+                    <td class="label">Valor total</td>
+                    <td class="valor">R$ {{ resumo_publico.valor_total|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
+    {% endif %}
 
-    <div class="no-print" style="text-align: center; margin-top: 20px;">
+    <div class="no-print" style="text-align: center; margin-top: 24px;">
         <button type="button" onclick="window.print()">Imprimir</button>
     </div>
 </body>
