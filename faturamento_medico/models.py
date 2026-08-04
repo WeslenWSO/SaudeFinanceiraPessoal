@@ -356,12 +356,14 @@ class ItemServico(models.Model):
         ('CONFERIDO', 'CONFERIDO'),
         ('FALTA DE GUIA', 'FALTA DE GUIA'),
         ('FALTA DE VALOR NA TABELA', 'FALTA DE VALOR NA TABELA'),
+        ('FALTA TABELA DE CONTRASTE', 'FALTA TABELA DE CONTRASTE'),
         ('OUTROS', 'OUTROS'),
     ]
     STATUS_CONFERENCIA_CSS = {
         'CONFERIDO': 'success',
         'FALTA DE GUIA': 'warning',
         'FALTA DE VALOR NA TABELA': 'danger',
+        'FALTA TABELA DE CONTRASTE': 'contraste',
         'OUTROS': 'info',
         'PENDENTE': 'secondary',
     }

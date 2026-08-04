@@ -234,7 +234,8 @@
                                 </thead>
                                 <tbody>
                                     {% for linha in grid_linhas %}
-                                    <tr class="{% if linha.conferido %}table-success{% endif %}"
+                                    <tr class="{% if linha.conferido %}table-success{% elif linha.status_conferencia == 'FALTA TABELA DE CONTRASTE' %}row-status-contraste{% endif %}"
+                                        data-status="{{ linha.status_conferencia }}"
                                         data-status-css="{{ linha.status_conferencia_css }}">
                                         <td>
                                             {% if linha.mostrar_selecao_lote and linha.faturamento.status != 'finalizado' %}
@@ -674,6 +675,15 @@
     border-color: #0dcaf0;
     color: #055160;
 }
+.grid-ris .badge-contraste { background-color: #ffc107; color: #212529; }
+.grid-ris .status-conferencia-select.status-contraste {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #664d03;
+}
+.grid-ris tbody tr.row-status-contraste td {
+    background-color: #fff3cd !important;
+}
 .resumo-modalidade-chart-card {
     min-height: 100%;
 }
@@ -981,6 +991,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const select = row.querySelector('.status-conferencia-select');
         if (checkbox) checkbox.checked = !!data.conferido;
         row.classList.toggle('table-success', !!data.conferido);
+        row.classList.toggle(
+            'row-status-contraste',
+            data.status === 'FALTA TABELA DE CONTRASTE' && !data.conferido
+        );
+        if (data.status) {
+            row.dataset.status = data.status;
+        }
+        if (data.status_css) {
+            row.dataset.statusCss = data.status_css;
+        }
         if (select && data.status) {
             select.value = data.status;
             select.className = 'form-select form-select-sm status-conferencia-select status-' + (data.status_css || 'secondary');
