@@ -139,6 +139,14 @@ def _mes_referencia_label(data_ref):
     return f'{mes} {data_ref.year}' if mes else str(data_ref.year)
 
 
+def _local_empresa(empresa):
+    """Primeira linha do endereço da empresa para o campo Local do rodapé."""
+    endereco = (empresa.endereco or '').strip()
+    if not endereco:
+        return ''
+    return endereco.splitlines()[0].strip()
+
+
 def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
     lote = _validar_acesso_lote(lote_id, empresa_id)
     empresa = Empresa.objects.get(id=empresa_id)
@@ -168,6 +176,7 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
                 'nome_associado': fat.nome_associado or fat.nome or '-',
                 'procedimento': item.servico or '-',
                 'modalidade': modalidade,
+                'com_contraste': item.com_contraste,
                 'valor': valor_item,
             })
             total_geral += valor_item
@@ -185,6 +194,7 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
         'lote': lote,
         'empresa': empresa,
         'convenio_nome': lote.convenio or '',
+        'local_relatorio': _local_empresa(empresa),
         'periodo_inicio': periodo_inicio,
         'periodo_fim': periodo_fim,
         'mes_referencia': mes_referencia,

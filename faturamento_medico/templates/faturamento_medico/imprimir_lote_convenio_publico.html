@@ -72,8 +72,10 @@
         }
         table.dados td.col-data,
         table.dados td.col-modalidade,
+        table.dados td.col-contraste,
         table.dados th.col-data,
-        table.dados th.col-modalidade {
+        table.dados th.col-modalidade,
+        table.dados th.col-contraste {
             text-align: center;
             white-space: nowrap;
         }
@@ -121,6 +123,48 @@
             margin-top: 12px;
             page-break-inside: avoid;
         }
+        .rodape-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px 40px;
+            align-items: flex-start;
+        }
+        .rodape-resumo {
+            flex: 0 0 auto;
+        }
+        .rodape-assinatura {
+            flex: 1 1 260px;
+            min-width: 260px;
+            padding-top: 8px;
+        }
+        .campo-assinatura {
+            margin-bottom: 22px;
+        }
+        .campo-assinatura .label-campo {
+            display: block;
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .linha-campo {
+            display: block;
+            border-bottom: 1px solid #000;
+            min-height: 22px;
+            padding: 2px 4px 4px;
+            font-size: 11px;
+        }
+        .linha-assinatura {
+            display: block;
+            border-bottom: 1px solid #000;
+            min-height: 48px;
+            margin-top: 4px;
+        }
+        .rodape-assinatura .empresa-rodape {
+            margin-top: 28px;
+            font-size: 10px;
+            color: #333;
+        }
         @media print {
             body { margin: 0; }
             .no-print { display: none; }
@@ -150,6 +194,7 @@
                 <th>Nome Associado</th>
                 <th>Procedimento</th>
                 <th class="col-modalidade">Modalidade</th>
+                <th class="col-contraste">Contraste</th>
                 <th class="col-valor">Valor</th>
             </tr>
         </thead>
@@ -161,11 +206,12 @@
                 <td>{{ linha.nome_associado }}</td>
                 <td>{{ linha.procedimento }}</td>
                 <td class="col-modalidade">{{ linha.modalidade }}</td>
+                <td class="col-contraste">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
                 <td class="col-valor">R$ {{ linha.valor|floatformat:2 }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="6" class="col-data">Nenhum procedimento encontrado neste lote.</td>
+                <td colspan="7" class="col-data">Nenhum procedimento encontrado neste lote.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -173,29 +219,48 @@
 
     {% if resumo_publico %}
     <div class="secao-resumo">
-        <table class="resumo">
-            <thead>
-                <tr>
-                    <th colspan="2">Resumo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in resumo_publico.modalidades %}
-                <tr>
-                    <td class="label">{{ item.label }}</td>
-                    <td class="qtd">{{ item.quantidade }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="total-qtd">
-                    <td class="label">Quantidade total</td>
-                    <td class="qtd">{{ resumo_publico.quantidade_total }}</td>
-                </tr>
-                <tr class="total-valor">
-                    <td class="label">Valor total</td>
-                    <td class="valor">R$ {{ resumo_publico.valor_total|floatformat:2 }}</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="rodape-grid">
+            <div class="rodape-resumo">
+                <table class="resumo">
+                    <thead>
+                        <tr>
+                            <th colspan="2">Resumo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in resumo_publico.modalidades %}
+                        <tr>
+                            <td class="label">{{ item.label }}</td>
+                            <td class="qtd">{{ item.quantidade }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="total-qtd">
+                            <td class="label">Quantidade total</td>
+                            <td class="qtd">{{ resumo_publico.quantidade_total }}</td>
+                        </tr>
+                        <tr class="total-valor">
+                            <td class="label">Valor total</td>
+                            <td class="valor">R$ {{ resumo_publico.valor_total|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="rodape-assinatura">
+                <div class="campo-assinatura">
+                    <span class="label-campo">Data</span>
+                    <span class="linha-campo">{{ data_emissao_relatorio|date:"d/m/Y" }}</span>
+                </div>
+                <div class="campo-assinatura">
+                    <span class="label-campo">Local</span>
+                    <span class="linha-campo">{% if local_relatorio %}{{ local_relatorio }}{% else %}&nbsp;{% endif %}</span>
+                </div>
+                <div class="campo-assinatura">
+                    <span class="label-campo">Responsável para assinatura</span>
+                    <span class="linha-assinatura">&nbsp;</span>
+                </div>
+                <p class="empresa-rodape">{{ empresa.razao }} · CNPJ {{ empresa.cnpj }}</p>
+            </div>
+        </div>
     </div>
     {% endif %}
 
