@@ -1,9 +1,24 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from empresa.models import Empresa
 
 class Convenio(models.Model):
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, verbose_name='Empresa', null=True, blank=True)
     nome = models.CharField(verbose_name='Nome do Convênio', max_length=100)
+    dia_fechamento = models.PositiveSmallIntegerField(
+        verbose_name='Dia para fechamento',
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        null=True,
+        blank=True,
+        help_text='Dia do mês para fechamento do convênio (1 a 31).',
+    )
+    dia_abertura = models.PositiveSmallIntegerField(
+        verbose_name='Dia para abertura',
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        null=True,
+        blank=True,
+        help_text='Dia do mês para abertura do convênio (1 a 31).',
+    )
 
     class Meta:
         verbose_name = 'Convênio'

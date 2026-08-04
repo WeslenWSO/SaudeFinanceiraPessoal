@@ -4,11 +4,17 @@ from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 class ConvenioForm(forms.ModelForm):
     class Meta:
         model = Convenio
-        fields = ['empresa', 'nome']
+        fields = ['empresa', 'nome', 'dia_fechamento', 'dia_abertura']
+        widgets = {
+            'dia_fechamento': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
+            'dia_abertura': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['empresa'].disabled = True
+        self.fields['dia_fechamento'].label = 'Dia para fechamento'
+        self.fields['dia_abertura'].label = 'Dia para abertura'
 
 class ServicosMedicosForm(forms.ModelForm):
     class Meta:

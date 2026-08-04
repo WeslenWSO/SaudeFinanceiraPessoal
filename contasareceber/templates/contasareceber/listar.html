@@ -75,6 +75,28 @@
     overflow-x: auto;
     overflow-y: visible;
 }
+.table-car-list th.car-th-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.table-car-list th.car-th-sortable:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+.table-car-list th.car-th-sortable::after {
+    content: ' ⇅';
+    font-size: 0.7em;
+    opacity: 0.35;
+    margin-left: 0.15rem;
+}
+.table-car-list th.car-th-sorted-asc::after {
+    content: ' ▲';
+    opacity: 0.85;
+}
+.table-car-list th.car-th-sorted-desc::after {
+    content: ' ▼';
+    opacity: 0.85;
+}
 </style>
 
 <div class="container-fluid">
@@ -236,30 +258,30 @@
 
                         <!-- Tabela -->
                         <div class="table-responsive">
-                            <table class="table table-striped">
+                            <table class="table table-striped table-car-list" id="tabelaContasReceber">
                                 <thead>
                                     <tr>
                                         <th>
                                             <input type="checkbox" id="select-all">
                                         </th>
-                                        <th>Cliente</th>
-                                        <th>CPF/CNPJ</th>
-                                        <th>Sócio</th>
-                                        <th>Categoria</th>
-                                        <th>Data Emissão</th>
-                                        <th>Data Recebimento</th>
-                                        <th>Documento</th>
-                                        <th>Autorização</th>
-                                        <th>Cobrança</th>
-                                        <th>Data Vencimento</th>
-                                        <th>Valor</th>
-                                        <th>Saldo nominal</th>
-                                        <th title="Se recebido (pago/cartão): valor recebido. Se não: valor a receber − tarifa − desconto + juros.">Total líquido</th>
-                                        <th>Desconto</th>
-                                        <th>Juros</th>
-                                        <th>Tarifas</th>
-                                        <th>Status</th>
-                                        <th>Dias Atraso</th>
+                                        <th data-col="cliente" data-sortable class="car-th-sortable{% if sort_col == 'cliente' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Cliente</th>
+                                        <th data-col="cnpj_cpf" data-sortable class="car-th-sortable{% if sort_col == 'cnpj_cpf' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">CPF/CNPJ</th>
+                                        <th data-col="socio" data-sortable class="car-th-sortable{% if sort_col == 'socio' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Sócio</th>
+                                        <th data-col="categoria" data-sortable class="car-th-sortable{% if sort_col == 'categoria' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Categoria</th>
+                                        <th data-col="data_emissao" data-sortable class="car-th-sortable{% if sort_col == 'data_emissao' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Data Emissão</th>
+                                        <th data-col="data_recebimento" data-sortable class="car-th-sortable{% if sort_col == 'data_recebimento' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Data Recebimento</th>
+                                        <th data-col="documento" data-sortable class="car-th-sortable{% if sort_col == 'documento' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Documento</th>
+                                        <th data-col="autorizacao" data-sortable class="car-th-sortable{% if sort_col == 'autorizacao' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Autorização</th>
+                                        <th data-col="cobranca" data-sortable class="car-th-sortable{% if sort_col == 'cobranca' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Cobrança</th>
+                                        <th data-col="data_vencimento" data-sortable class="car-th-sortable{% if sort_col == 'data_vencimento' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Data Vencimento</th>
+                                        <th data-col="valor" data-sortable class="car-th-sortable{% if sort_col == 'valor' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Valor</th>
+                                        <th data-col="saldo_nominal" data-sortable class="car-th-sortable{% if sort_col == 'saldo_nominal' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Saldo nominal</th>
+                                        <th data-col="total_liquido" data-sortable class="car-th-sortable{% if sort_col == 'total_liquido' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}" title="Se recebido (pago/cartão): valor recebido. Se não: valor a receber − tarifa − desconto + juros.">Total líquido</th>
+                                        <th data-col="desconto" data-sortable class="car-th-sortable{% if sort_col == 'desconto' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Desconto</th>
+                                        <th data-col="juros" data-sortable class="car-th-sortable{% if sort_col == 'juros' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Juros</th>
+                                        <th data-col="tarifas" data-sortable class="car-th-sortable{% if sort_col == 'tarifas' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Tarifas</th>
+                                        <th data-col="status" data-sortable class="car-th-sortable{% if sort_col == 'status' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Status</th>
+                                        <th data-col="dias_atraso" data-sortable class="car-th-sortable{% if sort_col == 'dias_atraso' %} car-th-sorted car-th-sorted-{{ sort_dir }}{% endif %}">Dias Atraso</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
@@ -660,6 +682,27 @@
 console.log('DEBUG: JavaScript carregado');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DEBUG: DOMContentLoaded executado');
+
+    (function initSortColunasCar() {
+        const currentSort = '{{ sort_col|default:"data_vencimento"|escapejs }}';
+        const currentDir = '{{ sort_dir|default:"desc"|escapejs }}';
+        document.querySelectorAll('#tabelaContasReceber thead th[data-sortable]').forEach(function(th) {
+            th.addEventListener('click', function() {
+                const col = th.getAttribute('data-col');
+                if (!col) return;
+                const url = new URL(window.location.href);
+                let dir = 'asc';
+                if (currentSort === col && currentDir === 'asc') {
+                    dir = 'desc';
+                }
+                url.searchParams.set('sort', col);
+                url.searchParams.set('dir', dir);
+                url.searchParams.delete('page');
+                window.location.href = url.toString();
+            });
+        });
+    })();
+
     const selectAllCheckbox = document.getElementById('select-all');
     const contaCheckboxes = document.querySelectorAll('.conta-checkbox');
     const conciliarBtn = document.getElementById('conciliar-btn');

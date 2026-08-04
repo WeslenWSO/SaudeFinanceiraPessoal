@@ -38,6 +38,11 @@ urlpatterns = [
 
     path('imprimir-lote/', views.selecionar_lote_imprimir, name='selecionar_lote_imprimir'),
     path('imprimir-lote/<int:lote_id>/', views.imprimir_lote, name='imprimir_lote'),
+    path(
+        'imprimir-lote-convenio-publico/<int:lote_id>/',
+        views.imprimir_lote_convenio_publico,
+        name='imprimir_lote_convenio_publico',
+    ),
     path('imprimir-repasses-fechados/', views.imprimir_repasses_fechados, name='imprimir_repasses_fechados'),
 
     # AJAX

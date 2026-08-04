@@ -3,7 +3,7 @@ from .models import Convenio, ServicosMedicos, TabelaPreco
 
 @admin.register(Convenio)
 class ConvenioAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nome', 'empresa')
+    list_display = ('id', 'nome', 'empresa', 'dia_fechamento', 'dia_abertura')
     list_display_links = ('id', 'nome')
     list_per_page = 10
     search_fields = ('nome',)

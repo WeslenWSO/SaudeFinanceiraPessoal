@@ -3156,48 +3156,49 @@ def selecionar_lote_imprimir(request):
 
 
 def imprimir_lote(request, lote_id):
-    """View para imprimir relatório de lote em HTML"""
+    """View para imprimir relatório de lote em HTML (layout padrão)."""
     if lote_id == 0:
         lote_id = request.GET.get('lote_id')
         if not lote_id:
             return HttpResponse('Lote não selecionado')
 
-    lote = get_object_or_404(Lote, id=lote_id)
     empresa_id = request.GET.get('empresa_id') or request.session.get('empresa_id')
     if not empresa_id:
         return HttpResponse('Sessão expirada. Faça login novamente.')
-    # Verificar se o lote pertence à empresa (já filtrado na seleção)
-    if lote.empresa_id != int(empresa_id):
+
+    from .lote_relatorio import montar_contexto_relatorio_lote
+
+    try:
+        context = montar_contexto_relatorio_lote(lote_id, empresa_id, layout='padrao')
+    except Lote.DoesNotExist:
+        return HttpResponse('Lote não encontrado')
+    except PermissionError:
         return HttpResponse('Acesso negado')
 
-    faturamentos = FaturamentoMedico.objects.filter(lote=str(lote.id)).order_by('data')
-    items = ItemServico.objects.filter(faturamento__in=faturamentos).select_related('faturamento').order_by('faturamento__nome', 'faturamento__data', 'faturamento__guia')
-
-    # Agrupar itens por beneficiário
-    grouped_items = {}
-    total_geral = 0
-    for item in items:
-        beneficiario = item.faturamento.nome or 'Sem Nome'
-        if beneficiario not in grouped_items:
-            grouped_items[beneficiario] = []
-        grouped_items[beneficiario].append(item)
-        total_geral += item.total or 0
-
-    empresa = Empresa.objects.get(id=empresa_id)
-
-    from django.db.models import Min, Max
-    periodo_inicio = faturamentos.aggregate(min_data=Min('data'))['min_data']
-    periodo_fim = faturamentos.aggregate(max_data=Max('data'))['max_data']
-
-    context = {
-        'lote': lote,
-        'empresa': empresa,
-        'periodo_inicio': periodo_inicio,
-        'periodo_fim': periodo_fim,
-        'grouped_items': grouped_items,
-        'total_geral': total_geral,
-    }
     return render(request, 'faturamento_medico/imprimir_lote.html', context)
+
+
+def imprimir_lote_convenio_publico(request, lote_id):
+    """Relatório de lote — layout para FUSEX, PM, Bombeiro e PP Saúde."""
+    if lote_id == 0:
+        lote_id = request.GET.get('lote_id')
+        if not lote_id:
+            return HttpResponse('Lote não selecionado')
+
+    empresa_id = request.GET.get('empresa_id') or request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+
+    from .lote_relatorio import montar_contexto_relatorio_lote
+
+    try:
+        context = montar_contexto_relatorio_lote(lote_id, empresa_id, layout='publico')
+    except Lote.DoesNotExist:
+        return HttpResponse('Lote não encontrado')
+    except PermissionError:
+        return HttpResponse('Acesso negado')
+
+    return render(request, 'faturamento_medico/imprimir_lote_convenio_publico.html', context)
 
 
 def imprimir_repasses_fechados(request):

@@ -30,6 +30,8 @@
       <th>ID</th>
       <th>Nome</th>
       <th>Empresa</th>
+      <th>Dia fechamento</th>
+      <th>Dia abertura</th>
       <th>Edi.</th>
     </tr>
   </thead>
@@ -47,6 +49,12 @@
       </td>
       <td>
         {{ convenio.empresa }}
+      </td>
+      <td>
+        {{ convenio.dia_fechamento|default:"—" }}
+      </td>
+      <td>
+        {{ convenio.dia_abertura|default:"—" }}
       </td>
 
         <td>

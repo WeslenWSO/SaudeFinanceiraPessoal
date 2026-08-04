@@ -161,6 +161,97 @@ def construir_url_crlistar_com_filtros(filtros):
     return reverse('contasareceber:crlistar')
 
 
+CAR_DEFAULT_SORT = 'data_vencimento'
+CAR_DEFAULT_SORT_DIR = 'desc'
+
+CAR_SORT_FIELDS = {
+    'cliente': 'cliente',
+    'cnpj_cpf': 'cnpj_cpf',
+    'socio': 'socio',
+    'categoria': 'categoria',
+    'data_emissao': 'data_emissao',
+    'data_recebimento': 'data_recebimento',
+    'documento': 'documento',
+    'autorizacao': 'autorizacao',
+    'cobranca': 'cobranca',
+    'data_vencimento': 'data_vencimento',
+    'valor': 'valor',
+    'saldo_nominal': 'saldo_nominal',
+    'total_liquido': 'total_liquido',
+    'desconto': 'desconto',
+    'juros': 'juros',
+    'tarifas': 'tarifas',
+    'status': 'status',
+    'dias_atraso': 'dias_atraso',
+}
+
+
+def _get_car_sort_from_request(request, filtros):
+    sort_get = (request.GET.get('sort') or '').strip()
+    dir_get = (request.GET.get('dir') or '').strip().lower()
+    if sort_get in CAR_SORT_FIELDS:
+        filtros['sort'] = sort_get
+        filtros['dir'] = dir_get if dir_get in ('asc', 'desc') else 'asc'
+
+    sort_col = filtros.get('sort', CAR_DEFAULT_SORT)
+    sort_dir = filtros.get('dir', CAR_DEFAULT_SORT_DIR)
+    if sort_col not in CAR_SORT_FIELDS:
+        sort_col = CAR_DEFAULT_SORT
+    if sort_dir not in ('asc', 'desc'):
+        sort_dir = CAR_DEFAULT_SORT_DIR
+    return sort_col, sort_dir
+
+
+def _car_sort_key(conta, sort_col):
+    if sort_col == 'cliente':
+        return (conta.cliente or '').lower()
+    if sort_col == 'cnpj_cpf':
+        return (conta.cnpj_cpf or '').lower()
+    if sort_col == 'socio':
+        if conta.socio:
+            return str(conta.socio).lower()
+        if conta.nota and conta.nota.socio:
+            return str(conta.nota.socio).lower()
+        return ''
+    if sort_col == 'categoria':
+        return (conta.categoria.nome if conta.categoria else '').lower()
+    if sort_col == 'data_emissao':
+        return conta.data_emissao or date.min
+    if sort_col == 'data_recebimento':
+        return conta.data_recebimento or date.min
+    if sort_col == 'documento':
+        doc = conta.doc or (conta.nota.numero_nota if conta.nota else '') or ''
+        return str(doc).lower()
+    if sort_col == 'autorizacao':
+        return (conta.autorizacao or '').lower()
+    if sort_col == 'cobranca':
+        return (conta.forma_pagamento.descricao if conta.forma_pagamento else '').lower()
+    if sort_col == 'data_vencimento':
+        return conta.data_vencimento or date.min
+    if sort_col == 'valor':
+        return conta.valor_a_receber or Decimal('0')
+    if sort_col == 'saldo_nominal':
+        return conta.get_saldo_nominal_pendente()
+    if sort_col == 'total_liquido':
+        return conta.get_total_liquido_listagem()
+    if sort_col == 'desconto':
+        return conta.desconto or Decimal('0')
+    if sort_col == 'juros':
+        return conta.juros or Decimal('0')
+    if sort_col == 'tarifas':
+        return conta.tarifas or Decimal('0')
+    if sort_col == 'status':
+        return conta.status or ''
+    if sort_col == 'dias_atraso':
+        return conta.dias_atraso
+    return conta.data_vencimento or date.min
+
+
+def _apply_car_sort(contas_list, sort_col, sort_dir):
+    reverse = sort_dir == 'desc'
+    return sorted(contas_list, key=lambda c: _car_sort_key(c, sort_col), reverse=reverse)
+
+
 def extrair_filtros_categorizar_baixados(request):
     """Filtros da tela de categorização de contas já recebidas (pago/cartão)."""
     return {
@@ -527,8 +618,13 @@ def listar_contas_a_receber(request):
 
     contas = contas.prefetch_related('baixas')
 
+    sort_col, sort_dir = _get_car_sort_from_request(request, filtros)
+    filtros['sort'] = sort_col
+    filtros['dir'] = sort_dir
+
     # Uma única materialização: cards e tabela usam o mesmo conjunto (evita divergência queryset vs página).
     contas_filtradas = list(contas)
+    contas_filtradas = _apply_car_sort(contas_filtradas, sort_col, sort_dir)
     total_pendente = sum(
         conta.get_valor_pendente() for conta in contas_filtradas if conta.status not in ('pago', 'cartao')
     )
@@ -563,6 +659,8 @@ def listar_contas_a_receber(request):
         'filtros': filtros,
         'socios': Socio.objects.filter(empresa_id=empresa_id).order_by('socio', 'lastname'),
         'resumo_val_receber': (request.GET.get('resumo_val_receber') or '').strip() == '1',
+        'sort_col': sort_col,
+        'sort_dir': sort_dir,
     }
 
     return render(request, 'contasareceber/listar.html', context)

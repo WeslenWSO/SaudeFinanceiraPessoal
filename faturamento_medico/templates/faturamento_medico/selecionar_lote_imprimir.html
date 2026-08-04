@@ -9,23 +9,60 @@
                     <h3 class="card-title">Selecionar Lote para Imprimir Relatório</h3>
                 </div>
                 <div class="card-body">
-                    <form method="get" action="{% url 'faturamento_medico:imprimir_lote' 0 %}" target="_blank">
-                        <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
-                        <div class="mb-3">
-                            <label for="lote_id" class="form-label">Selecione o Lote:</label>
-                            <select name="lote_id" id="lote_id" class="form-select" required>
-                                {% for lote in lotes %}
-                                <option value="{{ lote.id }}">Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|floatformat:2 }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-print"></i> Imprimir Relatório
-                        </button>
-                    </form>
+                    <div class="mb-3">
+                        <label for="lote_id" class="form-label">Selecione o Lote:</label>
+                        <select id="lote_id" class="form-select" required>
+                            {% for lote in lotes %}
+                            <option value="{{ lote.id }}" data-convenio="{{ lote.convenio|default:'' }}">
+                                Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|floatformat:2 }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 align-items-start">
+                        <form method="get" id="form-imprimir-padrao" action="{% url 'faturamento_medico:imprimir_lote' 0 %}" target="_blank" class="d-inline">
+                            <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
+                            <input type="hidden" name="lote_id" id="lote_id_padrao" value="">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-print"></i> Imprimir Relatório
+                            </button>
+                        </form>
+
+                        <form method="get" id="form-imprimir-publico" action="{% url 'faturamento_medico:imprimir_lote_convenio_publico' 0 %}" target="_blank" class="d-inline">
+                            <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
+                            <input type="hidden" name="lote_id" id="lote_id_publico" value="">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-file-medical"></i> Imprimir Relatório (Convênio Público)
+                            </button>
+                        </form>
+                    </div>
+
+                    <p class="text-muted small mt-3 mb-0">
+                        <strong>Relatório padrão:</strong> layout atual com local e anestesista.<br>
+                        <strong>Convênio público:</strong> FUSEX, Polícia Militar, Corpo de Bombeiro e PP Saúde
+                        (guia, carteirinha, procedimentos e subtotal por guia).
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('lote_id');
+    const hiddenPadrao = document.getElementById('lote_id_padrao');
+    const hiddenPublico = document.getElementById('lote_id_publico');
+
+    function syncLoteId() {
+        const val = select.value;
+        hiddenPadrao.value = val;
+        hiddenPublico.value = val;
+    }
+
+    select.addEventListener('change', syncLoteId);
+    syncLoteId();
+});
+</script>
 {% endblock %}
