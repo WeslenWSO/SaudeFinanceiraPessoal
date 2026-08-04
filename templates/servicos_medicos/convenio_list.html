@@ -32,6 +32,7 @@
       <th>Empresa</th>
       <th>Dia fechamento</th>
       <th>Dia abertura</th>
+      <th>Observação</th>
       <th>Edi.</th>
     </tr>
   </thead>
@@ -55,6 +56,9 @@
       </td>
       <td>
         {{ convenio.dia_abertura|default:"—" }}
+      </td>
+      <td>
+        {{ convenio.observacao|truncatechars:60|default:"—" }}
       </td>
 
         <td>

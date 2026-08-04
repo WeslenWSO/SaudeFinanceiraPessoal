@@ -12,20 +12,27 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="lote_id" class="form-label">Selecione o Lote:</label>
-                        <select id="lote_id" class="form-select" required>
+                        <select id="lote_id" class="form-select" required {% if not lotes %}disabled{% endif %}>
                             {% for lote in lotes %}
                             <option value="{{ lote.id }}" data-convenio="{{ lote.convenio|default:'' }}">
                                 Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|moeda_br }})
                             </option>
+                            {% empty %}
+                            <option value="">Nenhum lote pendente de impressão</option>
                             {% endfor %}
                         </select>
+                        {% if not lotes %}
+                        <p class="text-muted small mt-2 mb-0">
+                            Todos os lotes foram recebidos e baixados, ou ainda não há lotes cadastrados.
+                        </p>
+                        {% endif %}
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-start">
                         <form method="get" id="form-imprimir-padrao" action="{% url 'faturamento_medico:imprimir_lote' 0 %}" target="_blank" class="d-inline">
                             <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
                             <input type="hidden" name="lote_id" id="lote_id_padrao" value="">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary" {% if not lotes %}disabled{% endif %}>
                                 <i class="fas fa-print"></i> Imprimir Relatório
                             </button>
                         </form>
@@ -33,11 +40,33 @@
                         <form method="get" id="form-imprimir-publico" action="{% url 'faturamento_medico:imprimir_lote_convenio_publico' 0 %}" target="_blank" class="d-inline">
                             <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
                             <input type="hidden" name="lote_id" id="lote_id_publico" value="">
-                            <button type="submit" class="btn btn-success">
+                            <button type="submit" class="btn btn-success" {% if not lotes %}disabled{% endif %}>
                                 <i class="fas fa-file-medical"></i> Imprimir Relatório (Convênio Público)
                             </button>
                         </form>
                     </div>
+
+                    <hr class="my-4">
+
+                    <form method="post" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="marcar_baixado">
+                        <div class="col-auto">
+                            <label for="lote_baixado_id" class="form-label mb-0">Marcar lote como baixado</label>
+                            <input type="number" min="1" class="form-control form-control-sm" id="lote_baixado_id"
+                                   name="lote_baixado_id" placeholder="Nº do lote" style="width: 120px;">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                    onclick="return confirm('Marcar este lote como baixado? Ele sairá da lista de impressão.');">
+                                <i class="fas fa-check-circle"></i> Confirmar baixa do lote
+                            </button>
+                        </div>
+                    </form>
+                    <p class="text-muted small mt-2 mb-0">
+                        Lotes baixados no <strong>Extrato de Pagamento</strong> são ocultados automaticamente.
+                        Use o campo acima para marcar manualmente, se necessário.
+                    </p>
 
                     <p class="text-muted small mt-3 mb-0">
                         <strong>Relatório padrão:</strong> layout detalhado (guia, porte, anestesista, subtotal por guia).<br>
@@ -63,7 +92,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     select.addEventListener('change', syncLoteId);
-    syncLoteId();
+    if (select.value) {
+        syncLoteId();
+    }
 });
 </script>
 {% endblock %}

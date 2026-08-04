@@ -3181,13 +3181,31 @@ def buscar_precos_servico(request, cabecalho_id, codigo_servico):
 
 
 def selecionar_lote_imprimir(request):
-    """View para selecionar lote para imprimir relatório"""
+    """View para selecionar lote para imprimir relatório (apenas lotes não baixados)."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Empresa não encontrada na sessão.')
         return redirect('faturamento_medico:ftlistar')
 
-    lotes = Lote.objects.filter(empresa_id=empresa_id).order_by('-id')
+    if request.method == 'POST' and request.POST.get('acao') == 'marcar_baixado':
+        lote_id_raw = (request.POST.get('lote_baixado_id') or '').strip()
+        if not lote_id_raw:
+            messages.error(request, 'Informe o número do lote.')
+            return redirect('faturamento_medico:selecionar_lote_imprimir')
+        try:
+            lote = Lote.objects.get(pk=int(lote_id_raw), empresa_id=empresa_id)
+        except (TypeError, ValueError, Lote.DoesNotExist):
+            messages.error(request, 'Lote não encontrado.')
+            return redirect('faturamento_medico:selecionar_lote_imprimir')
+        if lote.baixado:
+            messages.info(request, f'Lote {lote.id} já estava marcado como baixado.')
+        else:
+            lote.baixado = True
+            lote.save(update_fields=['baixado', 'data_atualizacao'])
+            messages.success(request, f'Lote {lote.id} marcado como baixado e removido da lista de impressão.')
+        return redirect('faturamento_medico:selecionar_lote_imprimir')
+
+    lotes = Lote.objects.filter(empresa_id=empresa_id, baixado=False).order_by('-id')
     context = {'lotes': lotes}
     return render(request, 'faturamento_medico/selecionar_lote_imprimir.html', context)
 
@@ -4637,6 +4655,7 @@ def baixar_extrato_pagamento(request, pk):
             extrato.valor_recebido = _dec(valor_raw)
             extrato.banco = banco
             extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+            extrato.sincronizar_baixado_lote()
             messages.success(request, 'Baixa registrada com sucesso.')
             return redirect('faturamento_medico:listar_extrato_pagamento')
         except (ValueError, InvalidOperation):
@@ -4669,6 +4688,7 @@ def estornar_baixa_extrato_pagamento(request, pk):
     extrato.valor_recebido = Decimal('0')
     extrato.banco = ''
     extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+    extrato.sincronizar_baixado_lote()
     messages.success(request, 'Baixa estornada.')
     return redirect('faturamento_medico:listar_extrato_pagamento')
 

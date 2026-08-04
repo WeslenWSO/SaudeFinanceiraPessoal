@@ -454,6 +454,11 @@ class Lote(models.Model):
     convenio = models.CharField(verbose_name='Convênio', max_length=100, blank=True, null=True)
     data_lote = models.DateField(verbose_name='Data do Lote', default=timezone.now)
     total_lote = models.DecimalField(verbose_name='Total do Lote', max_digits=15, decimal_places=2, default=0)
+    baixado = models.BooleanField(
+        verbose_name='Lote baixado',
+        default=False,
+        help_text='Lote recebido e baixado — não aparece na seleção de impressão.',
+    )
 
     # Timestamps
     data_criacao = models.DateTimeField(verbose_name='Data de Criação', auto_now_add=True)
@@ -641,6 +646,15 @@ class ExtratoPagamentoConvenio(models.Model):
     @property
     def baixado(self) -> bool:
         return self.data_recebimento is not None and (self.valor_recebido or 0) > 0
+
+    def sincronizar_baixado_lote(self):
+        """Marca ou desmarca o lote de faturamento conforme recebimento baixado."""
+        lote = self.lote_faturamento
+        if not lote:
+            return
+        if lote.baixado != self.baixado:
+            lote.baixado = self.baixado
+            lote.save(update_fields=['baixado', 'data_atualizacao'])
 
 
 class MedcloudConfig(models.Model):

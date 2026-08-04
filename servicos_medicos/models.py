@@ -19,6 +19,12 @@ class Convenio(models.Model):
         blank=True,
         help_text='Dia do mês para abertura do convênio (1 a 31).',
     )
+    observacao = models.TextField(
+        verbose_name='Observação',
+        blank=True,
+        default='',
+        help_text='Particularidades e regras específicas deste convênio.',
+    )
 
     class Meta:
         verbose_name = 'Convênio'
