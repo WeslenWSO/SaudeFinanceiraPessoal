@@ -22,6 +22,12 @@ CONVENIOS_LAYOUT_PUBLICO_KEYWORDS = (
     'PP SAÚDE',
 )
 
+CONVENIOS_RELATORIO_COLUNA_GUIA = (
+    'FUSEX',
+    'POLICIA MILITAR',
+    'POLÍCIA MILITAR',
+)
+
 MESES_PT = (
     '',
     'JANEIRO',
@@ -53,6 +59,16 @@ RESUMO_MODALIDADES_PUBLICO = (
 def convenio_usa_layout_publico(nome_convenio: str) -> bool:
     nome = (nome_convenio or '').upper()
     return any(palavra in nome for palavra in CONVENIOS_LAYOUT_PUBLICO_KEYWORDS)
+
+
+def convenio_relatorio_coluna_guia(nome_convenio: str) -> bool:
+    """FUSEX e PM exibem número da guia; Bombeiro e PP Saúde exibem associado."""
+    nome = (nome_convenio or '').upper().strip()
+    if any(palavra in nome for palavra in CONVENIOS_RELATORIO_COLUNA_GUIA):
+        return True
+    if nome == 'PM' or nome.startswith('PM ') or nome.endswith(' PM') or ' PM ' in f' {nome} ':
+        return True
+    return False
 
 
 def _validar_acesso_lote(lote_id, empresa_id):
@@ -174,6 +190,7 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
                 'data': fat.data,
                 'paciente': fat.nome or '-',
                 'nome_associado': fat.nome_associado or fat.nome or '-',
+                'numero_guia': (fat.guia or '').strip() or '-',
                 'procedimento': item.servico or '-',
                 'modalidade': modalidade,
                 'com_contraste': item.com_contraste,
@@ -205,4 +222,5 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
         'data_emissao_relatorio': timezone.now().date(),
         'layout': layout,
         'usa_layout_publico': convenio_usa_layout_publico(lote.convenio),
+        'coluna_terceira_guia': convenio_relatorio_coluna_guia(lote.convenio) if layout == 'publico' else False,
     }

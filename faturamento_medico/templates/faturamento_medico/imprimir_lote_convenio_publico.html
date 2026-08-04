@@ -192,7 +192,11 @@
             <tr>
                 <th class="col-data">Data</th>
                 <th>Paciente</th>
+                {% if coluna_terceira_guia %}
+                <th>Número da Guia</th>
+                {% else %}
                 <th>Nome Associado</th>
+                {% endif %}
                 <th>Procedimento</th>
                 <th class="col-modalidade">Modalidade</th>
                 <th class="col-contraste">Contraste</th>
@@ -204,7 +208,11 @@
             <tr>
                 <td class="col-data">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                 <td>{{ linha.paciente }}</td>
+                {% if coluna_terceira_guia %}
+                <td>{{ linha.numero_guia }}</td>
+                {% else %}
                 <td>{{ linha.nome_associado }}</td>
+                {% endif %}
                 <td>{{ linha.procedimento }}</td>
                 <td class="col-modalidade">{{ linha.modalidade }}</td>
                 <td class="col-contraste">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
