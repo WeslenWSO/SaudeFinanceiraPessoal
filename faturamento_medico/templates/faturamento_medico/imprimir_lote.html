@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+{% load faturamento_extras %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -89,8 +90,8 @@
                 <td>{{ item.servico|default:"-" }}</td>
                 <td>{{ item.porte|default:"-" }}</td>
                 <td>{{ item.qt|default:0 }}</td>
-                <td>R$ {{ item.valor|floatformat:2 }}</td>
-                <td>R$ {{ item.total|floatformat:2 }}</td>
+                <td>R$ {{ item.valor|moeda_br }}</td>
+                <td>R$ {{ item.total|moeda_br }}</td>
                 <td>{{ item.faturamento.local|default:"-" }}</td>
                 <td>{{ item.faturamento.anestesista|default:"-" }}</td>
             </tr>
@@ -105,7 +106,7 @@
         <tfoot>
             <tr style="font-weight: bold; background-color: #f0f0f0;">
                 <td colspan="8" style="text-align: right;">TOTAL GERAL:</td>
-                <td>R$ {{ total_geral|floatformat:2 }}</td>
+                <td>R$ {{ total_geral|moeda_br }}</td>
                 <td colspan="2"></td>
             </tr>
         </tfoot>

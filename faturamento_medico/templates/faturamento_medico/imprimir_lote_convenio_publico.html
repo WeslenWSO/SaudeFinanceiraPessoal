@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+{% load faturamento_extras %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -207,7 +208,7 @@
                 <td>{{ linha.procedimento }}</td>
                 <td class="col-modalidade">{{ linha.modalidade }}</td>
                 <td class="col-contraste">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                <td class="col-valor">R$ {{ linha.valor|floatformat:2 }}</td>
+                <td class="col-valor">R$ {{ linha.valor|moeda_br }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -240,7 +241,7 @@
                         </tr>
                         <tr class="total-valor">
                             <td class="label">Valor total</td>
-                            <td class="valor">R$ {{ resumo_publico.valor_total|floatformat:2 }}</td>
+                            <td class="valor">R$ {{ resumo_publico.valor_total|moeda_br }}</td>
                         </tr>
                     </tbody>
                 </table>
