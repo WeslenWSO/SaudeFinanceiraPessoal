@@ -59,9 +59,11 @@ urlpatterns = [
     path('sincronizar-medcloud/', views.sincronizar_medcloud, name='sincronizar_medcloud'),
     path('importar-extrato-pagamento-bradesco/', views.importar_extrato_pagamento_bradesco, name='importar_extrato_pagamento_bradesco'),
     path('extrato-pagamento/', views.listar_extrato_pagamento, name='listar_extrato_pagamento'),
+    path('extrato-pagamento/<int:pk>/editar/', views.editar_extrato_pagamento, name='editar_extrato_pagamento'),
     path('extrato-pagamento/<int:pk>/baixar/', views.baixar_extrato_pagamento, name='baixar_extrato_pagamento'),
     path('extrato-pagamento/<int:pk>/estornar-baixa/', views.estornar_baixa_extrato_pagamento, name='estornar_baixa_extrato_pagamento'),
     path('modelo-ris/', views.baixar_modelo_ris, name='baixar_modelo_ris'),
+    path('item/<int:pk>/lancar-glosa/', views.lancar_glosa_item, name='lancar_glosa_item'),
     path('item/<int:pk>/conferencia/', views.toggle_conferencia_item, name='toggle_conferencia'),
     path('item/<int:pk>/status-conferencia/', views.alterar_status_conferencia_item, name='alterar_status_conferencia'),
 ]

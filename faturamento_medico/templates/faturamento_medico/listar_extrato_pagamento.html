@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load faturamento_extras %}
 
 {% block title %}Extrato de Pagamento{% endblock %}
 
@@ -75,19 +76,23 @@
                                     <td>{{ linha.lote }}</td>
                                     <td>{{ linha.protocolo }}</td>
                                     <td>{{ linha.qt_guias|default:"—" }}</td>
-                                    <td class="text-end">{{ linha.valor|floatformat:2 }}</td>
-                                    <td class="text-end">{{ linha.valor_glosado|floatformat:2 }}</td>
-                                    <td class="text-end">{{ linha.valor_liberado|floatformat:2 }}</td>
+                                    <td class="text-end">{{ linha.valor|moeda_br }}</td>
+                                    <td class="text-end">{{ linha.valor_glosado|moeda_br }}</td>
+                                    <td class="text-end">{{ linha.valor_liberado|moeda_br }}</td>
                                     <td>{{ linha.observacao|truncatechars:20 }}</td>
                                     <td>{{ linha.nota|default:"—" }}</td>
-                                    <td class="text-end">{% if linha.valor_nota %}{{ linha.valor_nota|floatformat:2 }}{% else %}—{% endif %}</td>
-                                    <td class="text-end">{{ linha.retencoes|floatformat:2 }}</td>
-                                    <td class="text-end">{{ linha.liquido|floatformat:2 }}</td>
+                                    <td class="text-end">{% if linha.valor_nota %}{{ linha.valor_nota|moeda_br }}{% else %}—{% endif %}</td>
+                                    <td class="text-end">{{ linha.retencoes|moeda_br }}</td>
+                                    <td class="text-end">{{ linha.liquido|moeda_br }}</td>
                                     <td>{% if linha.data_previsao %}{{ linha.data_previsao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                                     <td>{% if linha.data_recebimento %}{{ linha.data_recebimento|date:"d/m/Y" }}{% else %}<span class="text-muted">Pendente</span>{% endif %}</td>
-                                    <td class="text-end">{% if linha.baixado %}{{ linha.valor_recebido|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td class="text-end">{% if linha.baixado %}{{ linha.valor_recebido|moeda_br }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td>{% if linha.banco %}{{ linha.banco }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td class="text-nowrap">
+                                        <a href="{% url 'faturamento_medico:editar_extrato_pagamento' linha.pk %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}"
+                                           class="btn btn-outline-primary btn-sm" title="Editar protocolo, nota e valores">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
                                         {% if linha.baixado %}
                                         <span class="badge bg-success">Baixado</span>
                                         <form method="post" action="{% url 'faturamento_medico:estornar_baixa_extrato_pagamento' linha.pk %}" class="d-inline"
@@ -117,13 +122,13 @@
                             <tfoot class="table-light fw-bold">
                                 <tr>
                                     <td colspan="6" class="text-end">Totais</td>
-                                    <td class="text-end">{{ totais.total_valor|default:0|floatformat:2 }}</td>
-                                    <td class="text-end">{{ totais.total_glosado|default:0|floatformat:2 }}</td>
-                                    <td class="text-end">{{ totais.total_liberado|default:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ totais.total_valor|default:0|moeda_br }}</td>
+                                    <td class="text-end">{{ totais.total_glosado|default:0|moeda_br }}</td>
+                                    <td class="text-end">{{ totais.total_liberado|default:0|moeda_br }}</td>
                                     <td colspan="4"></td>
-                                    <td class="text-end">{{ totais.total_retencoes|default:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ totais.total_retencoes|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
-                                    <td class="text-end">{{ totais.total_recebido|default:0|floatformat:2 }}</td>
+                                    <td class="text-end">{{ totais.total_recebido|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
                                 </tr>
                             </tfoot>

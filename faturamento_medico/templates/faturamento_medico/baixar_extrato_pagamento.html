@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load faturamento_extras %}
 
 {% block title %}Baixar Extrato de Pagamento{% endblock %}
 
@@ -29,10 +30,10 @@
                             <p class="mb-1"><strong>Protocolo:</strong> {{ extrato.protocolo|default:"—" }}</p>
                         </div>
                         <div class="col-md-6">
-                            <p class="mb-1"><strong>Valor informado:</strong> R$ {{ extrato.valor|floatformat:2 }}</p>
-                            <p class="mb-1"><strong>Valor liberado:</strong> R$ {{ extrato.valor_liberado|floatformat:2 }}</p>
-                            <p class="mb-1"><strong>Retenções:</strong> R$ {{ extrato.retencoes|floatformat:2 }}</p>
-                            <p class="mb-1"><strong>Líquido convênio:</strong> R$ {{ extrato.liquido|floatformat:2 }}</p>
+                            <p class="mb-1"><strong>Valor informado:</strong> R$ {{ extrato.valor|moeda_br }}</p>
+                            <p class="mb-1"><strong>Valor liberado:</strong> R$ {{ extrato.valor_liberado|moeda_br }}</p>
+                            <p class="mb-1"><strong>Retenções:</strong> R$ {{ extrato.retencoes|moeda_br }}</p>
+                            <p class="mb-1"><strong>Líquido convênio:</strong> R$ {{ extrato.liquido|moeda_br }}</p>
                         </div>
                     </div>
 

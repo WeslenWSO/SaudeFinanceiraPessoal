@@ -288,6 +288,13 @@
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </summary>
                                                 <div class="fm-row-actions-menu" role="menu">
+                                                    {% if linha.item %}
+                                                    <a href="{% url 'faturamento_medico:lancar_glosa_item' linha.item.id %}?next={{ request.get_full_path|urlencode }}"
+                                                       class="fm-row-actions-item" role="menuitem">
+                                                        <i class="fas fa-ban text-danger"></i>
+                                                        {% if linha.item.valor_glosa %}Editar glosa{% else %}Lançar glosa{% endif %}
+                                                    </a>
+                                                    {% endif %}
                                                     <a href="{% url 'faturamento_medico:detalhes' linha.faturamento.pk %}" class="fm-row-actions-item" role="menuitem">
                                                         <i class="fas fa-eye text-info"></i> Detalhes
                                                     </a>

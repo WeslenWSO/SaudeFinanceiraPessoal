@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load faturamento_extras %}
+
+{% block title %}Lançar Glosa{% endblock %}
+
+{%block nav_%}
+    {% include 'parcial/_nav.html' %}
+{%endblock%}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        Informe o valor glosado pelo convênio e a data prevista para recorrência.
+                        {% if lote %}
+                        O total será somado e atualizado no <strong>Extrato de Pagamento</strong> do lote <strong>{{ lote.id }}</strong>.
+                        {% else %}
+                        Este faturamento ainda <strong>não está em um lote</strong> — a glosa será salva no procedimento, mas o extrato só será atualizado após formar o lote.
+                        {% endif %}
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Paciente:</strong> {{ faturamento.nome|default:"—" }}</p>
+                            <p class="mb-1"><strong>Convênio:</strong> {{ faturamento.convenio|default:"—" }}</p>
+                            <p class="mb-1"><strong>Guia:</strong> {{ faturamento.guia|default:"—" }}</p>
+                            <p class="mb-1"><strong>Data:</strong> {{ faturamento.data|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Procedimento:</strong> {{ item.servico|default:"—" }}</p>
+                            <p class="mb-1"><strong>Modalidade:</strong> {{ item.modalidade|default:"—" }}</p>
+                            <p class="mb-1"><strong>Valor do procedimento:</strong> R$ {{ valor_item_fmt }}</p>
+                            {% if lote %}
+                            <p class="mb-1"><strong>Lote:</strong> {{ lote.id }} — {{ lote.convenio|default:"—" }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="voltar" value="{{ voltar }}">
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="valor_glosa" class="form-label">Valor da glosa *</label>
+                                <input type="text" class="form-control" id="valor_glosa" name="valor_glosa"
+                                       value="{{ valor_glosa_fmt }}" required placeholder="0,00">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="data_recorrencia" class="form-label">Data da recorrência</label>
+                                <input type="date" class="form-control" id="data_recorrencia" name="data_recorrencia"
+                                       value="{% if item.data_recorrencia %}{{ item.data_recorrencia|date:'Y-m-d' }}{% endif %}">
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-ban"></i> Salvar glosa
+                            </button>
+                            {% if voltar %}
+                            <a href="{{ voltar }}" class="btn btn-secondary">Cancelar</a>
+                            {% else %}
+                            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary">Cancelar</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

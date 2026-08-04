@@ -4363,6 +4363,80 @@ def alterar_status_conferencia_item(request, pk):
     })
 
 
+def lancar_glosa_item(request, pk):
+    """Registra glosa no procedimento e atualiza o total glosado no extrato do lote."""
+    from emprestimos.sicoob_pdf import _dec
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    item = get_object_or_404(
+        ItemServico.objects.select_related('faturamento'),
+        pk=pk,
+        faturamento__empresa_id=empresa_id,
+    )
+    faturamento = item.faturamento
+    lote_ref = (faturamento.lote or '').strip()
+    lote = None
+    if lote_ref:
+        try:
+            lote = Lote.objects.filter(pk=int(lote_ref), empresa_id=empresa_id).first()
+        except (TypeError, ValueError):
+            lote = None
+
+    if request.method == 'POST':
+        valor_raw = (request.POST.get('valor_glosa') or '').strip()
+        if not valor_raw:
+            messages.error(request, 'Informe o valor da glosa.')
+            return redirect('faturamento_medico:lancar_glosa_item', pk=pk)
+
+        item.valor_glosa = _dec(valor_raw)
+
+        data_rec_raw = (request.POST.get('data_recorrencia') or '').strip()
+        if data_rec_raw:
+            try:
+                item.data_recorrencia = date.fromisoformat(data_rec_raw)
+            except ValueError:
+                messages.error(request, 'Data de recorrência inválida.')
+                return redirect('faturamento_medico:lancar_glosa_item', pk=pk)
+        else:
+            item.data_recorrencia = None
+
+        item.save(update_fields=['valor_glosa', 'data_recorrencia'])
+
+        extrato = None
+        if lote:
+            extrato = lote.recalcular_glosa_extrato()
+            messages.success(
+                request,
+                f'Glosa registrada. Total glosado do lote {lote.id} atualizado para R$ {_moeda_br(extrato.valor_glosado if extrato else item.valor_glosa)}.',
+            )
+        else:
+            messages.warning(
+                request,
+                'Glosa registrada no procedimento, mas o faturamento não está vinculado a um lote — o extrato não foi atualizado.',
+            )
+
+        voltar = (request.POST.get('voltar') or '').strip()
+        if voltar.startswith('/'):
+            return redirect(voltar)
+        return redirect('faturamento_medico:ftlistar')
+
+    valor_item = item.total if item.total is not None else (item.valor or 0)
+    context = {
+        'titulo': 'Lançar Glosa — Procedimento',
+        'item': item,
+        'faturamento': faturamento,
+        'lote': lote,
+        'valor_item_fmt': _moeda_br(valor_item),
+        'valor_glosa_fmt': _moeda_br(item.valor_glosa),
+        'voltar': request.GET.get('next') or request.META.get('HTTP_REFERER') or '',
+    }
+    return render(request, 'faturamento_medico/lancar_glosa_item.html', context)
+
+
 def listar_extrato_pagamento(request):
     """Lista extrato de pagamento importado por convênio."""
     from django.db.models import Sum
@@ -4597,4 +4671,72 @@ def estornar_baixa_extrato_pagamento(request, pk):
     extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
     messages.success(request, 'Baixa estornada.')
     return redirect('faturamento_medico:listar_extrato_pagamento')
+
+
+def _redirect_listar_extrato_pagamento(request):
+    from urllib.parse import urlencode
+
+    params = {}
+    competencia = (request.GET.get('competencia') or request.POST.get('competencia') or '').strip()
+    convenio = (request.GET.get('convenio') or request.POST.get('convenio') or '').strip()
+    if competencia:
+        params['competencia'] = competencia
+    if convenio:
+        params['convenio'] = convenio
+    url = reverse('faturamento_medico:listar_extrato_pagamento')
+    if params:
+        url += '?' + urlencode(params)
+    return redirect(url)
+
+
+def editar_extrato_pagamento(request, pk):
+    """Edita protocolo, nota fiscal e valores complementares do extrato."""
+    from emprestimos.sicoob_pdf import _dec
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    extrato = get_object_or_404(ExtratoPagamentoConvenio, pk=pk, empresa_id=empresa_id)
+
+    if request.method == 'POST':
+        extrato.protocolo = (request.POST.get('protocolo') or '').strip()
+        extrato.nota = (request.POST.get('nota') or '').strip()
+
+        valor_nota_raw = (request.POST.get('valor_nota') or '').strip()
+        if valor_nota_raw:
+            extrato.valor_nota = _dec(valor_nota_raw)
+        else:
+            extrato.valor_nota = None
+
+        extrato.retencoes = _dec(request.POST.get('retencoes'))
+        extrato.liquido = _dec(request.POST.get('liquido'))
+
+        data_previsao_raw = (request.POST.get('data_previsao') or '').strip()
+        if data_previsao_raw:
+            try:
+                extrato.data_previsao = date.fromisoformat(data_previsao_raw)
+            except ValueError:
+                messages.error(request, 'Data de previsão inválida.')
+                return redirect('faturamento_medico:editar_extrato_pagamento', pk=pk)
+        else:
+            extrato.data_previsao = None
+
+        extrato.save(update_fields=[
+            'protocolo', 'nota', 'valor_nota', 'retencoes', 'liquido',
+            'data_previsao', 'data_atualizacao',
+        ])
+        messages.success(request, 'Extrato atualizado com sucesso.')
+        return _redirect_listar_extrato_pagamento(request)
+
+    context = {
+        'titulo': 'Editar Extrato de Pagamento — Convênio',
+        'extrato': extrato,
+        'filtros': {
+            'competencia': (request.GET.get('competencia') or '').strip(),
+            'convenio': (request.GET.get('convenio') or '').strip(),
+        },
+    }
+    return render(request, 'faturamento_medico/editar_extrato_pagamento.html', context)
 

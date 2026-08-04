@@ -372,6 +372,17 @@ class ItemServico(models.Model):
         default='PENDENTE',
         blank=True,
     )
+    valor_glosa = models.DecimalField(
+        verbose_name='Valor da Glosa',
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    data_recorrencia = models.DateField(
+        verbose_name='Data da Recorrência',
+        null=True,
+        blank=True,
+    )
     data_criacao = models.DateTimeField(
         verbose_name='Data de Criação',
         auto_now_add=True
@@ -542,6 +553,23 @@ class Lote(models.Model):
         )
         return extrato
 
+    def recalcular_glosa_extrato(self):
+        """Soma glosas dos procedimentos do lote e atualiza o extrato de pagamento."""
+        from django.db.models import Sum
+
+        total_glosa = ItemServico.objects.filter(
+            faturamento__empresa_id=self.empresa_id,
+            faturamento__lote=str(self.id),
+        ).aggregate(total=Sum('valor_glosa'))['total'] or Decimal('0')
+
+        extrato = ExtratoPagamentoConvenio.objects.filter(lote_faturamento=self).first()
+        if not extrato:
+            extrato = self.sincronizar_extrato_pagamento()
+        if extrato:
+            extrato.valor_glosado = total_glosa
+            extrato.save(update_fields=['valor_glosado', 'data_atualizacao'])
+        return extrato
+
 
 class ExtratoPagamentoConvenio(models.Model):
     """Linha importada do Demonstrativo de Pagamento TISS (convênio)."""
@@ -607,6 +635,10 @@ class ExtratoPagamentoConvenio(models.Model):
 
     def __str__(self):
         return f'{self.convenio} — {self.competencia} — lote {self.lote} — R$ {self.valor_recebido}'
+
+    @property
+    def baixado(self) -> bool:
+        return self.data_recebimento is not None and (self.valor_recebido or 0) > 0
 
 
 class MedcloudConfig(models.Model):
@@ -677,7 +709,3 @@ class MedcloudConvenioParceiro(models.Model):
 
     def __str__(self):
         return f'{self.convenio_nome} (partner {self.partner_id})'
-
-    @property
-    def baixado(self) -> bool:
-        return self.data_recebimento is not None and (self.valor_recebido or 0) > 0
