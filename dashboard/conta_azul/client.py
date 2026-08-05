@@ -136,6 +136,13 @@ class ContaAzulClient:
             filtros,
         )
 
+    def buscar_parcela_por_id(self, parcela_id: str) -> dict:
+        pid = (parcela_id or '').strip()
+        if not pid:
+            return {}
+        data = self.get(f'/v1/financeiro/eventos-financeiros/parcelas/{pid}')
+        return data if isinstance(data, dict) else {}
+
     def buscar_despesas(self, **filtros) -> list:
         return self.paginar_todos(
             '/v1/financeiro/eventos-financeiros/contas-a-pagar/buscar',

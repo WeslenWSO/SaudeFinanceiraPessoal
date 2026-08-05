@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -62,6 +63,32 @@ STATUS_RECEITA_MAP = {
     'RENEGOCIADO': 'pendente',
     'ACQUITTED': 'pago',
     'QUITADO': 'pago',
+}
+
+_RE_UUID = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE,
+)
+
+METODO_PAGAMENTO_CA = {
+    'DINHEIRO': 'Dinheiro',
+    'CARTAO_CREDITO': 'Cartão de Crédito',
+    'CARTAO_CREDITO_VIA_LINK': 'Cartão de Crédito (Link)',
+    'CARTAO_DEBITO': 'Cartão de Débito',
+    'BOLETO_BANCARIO': 'Boleto Bancário',
+    'CHEQUE': 'Cheque',
+    'TRANSFERENCIA_BANCARIA': 'Transferência Bancária',
+    'PIX_PAGAMENTO_INSTANTANEO': 'PIX',
+    'PIX_COBRANCA': 'PIX Cobrança',
+    'CARTEIRA_DIGITAL': 'Carteira Digital',
+    'DEPOSITO_BANCARIO': 'Depósito Bancário',
+    'DEBITO_AUTOMATICO': 'Débito Automático',
+    'VALE_ALIMENTACAO': 'Vale Alimentação',
+    'VALE_REFEICAO': 'Vale Refeição',
+    'VALE_COMBUSTIVEL': 'Vale Combustível',
+    'VALE_PRESENTE': 'Vale Presente',
+    'SEM_PAGAMENTO': 'Sem Pagamento',
+    'OUTRO': 'Outro',
 }
 
 STATUS_DESPESA_MAP = {
@@ -204,7 +231,24 @@ def _nome_cliente_item(empresa, item: dict) -> str:
     return 'Cliente CA'
 
 
+def _label_metodo_pagamento_ca(codigo: str) -> str:
+    codigo = (codigo or '').strip().upper()
+    if not codigo:
+        return ''
+    if codigo in METODO_PAGAMENTO_CA:
+        return METODO_PAGAMENTO_CA[codigo]
+    return codigo.replace('_', ' ').title()
+
+
 def _texto_forma_pagamento_item(item: dict) -> str:
+    metodo = _label_metodo_pagamento_ca(str(item.get('metodo_pagamento') or ''))
+    if metodo:
+        return metodo[:50]
+    for baixa in reversed(item.get('baixas') or []):
+        if isinstance(baixa, dict):
+            metodo = _label_metodo_pagamento_ca(str(baixa.get('metodo_pagamento') or ''))
+            if metodo:
+                return metodo[:50]
     for key in ('forma_pagamento', 'meio_pagamento', 'tipo_pagamento', 'forma_recebimento'):
         raw = item.get(key)
         if isinstance(raw, dict):
@@ -213,6 +257,95 @@ def _texto_forma_pagamento_item(item: dict) -> str:
                 return texto[:50]
         elif isinstance(raw, str) and raw.strip():
             return raw.strip()[:50]
+    return ''
+
+
+def _mesclar_item_receita(item_busca: dict, item_detalhe: dict) -> dict:
+    """Detalhe da parcela (GET por id) sobrescreve campos ausentes no buscar."""
+    merged = dict(item_busca or {})
+    for key, val in (item_detalhe or {}).items():
+        if val is None or val == '' or val == []:
+            continue
+        merged[key] = val
+    return merged
+
+
+def _enriquecer_item_receita(
+    client: ContaAzulClient,
+    item: dict,
+    cache: dict[str, dict],
+) -> dict:
+    parcela_id = str(item.get('id') or item.get('id_parcela') or '').strip()
+    if not parcela_id:
+        return item
+    if parcela_id not in cache:
+        try:
+            cache[parcela_id] = client.buscar_parcela_por_id(parcela_id)
+        except ContaAzulAPIError:
+            cache[parcela_id] = {}
+    detalhe = cache.get(parcela_id) or {}
+    if not detalhe:
+        return item
+    return _mesclar_item_receita(item, detalhe)
+
+
+def _numero_fatura_item(item: dict) -> str:
+    fatura = item.get('fatura')
+    if isinstance(fatura, dict):
+        for key in ('numero', 'numero_nota', 'numero_nf', 'rps'):
+            val = fatura.get(key)
+            if val is not None and str(val).strip() not in ('', '0'):
+                return str(val).strip()
+    for key in ('numero_nota_fiscal', 'numero_nf', 'numero_nota'):
+        val = item.get(key)
+        if val is not None and str(val).strip() not in ('', '0'):
+            return str(val).strip()
+    return ''
+
+
+def _numero_venda_item(item: dict) -> str:
+    evento = item.get('evento') if isinstance(item.get('evento'), dict) else {}
+    codigo = str(evento.get('codigo_referencia') or item.get('codigo_referencia') or '').strip()
+    if codigo:
+        return codigo
+    venda = item.get('venda')
+    if isinstance(venda, dict):
+        for key in ('numero', 'codigo', 'numero_venda'):
+            val = venda.get(key)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+    for key in ('numero_venda', 'codigo_venda'):
+        val = item.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return ''
+
+
+def _documento_receita_item(item: dict) -> str:
+    """Nota fiscal; se não houver, número/código da venda."""
+    doc = _numero_fatura_item(item)
+    if doc:
+        return doc[:50]
+    doc = _numero_venda_item(item)
+    if doc:
+        return doc[:50]
+    bruto = str(item.get('documento') or item.get('numero_documento') or '').strip()
+    if bruto and not _RE_UUID.match(bruto):
+        return bruto[:50]
+    return ''
+
+
+def _nsu_receita_item(item: dict) -> str:
+    for key in ('nsu', 'numero_nsu', 'numero_autorizacao', 'autorizacao', 'codigo_autorizacao'):
+        val = str(item.get(key) or '').strip()
+        if val and not _RE_UUID.match(val):
+            return val[:100]
+    for baixa in reversed(item.get('baixas') or []):
+        if not isinstance(baixa, dict):
+            continue
+        val = str(baixa.get('nsu') or baixa.get('numero_autorizacao') or '').strip()
+        if val:
+            return val[:100]
     return ''
 
 
@@ -805,6 +938,7 @@ def importar_receitas(
         itens = client.buscar_receitas(**params)
     except ContaAzulAPIError as exc:
         return {**stats, 'erro': str(exc)}
+    cache_parcelas: dict[str, dict] = {}
     for item in itens:
         parcela_id = str(item.get('id') or item.get('id_parcela') or '').strip()
         if not parcela_id:
@@ -813,6 +947,7 @@ def importar_receitas(
         if dry_run:
             stats['criados'] += 1
             continue
+        item = _enriquecer_item_receita(client, item, cache_parcelas)
         status_local = _map_status_receita(item)
         cat_id = ''
         cats = item.get('categorias') or []
@@ -829,7 +964,8 @@ def importar_receitas(
             'valor_recebido': valor_pago if status_local == 'pago' else Decimal('0'),
             'data_recebimento': data_pg,
             'status': status_local,
-            'doc': str(item.get('documento') or parcela_id)[:50],
+            'doc': _documento_receita_item(item),
+            'autorizacao': _nsu_receita_item(item),
             'observacao': str(item.get('descricao') or item.get('observacao') or '')[:500],
             'categoria': _categoria_por_ca(empresa, cat_id),
             'conta_banco': _conta_por_ca(empresa, _id_conta_financeira_item(item)),
