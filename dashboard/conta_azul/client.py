@@ -150,8 +150,13 @@ class ContaAzulClient:
         )
 
     def buscar_transferencias(self, **filtros) -> list:
+        filtros = dict(filtros)
+        if 'data_de' in filtros and 'data_inicio' not in filtros:
+            filtros['data_inicio'] = filtros.pop('data_de')
+        if 'data_ate' in filtros and 'data_fim' not in filtros:
+            filtros['data_fim'] = filtros.pop('data_ate')
         return self.paginar_todos(
-            '/v1/financeiro/transferencias/buscar',
+            '/v1/financeiro/transferencias',
             filtros,
         )
 

@@ -8,7 +8,7 @@
     <form method="post">
       {% csrf_token %}
       <button type="submit" class="btn btn-danger">Sim, excluir</button>
-      <a href="{% url 'opcartao:fatura_detalhe' fatura.pk %}" class="btn btn-secondary">Cancelar</a>
+      <a href="{% url 'opcartao:fatura_detalhe' fatura.pk %}" class="btn btn-cancel btn-secondary">Cancelar</a>
     </form>
   </div>
 </div>

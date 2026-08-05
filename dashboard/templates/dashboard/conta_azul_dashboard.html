@@ -71,6 +71,29 @@
     </div>
   </div>
 
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Receitas por Forma de Pagamento</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartReceitasForma" aria-label="Receitas por forma de pagamento"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Despesas por Forma de Pagamento</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartDespesasForma" aria-label="Despesas por forma de pagamento"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm mb-4" id="saldos-contas">
     <div class="card-header fw-semibold py-2 bg-white border-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <span><i class="fas fa-university me-1 text-primary"></i> Saldos das contas (Conta Azul)</span>
@@ -271,6 +294,20 @@
     {{ visao.chart_saidas_data_json|safe }},
     '{{ visao.legenda_despesas|escapejs }}',
     'rgba(13, 110, 253, 0.85)'
+  );
+  barHorizontal(
+    'chartReceitasForma',
+    {{ visao.chart_receitas_forma_labels_json|safe }},
+    {{ visao.chart_receitas_forma_data_json|safe }},
+    '{{ visao.legenda_receitas|escapejs }}',
+    'rgba(25, 135, 84, 0.85)'
+  );
+  barHorizontal(
+    'chartDespesasForma',
+    {{ visao.chart_despesas_forma_labels_json|safe }},
+    {{ visao.chart_despesas_forma_data_json|safe }},
+    '{{ visao.legenda_despesas|escapejs }}',
+    'rgba(253, 126, 20, 0.85)'
   );
 })();
 </script>

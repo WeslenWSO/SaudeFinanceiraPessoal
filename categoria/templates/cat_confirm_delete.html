@@ -24,7 +24,7 @@
                     <p class="text-muted">Esta ação não pode ser desfeita.</p>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'categoria:catList' %}" class="btn btn-secondary">Cancelar</a>
+                        <a href="{% url 'categoria:catList' %}" class="btn btn-cancel btn-secondary">Cancelar</a>
                         <form method="post">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger">Excluir</button>

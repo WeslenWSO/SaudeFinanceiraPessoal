@@ -15,7 +15,7 @@
           <form method="post">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger">Excluir</button>
-            <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-cancel btn-outline-secondary">Cancelar</a>
           </form>
         </div>
       </div>

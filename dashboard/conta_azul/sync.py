@@ -69,6 +69,13 @@ _RE_UUID = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     re.IGNORECASE,
 )
+_RE_DESC_VENDA = re.compile(r'Venda\s+(\d+)', re.IGNORECASE)
+_RE_DESC_NFSE = re.compile(r'NFS-e\s*:\s*(\d+)', re.IGNORECASE)
+_RE_DESC_NFE = re.compile(r'NF-?e?\s*[:#]?\s*(\d+)', re.IGNORECASE)
+_RE_DESC_NF = re.compile(r'(?:nota fiscal|\bnf\b)\s*[:#nº°]?\s*(\d+)', re.IGNORECASE)
+
+# Limite de GET /parcelas/{id} por execução (NSU em títulos pagos; evita timeout no Render).
+LIMITE_DETALHE_PARCELA_SYNC = 15
 
 METODO_PAGAMENTO_CA = {
     'DINHEIRO': 'Dinheiro',
@@ -257,7 +264,80 @@ def _texto_forma_pagamento_item(item: dict) -> str:
                 return texto[:50]
         elif isinstance(raw, str) and raw.strip():
             return raw.strip()[:50]
+    metodo_cat = _metodo_pagamento_da_categoria(item)
+    if metodo_cat:
+        return metodo_cat[:50]
     return ''
+
+
+def _metodo_pagamento_da_categoria(item: dict) -> str:
+    """Heurística a partir do nome da categoria CA (ex.: CONVENIO - CARTAO CREDITO)."""
+    cats = item.get('categorias') or []
+    if not cats or not isinstance(cats[0], dict):
+        return ''
+    nome = str(cats[0].get('nome') or '').upper()
+    nome = (
+        nome.replace('Á', 'A').replace('À', 'A').replace('Ã', 'A')
+        .replace('É', 'E').replace('Í', 'I').replace('Ó', 'O')
+        .replace('Ú', 'U').replace('Ç', 'C')
+    )
+    if 'PIX' in nome:
+        return 'PIX'
+    if 'BOLETO' in nome:
+        return 'Boleto Bancário'
+    if 'DINHEIRO' in nome:
+        return 'Dinheiro'
+    if 'TRANSFERENCIA' in nome:
+        return 'Transferência Bancária'
+    if 'CHEQUE' in nome:
+        return 'Cheque'
+    if 'DEBITO' in nome or 'DEBIT' in nome:
+        return 'Cartão de Débito'
+    if 'CARTAO' in nome or 'CREDITO' in nome or 'CREDIT' in nome:
+        return 'Cartão de Crédito'
+    return ''
+
+
+def _aplicar_campos_da_descricao(item: dict) -> dict:
+    """Extrai NF/venda da descrição da busca (sem GET extra por parcela)."""
+    item = dict(item or {})
+    desc = str(item.get('descricao') or '')
+    if not desc:
+        return item
+    fatura = item.get('fatura')
+    tem_nf = isinstance(fatura, dict) and str(fatura.get('numero') or '').strip() not in ('', '0')
+    m_nf = _RE_DESC_NFSE.search(desc)
+    if m_nf and not tem_nf:
+        item['fatura'] = {'numero': m_nf.group(1), 'tipo_fatura': 'NFSE'}
+    if not _numero_fatura_item(item):
+        for rx in (_RE_DESC_NFE, _RE_DESC_NF):
+            m = rx.search(desc)
+            if m:
+                item['fatura'] = {'numero': m.group(1), 'tipo_fatura': 'NFE'}
+                break
+    evento = item.get('evento') if isinstance(item.get('evento'), dict) else {}
+    tem_venda = bool(str(evento.get('codigo_referencia') or item.get('codigo_venda') or '').strip())
+    m_v = _RE_DESC_VENDA.search(desc)
+    if m_v and not tem_venda:
+        ev = dict(evento)
+        ev['codigo_referencia'] = m_v.group(1)
+        item['evento'] = ev
+    return item
+
+
+def _item_receita_pago(item: dict) -> bool:
+    status = str(item.get('status') or '').upper()
+    if status in ('RECEBIDO', 'ACQUITTED', 'QUITADO', 'PAGO', 'RECEBIDO_PARCIAL'):
+        return True
+    try:
+        return Decimal(str(item.get('pago') or 0)) > 0
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+def _precisa_detalhe_parcela(item: dict) -> bool:
+    """Busca detalhe só para NSU em títulos já pagos (forma de pagamento vem da categoria/descrição)."""
+    return _item_receita_pago(item) and not _nsu_receita_item(item)
 
 
 def _mesclar_item_receita(item_busca: dict, item_detalhe: dict) -> dict:
@@ -321,6 +401,34 @@ def _numero_venda_item(item: dict) -> str:
     return ''
 
 
+def _numero_nota_item(item: dict) -> str:
+    nota = item.get('nota')
+    if isinstance(nota, dict):
+        for key in ('numero', 'numero_nota', 'numero_nf', 'numero_nfe', 'numero_nota_fiscal'):
+            val = nota.get(key)
+            if val is not None and str(val).strip() not in ('', '0'):
+                return str(val).strip()
+    elif nota is not None and str(nota).strip() not in ('', '0'):
+        s = str(nota).strip()
+        if not _RE_UUID.match(s):
+            return s
+    return ''
+
+
+def _documento_despesa_item(item: dict) -> str:
+    """Nota fiscal de entrada; sem NF permanece em branco (nunca UUID da parcela)."""
+    doc = _numero_fatura_item(item)
+    if doc:
+        return doc[:15]
+    doc = _numero_nota_item(item)
+    if doc:
+        return doc[:15]
+    bruto = str(item.get('documento') or item.get('numero_documento') or '').strip()
+    if bruto and not _RE_UUID.match(bruto):
+        return bruto[:15]
+    return ''
+
+
 def _documento_receita_item(item: dict) -> str:
     """Nota fiscal; se não houver, número/código da venda."""
     doc = _numero_fatura_item(item)
@@ -349,14 +457,23 @@ def _nsu_receita_item(item: dict) -> str:
     return ''
 
 
-def _cobranca_de_item(item: dict) -> Cobranca | None:
+def _cobranca_de_item(item: dict, cache: dict[str, Cobranca] | None = None) -> Cobranca | None:
     texto = _texto_forma_pagamento_item(item)
     if not texto:
         return None
+    if cache is not None:
+        chave = texto.casefold()
+        if chave in cache:
+            return cache[chave]
     cob = Cobranca.objects.filter(descricao__iexact=texto).first()
     if cob:
+        if cache is not None:
+            cache[texto.casefold()] = cob
         return cob
-    return Cobranca.objects.create(descricao=texto[:50], tpag='99', formapgto='0')
+    cob = Cobranca.objects.create(descricao=texto[:50], tpag='99', formapgto='0')
+    if cache is not None:
+        cache[texto.casefold()] = cob
+    return cob
 
 
 def _id_conta_financeira_item(item: dict) -> str:
@@ -939,6 +1056,11 @@ def importar_receitas(
     except ContaAzulAPIError as exc:
         return {**stats, 'erro': str(exc)}
     cache_parcelas: dict[str, dict] = {}
+    cache_cobranca: dict[str, Cobranca] = {}
+    cache_categorias: dict[str, Categoria | None] = {}
+    cache_contas: dict[str, ContaBancaria | None] = {}
+    chamadas_detalhe = 0
+    preparados: list[tuple[str, dict]] = []
     for item in itens:
         parcela_id = str(item.get('id') or item.get('id_parcela') or '').strip()
         if not parcela_id:
@@ -947,7 +1069,14 @@ def importar_receitas(
         if dry_run:
             stats['criados'] += 1
             continue
-        item = _enriquecer_item_receita(client, item, cache_parcelas)
+        item = _aplicar_campos_da_descricao(item)
+        if _precisa_detalhe_parcela(item):
+            if parcela_id not in cache_parcelas:
+                if chamadas_detalhe < LIMITE_DETALHE_PARCELA_SYNC:
+                    chamadas_detalhe += 1
+                    item = _enriquecer_item_receita(client, item, cache_parcelas)
+            else:
+                item = _enriquecer_item_receita(client, item, cache_parcelas)
         status_local = _map_status_receita(item)
         cat_id = ''
         cats = item.get('categorias') or []
@@ -956,30 +1085,69 @@ def importar_receitas(
         valor = _parse_decimal(item.get('valor') or item.get('total') or item.get('valor_liquido'))
         valor_pago = _valor_pago_item(item)
         data_pg = _data_pagamento_item(item, data_de)
-        defaults = {
-            'cliente': _nome_cliente_item(empresa, item),
-            'data_vencimento': _parse_data(item.get('data_vencimento')) or data_de,
-            'data_emissao': _parse_data(item.get('data_competencia')) or data_de,
-            'valor_a_receber': valor,
-            'valor_recebido': valor_pago if status_local == 'pago' else Decimal('0'),
-            'data_recebimento': data_pg,
-            'status': status_local,
-            'doc': _documento_receita_item(item),
-            'autorizacao': _nsu_receita_item(item),
-            'observacao': str(item.get('descricao') or item.get('observacao') or '')[:500],
-            'categoria': _categoria_por_ca(empresa, cat_id),
-            'conta_banco': _conta_por_ca(empresa, _id_conta_financeira_item(item)),
-            'forma_pagamento': _cobranca_de_item(item),
-        }
-        try:
-            _, created = ContaAReceber.objects.update_or_create(
+        if cat_id not in cache_categorias:
+            cache_categorias[cat_id] = _categoria_por_ca(empresa, cat_id)
+        conta_ca_id = _id_conta_financeira_item(item)
+        if conta_ca_id not in cache_contas:
+            cache_contas[conta_ca_id] = _conta_por_ca(empresa, conta_ca_id)
+        preparados.append((
+            parcela_id,
+            {
+                'cliente': _nome_cliente_item(empresa, item),
+                'data_vencimento': _parse_data(item.get('data_vencimento')) or data_de,
+                'data_emissao': _parse_data(item.get('data_competencia')) or data_de,
+                'valor_a_receber': valor,
+                'valor_recebido': valor_pago if status_local == 'pago' else Decimal('0'),
+                'data_recebimento': data_pg,
+                'status': status_local,
+                'doc': _documento_receita_item(item),
+                'autorizacao': _nsu_receita_item(item),
+                'observacao': str(item.get('descricao') or item.get('observacao') or '')[:500],
+                'categoria': cache_categorias[cat_id],
+                'conta_banco': cache_contas[conta_ca_id],
+                'forma_pagamento': _cobranca_de_item(item, cache_cobranca),
+            },
+        ))
+
+    if preparados and not dry_run:
+        ids = [p[0] for p in preparados]
+        existentes = {
+            c.conta_azul_parcela_id: c
+            for c in ContaAReceber.objects.filter(
                 empresa=empresa,
-                conta_azul_parcela_id=parcela_id,
-                defaults=defaults,
+                conta_azul_parcela_id__in=ids,
             )
-            stats['criados' if created else 'atualizados'] += 1
+        }
+        campos_update = (
+            'cliente', 'data_vencimento', 'data_emissao', 'valor_a_receber',
+            'valor_recebido', 'data_recebimento', 'status', 'doc', 'autorizacao',
+            'observacao', 'categoria', 'conta_banco', 'forma_pagamento',
+        )
+        criar: list[ContaAReceber] = []
+        atualizar: list[ContaAReceber] = []
+        for parcela_id, defaults in preparados:
+            obj = existentes.get(parcela_id)
+            if obj:
+                for campo, val in defaults.items():
+                    setattr(obj, campo, val)
+                atualizar.append(obj)
+            else:
+                criar.append(ContaAReceber(
+                    empresa=empresa,
+                    conta_azul_parcela_id=parcela_id,
+                    **defaults,
+                ))
+        try:
+            if criar:
+                ContaAReceber.objects.bulk_create(criar, batch_size=300)
+                stats['criados'] += len(criar)
+            if atualizar:
+                ContaAReceber.objects.bulk_update(atualizar, campos_update, batch_size=300)
+                stats['atualizados'] += len(atualizar)
         except IntegrityError:
-            stats['erros'] += 1
+            stats['erros'] += len(preparados)
+    if chamadas_detalhe >= LIMITE_DETALHE_PARCELA_SYNC:
+        stats['detalhes_limitados'] = chamadas_detalhe
     return stats
 
 
@@ -992,7 +1160,7 @@ def importar_despesas(
     dry_run: bool = False,
 ) -> dict:
     stats = {'criados': 0, 'atualizados': 0, 'erros': 0}
-    cobranca = _cobranca_padrao()
+    cobranca_padrao = _cobranca_padrao()
     params = {
         'pagina': 1,
         'tamanho_pagina': 100,
@@ -1003,6 +1171,17 @@ def importar_despesas(
         itens = client.buscar_despesas(**params)
     except ContaAzulAPIError as exc:
         return {**stats, 'erro': str(exc)}
+
+    categoria_fallback = Categoria.objects.filter(empresa=empresa, tipo='D').first()
+    conta_fallback = ContaBancaria.objects.filter(empresa=empresa).first()
+    cache_categorias: dict[str, Categoria | None] = {}
+    cache_contas: dict[str, ContaBancaria | None] = {}
+    cache_cobranca: dict[str, Cobranca] = {}
+    cache_fornecedores: dict[str, Fornecedor | None] = {}
+    cache_parcelas: dict[str, dict] = {}
+    chamadas_detalhe = 0
+    preparados: list[tuple[str, dict]] = []
+
     for item in itens:
         parcela_id = str(item.get('id') or item.get('id_parcela') or '').strip()
         if not parcela_id:
@@ -1011,18 +1190,27 @@ def importar_despesas(
         if dry_run:
             stats['criados'] += 1
             continue
-        fornecedor = _fornecedor_de_item(empresa, item)
+
+        forn_key = ''
+        forn_raw = item.get('fornecedor')
+        if isinstance(forn_raw, dict):
+            forn_key = str(forn_raw.get('id') or forn_raw.get('uuid') or '').strip()
+        if not forn_key:
+            forn_key = str(item.get('id_fornecedor') or item.get('fornecedor_id') or _nome_fornecedor_item(item)).strip()
+        if forn_key not in cache_fornecedores:
+            cache_fornecedores[forn_key] = _fornecedor_de_item(empresa, item)
+        fornecedor = cache_fornecedores[forn_key]
         if not fornecedor:
             stats['erros'] += 1
             continue
-        fornecedor_nome = fornecedor.razao
+
         cat_id = ''
         cats = item.get('categorias') or []
         if cats and isinstance(cats[0], dict):
             cat_id = str(cats[0].get('id') or '')
-        categoria = _categoria_por_ca(empresa, cat_id)
-        if not categoria:
-            categoria = Categoria.objects.filter(empresa=empresa, tipo='D').first()
+        if cat_id not in cache_categorias:
+            cache_categorias[cat_id] = _categoria_por_ca(empresa, cat_id)
+        categoria = cache_categorias[cat_id] or categoria_fallback
         if not categoria:
             categoria = Categoria.objects.create(
                 empresa=empresa,
@@ -1031,43 +1219,106 @@ def importar_despesas(
                 classificacao='CA',
                 sintetico='A',
             )
-        conta = _conta_por_ca(empresa, _id_conta_financeira_item(item)) or ContaBancaria.objects.filter(empresa=empresa).first()
+            cache_categorias[cat_id] = categoria
+
+        conta_ca_id = _id_conta_financeira_item(item)
+        if conta_ca_id not in cache_contas:
+            cache_contas[conta_ca_id] = _conta_por_ca(empresa, conta_ca_id)
+        conta = cache_contas[conta_ca_id] or conta_fallback
         if not conta:
             stats['erros'] += 1
             continue
+
+        item = _aplicar_campos_da_descricao(item)
+        if not _documento_despesa_item(item):
+            if parcela_id not in cache_parcelas:
+                if chamadas_detalhe < LIMITE_DETALHE_PARCELA_SYNC:
+                    chamadas_detalhe += 1
+                    item = _enriquecer_item_receita(client, item, cache_parcelas)
+            else:
+                item = _enriquecer_item_receita(client, item, cache_parcelas)
         status_local = _map_status_despesa(item)
         valor = _parse_decimal(item.get('valor') or item.get('total'))
         valor_pago = _valor_pago_item(item)
         data_pg = _data_pagamento_item(item, data_de)
-        cobranca = _cobranca_de_item(item) or cobranca
-        defaults = {
-            'fornecedor': fornecedor,
-            'descricao': str(item.get('descricao') or fornecedor_nome)[:100],
-            'numdoc': parcela_id[:15],
-            'valorDoc': valor,
-            'categoria': categoria,
-            'parcela': '1',
-            'dtvenc': _parse_data(item.get('data_vencimento')) or data_de,
-            'dtEmissao': _parse_data(item.get('data_competencia')) or data_de,
-            'cobranca': cobranca,
-            'conta_banco': conta,
-            'dtPag': data_pg,
-            'valorPago': valor_pago if status_local == 'pago' else Decimal('0'),
-            'status': status_local,
-            'obs': 'Importado Conta Azul',
-            'nossonumero': '',
-            'nsu': '',
-        }
-        try:
-            _, created = ContasaPagar.objects.update_or_create(
+        cobranca = _cobranca_de_item(item, cache_cobranca) or cobranca_padrao
+        numdoc = _documento_despesa_item(item)
+        preparados.append((
+            parcela_id,
+            {
+                'fornecedor': fornecedor,
+                'descricao': str(item.get('descricao') or fornecedor.razao)[:100],
+                'numdoc': numdoc[:15],
+                'valorDoc': valor,
+                'categoria': categoria,
+                'parcela': '1',
+                'dtvenc': _parse_data(item.get('data_vencimento')) or data_de,
+                'dtEmissao': _parse_data(item.get('data_competencia')) or data_de,
+                'cobranca': cobranca,
+                'conta_banco': conta,
+                'dtPag': data_pg,
+                'valorPago': valor_pago if status_local == 'pago' else Decimal('0'),
+                'status': status_local,
+                'obs': 'Importado Conta Azul',
+                'nossonumero': '',
+                'nsu': _nsu_receita_item(item)[:15],
+            },
+        ))
+
+    if preparados and not dry_run:
+        ids = [p[0] for p in preparados]
+        existentes = {
+            c.conta_azul_parcela_id: c
+            for c in ContasaPagar.objects.filter(
                 empresa=empresa,
-                conta_azul_parcela_id=parcela_id,
-                defaults=defaults,
+                conta_azul_parcela_id__in=ids,
             )
-            stats['criados' if created else 'atualizados'] += 1
+        }
+        campos_update = (
+            'fornecedor', 'descricao', 'numdoc', 'valorDoc', 'categoria', 'parcela',
+            'dtvenc', 'dtEmissao', 'cobranca', 'conta_banco', 'dtPag', 'valorPago',
+            'status', 'obs', 'nossonumero', 'nsu',
+        )
+        criar: list[ContasaPagar] = []
+        atualizar: list[ContasaPagar] = []
+        for parcela_id, defaults in preparados:
+            obj = existentes.get(parcela_id)
+            if obj:
+                for campo, val in defaults.items():
+                    setattr(obj, campo, val)
+                atualizar.append(obj)
+            else:
+                criar.append(ContasaPagar(
+                    empresa=empresa,
+                    conta_azul_parcela_id=parcela_id,
+                    **defaults,
+                ))
+        try:
+            if criar:
+                ContasaPagar.objects.bulk_create(criar, batch_size=300)
+                stats['criados'] += len(criar)
+            if atualizar:
+                ContasaPagar.objects.bulk_update(atualizar, campos_update, batch_size=300)
+                stats['atualizados'] += len(atualizar)
         except IntegrityError:
-            stats['erros'] += 1
+            stats['erros'] += len(preparados)
+    if chamadas_detalhe >= LIMITE_DETALHE_PARCELA_SYNC:
+        stats['detalhes_limitados'] = chamadas_detalhe
     return stats
+
+
+def _id_conta_origem_transferencia(item: dict) -> str:
+    origem = item.get('origem') if isinstance(item.get('origem'), dict) else {}
+    conta_fin = origem.get('conta_financeira') if isinstance(origem.get('conta_financeira'), dict) else {}
+    val = conta_fin.get('id')
+    if val:
+        return str(val).strip()
+    conta_origem = item.get('conta_origem')
+    if isinstance(conta_origem, dict) and conta_origem.get('id'):
+        return str(conta_origem['id']).strip()
+    if item.get('id_conta_origem'):
+        return str(item['id_conta_origem']).strip()
+    return ''
 
 
 def importar_transferencias(
@@ -1087,8 +1338,9 @@ def importar_transferencias(
     }
     try:
         itens = client.buscar_transferencias(**params)
-    except ContaAzulAPIError:
-        itens = []
+    except ContaAzulAPIError as exc:
+        return {**stats, 'erro': str(exc)}
+    cache_contas: dict[str, ContaBancaria | None] = {}
     for item in itens:
         ca_id = str(item.get('id') or '').strip()
         if not ca_id:
@@ -1097,32 +1349,37 @@ def importar_transferencias(
         if dry_run:
             stats['criados'] += 1
             continue
-        conta_origem = _conta_por_ca(
-            empresa,
-            str((item.get('conta_origem') or {}).get('id', '') if isinstance(item.get('conta_origem'), dict) else item.get('id_conta_origem') or ''),
-        )
+        origem = item.get('origem') if isinstance(item.get('origem'), dict) else {}
+        id_conta = _id_conta_origem_transferencia(item)
+        if id_conta not in cache_contas:
+            cache_contas[id_conta] = _conta_por_ca(empresa, id_conta)
+        conta_origem = cache_contas[id_conta]
         if not conta_origem:
             stats['erros'] += 1
             continue
         valor = _parse_decimal(item.get('valor'))
-        dia = _parse_data(item.get('data') or item.get('data_transferencia')) or data_de
+        dia = _parse_data(item.get('data') or origem.get('data') or item.get('data_transferencia')) or data_de
+        desc = str(item.get('descricao') or 'Transferência Conta Azul')[:255]
         hash_unico = f'ca-transfer-{ca_id}'
         defaults = {
             'banco': conta_origem.banco,
             'data': dia,
-            'historico': f"Transferência CA {ca_id}"[:255],
+            'historico': desc,
             'valor': -abs(valor),
             'origem': 'CONTA_AZUL',
             'hash_unico': hash_unico,
             'documento': ca_id[:60],
         }
-        _, created = Lancamento.objects.update_or_create(
-            empresa=empresa,
-            conta=conta_origem,
-            hash_unico=hash_unico,
-            defaults=defaults,
-        )
-        stats['criados' if created else 'atualizados'] += 1
+        try:
+            _, created = Lancamento.objects.update_or_create(
+                empresa=empresa,
+                conta=conta_origem,
+                hash_unico=hash_unico,
+                defaults=defaults,
+            )
+            stats['criados' if created else 'atualizados'] += 1
+        except IntegrityError:
+            stats['erros'] += 1
     return stats
 
 
@@ -1195,6 +1452,8 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["saldos_erros"]} saldos sem resposta'
         if erros_qtd:
             ok[-1] += f', {erros_qtd} ignorados'
+        if stats.get('detalhes_limitados'):
+            ok[-1] += f' (detalhe API limitado a {stats["detalhes_limitados"]} parcelas; rode de novo para completar NSU/cobrança)'
 
     erros_unicos = list(dict.fromkeys(erros))
     if erros_unicos and not ok:

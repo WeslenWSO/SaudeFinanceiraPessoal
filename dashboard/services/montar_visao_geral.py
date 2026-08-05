@@ -241,6 +241,143 @@ def _despesas_por_categoria(empresa, ini: date, fim: date, regime: str, limite: 
     return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
 
 
+def _lbl_forma_pagamento(descricao: str | None) -> str:
+    texto = (descricao or '').strip()
+    return texto or 'Sem forma de pagamento'
+
+
+def _receitas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, limite: int = 10):
+    if regime == 'caixa':
+        qs = (
+            ContaAReceber.objects.filter(
+                empresa=empresa,
+                status='pago',
+                data_recebimento__gte=ini,
+                data_recebimento__lte=fim,
+            )
+            .values('forma_pagamento_id', 'forma_pagamento__descricao')
+            .annotate(total=Coalesce(Sum('valor_recebido'), Decimal('0')))
+            .order_by('-total')[:limite]
+        )
+        return [
+            {'nome': _lbl_forma_pagamento(r['forma_pagamento__descricao']), 'total': r['total'] or Decimal('0')}
+            for r in qs
+        ]
+    if regime == 'competencia':
+        qs = (
+            ContaAReceber.objects.filter(
+                empresa=empresa,
+                data_emissao__gte=ini,
+                data_emissao__lte=fim,
+            )
+            .exclude(status='cancelado')
+            .values('forma_pagamento_id', 'forma_pagamento__descricao')
+            .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
+            .order_by('-total')[:limite]
+        )
+        return [
+            {'nome': _lbl_forma_pagamento(r['forma_pagamento__descricao']), 'total': r['total'] or Decimal('0')}
+            for r in qs
+        ]
+
+    qs_pago = (
+        ContaAReceber.objects.filter(
+            empresa=empresa,
+            status='pago',
+            data_recebimento__gte=ini,
+            data_recebimento__lte=fim,
+        )
+        .values('forma_pagamento_id', 'forma_pagamento__descricao')
+        .annotate(total=Coalesce(Sum('valor_recebido'), Decimal('0')))
+    )
+    qs_aberto = (
+        ContaAReceber.objects.filter(
+            empresa=empresa,
+            data_vencimento__gte=ini,
+            data_vencimento__lte=fim,
+        )
+        .exclude(status__in=['pago', 'cancelado'])
+        .values('forma_pagamento_id', 'forma_pagamento__descricao')
+        .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
+    )
+    totais: dict = {}
+    for row in list(qs_pago) + list(qs_aberto):
+        chave = row['forma_pagamento_id'] or 0
+        if chave not in totais:
+            totais[chave] = {
+                'nome': _lbl_forma_pagamento(row['forma_pagamento__descricao']),
+                'total': Decimal('0'),
+            }
+        totais[chave]['total'] += row['total'] or Decimal('0')
+    ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
+    return ordenado
+
+
+def _despesas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, limite: int = 10):
+    base = ContasaPagar.objects.filter(
+        _cap_empresa_q(empresa),
+        categoria__tipo='D',
+    ).exclude(status='cancelado')
+
+    if regime == 'caixa':
+        qs = (
+            base.filter(dtPag__gte=ini, dtPag__lte=fim, valorPago__gt=0)
+            .values('cobranca_id', 'cobranca__descricao')
+            .annotate(total=Coalesce(Sum('valorPago'), Decimal('0')))
+            .order_by('-total')[:limite]
+        )
+        return [
+            {'nome': _lbl_forma_pagamento(r['cobranca__descricao']), 'total': r['total'] or Decimal('0')}
+            for r in qs
+        ]
+    if regime == 'competencia':
+        qs_em = (
+            base.filter(dtEmissao__gte=ini, dtEmissao__lte=fim)
+            .values('cobranca_id', 'cobranca__descricao')
+            .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
+        )
+        qs_venc = (
+            base.filter(dtEmissao__isnull=True, dtvenc__gte=ini, dtvenc__lte=fim)
+            .values('cobranca_id', 'cobranca__descricao')
+            .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
+        )
+        totais: dict = {}
+        for row in list(qs_em) + list(qs_venc):
+            chave = row['cobranca_id'] or 0
+            if chave not in totais:
+                totais[chave] = {
+                    'nome': _lbl_forma_pagamento(row['cobranca__descricao']),
+                    'total': Decimal('0'),
+                }
+            totais[chave]['total'] += row['total'] or Decimal('0')
+        ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
+        return ordenado
+
+    qs_pago = (
+        base.filter(dtPag__gte=ini, dtPag__lte=fim, valorPago__gt=0)
+        .values('cobranca_id', 'cobranca__descricao')
+        .annotate(total=Coalesce(Sum('valorPago'), Decimal('0')))
+    )
+    qs_aberto = (
+        base.filter(dtvenc__gte=ini, dtvenc__lte=fim)
+        .filter(Q(valorPago__isnull=True) | Q(valorPago=0))
+        .exclude(status='pago')
+        .values('cobranca_id', 'cobranca__descricao')
+        .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
+    )
+    totais = {}
+    for row in list(qs_pago) + list(qs_aberto):
+        chave = row['cobranca_id'] or 0
+        if chave not in totais:
+            totais[chave] = {
+                'nome': _lbl_forma_pagamento(row['cobranca__descricao']),
+                'total': Decimal('0'),
+            }
+        totais[chave]['total'] += row['total'] or Decimal('0')
+    ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
+    return ordenado
+
+
 def _contas_a_vencer(empresa) -> tuple[Decimal, Decimal]:
     """Saldo pendente a receber e a pagar (todas as contas em aberto)."""
     a_receber = Decimal('0')
@@ -285,6 +422,8 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
 
     entradas = _receitas_por_categoria(empresa, data_inicio, data_fim, regime)
     saidas = _despesas_por_categoria(empresa, data_inicio, data_fim, regime)
+    receitas_forma = _receitas_por_forma_pagamento(empresa, data_inicio, data_fim, regime)
+    despesas_forma = _despesas_por_forma_pagamento(empresa, data_inicio, data_fim, regime)
     total_receber, total_pagar = _contas_a_vencer(empresa)
 
     sufixo = SUFIXO_REGIME[regime]
@@ -301,6 +440,8 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
         'contas_pagar': total_pagar,
         'entradas_categoria': entradas,
         'saidas_categoria': saidas,
+        'receitas_forma_pagamento': receitas_forma,
+        'despesas_forma_pagamento': despesas_forma,
         'chart_mensal_labels_json': json.dumps(labels, ensure_ascii=False),
         'chart_mensal_receitas_json': json.dumps(receitas_mes),
         'chart_mensal_despesas_json': json.dumps(despesas_mes),
@@ -310,5 +451,12 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
         'chart_entradas_data_json': json.dumps([float(e['total']) for e in entradas]),
         'chart_saidas_labels_json': json.dumps([s['nome'] for s in saidas], ensure_ascii=False),
         'chart_saidas_data_json': json.dumps([float(s['total']) for s in saidas]),
-        'tem_dados': any(receitas_mes) or any(despesas_mes) or entradas or saidas,
+        'chart_receitas_forma_labels_json': json.dumps([r['nome'] for r in receitas_forma], ensure_ascii=False),
+        'chart_receitas_forma_data_json': json.dumps([float(r['total']) for r in receitas_forma]),
+        'chart_despesas_forma_labels_json': json.dumps([d['nome'] for d in despesas_forma], ensure_ascii=False),
+        'chart_despesas_forma_data_json': json.dumps([float(d['total']) for d in despesas_forma]),
+        'tem_dados': (
+            any(receitas_mes) or any(despesas_mes) or entradas or saidas
+            or receitas_forma or despesas_forma
+        ),
     }

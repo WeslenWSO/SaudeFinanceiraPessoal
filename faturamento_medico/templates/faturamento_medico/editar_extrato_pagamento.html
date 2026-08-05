@@ -1,90 +1,180 @@
-{% extends 'base.html' %}
-{% load static %}
-{% load faturamento_extras %}
-
-{% block title %}Editar Extrato de Pagamento{% endblock %}
-
-{%block nav_%}
-    {% include 'parcial/_nav.html' %}
-{%endblock%}
-
-{% block conteudo %}
-<div class="container-fluid">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">{{ titulo }}</h3>
-                </div>
-                <div class="card-body">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Convênio:</strong> {{ extrato.convenio }}</p>
-                            <p class="mb-1"><strong>Competência:</strong> {{ extrato.competencia|default:"—" }}</p>
-                            <p class="mb-1"><strong>Lote:</strong> {{ extrato.lote|default:"—" }}</p>
-                            <p class="mb-1"><strong>Data do lote:</strong> {% if extrato.data_lote %}{{ extrato.data_lote|date:"d/m/Y" }}{% else %}—{% endif %}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Valor:</strong> R$ {{ extrato.valor|moeda_br }}</p>
-                            <p class="mb-1"><strong>Glosado:</strong> R$ {{ extrato.valor_glosado|moeda_br }}</p>
-                            <p class="mb-1"><strong>Liberado:</strong> R$ {{ extrato.valor_liberado|moeda_br }}</p>
-                            <p class="mb-1"><strong>Qt. guias:</strong> {{ extrato.qt_guias|default:"—" }}</p>
-                        </div>
-                    </div>
-
-                    <form method="post">
-                        {% csrf_token %}
-                        <input type="hidden" name="competencia" value="{{ filtros.competencia }}">
-                        <input type="hidden" name="convenio" value="{{ filtros.convenio }}">
-
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="protocolo" class="form-label">Protocolo</label>
-                                <input type="text" class="form-control" id="protocolo" name="protocolo"
-                                       value="{{ extrato.protocolo }}" maxlength="50"
-                                       placeholder="Número do protocolo">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="nota" class="form-label">Nota fiscal</label>
-                                <input type="text" class="form-control" id="nota" name="nota"
-                                       value="{{ extrato.nota }}" maxlength="50"
-                                       placeholder="Número da NF">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="valor_nota" class="form-label">Valor da nota</label>
-                                <input type="text" class="form-control" id="valor_nota" name="valor_nota"
-                                       value="{% if extrato.valor_nota %}{{ extrato.valor_nota|moeda_br }}{% endif %}"
-                                       placeholder="0,00">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="retencoes" class="form-label">Retenções</label>
-                                <input type="text" class="form-control" id="retencoes" name="retencoes"
-                                       value="{{ extrato.retencoes|moeda_br }}" placeholder="0,00">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="liquido" class="form-label">Líquido</label>
-                                <input type="text" class="form-control" id="liquido" name="liquido"
-                                       value="{{ extrato.liquido|moeda_br }}" placeholder="0,00">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="data_previsao" class="form-label">Previsão de pagamento</label>
-                                <input type="date" class="form-control" id="data_previsao" name="data_previsao"
-                                       value="{% if extrato.data_previsao %}{{ extrato.data_previsao|date:'Y-m-d' }}{% endif %}">
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Salvar
-                            </button>
-                            <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}" class="btn btn-secondary">
-                                Cancelar
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% load faturamento_extras %}
+
+
+
+{% block title %}Editar Extrato de Pagamento{% endblock %}
+
+
+
+{%block nav_%}
+
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="row mb-4">
+
+                        <div class="col-md-6">
+
+                            <p class="mb-1"><strong>Convênio:</strong> {{ extrato.convenio }}</p>
+
+                            <p class="mb-1"><strong>Competência:</strong> {{ extrato.competencia|default:"—" }}</p>
+
+                            <p class="mb-1"><strong>Lote:</strong> {{ extrato.lote|default:"—" }}</p>
+
+                            <p class="mb-1"><strong>Data do lote:</strong> {% if extrato.data_lote %}{{ extrato.data_lote|date:"d/m/Y" }}{% else %}—{% endif %}</p>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <p class="mb-1"><strong>Valor:</strong> R$ {{ extrato.valor|moeda_br }}</p>
+
+                            <p class="mb-1"><strong>Glosado:</strong> R$ {{ extrato.valor_glosado|moeda_br }}</p>
+
+                            <p class="mb-1"><strong>Liberado:</strong> R$ {{ extrato.valor_liberado|moeda_br }}</p>
+
+                            <p class="mb-1"><strong>Qt. guias:</strong> {{ extrato.qt_guias|default:"—" }}</p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <form method="post">
+
+                        {% csrf_token %}
+
+                        <input type="hidden" name="competencia" value="{{ filtros.competencia }}">
+
+                        <input type="hidden" name="convenio" value="{{ filtros.convenio }}">
+
+
+
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+
+                                <label for="protocolo" class="form-label">Protocolo</label>
+
+                                <input type="text" class="form-control" id="protocolo" name="protocolo"
+
+                                       value="{{ extrato.protocolo }}" maxlength="50"
+
+                                       placeholder="Número do protocolo">
+
+                            </div>
+
+                            <div class="col-md-6">
+
+                                <label for="nota" class="form-label">Nota fiscal</label>
+
+                                <input type="text" class="form-control" id="nota" name="nota"
+
+                                       value="{{ extrato.nota }}" maxlength="50"
+
+                                       placeholder="Número da NF">
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="valor_nota" class="form-label">Valor da nota</label>
+
+                                <input type="text" class="form-control" id="valor_nota" name="valor_nota"
+
+                                       value="{% if extrato.valor_nota %}{{ extrato.valor_nota|moeda_br }}{% endif %}"
+
+                                       placeholder="0,00">
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="retencoes" class="form-label">Retenções</label>
+
+                                <input type="text" class="form-control" id="retencoes" name="retencoes"
+
+                                       value="{{ extrato.retencoes|moeda_br }}" placeholder="0,00">
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="liquido" class="form-label">Líquido</label>
+
+                                <input type="text" class="form-control" id="liquido" name="liquido"
+
+                                       value="{{ extrato.liquido|moeda_br }}" placeholder="0,00">
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="data_previsao" class="form-label">Previsão de pagamento</label>
+
+                                <input type="date" class="form-control" id="data_previsao" name="data_previsao"
+
+                                       value="{% if extrato.data_previsao %}{{ extrato.data_previsao|date:'Y-m-d' }}{% endif %}">
+
+                            </div>
+
+                        </div>
+
+
+
+                        <div class="mt-4">
+
+                            <button type="submit" class="btn btn-primary">
+
+                                <i class="fas fa-save"></i> Salvar
+
+                            </button>
+
+                            <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}" class="btn btn-secondary">
+
+                                Cancelar
+
+                            </a>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+

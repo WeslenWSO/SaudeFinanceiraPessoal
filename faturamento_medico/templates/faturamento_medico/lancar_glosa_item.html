@@ -65,9 +65,9 @@
                                 <i class="fas fa-ban"></i> Salvar glosa
                             </button>
                             {% if voltar %}
-                            <a href="{{ voltar }}" class="btn btn-secondary">Cancelar</a>
+                            <a href="{{ voltar }}" class="btn btn-cancel btn-secondary">Cancelar</a>
                             {% else %}
-                            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary">Cancelar</a>
+                            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-cancel btn-secondary">Cancelar</a>
                             {% endif %}
                         </div>
                     </form>

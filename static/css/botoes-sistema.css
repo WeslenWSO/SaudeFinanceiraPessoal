@@ -1,0 +1,197 @@
+/**
+ * Padrão global de botões — Saude Financeira
+ * Azul: ações gerais | Vermelho: excluir/cancelar | Verde: editar/alterar
+ */
+
+:root {
+  --sys-btn-azul: #0d6efd;
+  --sys-btn-azul-hover: #0b5ed7;
+  --sys-btn-azul-active: #0a58ca;
+  --sys-btn-vermelho: #dc3545;
+  --sys-btn-vermelho-hover: #bb2d3b;
+  --sys-btn-verde: #198754;
+  --sys-btn-verde-hover: #157347;
+}
+
+/* Não alterar links, fechar modal nativo, paginação */
+.btn-link,
+.btn-close,
+.btn-check,
+.page-link,
+.pagination .page-link {
+  background: unset !important;
+  border-color: unset !important;
+  color: unset !important;
+}
+
+/* ========== AZUL — ações gerais ========== */
+.btn-primary,
+.btn-secondary:not(.dropdown-toggle),
+.btn-info,
+.btn-success,
+.btn-warning,
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-info,
+.btn-outline-success,
+.btn-outline-warning,
+input[type="submit"].btn-primary,
+input[type="submit"].btn-secondary,
+input[type="submit"].btn-success,
+input[type="submit"].btn-info,
+input[type="submit"].btn-warning,
+button.btn-primary,
+button.btn-secondary:not(.dropdown-toggle),
+button.btn-info,
+button.btn-success,
+button.btn-warning,
+a.btn-primary,
+a.btn-secondary:not(.dropdown-toggle),
+a.btn-info,
+a.btn-success,
+a.btn-warning,
+a.btn-outline-primary,
+a.btn-outline-secondary,
+a.btn-outline-info,
+a.btn-outline-success,
+a.btn-outline-warning,
+.btn.dropdown-toggle {
+  background-color: var(--sys-btn-azul) !important;
+  border-color: var(--sys-btn-azul) !important;
+  color: #fff !important;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-secondary:not(.dropdown-toggle):hover:not(:disabled),
+.btn-info:hover:not(:disabled),
+.btn-success:hover:not(:disabled),
+.btn-warning:hover:not(:disabled),
+.btn-outline-primary:hover:not(:disabled),
+.btn-outline-secondary:hover:not(:disabled),
+.btn-outline-info:hover:not(:disabled),
+.btn-outline-success:hover:not(:disabled),
+.btn-outline-warning:hover:not(:disabled),
+a.btn-primary:hover,
+a.btn-secondary:not(.dropdown-toggle):hover,
+a.btn-info:hover,
+a.btn-success:hover,
+a.btn-warning:hover,
+a.btn-outline-primary:hover,
+a.btn-outline-secondary:hover,
+a.btn-outline-info:hover,
+a.btn-outline-success:hover,
+a.btn-outline-warning:hover,
+.btn.dropdown-toggle:hover {
+  background-color: var(--sys-btn-azul-hover) !important;
+  border-color: var(--sys-btn-azul-hover) !important;
+  color: #fff !important;
+}
+
+.btn-group > .btn.active,
+.btn-group > .btn-check:checked + .btn {
+  background-color: var(--sys-btn-azul-active) !important;
+  border-color: var(--sys-btn-azul-active) !important;
+  color: #fff !important;
+}
+
+/* ========== VERMELHO — excluir e cancelar ========== */
+.btn-danger,
+.btn-outline-danger,
+.btn-cancel,
+.btn-excluir,
+.btn.btn-outline,
+input[type="submit"].btn-danger,
+button.btn-danger,
+a.btn-danger,
+a.btn-outline-danger,
+button.btn-secondary[data-bs-dismiss="modal"],
+button.btn-secondary[data-dismiss="modal"],
+.modal-footer .btn-secondary[data-bs-dismiss="modal"],
+.fm-row-actions-item-danger {
+  background-color: var(--sys-btn-vermelho) !important;
+  border-color: var(--sys-btn-vermelho) !important;
+  color: #fff !important;
+}
+
+.btn-danger:hover:not(:disabled),
+.btn-outline-danger:hover:not(:disabled),
+.btn-cancel:hover:not(:disabled),
+.btn-excluir:hover:not(:disabled),
+.btn.btn-outline:hover,
+a.btn-danger:hover,
+a.btn-outline-danger:hover,
+a.btn-cancel:hover,
+button.btn-secondary[data-bs-dismiss="modal"]:hover,
+.fm-row-actions-item-danger:hover {
+  background-color: var(--sys-btn-vermelho-hover) !important;
+  border-color: var(--sys-btn-vermelho-hover) !important;
+  color: #fff !important;
+}
+
+.fm-row-actions-item-danger .fa-trash,
+.fm-row-actions-item-danger .text-danger {
+  color: #fff !important;
+}
+
+/* ========== VERDE — editar e alterar ========== */
+.btn-edit,
+.btn-alterar,
+.btn.btn-warning:has(.fa-edit),
+.btn.btn-warning:has(.fa-pen-to-square),
+.btn.btn-outline-primary:has(.fa-edit),
+.btn.btn-outline-primary:has(.fa-pen-to-square),
+.btn.btn-sm.btn-warning:has(.fa-edit),
+.btn.btn-warning[onclick*="editar" i],
+.btn.btn-warning[onclick*="Editar" i],
+.btn[title*="Editar" i]:not(.btn-danger):not(.btn-cancel),
+.btn[title*="Alterar" i]:not(.btn-danger):not(.btn-cancel),
+a.btn[href*="/editar/"]:not(.btn-danger):not(.btn-cancel),
+a.btn[href*="/edit/"]:not(.btn-danger):not(.btn-cancel),
+a.btn[href*="-update/"]:not(.btn-danger):not(.btn-cancel),
+a.btn[href*="Update"]:not(.btn-danger):not(.btn-cancel),
+a.btn-primary[href*="editar"]:not(.btn-danger),
+a.btn-primary[href*="update"]:not(.btn-danger),
+.btn.btn-primary:has(.fa-edit),
+.btn.btn-primary:has(.fa-pen-to-square),
+a.btn.btn-primary:has(.fa-edit),
+a.btn.btn-primary:has(.fa-pen-to-square),
+.fm-row-actions-item:has(.fa-edit):not(.fm-row-actions-item-danger),
+.fm-row-actions-item:has(.fa-pen-to-square):not(.fm-row-actions-item-danger) {
+  background-color: var(--sys-btn-verde) !important;
+  border-color: var(--sys-btn-verde) !important;
+  color: #fff !important;
+}
+
+.btn-edit:hover:not(:disabled),
+.btn-alterar:hover:not(:disabled),
+.btn.btn-warning:has(.fa-edit):hover,
+.btn.btn-outline-primary:has(.fa-edit):hover,
+.btn[title*="Editar" i]:hover:not(.btn-danger),
+a.btn[href*="/editar/"]:hover:not(.btn-danger),
+.fm-row-actions-item:has(.fa-edit):hover:not(.fm-row-actions-item-danger) {
+  background-color: var(--sys-btn-verde-hover) !important;
+  border-color: var(--sys-btn-verde-hover) !important;
+  color: #fff !important;
+}
+
+.btn:has(.fa-edit) .fa-edit,
+.btn:has(.fa-pen-to-square) .fa-pen-to-square,
+.fm-row-actions-item:has(.fa-edit) .fa-edit,
+.fm-row-actions-item:has(.fa-pen-to-square) .fa-pen-to-square,
+.btn .fa-edit.text-warning,
+.btn .fa-pen-to-square.text-warning,
+.fm-row-actions-item .fa-edit.text-warning {
+  color: #fff !important;
+}
+
+/* Ícones dentro de botões coloridos */
+.btn-primary .fas,
+.btn-primary .fa,
+.btn-danger .fas,
+.btn-danger .fa,
+.btn-edit .fas,
+.btn-edit .fa,
+.btn-cancel .fas,
+.btn-cancel .fa {
+  color: inherit;
+}

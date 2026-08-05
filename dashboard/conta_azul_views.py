@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import threading
 from datetime import date
 
 from django.contrib import messages
@@ -28,6 +30,17 @@ from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta
 from dashboard.conta_azul_forms import ContaAzulConfigForm
 from dashboard.models import ContaAzulConfig
 from empresa.models import Empresa
+
+logger = logging.getLogger(__name__)
+
+
+def _executar_sync_conta_azul_em_background(empresa_id: int, opcoes: dict) -> None:
+    """Evita timeout HTTP no Render (sync pode levar vários minutos)."""
+    try:
+        empresa = Empresa.objects.get(pk=empresa_id)
+        sincronizar_conta_azul(empresa, **opcoes)
+    except Exception:
+        logger.exception('Falha na sincronização Conta Azul em background (empresa=%s)', empresa_id)
 
 
 def _empresa_autorizada(request, empresa: Empresa) -> bool:
@@ -326,8 +339,7 @@ def conta_azul_sincronizar(request, pk):
             data_ate = data_ate - timedelta(days=1)
 
         try:
-            stats = sincronizar_conta_azul(
-                empresa,
+            opcoes = dict(
                 cadastros='cadastros' in request.POST,
                 receitas='receitas' in request.POST,
                 despesas='despesas' in request.POST,
@@ -335,24 +347,19 @@ def conta_azul_sincronizar(request, pk):
                 data_de=data_de,
                 data_ate=data_ate,
             )
-            nivel, texto = mensagem_resultado_sync(stats)
-            getattr(messages, nivel)(request, texto)
-        except IntegrityError as exc:
-            messages.error(
+            threading.Thread(
+                target=_executar_sync_conta_azul_em_background,
+                args=(empresa.pk, opcoes),
+                daemon=True,
+            ).start()
+            messages.info(
                 request,
-                f'Conflito ao gravar dados (conta/categoria duplicada). '
-                f'Detalhe: {exc}. Tente sincronizar só cadastros primeiro.',
+                'Sincronização Conta Azul iniciada em segundo plano. '
+                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar. '
+                'Use um mês por vez se houver muitos lançamentos.',
             )
-        except OperationalError as exc:
-            messages.error(
-                request,
-                'Banco SQLite ocupado (database is locked). '
-                'Feche outras abas/terminais usando o sistema, pause a sync do OneDrive '
-                'na pasta do projeto e tente de novo em alguns segundos. '
-                f'Detalhe: {exc}',
-            )
-        except ContaAzulAPIError as exc:
-            messages.error(request, f'Erro na sincronização: {exc}')
+        except Exception as exc:
+            messages.error(request, f'Não foi possível iniciar a sincronização: {exc}')
         return redirect('empresa:conta_azul_sincronizar', pk=pk)
 
     return render(
@@ -415,6 +422,8 @@ def conta_azul_sincronizar_dashboard(request):
         )
     except ContaAzulAPIError as exc:
         messages.error(request, f'Erro: {exc}')
+    except Exception as exc:
+        messages.error(request, f'Erro inesperado na sincronização: {exc}')
     from django.urls import reverse
 
     return rd(reverse('dashboard:index') + f'?mes={mes}&ano={ano}')
