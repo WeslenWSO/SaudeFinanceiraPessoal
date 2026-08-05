@@ -46,13 +46,17 @@ def _regra_rateio_from_post(request, empresa_id=None):
     return None
 
 
+def _redirect_sem_empresa(request):
+    messages.error(request, 'Empresa não encontrada na sessão.')
+    return redirect('empresa:lista')
+
+
 # Create your views here.
 def listar_contas_a_pagar(request):
     """Lista todas as contas a pagar com filtros e paginação"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasapagar:listar')
+        return _redirect_sem_empresa(request)
 
     # Para contas a pagar, filtrar por fornecedor da empresa
     contas = ContasaPagar.objects.filter(empresa_id=empresa_id).order_by('-dtvenc')

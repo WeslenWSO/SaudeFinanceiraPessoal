@@ -27,6 +27,13 @@ import re
 import json
 # import Levenshtein  # Temporariamente desabilitado - módulo não instalado
 
+
+def _redirect_sem_empresa(request):
+    """Evita loop infinito (crlistar → crlistar) quando a sessão perde empresa_id."""
+    messages.error(request, 'Empresa não encontrada na sessão.')
+    return redirect('empresa:lista')
+
+
 def _parcela_para_titulo_diferenca(conta):
     """Parcela do novo título gerado pela diferença (tenta sequência da NF; senão rótulo padrão)."""
     p = (conta.parcela or '').strip().replace(' ', '')
@@ -267,8 +274,7 @@ def categorizar_recebidos_baixados(request):
     """Lista contas já baixadas (pago/cartão) para aplicar categoria em lote, com filtros por cobrança e data de recebimento."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     filtros = extrair_filtros_categorizar_baixados(request)
     per_page = filtros['per_page']
@@ -345,8 +351,7 @@ def criar_conta_a_receber(request):
     if request.method == 'POST':
         empresa_id = request.session.get('empresa_id')
         if not empresa_id:
-            messages.error(request, 'Empresa não encontrada na sessão.')
-            return redirect('contasareceber:crlistar')
+            return _redirect_sem_empresa(request)
 
         try:
             empresa = Empresa.objects.get(id=empresa_id)
@@ -500,8 +505,7 @@ def listar_contas_a_receber(request):
     """Lista todas as contas a receber com filtros"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     contas = (
         ContaAReceber.objects.filter(empresa_id=empresa_id)
@@ -674,8 +678,7 @@ def alterar_socio_lote(request):
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     contas_ids = request.POST.getlist('contas_ids')
     socio_id_raw = (request.POST.get('socio_id') or '').strip()
@@ -743,8 +746,7 @@ def detalhes_conta_a_receber(request, pk):
     """Exibe detalhes de uma conta a receber"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     conta = get_object_or_404(
         ContaAReceber.objects.prefetch_related(
@@ -771,8 +773,7 @@ def baixar_conta_a_receber(request, pk):
     """Permite baixar (receber) uma conta a receber"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     conta = get_object_or_404(ContaAReceber, pk=pk, empresa_id=empresa_id)
 
@@ -1046,8 +1047,7 @@ def baixar_contas_a_receber(request):
     """Escolhe uma conta a receber e redireciona para a baixa com extrato (vários lançamentos)."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method == 'POST':
         form = EscolhaContaBaixaForm(request.POST, empresa_id=empresa_id)
@@ -1069,8 +1069,7 @@ def editar_conta_a_receber(request, pk):
     empresa_id = request.session.get('empresa_id')
 
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     conta = get_object_or_404(ContaAReceber, pk=pk, empresa_id=empresa_id)
 
@@ -1221,8 +1220,7 @@ def estornar_conta_a_receber(request, pk):
     empresa_id = request.session.get('empresa_id')
 
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     conta = get_object_or_404(ContaAReceber, pk=pk, empresa_id=empresa_id)
 
@@ -1284,8 +1282,7 @@ def listar_baixas(request):
     """Lista todas as baixas de contas a receber"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:listar')
+        return _redirect_sem_empresa(request)
 
     baixas = (
         BaixaContaAReceber.objects.filter(empresa_id=empresa_id)
@@ -1385,8 +1382,7 @@ def conciliar_contas_a_receber(request):
     """Conciliar múltiplas contas a receber com lançamentos bancários aplicando regras específicas"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method == 'POST':
         contas_ids = request.POST.getlist('contas')
@@ -1885,8 +1881,7 @@ def nao_conciliados(request):
     """Exibe relatório de itens não conciliados: contas a receber, cartão e extrato bancário"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     # Filtros de período
     data_inicio = request.GET.get('data_inicio')
@@ -1942,8 +1937,7 @@ def nao_conciliados_excel(request):
     """Exporta os itens não conciliados para Excel"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     # Obter empresa
     from empresa.models import Empresa
@@ -2067,8 +2061,7 @@ def lancar_contas_selecionadas(request):
     """Cria lançamentos para contas a receber selecionadas"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method == 'POST':
         contas_ids = request.POST.getlist('contas')
@@ -2759,8 +2752,7 @@ def aplicar_categoria(request):
     """Aplicar categoria a múltiplas contas a receber selecionadas"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method != 'POST':
         return redirect('contasareceber:crlistar')
@@ -2781,7 +2773,7 @@ def aplicar_categoria(request):
         empresa = Empresa.objects.get(id=empresa_id)
     except Empresa.DoesNotExist:
         messages.error(request, 'Empresa não encontrada.')
-        return redirect('contasareceber:crlistar')
+        return redirect('empresa:lista')
 
     # Obter dados do formulário
     contas_ids = request.POST.getlist('contas_ids')
@@ -2840,8 +2832,7 @@ def baixar_contas_dinheiro(request):
     """Processar baixa de múltiplas contas a receber em dinheiro"""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     # Capturar parâmetros GET para preservar filtros na navegação
     filtros_query = request.GET.urlencode()
@@ -2853,7 +2844,7 @@ def baixar_contas_dinheiro(request):
         empresa = Empresa.objects.get(id=empresa_id)
     except Empresa.DoesNotExist:
         messages.error(request, 'Empresa não encontrada.')
-        return redirect('contasareceber:crlistar')
+        return redirect('empresa:lista')
 
     # Obter dados do formulário
     contas_ids = request.POST.getlist('contas_ids')
@@ -3013,8 +3004,7 @@ def conciliar_cartao_por_autorizacao(request):
     """
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method == 'POST':
         contas_ids = request.POST.getlist('contas')
@@ -3138,8 +3128,7 @@ def deletar_conta_a_receber(request, pk):
     empresa_id = request.session.get('empresa_id')
 
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     conta = get_object_or_404(ContaAReceber, pk=pk, empresa_id=empresa_id)
 
@@ -3181,8 +3170,7 @@ def excluir_contas_selecionadas(request):
     filtros = extrair_filtros_contas_receber(request)
 
     if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('contasareceber:crlistar')
+        return _redirect_sem_empresa(request)
 
     if request.method != 'POST':
         messages.warning(request, 'Use a seleção na listagem para excluir contas.')
