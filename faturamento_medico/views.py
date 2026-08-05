@@ -252,6 +252,32 @@ def _periodo_filtro_padrao(hoje: date | None = None) -> tuple[date, date]:
     return ini, fim
 
 
+def _periodo_ultimos_dias(hoje: date | None = None, dias: int = 15) -> tuple[date, date]:
+    """Período inclusivo: últimos N dias (ex.: 15 = hoje e os 14 anteriores)."""
+    hoje = hoje or date.today()
+    if dias < 1:
+        dias = 1
+    return hoje - timedelta(days=dias - 1), hoje
+
+
+def _montar_dias_regua(data_min: date, data_max: date) -> list[dict]:
+    """Lista de dias para a régua visual do filtro."""
+    if data_max < data_min:
+        data_min, data_max = data_max, data_min
+    dias = []
+    d = data_min
+    while d <= data_max:
+        dias.append({
+            'iso': d.isoformat(),
+            'label': d.strftime('%d/%m'),
+            'titulo': d.strftime('%d/%m/%Y'),
+            'fim_semana': d.weekday() >= 5,
+            'primeiro_mes': d.day == 1,
+        })
+        d += timedelta(days=1)
+    return dias
+
+
 def _intervalos_sobrepoem(ini_a, fim_a, ini_b, fim_b):
     if None in (ini_a, fim_a, ini_b, fim_b):
         return False
@@ -1201,7 +1227,9 @@ def listar_cancelados(request):
     maquina = next(iter(sorted(codigos_maquina)), '') if codigos_maquina else ''
 
     hoje = date.today()
-    di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+    di_padrao, df_padrao = _periodo_ultimos_dias(hoje, 15)
+    regua_fim = hoje
+    regua_ini = hoje - timedelta(days=89)
     di = _parse_data_filtro(request.GET.get('data_inicio'))
     df = _parse_data_filtro(request.GET.get('data_fim'))
     if di is None:
@@ -1415,6 +1443,11 @@ def listar_cancelados(request):
             'situacao_vaga': situacao_vaga,
             'maquina': maquina,
         },
+        'dias_regua': _montar_dias_regua(regua_ini, regua_fim),
+        'regua_min': regua_ini.isoformat(),
+        'regua_max': regua_fim.isoformat(),
+        'periodo_inicio_fmt': di.strftime('%d/%m/%Y'),
+        'periodo_fim_fmt': df.strftime('%d/%m/%Y'),
     }
     return render(request, 'faturamento_medico/listar_cancelados.html', context)
 

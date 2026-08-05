@@ -42,6 +42,43 @@
 .fm-resumo-card:hover { box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12); transform: translateY(-1px); }
 .fm-resumo-card .fm-resumo-filtros { cursor: default; }
 .fm-resumo-card .fm-resumo-filtros a { cursor: pointer; }
+.fm-regua-periodo {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+}
+.fm-regua-dias {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    padding: 0.35rem 0.15rem;
+    scrollbar-width: thin;
+}
+.fm-regua-dia {
+    flex: 0 0 2.1rem;
+    min-width: 2.1rem;
+    height: 2.35rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.35rem;
+    background: #fff;
+    font-size: 0.62rem;
+    line-height: 1.1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 0.1rem;
+}
+.fm-regua-dia.fim-semana { background: #f1f3f5; }
+.fm-regua-dia.primeiro-mes { box-shadow: inset 2px 0 0 #6c757d; }
+.fm-regua-dia.in-range { background: #cfe2ff; border-color: #9ec5fe; }
+.fm-regua-dia.range-start,
+.fm-regua-dia.range-end,
+.fm-regua-dia.selected { background: #0d6efd; border-color: #0d6efd; color: #fff; }
+.fm-regua-dia:hover { border-color: #0d6efd; }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -56,7 +93,29 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <form method="GET" class="mb-4">
+                    <form method="GET" class="mb-4" id="formFiltrosCancelados">
+                        <div class="row g-2 mb-3">
+                            <div class="col-12">
+                                <label class="form-label small mb-1 text-muted">
+                                    Período — clique no dia inicial e depois no final (régua)
+                                </label>
+                                <div class="fm-regua-periodo">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small">
+                                        <span>Início: <strong id="reguaLblInicio">{{ periodo_inicio_fmt }}</strong></span>
+                                        <span>Fim: <strong id="reguaLblFim">{{ periodo_fim_fmt }}</strong></span>
+                                        <span class="text-muted">Últimos 90 dias · padrão: 15 dias</span>
+                                    </div>
+                                    <div class="fm-regua-dias" id="fmReguaDias" role="group" aria-label="Seleção de período">
+                                        {% for d in dias_regua %}
+                                        <button type="button"
+                                                class="fm-regua-dia{% if d.fim_semana %} fim-semana{% endif %}{% if d.primeiro_mes %} primeiro-mes{% endif %}"
+                                                data-iso="{{ d.iso }}"
+                                                title="{{ d.titulo }}">{{ d.label }}</button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="row g-2">
                             <div class="col-md-2">
                                 <label class="form-label small mb-0 text-muted">Paciente</label>
@@ -65,11 +124,13 @@
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small mb-0 text-muted">Data início</label>
-                                <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                                <input type="date" name="data_inicio" id="inputDataInicio" class="form-control"
+                                       value="{{ filtros.data_inicio }}" min="{{ regua_min }}" max="{{ regua_max }}">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small mb-0 text-muted">Data fim</label>
-                                <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                                <input type="date" name="data_fim" id="inputDataFim" class="form-control"
+                                       value="{{ filtros.data_fim }}" min="{{ regua_min }}" max="{{ regua_max }}">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small mb-0 text-muted">Status</label>
@@ -525,5 +586,82 @@ document.querySelectorAll('.fm-resumo-card').forEach(function(card) {
         }
     });
 });
+
+(function initReguaPeriodo() {
+    var regua = document.getElementById('fmReguaDias');
+    var inputIni = document.getElementById('inputDataInicio');
+    var inputFim = document.getElementById('inputDataFim');
+    var lblIni = document.getElementById('reguaLblInicio');
+    var lblFim = document.getElementById('reguaLblFim');
+    if (!regua || !inputIni || !inputFim) return;
+
+    var anchor = null;
+
+    function fmtBr(iso) {
+        if (!iso) return '—';
+        var p = iso.split('-');
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    function paintRegua() {
+        var ini = inputIni.value;
+        var fim = inputFim.value;
+        regua.querySelectorAll('.fm-regua-dia').forEach(function(btn) {
+            var iso = btn.getAttribute('data-iso');
+            btn.classList.remove('in-range', 'range-start', 'range-end', 'selected');
+            if (!ini || !fim) return;
+            var a = ini <= fim ? ini : fim;
+            var b = ini <= fim ? fim : ini;
+            if (iso >= a && iso <= b) btn.classList.add('in-range');
+            if (iso === a) btn.classList.add('range-start');
+            if (iso === b) btn.classList.add('range-end');
+        });
+        if (lblIni) lblIni.textContent = fmtBr(ini);
+        if (lblFim) lblFim.textContent = fmtBr(fim);
+    }
+
+    function setRange(ini, fim) {
+        if (!ini || !fim) return;
+        if (ini > fim) { var t = ini; ini = fim; fim = t; }
+        inputIni.value = ini;
+        inputFim.value = fim;
+        paintRegua();
+    }
+
+    regua.addEventListener('click', function(e) {
+        var btn = e.target.closest('.fm-regua-dia');
+        if (!btn) return;
+        var iso = btn.getAttribute('data-iso');
+        if (!anchor) {
+            anchor = iso;
+            regua.querySelectorAll('.fm-regua-dia').forEach(function(b) {
+                b.classList.remove('selected');
+            });
+            btn.classList.add('selected');
+            return;
+        }
+        setRange(anchor, iso);
+        anchor = null;
+    });
+
+    inputIni.addEventListener('change', function() {
+        anchor = null;
+        if (inputIni.value && inputFim.value && inputIni.value > inputFim.value) {
+            inputFim.value = inputIni.value;
+        }
+        paintRegua();
+    });
+    inputFim.addEventListener('change', function() {
+        anchor = null;
+        if (inputIni.value && inputFim.value && inputIni.value > inputFim.value) {
+            inputIni.value = inputFim.value;
+        }
+        paintRegua();
+    });
+
+    paintRegua();
+    var endBtn = regua.querySelector('[data-iso="' + inputFim.value + '"]');
+    if (endBtn) endBtn.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'auto' });
+})();
 </script>
 {% endblock %}
