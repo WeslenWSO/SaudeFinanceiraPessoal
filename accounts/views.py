@@ -38,7 +38,7 @@ def login_view(request):
             if user is not None:
                 login(request, user)
                 if _selecionar_empresa_unica(request, user):
-                    return redirect('dashboard:index')
+                    return redirect('faturamento_medico:ftlistar')
                 return redirect('empresa:lista')
             else:
                 form.add_error(None, 'Usuário ou senha incorretos.')

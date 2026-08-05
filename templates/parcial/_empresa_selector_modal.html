@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(function(data) {
       if (data.success) {
         dialog.close();
-        window.location.href = data.redirect_url || '{% url "dashboard:index" %}';
+        window.location.href = data.redirect_url || '{% url "faturamento_medico:ftlistar" %}';
       } else {
         alert(data.message || 'Erro ao selecionar.');
       }

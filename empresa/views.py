@@ -503,7 +503,7 @@ def lista_empresas(request):
         request.session['empresa_id'] = empresa.id
         request.session['empresa_nome'] = empresa.razao
         request.session['regime_tributario'] = empresa.regime_tributario
-        return redirect('dashboard:index')
+        return redirect('faturamento_medico:ftlistar')
     
     context = {
         'usuario_empresas': usuario_empresas,
@@ -552,7 +552,7 @@ def selecionar_empresa_ajax(request):
         return JsonResponse({
             'success': True,
             'message': f'Empresa {usuario_empresa.empresa.razao} selecionada com sucesso!',
-            'redirect_url': reverse('dashboard:index'),
+            'redirect_url': reverse('faturamento_medico:ftlistar'),
             'empresa': {
                 'id': usuario_empresa.empresa.id,
                 'razao': usuario_empresa.empresa.razao,
@@ -592,7 +592,7 @@ def selecionar_empresa(request, empresa_id):
         messages.success(request, f'Empresa {usuario_empresa.empresa.razao} selecionada com sucesso!')
         
         # Sempre vai para o dashboard (início) após escolher a empresa
-        return redirect('dashboard:index')
+        return redirect('faturamento_medico:ftlistar')
         
     except UsuarioEmpresa.DoesNotExist:
         messages.error(request, 'Empresa não encontrada ou acesso negado.')
