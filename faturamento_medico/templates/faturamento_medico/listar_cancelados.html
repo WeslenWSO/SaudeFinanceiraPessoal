@@ -50,10 +50,9 @@
 }
 .fm-regua-dias {
     display: flex;
-    gap: 3px;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    gap: 4px;
     padding: 0.35rem 0.15rem;
-    scrollbar-width: thin;
 }
 .fm-regua-dia {
     flex: 0 0 2.1rem;
@@ -103,7 +102,7 @@
                                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small">
                                         <span>Início: <strong id="reguaLblInicio">{{ periodo_inicio_fmt }}</strong></span>
                                         <span>Fim: <strong id="reguaLblFim">{{ periodo_fim_fmt }}</strong></span>
-                                        <span class="text-muted">Últimos 90 dias · padrão: 15 dias</span>
+                                        <span class="text-muted">Últimos 15 dias</span>
                                     </div>
                                     <div class="fm-regua-dias" id="fmReguaDias" role="group" aria-label="Seleção de período">
                                         {% for d in dias_regua %}
@@ -660,8 +659,6 @@ document.querySelectorAll('.fm-resumo-card').forEach(function(card) {
     });
 
     paintRegua();
-    var endBtn = regua.querySelector('[data-iso="' + inputFim.value + '"]');
-    if (endBtn) endBtn.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'auto' });
 })();
 </script>
 {% endblock %}

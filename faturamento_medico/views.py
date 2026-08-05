@@ -1227,15 +1227,21 @@ def listar_cancelados(request):
     maquina = next(iter(sorted(codigos_maquina)), '') if codigos_maquina else ''
 
     hoje = date.today()
-    di_padrao, df_padrao = _periodo_ultimos_dias(hoje, 15)
-    regua_fim = hoje
-    regua_ini = hoje - timedelta(days=89)
+    dias_regua_qtd = 15
+    regua_ini, regua_fim = _periodo_ultimos_dias(hoje, dias_regua_qtd)
+    di_padrao, df_padrao = regua_ini, regua_fim
     di = _parse_data_filtro(request.GET.get('data_inicio'))
     df = _parse_data_filtro(request.GET.get('data_fim'))
     if di is None:
         di = di_padrao
     if df is None:
         df = df_padrao
+    if di > df:
+        di, df = df, di
+    if di < regua_ini:
+        di = regua_ini
+    if df > regua_fim:
+        df = regua_fim
     if di > df:
         di, df = df, di
     data_inicio = di.isoformat()
