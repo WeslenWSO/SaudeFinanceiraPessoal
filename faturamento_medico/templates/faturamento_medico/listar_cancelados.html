@@ -38,6 +38,10 @@
     cursor: pointer;
 }
 .fm-row-actions-item:hover { background: #f3f4f6; color: inherit; text-decoration: none; }
+.fm-resumo-card { cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.fm-resumo-card:hover { box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12); transform: translateY(-1px); }
+.fm-resumo-card .fm-resumo-filtros { cursor: default; }
+.fm-resumo-card .fm-resumo-filtros a { cursor: pointer; }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -150,121 +154,207 @@
                         </div>
                     </div>
 
-                    {% if resumo_parada.slots %}
-                    <div class="card mb-3 border-warning">
-                        <div class="card-header py-2 bg-warning-subtle">
-                            <strong><i class="fas fa-clock"></i> Horário de máquinas paradas</strong>
-                            <span class="text-muted small ms-1">
-                                — soma por dia e máquina · filtro: {{ filtros_rotulo }}
-                            </span>
-                        </div>
-                        <div class="card-body py-2">
-                            {% if resumo_parada.por_maquina %}
-                            <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
-                                <a href="?{{ qs_sem_maquina }}"
-                                   class="badge text-decoration-none {% if not filtros.maquina %}bg-dark{% else %}bg-light text-dark border{% endif %}">
-                                    Todas
-                                </a>
-                                {% for m in resumo_parada.por_maquina %}
-                                <a href="?{{ qs_sem_maquina }}&maquina={{ m.maquina_codigo|urlencode }}"
-                                   class="badge text-decoration-none {% if filtros.maquina == m.maquina_codigo %}bg-warning text-dark{% else %}bg-secondary{% endif %}"
-                                   title="Filtrar esta máquina">
-                                    {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
-                                </a>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0 align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Data</th>
-                                            <th>Máquina</th>
-                                            <th class="text-end">Tempo parado</th>
-                                            <th class="text-end">Exames no slot</th>
-                                            <th class="text-end">Slots</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for s in resumo_parada.slots %}
-                                        <tr>
-                                            <td>{{ s.data|date:"d/m/Y" }}</td>
-                                            <td>{{ s.maquina }}</td>
-                                            <td class="text-end fw-semibold">{{ s.minutos_fmt }}</td>
-                                            <td class="text-end">{{ s.qtd_exames }}</td>
-                                            <td class="text-end text-muted">{{ s.slots }}</td>
-                                        </tr>
+                    {% if resumo_parada.slots or resumo_reutilizado.slots %}
+                    <div class="row g-3 mb-3">
+                        {% if resumo_parada.slots %}
+                        <div class="col-lg-6">
+                            <div class="card border-warning h-100 fm-resumo-card"
+                                 role="button" tabindex="0"
+                                 data-bs-toggle="modal" data-bs-target="#modalParada"
+                                 title="Clique para ver detalhamento por dia">
+                                <div class="card-header py-2 bg-warning-subtle d-flex justify-content-between align-items-center">
+                                    <strong><i class="fas fa-clock"></i> Horário de máquinas paradas</strong>
+                                    <span class="badge bg-warning text-dark">{{ resumo_parada.total_fmt }}</span>
+                                </div>
+                                <div class="card-body py-3">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <div class="text-muted small">Tempo total</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_parada.total_fmt }}</div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="text-muted small">Exames</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_parada.total_exames }}</div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="text-muted small">Slots</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_parada.total_slots }}</div>
+                                        </div>
+                                    </div>
+                                    {% if resumo_parada.por_maquina %}
+                                    <div class="fm-resumo-filtros d-flex flex-wrap gap-2 align-items-center" onclick="event.stopPropagation();">
+                                        <a href="?{{ qs_sem_maquina }}"
+                                           class="badge text-decoration-none {% if not filtros.maquina %}bg-dark{% else %}bg-light text-dark border{% endif %}">
+                                            Todas
+                                        </a>
+                                        {% for m in resumo_parada.por_maquina %}
+                                        <a href="?{{ qs_sem_maquina }}&maquina={{ m.maquina_codigo|urlencode }}"
+                                           class="badge text-decoration-none {% if filtros.maquina == m.maquina_codigo %}bg-warning text-dark{% else %}bg-secondary{% endif %}"
+                                           title="Filtrar esta máquina">
+                                            {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
+                                        </a>
                                         {% endfor %}
-                                    </tbody>
-                                    <tfoot class="table-light">
-                                        <tr>
-                                            <th colspan="2">Total</th>
-                                            <th class="text-end">{{ resumo_parada.total_fmt }}</th>
-                                            <th class="text-end">{{ resumo_parada.total_exames }}</th>
-                                            <th class="text-end">{{ resumo_parada.total_slots }}</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                                    </div>
+                                    {% endif %}
+                                    <p class="text-muted small mb-0 mt-2">
+                                        <i class="fas fa-mouse-pointer me-1"></i>Clique no card para ver por dia · {{ filtros_rotulo }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if resumo_reutilizado.slots %}
+                        <div class="col-lg-6">
+                            <div class="card border-success h-100 fm-resumo-card"
+                                 role="button" tabindex="0"
+                                 data-bs-toggle="modal" data-bs-target="#modalReutilizado"
+                                 title="Clique para ver detalhamento por dia">
+                                <div class="card-header py-2 bg-success-subtle d-flex justify-content-between align-items-center">
+                                    <strong><i class="fas fa-exchange-alt"></i> Horários reutilizados</strong>
+                                    <span class="badge bg-success">{{ resumo_reutilizado.total_fmt }}</span>
+                                </div>
+                                <div class="card-body py-3">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <div class="text-muted small">Tempo total</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_reutilizado.total_fmt }}</div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="text-muted small">Exames</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_reutilizado.total_exames }}</div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="text-muted small">Slots</div>
+                                            <div class="fs-5 fw-semibold">{{ resumo_reutilizado.total_slots }}</div>
+                                        </div>
+                                    </div>
+                                    {% if resumo_reutilizado.por_maquina %}
+                                    <div class="fm-resumo-filtros d-flex flex-wrap gap-2 align-items-center" onclick="event.stopPropagation();">
+                                        <a href="?{{ qs_sem_maquina }}"
+                                           class="badge text-decoration-none {% if not filtros.maquina %}bg-dark{% else %}bg-light text-dark border{% endif %}">
+                                            Todas
+                                        </a>
+                                        {% for m in resumo_reutilizado.por_maquina %}
+                                        <a href="?{{ qs_sem_maquina }}&maquina={{ m.maquina_codigo|urlencode }}"
+                                           class="badge text-decoration-none {% if filtros.maquina == m.maquina_codigo %}bg-success{% else %}bg-success-subtle text-success border border-success{% endif %}"
+                                           title="Filtrar esta máquina">
+                                            {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
+                                        </a>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    <p class="text-muted small mb-0 mt-2">
+                                        <i class="fas fa-mouse-pointer me-1"></i>Clique no card para ver por dia · {{ filtros_rotulo }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if resumo_parada.slots %}
+                    <div class="modal fade" id="modalParada" tabindex="-1" aria-labelledby="modalParadaLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning-subtle">
+                                    <h5 class="modal-title" id="modalParadaLabel">
+                                        <i class="fas fa-clock"></i> Horário de máquinas paradas — por dia
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body p-0">
+                                    <p class="small text-muted px-3 pt-3 mb-2">Filtro: {{ filtros_rotulo }}</p>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0 align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Máquina</th>
+                                                    <th class="text-end">Tempo parado</th>
+                                                    <th class="text-end">Exames no slot</th>
+                                                    <th class="text-end">Slots</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for s in resumo_parada.slots %}
+                                                <tr>
+                                                    <td>{{ s.data|date:"d/m/Y" }}</td>
+                                                    <td>{{ s.maquina }}</td>
+                                                    <td class="text-end fw-semibold">{{ s.minutos_fmt }}</td>
+                                                    <td class="text-end">{{ s.qtd_exames }}</td>
+                                                    <td class="text-end text-muted">{{ s.slots }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot class="table-light">
+                                                <tr>
+                                                    <th colspan="2">Total</th>
+                                                    <th class="text-end">{{ resumo_parada.total_fmt }}</th>
+                                                    <th class="text-end">{{ resumo_parada.total_exames }}</th>
+                                                    <th class="text-end">{{ resumo_parada.total_slots }}</th>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                     {% endif %}
 
                     {% if resumo_reutilizado.slots %}
-                    <div class="card mb-3 border-success">
-                        <div class="card-header py-2 bg-success-subtle">
-                            <strong><i class="fas fa-exchange-alt"></i> Horários reutilizados</strong>
-                            <span class="text-muted small ms-1">
-                                — soma por dia e máquina · filtro: {{ filtros_rotulo }}
-                            </span>
-                        </div>
-                        <div class="card-body py-2">
-                            {% if resumo_reutilizado.por_maquina %}
-                            <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
-                                <a href="?{{ qs_sem_maquina }}"
-                                   class="badge text-decoration-none {% if not filtros.maquina %}bg-dark{% else %}bg-light text-dark border{% endif %}">
-                                    Todas
-                                </a>
-                                {% for m in resumo_reutilizado.por_maquina %}
-                                <a href="?{{ qs_sem_maquina }}&maquina={{ m.maquina_codigo|urlencode }}"
-                                   class="badge text-decoration-none {% if filtros.maquina == m.maquina_codigo %}bg-success{% else %}bg-success-subtle text-success border border-success{% endif %}"
-                                   title="Filtrar esta máquina">
-                                    {{ m.maquina }}: {{ m.minutos_fmt }} ({{ m.slots }} slot{{ m.slots|pluralize:"s" }})
-                                </a>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0 align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Data</th>
-                                            <th>Máquina</th>
-                                            <th class="text-end">Tempo reutilizado</th>
-                                            <th class="text-end">Exames no slot</th>
-                                            <th class="text-end">Slots</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for s in resumo_reutilizado.slots %}
-                                        <tr>
-                                            <td>{{ s.data|date:"d/m/Y" }}</td>
-                                            <td>{{ s.maquina }}</td>
-                                            <td class="text-end fw-semibold">{{ s.minutos_fmt }}</td>
-                                            <td class="text-end">{{ s.qtd_exames }}</td>
-                                            <td class="text-end text-muted">{{ s.slots }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                    <tfoot class="table-light">
-                                        <tr>
-                                            <th colspan="2">Total</th>
-                                            <th class="text-end">{{ resumo_reutilizado.total_fmt }}</th>
-                                            <th class="text-end">{{ resumo_reutilizado.total_exames }}</th>
-                                            <th class="text-end">{{ resumo_reutilizado.total_slots }}</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                    <div class="modal fade" id="modalReutilizado" tabindex="-1" aria-labelledby="modalReutilizadoLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header bg-success-subtle">
+                                    <h5 class="modal-title" id="modalReutilizadoLabel">
+                                        <i class="fas fa-exchange-alt"></i> Horários reutilizados — por dia
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body p-0">
+                                    <p class="small text-muted px-3 pt-3 mb-2">Filtro: {{ filtros_rotulo }}</p>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0 align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Máquina</th>
+                                                    <th class="text-end">Tempo reutilizado</th>
+                                                    <th class="text-end">Exames no slot</th>
+                                                    <th class="text-end">Slots</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for s in resumo_reutilizado.slots %}
+                                                <tr>
+                                                    <td>{{ s.data|date:"d/m/Y" }}</td>
+                                                    <td>{{ s.maquina }}</td>
+                                                    <td class="text-end fw-semibold">{{ s.minutos_fmt }}</td>
+                                                    <td class="text-end">{{ s.qtd_exames }}</td>
+                                                    <td class="text-end text-muted">{{ s.slots }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot class="table-light">
+                                                <tr>
+                                                    <th colspan="2">Total</th>
+                                                    <th class="text-end">{{ resumo_reutilizado.total_fmt }}</th>
+                                                    <th class="text-end">{{ resumo_reutilizado.total_exames }}</th>
+                                                    <th class="text-end">{{ resumo_reutilizado.total_slots }}</th>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -424,6 +514,15 @@ document.addEventListener('click', function(e) {
     if (e.target.closest('.fm-row-actions')) return;
     document.querySelectorAll('.fm-row-actions[open]').forEach(function(d) {
         d.removeAttribute('open');
+    });
+});
+document.querySelectorAll('.fm-resumo-card').forEach(function(card) {
+    card.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            var target = card.getAttribute('data-bs-target');
+            if (target) bootstrap.Modal.getOrCreateInstance(document.querySelector(target)).show();
+        }
     });
 });
 </script>
