@@ -209,7 +209,7 @@ def _normalizar_codigo_modalidade(codigo):
 
 
 SOLICITANTE_NAO_INFORMADO = 'Não informado'
-SOLICITANTE_SIMILARIDADE_MIN = 0.92
+SOLICITANTE_SIMILARIDADE_MIN = 0.90
 
 
 def _chave_nome_solicitante(texto: str) -> str:
@@ -229,6 +229,76 @@ def _chave_nome_solicitante(texto: str) -> str:
     t = re.sub(r'[^\w\s]', ' ', t)
     t = re.sub(r'\s+', ' ', t).strip()
     return t or '__vazio__'
+
+
+def _primeiro_nome_compativel(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if not a or not b:
+        return False
+    if len(a) > 4 and len(b) > 4 and a.rstrip('S') == b.rstrip('S'):
+        return True
+    return SequenceMatcher(None, a, b).ratio() >= 0.88
+
+
+def _sobrenome_compativel(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if SequenceMatcher(None, a, b).ratio() >= 0.84:
+        return True
+    min_len = min(len(a), len(b))
+    if min_len >= 5 and a[:5] == b[:5]:
+        return True
+    return False
+
+
+def _partes_meio_compativeis(partes_a: list[str], partes_b: list[str]) -> bool:
+    meio_a = ' '.join(partes_a).strip()
+    meio_b = ' '.join(partes_b).strip()
+    if not meio_a or not meio_b:
+        return True
+    if meio_a == meio_b:
+        return True
+    return SequenceMatcher(None, meio_a, meio_b).ratio() >= 0.82
+
+
+def _solicitantes_mesma_pessoa(chave_a: str, chave_b: str) -> bool:
+    """True se dois nomes normalizados parecem ser o mesmo solicitante."""
+    if chave_a == chave_b:
+        return True
+    if chave_a in ('__sem__', '__vazio__') or chave_b in ('__sem__', '__vazio__'):
+        return False
+    if SequenceMatcher(None, chave_a, chave_b).ratio() >= SOLICITANTE_SIMILARIDADE_MIN:
+        return True
+    partes_a = chave_a.split()
+    partes_b = chave_b.split()
+    if len(partes_a) < 2 or len(partes_b) < 2:
+        return False
+    if not _primeiro_nome_compativel(partes_a[0], partes_b[0]):
+        return False
+    if not _sobrenome_compativel(partes_a[-1], partes_b[-1]):
+        return False
+    return _partes_meio_compativeis(partes_a[1:-1], partes_b[1:-1])
+
+
+def _chave_agrupamento_solicitante(texto: str) -> str:
+    """
+    Chave de agrupamento: primeiro nome + meio + prefixo do sobrenome.
+    Une MARCO/MARCOS, PIMENTA/PIMENTEL, etc.
+    """
+    chave = _chave_nome_solicitante(texto)
+    if chave in ('__sem__', '__vazio__'):
+        return chave
+    partes = chave.split()
+    if len(partes) < 2:
+        return chave
+    primeiro = partes[0]
+    if len(primeiro) >= 6 and primeiro.endswith('S'):
+        primeiro = primeiro[:-1]
+    sobrenome = partes[-1]
+    stem_sobrenome = sobrenome[:6] if len(sobrenome) >= 5 else sobrenome
+    meio = ' '.join(partes[1:-1])
+    return f'{primeiro}|{meio}|{stem_sobrenome}'
 
 
 def _escolher_nome_exibicao_solicitante(nomes: list[str]) -> str:
@@ -254,7 +324,7 @@ def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]
         if not original:
             por_chave['__sem__'].append('')
             continue
-        por_chave[_chave_nome_solicitante(original)].append(original)
+        por_chave[_chave_agrupamento_solicitante(original)].append(original)
 
     chaves = [c for c in por_chave.keys() if c not in ('__sem__', '__vazio__')]
     pai = {c: c for c in chaves}
@@ -271,10 +341,12 @@ def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]
             pai[rb] = ra
 
     for i, ca in enumerate(chaves):
+        rep_a = max(por_chave[ca], key=len)
+        nome_a = _chave_nome_solicitante(rep_a)
         for cb in chaves[i + 1:]:
-            if len(ca) < 6 or len(cb) < 6:
-                continue
-            if SequenceMatcher(None, ca, cb).ratio() >= SOLICITANTE_SIMILARIDADE_MIN:
+            rep_b = max(por_chave[cb], key=len)
+            nome_b = _chave_nome_solicitante(rep_b)
+            if _solicitantes_mesma_pessoa(nome_a, nome_b):
                 _unir(ca, cb)
 
     grupos_raw = defaultdict(list)
