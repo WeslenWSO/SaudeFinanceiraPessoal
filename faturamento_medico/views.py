@@ -1916,6 +1916,15 @@ def listar_exames_por_solicitante(request):
             card['meses'] = []
         cards_resumo.append(card)
 
+    cards_resumo.sort(key=lambda c: (-c['total'], c['nome'].lower()))
+
+    totais_solicitante = {card['nome']: card['total'] for card in cards_resumo}
+    grid_linhas.sort(key=lambda linha: (
+        -totais_solicitante.get(linha['solicitante'], 0),
+        -(linha['data'].toordinal() if linha['data'] else 0),
+        linha['paciente'].lower(),
+    ))
+
     valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
     context = {
         'grid_linhas': grid_linhas,
