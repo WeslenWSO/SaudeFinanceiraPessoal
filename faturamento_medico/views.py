@@ -208,6 +208,239 @@ def _normalizar_codigo_modalidade(codigo):
     return cod if cod and cod != '-' else 'OUTROS'
 
 
+SOLICITANTE_NAO_INFORMADO = 'Não informado'
+SOLICITANTE_SIMILARIDADE_MIN = 0.92
+
+
+def _chave_nome_solicitante(texto: str) -> str:
+    """Normaliza nome do solicitante para agrupar grafias repetidas."""
+    bruto = (texto or '').strip()
+    if not bruto:
+        return '__sem__'
+    t = _normalizar_texto_filtro(bruto)
+    for prefixo in (
+        'DR.', 'DR ', 'DRA.', 'DRA ', 'PROF.', 'PROF ', 'PROFA.', 'PROFA ',
+        'MEDICO ', 'MEDICA ',
+    ):
+        if t.startswith(prefixo):
+            t = t[len(prefixo):].strip()
+    t = re.sub(r'^CRM\s*\d+\s*[-–./]?\s*', '', t, flags=re.I)
+    t = re.sub(r'\s*\(?CRM\s*\d+\)?\s*', ' ', t, flags=re.I)
+    t = re.sub(r'[^\w\s]', ' ', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t or '__vazio__'
+
+
+def _escolher_nome_exibicao_solicitante(nomes: list[str]) -> str:
+    """Escolhe o nome mais completo/frequente para exibir no grupo."""
+    if not nomes:
+        return SOLICITANTE_NAO_INFORMADO
+    contagem = defaultdict(int)
+    for nome in nomes:
+        limpo = (nome or '').strip()
+        if limpo:
+            contagem[limpo] += 1
+    return max(contagem.keys(), key=lambda n: (contagem[n], len(n)))
+
+
+def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]]:
+    """
+    Agrupa nomes repetidos do solicitante.
+    Retorna (raw -> nome canônico, grupos por nome canônico).
+    """
+    por_chave = defaultdict(list)
+    for raw in raws:
+        original = (raw or '').strip()
+        if not original:
+            por_chave['__sem__'].append('')
+            continue
+        por_chave[_chave_nome_solicitante(original)].append(original)
+
+    chaves = [c for c in por_chave.keys() if c not in ('__sem__', '__vazio__')]
+    pai = {c: c for c in chaves}
+
+    def _find(chave):
+        while pai[chave] != chave:
+            pai[chave] = pai[pai[chave]]
+            chave = pai[chave]
+        return chave
+
+    def _unir(a, b):
+        ra, rb = _find(a), _find(b)
+        if ra != rb:
+            pai[rb] = ra
+
+    for i, ca in enumerate(chaves):
+        for cb in chaves[i + 1:]:
+            if len(ca) < 6 or len(cb) < 6:
+                continue
+            if SequenceMatcher(None, ca, cb).ratio() >= SOLICITANTE_SIMILARIDADE_MIN:
+                _unir(ca, cb)
+
+    grupos_raw = defaultdict(list)
+    for chave, nomes in por_chave.items():
+        if chave in ('__sem__', '__vazio__'):
+            grupos_raw[chave].extend(nomes)
+            continue
+        grupos_raw[_find(chave)].extend(nomes)
+
+    mapeamento: dict[str, str] = {}
+    grupos: dict[str, dict] = {}
+
+    for chave, nomes in grupos_raw.items():
+        variantes = sorted({n for n in nomes if n is not None})
+        if chave in ('__sem__', '__vazio__') or not variantes:
+            canonico = SOLICITANTE_NAO_INFORMADO
+            variantes = ['']
+        else:
+            canonico = _escolher_nome_exibicao_solicitante(variantes)
+        if canonico in grupos:
+            variantes = sorted(set(grupos[canonico]['variantes'] + variantes))
+        grupos[canonico] = {
+            'nome': canonico,
+            'variantes': variantes,
+            'qtd_variantes': len([v for v in variantes if v]),
+        }
+        for raw in variantes:
+            mapeamento[raw] = canonico
+
+    mapeamento[''] = SOLICITANTE_NAO_INFORMADO
+    return mapeamento, grupos
+
+
+def _canonico_solicitante(raw, mapeamento: dict[str, str]) -> str:
+    original = (raw or '').strip()
+    if not original:
+        return SOLICITANTE_NAO_INFORMADO
+    return mapeamento.get(original, original)
+
+
+def _filtrar_por_solicitantes(qs, solicitantes_sel, grupos: dict[str, dict]):
+    if not solicitantes_sel:
+        return qs
+    q_sol = Q()
+    for selecionado in solicitantes_sel:
+        if selecionado == SOLICITANTE_NAO_INFORMADO:
+            q_sol |= Q(medico_solicitante__isnull=True) | Q(medico_solicitante='')
+            continue
+        info = grupos.get(selecionado)
+        variantes = info['variantes'] if info else [selecionado]
+        for variante in variantes:
+            if variante:
+                q_sol |= Q(medico_solicitante__iexact=variante)
+    return qs.filter(q_sol) if q_sol else qs
+
+
+MESES_PT = (
+    '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+)
+
+
+def _periodo_abrange_mais_de_um_mes(data_inicio: date, data_fim: date) -> bool:
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+    return (data_inicio.year, data_inicio.month) != (data_fim.year, data_fim.month)
+
+
+def _meses_no_periodo(data_inicio: date, data_fim: date) -> list[tuple[int, int]]:
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+    meses = []
+    cursor = data_inicio.replace(day=1)
+    fim = data_fim.replace(day=1)
+    while cursor <= fim:
+        meses.append((cursor.year, cursor.month))
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month + 1)
+    return meses
+
+
+def _rotulo_mes_ano(ano: int, mes: int) -> str:
+    nome = MESES_PT[mes] if 1 <= mes <= 12 else str(mes)
+    return f'{nome}/{ano}'
+
+
+def _montar_modalidades_card(dados_mes, codigos_modalidade, labels_modalidade):
+    modalidades = []
+    for codigo in codigos_modalidade:
+        qtd = dados_mes['modalidades'].get(codigo, 0)
+        if qtd:
+            modalidades.append({
+                'codigo': codigo,
+                'label': labels_modalidade.get(codigo, codigo),
+                'quantidade': qtd,
+            })
+    if dados_mes.get('outros'):
+        modalidades.append({
+            'codigo': 'OUTROS',
+            'label': 'Outros',
+            'quantidade': dados_mes['outros'],
+        })
+    return modalidades
+
+
+def _novo_resumo_solicitante(codigos_modalidade, por_mes=False):
+    resumo = {
+        'total': 0,
+        'valor': Decimal('0'),
+        'modalidades': {codigo: 0 for codigo in codigos_modalidade},
+        'outros': 0,
+    }
+    if por_mes:
+        resumo['meses'] = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, por_mes=False))
+    return resumo
+
+
+def _acumular_modalidade_resumo(resumo, modalidade, valor, codigos_modalidade):
+    try:
+        resumo['valor'] += Decimal(str(valor or 0))
+    except (InvalidOperation, ValueError, TypeError):
+        pass
+    resumo['total'] += 1
+    cod_mod = _normalizar_codigo_modalidade(modalidade)
+    if cod_mod in resumo['modalidades']:
+        resumo['modalidades'][cod_mod] += 1
+    else:
+        resumo['outros'] += 1
+
+
+def _badge_status_agendamento(status):
+    texto = (status or '').strip() or '-'
+    if texto == '-':
+        return texto, 'secondary'
+    if _eh_status_agendamento_cancelado(status):
+        return texto, 'danger'
+    norm = (
+        texto.lower()
+        .replace('ê', 'e')
+        .replace('é', 'e')
+        .replace('ç', 'c')
+        .replace('ã', 'a')
+    )
+    if 'conclu' in norm or 'realiz' in norm:
+        return texto, 'success'
+    if 'confirm' in norm:
+        return texto, 'primary'
+    if 'aguard' in norm or 'pend' in norm or 'andamento' in norm:
+        return texto, 'warning'
+    return texto, 'secondary'
+
+
+def _filtrar_por_status_agendamento(qs, status_sel):
+    if not status_sel:
+        return qs.exclude(_q_status_agendamento_cancelados())
+    q_status = Q()
+    for status in status_sel:
+        if status == 'Não informado':
+            q_status |= Q(status_agendamento__isnull=True) | Q(status_agendamento='')
+        else:
+            q_status |= Q(status_agendamento__iexact=status)
+    return qs.filter(q_status) if q_status else qs
+
+
 def _eh_status_agendamento_cancelado(status):
     if not status:
         return False
@@ -1496,7 +1729,6 @@ def listar_exames_por_solicitante(request):
         qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
     else:
         qs_base = FaturamentoMedico.objects.all()
-    qs_base = qs_base.exclude(_q_status_agendamento_cancelados())
 
     hoje = date.today()
     di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
@@ -1506,46 +1738,41 @@ def listar_exames_por_solicitante(request):
         di, df = df, di
 
     solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
+    status_agendamento_sel = [
+        s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
+    ]
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
 
-    solicitantes_disponiveis = []
-    vistos = set()
-    for nome_sol in qs_periodo.values_list('medico_solicitante', flat=True).distinct():
-        chave = (nome_sol or '').strip() or 'Não informado'
-        if chave in vistos:
-            continue
-        vistos.add(chave)
-        solicitantes_disponiveis.append({'nome': chave})
-    solicitantes_disponiveis.sort(key=lambda x: x['nome'].lower())
+    status_disponiveis = sorted({
+        (status or '').strip() or 'Não informado'
+        for status in qs_periodo.values_list('status_agendamento', flat=True).distinct()
+    }, key=str.lower)
 
-    qs = qs_periodo
-    if solicitantes_sel:
-        q_sol = Q()
-        for s in solicitantes_sel:
-            if s == 'Não informado':
-                q_sol |= Q(medico_solicitante__isnull=True) | Q(medico_solicitante='')
-            else:
-                q_sol |= Q(medico_solicitante__iexact=s)
-        qs = qs.filter(q_sol)
+    mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
+        qs_periodo.values_list('medico_solicitante', flat=True).distinct()
+    )
+    solicitantes_disponiveis = [
+        info for _, info in sorted(grupos_solicitante.items(), key=lambda x: x[0].lower())
+    ]
+
+    qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
 
     qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
     labels_modalidade = dict(MODALIDADES_SOLICITANTE)
+    periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
 
     grid_linhas = []
-    cards_map = defaultdict(lambda: {
-        'total': 0,
-        'valor': Decimal('0'),
-        'modalidades': {codigo: 0 for codigo in codigos_modalidade},
-        'outros': 0,
-    })
+    cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     for faturamento in qs:
-        solicitante = (faturamento.medico_solicitante or '').strip() or 'Não informado'
+        solicitante = _canonico_solicitante(faturamento.medico_solicitante, mapa_solicitante)
         itens = list(faturamento.itens_servico.all())
 
         def _registrar_linha(procedimento, modalidade, valor, item=None):
             status_label, status_css = _status_linha_faturamento(faturamento, item)
+            status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             grid_linhas.append({
                 'data': faturamento.data,
                 'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
@@ -1554,22 +1781,18 @@ def listar_exames_por_solicitante(request):
                 'modalidade': modalidade or '-',
                 'status': status_label,
                 'status_css': status_css,
+                'status_agendamento': status_ag_label,
+                'status_agendamento_css': status_ag_css,
                 'valor': valor,
                 'valor_fmt': _moeda_br(valor),
                 'solicitante': solicitante,
                 'convenio': faturamento.convenio or '-',
             })
             card = cards_map[solicitante]
-            card['total'] += 1
-            try:
-                card['valor'] += Decimal(str(valor or 0))
-            except (InvalidOperation, ValueError, TypeError):
-                pass
-            cod_mod = _normalizar_codigo_modalidade(modalidade)
-            if cod_mod in card['modalidades']:
-                card['modalidades'][cod_mod] += 1
-            else:
-                card['outros'] += 1
+            _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
+            if periodo_multimes and faturamento.data:
+                chave_mes = (faturamento.data.year, faturamento.data.month)
+                _acumular_modalidade_resumo(card['meses'][chave_mes], modalidade, valor, codigos_modalidade)
 
         if not itens:
             _registrar_linha(
@@ -1588,28 +1811,38 @@ def listar_exames_por_solicitante(request):
             )
 
     cards_resumo = []
+    meses_periodo = _meses_no_periodo(di, df) if periodo_multimes else []
     for nome, dados in sorted(cards_map.items(), key=lambda x: (-x[1]['total'], x[0].lower())):
-        modalidades = []
-        for codigo in codigos_modalidade:
-            qtd = dados['modalidades'].get(codigo, 0)
-            if qtd:
-                modalidades.append({
-                    'codigo': codigo,
-                    'label': labels_modalidade.get(codigo, codigo),
-                    'quantidade': qtd,
-                })
-        if dados['outros']:
-            modalidades.append({
-                'codigo': 'OUTROS',
-                'label': 'Outros',
-                'quantidade': dados['outros'],
-            })
-        cards_resumo.append({
+        card = {
             'nome': nome,
             'total': dados['total'],
             'valor_fmt': _moeda_br(dados['valor']),
-            'modalidades': modalidades,
-        })
+            'variantes': grupos_solicitante.get(nome, {}).get('variantes', []),
+            'qtd_variantes': grupos_solicitante.get(nome, {}).get('qtd_variantes', 0),
+            'periodo_multimes': periodo_multimes,
+        }
+        if periodo_multimes:
+            meses_card = []
+            for ano, mes in meses_periodo:
+                dados_mes = dados['meses'].get((ano, mes))
+                if not dados_mes or not dados_mes['total']:
+                    continue
+                meses_card.append({
+                    'label': _rotulo_mes_ano(ano, mes),
+                    'total': dados_mes['total'],
+                    'valor_fmt': _moeda_br(dados_mes['valor']),
+                    'modalidades': _montar_modalidades_card(
+                        dados_mes, codigos_modalidade, labels_modalidade,
+                    ),
+                })
+            card['meses'] = meses_card
+            card['modalidades'] = []
+        else:
+            card['modalidades'] = _montar_modalidades_card(
+                dados, codigos_modalidade, labels_modalidade,
+            )
+            card['meses'] = []
+        cards_resumo.append(card)
 
     valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
     context = {
@@ -1618,12 +1851,15 @@ def listar_exames_por_solicitante(request):
         'total_exames': len(grid_linhas),
         'valor_total_fmt': _moeda_br(valor_total),
         'solicitantes_disponiveis': solicitantes_disponiveis,
+        'status_disponiveis': status_disponiveis,
         'filtros': {
             'data_inicio': di.isoformat(),
             'data_fim': df.isoformat(),
             'solicitante': solicitantes_sel,
+            'status_agendamento': status_agendamento_sel,
         },
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+        'periodo_multimes': periodo_multimes,
     }
     return render(request, 'faturamento_medico/listar_exames_por_solicitante.html', context)
 
