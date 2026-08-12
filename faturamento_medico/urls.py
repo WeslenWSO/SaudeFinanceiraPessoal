@@ -6,6 +6,7 @@ app_name = 'faturamento_medico'
 urlpatterns = [
     path('', views.listar_faturamentos, name='ftlistar'),
     path('cancelados/', views.listar_cancelados, name='listar_cancelados'),
+    path('exames-por-solicitante/', views.listar_exames_por_solicitante, name='listar_exames_por_solicitante'),
     path('verificar-corrigir-precos/', views.verificar_corrigir_precos, name='verificar_corrigir_precos'),
     path('criar/', views.criar_faturamento, name='criar'),
     path('<int:pk>/editar/', views.editar_faturamento, name='editar'),

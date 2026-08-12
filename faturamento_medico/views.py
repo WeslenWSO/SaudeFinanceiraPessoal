@@ -177,6 +177,37 @@ def _status_linha_faturamento(faturamento, item=None):
     return 'PENDENTE', 'secondary'
 
 
+def _modalidade_faturamento_item(faturamento, item=None):
+    if item and item.modalidade:
+        return item.modalidade
+    obs = faturamento.observacao or ''
+    if 'Modalidade:' in obs:
+        for parte in obs.splitlines():
+            if parte.strip().lower().startswith('modalidade:'):
+                valor = parte.split(':', 1)[-1].strip()
+                if valor:
+                    return valor
+    return '-'
+
+
+MODALIDADES_SOLICITANTE = (
+    ('US', 'Ultrassonografia'),
+    ('CT', 'Tomografia'),
+    ('MG', 'Mamografia'),
+    ('CR', 'Raio X'),
+    ('MR', 'Ressonância'),
+    ('EG', 'EEG'),
+    ('EC', 'ECG'),
+)
+
+
+def _normalizar_codigo_modalidade(codigo):
+    cod = (codigo or '').strip().upper()
+    if cod == 'RX':
+        cod = 'CR'
+    return cod if cod and cod != '-' else 'OUTROS'
+
+
 def _eh_status_agendamento_cancelado(status):
     if not status:
         return False
@@ -1456,6 +1487,145 @@ def listar_cancelados(request):
         'periodo_fim_fmt': df.strftime('%d/%m/%Y'),
     }
     return render(request, 'faturamento_medico/listar_cancelados.html', context)
+
+
+def listar_exames_por_solicitante(request):
+    """Relatório de exames agrupados por médico solicitante."""
+    empresa_id = request.session.get('empresa_id')
+    if empresa_id:
+        qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
+    else:
+        qs_base = FaturamentoMedico.objects.all()
+    qs_base = qs_base.exclude(_q_status_agendamento_cancelados())
+
+    hoje = date.today()
+    di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+    di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
+    df = _parse_data_filtro(request.GET.get('data_fim')) or df_padrao
+    if di > df:
+        di, df = df, di
+
+    solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
+    qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
+
+    solicitantes_disponiveis = []
+    vistos = set()
+    for nome_sol in qs_periodo.values_list('medico_solicitante', flat=True).distinct():
+        chave = (nome_sol or '').strip() or 'Não informado'
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        solicitantes_disponiveis.append({'nome': chave})
+    solicitantes_disponiveis.sort(key=lambda x: x['nome'].lower())
+
+    qs = qs_periodo
+    if solicitantes_sel:
+        q_sol = Q()
+        for s in solicitantes_sel:
+            if s == 'Não informado':
+                q_sol |= Q(medico_solicitante__isnull=True) | Q(medico_solicitante='')
+            else:
+                q_sol |= Q(medico_solicitante__iexact=s)
+        qs = qs.filter(q_sol)
+
+    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+    codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
+    labels_modalidade = dict(MODALIDADES_SOLICITANTE)
+
+    grid_linhas = []
+    cards_map = defaultdict(lambda: {
+        'total': 0,
+        'valor': Decimal('0'),
+        'modalidades': {codigo: 0 for codigo in codigos_modalidade},
+        'outros': 0,
+    })
+
+    for faturamento in qs:
+        solicitante = (faturamento.medico_solicitante or '').strip() or 'Não informado'
+        itens = list(faturamento.itens_servico.all())
+
+        def _registrar_linha(procedimento, modalidade, valor, item=None):
+            status_label, status_css = _status_linha_faturamento(faturamento, item)
+            grid_linhas.append({
+                'data': faturamento.data,
+                'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
+                'paciente': faturamento.nome or '-',
+                'procedimento': procedimento,
+                'modalidade': modalidade or '-',
+                'status': status_label,
+                'status_css': status_css,
+                'valor': valor,
+                'valor_fmt': _moeda_br(valor),
+                'solicitante': solicitante,
+                'convenio': faturamento.convenio or '-',
+            })
+            card = cards_map[solicitante]
+            card['total'] += 1
+            try:
+                card['valor'] += Decimal(str(valor or 0))
+            except (InvalidOperation, ValueError, TypeError):
+                pass
+            cod_mod = _normalizar_codigo_modalidade(modalidade)
+            if cod_mod in card['modalidades']:
+                card['modalidades'][cod_mod] += 1
+            else:
+                card['outros'] += 1
+
+        if not itens:
+            _registrar_linha(
+                faturamento.servico or '-',
+                _modalidade_faturamento_item(faturamento),
+                faturamento.total or 0,
+            )
+            continue
+        for item in itens:
+            valor_item = item.total if item.total is not None else (item.valor or 0)
+            _registrar_linha(
+                item.servico or '-',
+                _modalidade_faturamento_item(faturamento, item),
+                valor_item,
+                item,
+            )
+
+    cards_resumo = []
+    for nome, dados in sorted(cards_map.items(), key=lambda x: (-x[1]['total'], x[0].lower())):
+        modalidades = []
+        for codigo in codigos_modalidade:
+            qtd = dados['modalidades'].get(codigo, 0)
+            if qtd:
+                modalidades.append({
+                    'codigo': codigo,
+                    'label': labels_modalidade.get(codigo, codigo),
+                    'quantidade': qtd,
+                })
+        if dados['outros']:
+            modalidades.append({
+                'codigo': 'OUTROS',
+                'label': 'Outros',
+                'quantidade': dados['outros'],
+            })
+        cards_resumo.append({
+            'nome': nome,
+            'total': dados['total'],
+            'valor_fmt': _moeda_br(dados['valor']),
+            'modalidades': modalidades,
+        })
+
+    valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
+    context = {
+        'grid_linhas': grid_linhas,
+        'cards_resumo': cards_resumo,
+        'total_exames': len(grid_linhas),
+        'valor_total_fmt': _moeda_br(valor_total),
+        'solicitantes_disponiveis': solicitantes_disponiveis,
+        'filtros': {
+            'data_inicio': di.isoformat(),
+            'data_fim': df.isoformat(),
+            'solicitante': solicitantes_sel,
+        },
+        'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+    }
+    return render(request, 'faturamento_medico/listar_exames_por_solicitante.html', context)
 
 
 FUZZY_NOME_MIN_RATIO = 0.90
