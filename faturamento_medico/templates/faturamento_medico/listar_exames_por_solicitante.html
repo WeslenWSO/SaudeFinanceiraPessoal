@@ -316,7 +316,7 @@
                                     {% endif %}
                                     {% if card.metas %}
                                     <div class="mt-2 pt-2 border-top">
-                                        <div class="small text-muted mb-1">Metas do mês — {{ card.mes_label }}</div>
+                                        <div class="small text-muted mb-1">Metas do mês — {{ card.mes_label }} (meta mensal de referência)</div>
                                         {% for meta in card.metas %}
                                         <div class="fm-meta-linha d-flex justify-content-between align-items-center gap-2 mb-1">
                                             <span>
@@ -348,23 +348,18 @@
                                     </div>
                                     <div class="modal-body">
                                         <p class="small text-muted mb-3">
-                                            Metas mensais por tipo de exame. Deixe em branco ou 0 para remover.
+                                            Informe a meta <strong>mensal</strong> por tipo de exame (lançamento único).
+                                            A comparação é feita em cada mês do período filtrado.
                                         </p>
-                                        {% for bloco in card.metas_form_meses %}
-                                        <input type="hidden" name="meta_mes" value="{{ bloco.ano }}-{{ bloco.mes }}">
-                                        <div class="border rounded p-2 mb-3">
-                                            <div class="fw-semibold small mb-2">{{ bloco.label }}</div>
-                                            {% for campo in bloco.campos %}
-                                            <div class="mb-2">
-                                                <label class="form-label small mb-0">{{ campo.label }}</label>
-                                                <input type="number"
-                                                       class="form-control form-control-sm"
-                                                       name="meta_{{ bloco.ano }}_{{ bloco.mes }}_{{ campo.codigo }}"
-                                                       min="0"
-                                                       step="1"
-                                                       value="{{ campo.valor }}">
-                                            </div>
-                                            {% endfor %}
+                                        {% for campo in card.metas_form %}
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-0">{{ campo.label }}</label>
+                                            <input type="number"
+                                                   class="form-control form-control-sm"
+                                                   name="meta_{{ campo.codigo }}"
+                                                   min="0"
+                                                   step="1"
+                                                   value="{{ campo.valor }}">
                                         </div>
                                         {% endfor %}
                                     </div>

@@ -292,8 +292,8 @@ def _solicitantes_mesma_pessoa(chave_a: str, chave_b: str) -> bool:
 
 def _chave_agrupamento_solicitante(texto: str) -> str:
     """
-    Chave de agrupamento: primeiro nome + meio + prefixo do sobrenome.
-    Une MARCO/MARCOS, PIMENTA/PIMENTEL, etc.
+    Chave de agrupamento: primeiro + segundo nome (ex.: MARCO|ANTONIO).
+    Une MARCO/MARCOS, PIMENTEL/MENEZES etc. quando o nome base coincide.
     """
     chave = _chave_nome_solicitante(texto)
     if chave in ('__sem__', '__vazio__'):
@@ -304,10 +304,7 @@ def _chave_agrupamento_solicitante(texto: str) -> str:
     primeiro = partes[0]
     if len(primeiro) >= 6 and primeiro.endswith('S'):
         primeiro = primeiro[:-1]
-    sobrenome = partes[-1]
-    stem_sobrenome = sobrenome[:6] if len(sobrenome) >= 5 else sobrenome
-    meio = ' '.join(partes[1:-1])
-    return f'{primeiro}|{meio}|{stem_sobrenome}'
+    return f'{primeiro}|{partes[1]}'
 
 
 def _escolher_nome_exibicao_solicitante(nomes: list[str]) -> str:
@@ -463,19 +460,34 @@ def _montar_modalidades_card(dados_mes, codigos_modalidade, labels_modalidade):
     return modalidades
 
 
-def _carregar_metas_solicitante(empresa_id) -> dict[str, dict[tuple[int, int], dict[str, int]]]:
+def _carregar_metas_solicitante(empresa_id) -> dict[str, dict[str, int]]:
     metas = {}
     if not empresa_id:
         return metas
     for row in MetaModalidadeSolicitante.objects.filter(empresa_id=empresa_id):
-        metas.setdefault(row.solicitante, {}).setdefault(
-            (row.ano, row.mes), {},
-        )[row.modalidade] = row.meta
+        metas.setdefault(row.solicitante, {})[row.modalidade] = row.meta
     return metas
 
 
-def _metas_solicitante_mes(metas_map, solicitante, ano, mes):
-    return metas_map.get(solicitante, {}).get((ano, mes), {})
+def _metas_solicitante_grupo(metas_map, solicitante, grupos):
+    """Metas cadastradas para o solicitante (inclui grafias do grupo)."""
+    nomes = {solicitante}
+    info = grupos.get(solicitante) or {}
+    for variante in info.get('variantes') or []:
+        if variante:
+            nomes.add(variante)
+    for nome_grupo, dados in grupos.items():
+        if nome_grupo == solicitante:
+            continue
+        variantes = dados.get('variantes') or []
+        if solicitante in variantes or any(v in nomes for v in variantes):
+            nomes.add(nome_grupo)
+            nomes.update(v for v in variantes if v)
+    agregado = {}
+    for nome in nomes:
+        for codigo, valor in (metas_map.get(nome) or {}).items():
+            agregado[codigo] = max(agregado.get(codigo, 0), valor)
+    return agregado
 
 
 def _realizado_por_modalidade(dados_resumo) -> dict[str, int]:
@@ -571,24 +583,16 @@ def _resumo_metas_solicitante(metas_list):
     }
 
 
-def _metas_form_meses(solicitante, metas_map, meses_list):
-    blocos = []
-    for ano, mes in meses_list:
-        metas_mes = _metas_solicitante_mes(metas_map, solicitante, ano, mes)
-        blocos.append({
-            'ano': ano,
-            'mes': mes,
-            'label': _rotulo_mes_ano(ano, mes),
-            'campos': [
-                {
-                    'codigo': codigo,
-                    'label': label,
-                    'valor': metas_mes.get(codigo, ''),
-                }
-                for codigo, label in METAS_MODALIDADES_SOLICITANTE
-            ],
-        })
-    return blocos
+def _metas_form_solicitante(solicitante, metas_map, grupos=None):
+    metas = _metas_solicitante_grupo(metas_map, solicitante, grupos or {})
+    return [
+        {
+            'codigo': codigo,
+            'label': label,
+            'valor': metas.get(codigo, ''),
+        }
+        for codigo, label in METAS_MODALIDADES_SOLICITANTE
+    ]
 
 
 def _salvar_metas_modalidade_solicitante(request):
@@ -604,46 +608,27 @@ def _salvar_metas_modalidade_solicitante(request):
         url = reverse('faturamento_medico:listar_exames_por_solicitante')
         return redirect(f'{url}?{redirect_qs}' if redirect_qs else url)
 
-    meses_tokens = [t.strip() for t in request.POST.getlist('meta_mes') if t.strip()]
-    if not meses_tokens:
-        messages.error(request, 'Mês de referência não informado.')
-        redirect_qs = (request.POST.get('redirect_qs') or '').strip()
-        url = reverse('faturamento_medico:listar_exames_por_solicitante')
-        return redirect(f'{url}?{redirect_qs}' if redirect_qs else url)
-
-    for token in meses_tokens:
+    for codigo, _ in METAS_MODALIDADES_SOLICITANTE:
+        bruto = (request.POST.get(f'meta_{codigo}') or '').strip()
         try:
-            ano_str, mes_str = token.split('-', 1)
-            ano, mes = int(ano_str), int(mes_str)
-        except (ValueError, TypeError):
-            continue
-        if mes < 1 or mes > 12:
-            continue
-        for codigo, _ in METAS_MODALIDADES_SOLICITANTE:
-            bruto = (request.POST.get(f'meta_{ano}_{mes}_{codigo}') or '').strip()
-            try:
-                meta = max(0, int(bruto)) if bruto else 0
-            except ValueError:
-                meta = 0
-            if meta > 0:
-                MetaModalidadeSolicitante.objects.update_or_create(
-                    empresa_id=empresa_id,
-                    solicitante=solicitante,
-                    ano=ano,
-                    mes=mes,
-                    modalidade=codigo,
-                    defaults={'meta': meta},
-                )
-            else:
-                MetaModalidadeSolicitante.objects.filter(
-                    empresa_id=empresa_id,
-                    solicitante=solicitante,
-                    ano=ano,
-                    mes=mes,
-                    modalidade=codigo,
-                ).delete()
+            meta = max(0, int(bruto)) if bruto else 0
+        except ValueError:
+            meta = 0
+        if meta > 0:
+            MetaModalidadeSolicitante.objects.update_or_create(
+                empresa_id=empresa_id,
+                solicitante=solicitante,
+                modalidade=codigo,
+                defaults={'meta': meta},
+            )
+        else:
+            MetaModalidadeSolicitante.objects.filter(
+                empresa_id=empresa_id,
+                solicitante=solicitante,
+                modalidade=codigo,
+            ).delete()
 
-    messages.success(request, f'Metas mensais atualizadas para {solicitante}.')
+    messages.success(request, f'Metas atualizadas para {solicitante}.')
     redirect_qs = (request.POST.get('redirect_qs') or '').strip()
     url = reverse('faturamento_medico:listar_exames_por_solicitante')
     return redirect(f'{url}?{redirect_qs}' if redirect_qs else url)
@@ -2083,7 +2068,6 @@ def listar_exames_por_solicitante(request):
 
     cards_resumo = []
     meses_periodo = _meses_no_periodo(di, df) if periodo_multimes else [(di.year, di.month)]
-    meses_meta_edicao = meses_periodo
     for nome, dados in sorted(cards_map.items(), key=lambda x: (-x[1]['total'], x[0].lower())):
         card = {
             'nome': nome,
@@ -2092,14 +2076,15 @@ def listar_exames_por_solicitante(request):
             'variantes': grupos_solicitante.get(nome, {}).get('variantes', []),
             'qtd_variantes': grupos_solicitante.get(nome, {}).get('qtd_variantes', 0),
             'periodo_multimes': periodo_multimes,
-            'metas_form_meses': _metas_form_meses(nome, metas_map, meses_meta_edicao),
+            'metas_form': _metas_form_solicitante(nome, metas_map, grupos_solicitante),
+            'metas_ref': _metas_solicitante_grupo(metas_map, nome, grupos_solicitante),
         }
         if periodo_multimes:
             meses_card = []
+            metas_ref = card['metas_ref']
             for ano, mes in meses_periodo:
                 dados_mes = dados['meses'].get((ano, mes))
-                metas_mes = _metas_solicitante_mes(metas_map, nome, ano, mes)
-                if not dados_mes and not metas_mes:
+                if not dados_mes and not metas_ref:
                     continue
                 if not dados_mes:
                     dados_mes = {
@@ -2112,8 +2097,8 @@ def listar_exames_por_solicitante(request):
                 modalidades_mes = _montar_modalidades_card(
                     dados_mes, codigos_modalidade, labels_modalidade,
                 )
-                _enriquecer_modalidades_com_meta(modalidades_mes, realizado_mes, metas_mes)
-                metas_list_mes = _lista_metas_from_dict(metas_mes, realizado_mes)
+                _enriquecer_modalidades_com_meta(modalidades_mes, realizado_mes, metas_ref)
+                metas_list_mes = _lista_metas_from_dict(metas_ref, realizado_mes)
                 meses_card.append({
                     'label': _rotulo_mes_ano(ano, mes),
                     'ano': ano,
@@ -2130,13 +2115,13 @@ def listar_exames_por_solicitante(request):
             card['resumo_metas'] = None
         else:
             ano, mes = di.year, di.month
-            metas_mes = _metas_solicitante_mes(metas_map, nome, ano, mes)
+            metas_ref = card['metas_ref']
             realizado_map = _realizado_por_modalidade(dados)
             modalidades = _montar_modalidades_card(
                 dados, codigos_modalidade, labels_modalidade,
             )
-            _enriquecer_modalidades_com_meta(modalidades, realizado_map, metas_mes)
-            metas_list = _lista_metas_from_dict(metas_mes, realizado_map)
+            _enriquecer_modalidades_com_meta(modalidades, realizado_map, metas_ref)
+            metas_list = _lista_metas_from_dict(metas_ref, realizado_map)
             card['modalidades'] = modalidades
             card['meses'] = []
             card['metas'] = metas_list

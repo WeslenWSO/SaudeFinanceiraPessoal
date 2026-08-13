@@ -746,8 +746,6 @@ class MetaModalidadeSolicitante(models.Model):
         verbose_name='Empresa',
     )
     solicitante = models.CharField(verbose_name='Solicitante', max_length=200)
-    ano = models.PositiveIntegerField(verbose_name='Ano')
-    mes = models.PositiveIntegerField(verbose_name='Mês')
     modalidade = models.CharField(
         verbose_name='Modalidade',
         max_length=10,
@@ -758,11 +756,8 @@ class MetaModalidadeSolicitante(models.Model):
     class Meta:
         verbose_name = 'Meta por modalidade (solicitante)'
         verbose_name_plural = 'Metas por modalidade (solicitante)'
-        ordering = ['-ano', '-mes', 'solicitante', 'modalidade']
-        unique_together = [['empresa', 'solicitante', 'ano', 'mes', 'modalidade']]
+        ordering = ['solicitante', 'modalidade']
+        unique_together = [['empresa', 'solicitante', 'modalidade']]
 
     def __str__(self):
-        return (
-            f'{self.solicitante} — {self.mes:02d}/{self.ano} — '
-            f'{self.get_modalidade_display()}: {self.meta}'
-        )
+        return f'{self.solicitante} — {self.get_modalidade_display()}: {self.meta}/mês'
