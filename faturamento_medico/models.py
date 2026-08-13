@@ -725,3 +725,39 @@ class MedcloudConvenioParceiro(models.Model):
 
     def __str__(self):
         return f'{self.convenio_nome} (partner {self.partner_id})'
+
+
+class MetaModalidadeSolicitante(models.Model):
+    """Meta de quantidade de exames por modalidade para um solicitante."""
+
+    MODALIDADE_CHOICES = (
+        ('MR', 'Ressonância'),
+        ('US', 'Ultrassonografia'),
+        ('CR', 'Raio X'),
+        ('CT', 'Tomografia'),
+        ('MG', 'Mamografia'),
+        ('EG', 'EEG'),
+    )
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='metas_solicitante_modalidade',
+        verbose_name='Empresa',
+    )
+    solicitante = models.CharField(verbose_name='Solicitante', max_length=200)
+    modalidade = models.CharField(
+        verbose_name='Modalidade',
+        max_length=10,
+        choices=MODALIDADE_CHOICES,
+    )
+    meta = models.PositiveIntegerField(verbose_name='Meta', default=0)
+
+    class Meta:
+        verbose_name = 'Meta por modalidade (solicitante)'
+        verbose_name_plural = 'Metas por modalidade (solicitante)'
+        ordering = ['solicitante', 'modalidade']
+        unique_together = [['empresa', 'solicitante', 'modalidade']]
+
+    def __str__(self):
+        return f'{self.solicitante} — {self.get_modalidade_display()}: {self.meta}'

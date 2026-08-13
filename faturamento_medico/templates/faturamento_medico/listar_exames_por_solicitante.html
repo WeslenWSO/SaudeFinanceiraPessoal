@@ -90,6 +90,16 @@
     line-height: 1;
     cursor: pointer;
 }
+.fm-meta-linha {
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+.fm-meta-resumo {
+    font-size: 0.8rem;
+    border-radius: 0.35rem;
+}
+.fm-mod-badge.meta-atingida { background: #d1e7dd; color: #146c43; }
+.fm-mod-badge.meta-pendente { background: #fff3cd; color: #997404; }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -198,18 +208,42 @@
                         {% for card in cards_resumo %}
                         <div class="col-md-6 {% if periodo_multimes %}col-xl-6{% else %}col-lg-4 col-xl-3{% endif %}">
                             <div class="card fm-card-solicitante shadow-sm">
-                                <div class="card-header py-2"
+                                <div class="card-header py-2 d-flex justify-content-between align-items-start gap-2"
                                      {% if card.qtd_variantes > 1 %}title="{{ card.variantes|join:', ' }}"{% endif %}>
-                                    {{ card.nome }}
-                                    {% if card.qtd_variantes > 1 %}
-                                    <span class="badge bg-secondary ms-1">{{ card.qtd_variantes }} grafias</span>
-                                    {% endif %}
+                                    <span>
+                                        {{ card.nome }}
+                                        {% if card.qtd_variantes > 1 %}
+                                        <span class="badge bg-secondary ms-1">{{ card.qtd_variantes }} grafias</span>
+                                        {% endif %}
+                                    </span>
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-sm py-0 px-2"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalMetas{{ forloop.counter }}"
+                                            title="Definir metas por tipo de exame">
+                                        Metas
+                                    </button>
                                 </div>
                                 <div class="card-body py-2">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="small text-muted">Total de exames</span>
                                         <span class="badge bg-primary">{{ card.total }}</span>
                                     </div>
+                                    {% if card.resumo_metas %}
+                                    <div class="fm-meta-resumo alert alert-{{ card.resumo_metas.css }} py-1 px-2 mb-2 d-flex justify-content-between align-items-center">
+                                        <span>
+                                            {% if card.resumo_metas.status == 'atingida' %}
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            {% elif card.resumo_metas.status == 'parcial' %}
+                                            <i class="fas fa-exclamation-circle me-1"></i>
+                                            {% else %}
+                                            <i class="fas fa-times-circle me-1"></i>
+                                            {% endif %}
+                                            {{ card.resumo_metas.label }}
+                                        </span>
+                                        <span class="badge bg-{{ card.resumo_metas.css }}">{{ card.resumo_metas.atingidas }}/{{ card.resumo_metas.total }}</span>
+                                    </div>
+                                    {% endif %}
                                     {% if card.periodo_multimes %}
                                     <div class="small text-muted mb-2">Por modalidade — mensal</div>
                                     {% for mes in card.meses %}
@@ -220,8 +254,8 @@
                                         </div>
                                         <div>
                                             {% for mod in mes.modalidades %}
-                                            <span class="fm-mod-badge">
-                                                {{ mod.label }}: <strong>{{ mod.quantidade }}</strong>
+                                            <span class="fm-mod-badge{% if mod.meta %}{% if mod.atingiu_meta %} meta-atingida{% else %} meta-pendente{% endif %}{% endif %}">
+                                                {{ mod.label }}: <strong>{% if mod.meta %}{{ mod.quantidade }}/{{ mod.meta }}{% else %}{{ mod.quantidade }}{% endif %}</strong>
                                             </span>
                                             {% empty %}
                                             <span class="text-muted small">—</span>
@@ -241,8 +275,8 @@
                                     <div class="small text-muted mb-1">Por modalidade</div>
                                     <div>
                                         {% for mod in card.modalidades %}
-                                        <span class="fm-mod-badge">
-                                            {{ mod.label }}: <strong>{{ mod.quantidade }}</strong>
+                                        <span class="fm-mod-badge{% if mod.meta %}{% if mod.atingiu_meta %} meta-atingida{% else %} meta-pendente{% endif %}{% endif %}">
+                                            {{ mod.label }}: <strong>{% if mod.meta %}{{ mod.quantidade }}/{{ mod.meta }}{% else %}{{ mod.quantidade }}{% endif %}</strong>
                                         </span>
                                         {% empty %}
                                         <span class="text-muted small">—</span>
@@ -252,11 +286,63 @@
                                         Valor: <strong>R$ {{ card.valor_fmt }}</strong>
                                     </div>
                                     {% endif %}
+                                    {% if card.metas %}
+                                    <div class="mt-2 pt-2 border-top">
+                                        <div class="small text-muted mb-1">Metas por tipo de exame</div>
+                                        {% for meta in card.metas %}
+                                        <div class="fm-meta-linha d-flex justify-content-between align-items-center gap-2 mb-1">
+                                            <span>
+                                                {{ meta.label }} = {{ meta.meta }}
+                                                <span class="text-muted">({{ meta.quantidade }} realizado)</span>
+                                            </span>
+                                            <span class="badge bg-{{ meta.status_css }}">{{ meta.status_label }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
+
+                    {% for card in cards_resumo %}
+                    <div class="modal fade" id="modalMetas{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="solicitante" value="{{ card.nome }}">
+                                    <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+                                    <div class="modal-header py-2">
+                                        <h5 class="modal-title">Metas — {{ card.nome }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="small text-muted mb-3">
+                                            Informe a meta de exames por tipo. Deixe em branco ou 0 para remover.
+                                        </p>
+                                        {% for campo in card.metas_form %}
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-0">{{ campo.label }}</label>
+                                            <input type="number"
+                                                   class="form-control form-control-sm"
+                                                   name="meta_{{ campo.codigo }}"
+                                                   min="0"
+                                                   step="1"
+                                                   value="{{ campo.valor }}">
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="modal-footer py-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary btn-sm">Salvar metas</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                     {% endif %}
 
                     <h5 class="mb-2">Lista de exames</h5>
