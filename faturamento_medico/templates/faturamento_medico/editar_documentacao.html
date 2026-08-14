@@ -8,7 +8,20 @@
 {%endblock%}
 
 {% block conteudo %}
-<div class="container-fluid">
+<style>
+.fat-doc-form .form-control {
+    width: 4.75rem;
+    max-width: 100%;
+    min-height: 2rem;
+    font-size: 0.875rem;
+}
+.fat-doc-form .row.g-3 > [class*="col-"] {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+}
+</style>
+<div class="container-fluid fat-doc-form">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card">
@@ -41,22 +54,22 @@
                         {% endif %}
 
                         <div class="row g-3">
-                            <div class="col-md-6 col-lg-3">
+                            <div class="col-auto">
                                 <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">{{ form.guia_lancada.label }}</label>
                                 {{ form.guia_lancada }}
                                 {% if form.guia_lancada.errors %}<div class="text-danger small">{{ form.guia_lancada.errors }}</div>{% endif %}
                             </div>
-                            <div class="col-md-6 col-lg-3">
+                            <div class="col-auto">
                                 <label class="form-label" for="{{ form.lote.id_for_label }}">{{ form.lote.label }}</label>
                                 {{ form.lote }}
                                 {% if form.lote.errors %}<div class="text-danger small">{{ form.lote.errors }}</div>{% endif %}
                             </div>
-                            <div class="col-md-6 col-lg-3">
+                            <div class="col-auto">
                                 <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">{{ form.numero_guia_lancada.label }}</label>
                                 {{ form.numero_guia_lancada }}
                                 {% if form.numero_guia_lancada.errors %}<div class="text-danger small">{{ form.numero_guia_lancada.errors }}</div>{% endif %}
                             </div>
-                            <div class="col-md-6 col-lg-3">
+                            <div class="col-auto">
                                 <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">{{ form.nota_fiscal.label }}</label>
                                 {{ form.nota_fiscal }}
                                 {% if form.nota_fiscal.errors %}<div class="text-danger small">{{ form.nota_fiscal.errors }}</div>{% endif %}
