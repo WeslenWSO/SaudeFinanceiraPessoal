@@ -93,7 +93,7 @@ if not DEBUG:
 
 # Login real em /login/ (accounts.urls); o padrão do Django é /accounts/login/ (404 neste projeto)
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/faturamento_medico/'
+LOGIN_REDIRECT_URL = '/empresa/lista/'
 
 
 

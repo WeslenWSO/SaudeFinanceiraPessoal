@@ -498,13 +498,6 @@ def lista_empresas(request):
     # Filtra apenas empresas ativas para seleção
     empresas_ativas = [ue.empresa for ue in usuario_empresas if ue.empresa.status == 'Ativa']
 
-    if not request.session.get('empresa_id') and len(empresas_ativas) == 1:
-        empresa = empresas_ativas[0]
-        request.session['empresa_id'] = empresa.id
-        request.session['empresa_nome'] = empresa.razao
-        request.session['regime_tributario'] = empresa.regime_tributario
-        return redirect('faturamento_medico:ftlistar')
-    
     context = {
         'usuario_empresas': usuario_empresas,
         'empresa_atual': request.session.get('empresa_nome'),
