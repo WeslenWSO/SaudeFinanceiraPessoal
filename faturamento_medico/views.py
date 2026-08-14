@@ -2425,6 +2425,7 @@ def verificar_corrigir_precos(request):
     data_fim = request.GET.get('data_fim') or request.POST.get('data_fim')
     convenio = (request.GET.get('convenio') or request.POST.get('convenio') or '').strip()
     procedimento = (request.GET.get('procedimento') or request.POST.get('procedimento') or '').strip()
+    status_conferencia = (request.GET.get('status_conferencia') or request.POST.get('status_conferencia') or '').strip()
     so_divergentes = (request.GET.get('so_divergentes') or request.POST.get('so_divergentes') or '') == '1'
 
     if not data_inicio:
@@ -2485,6 +2486,7 @@ def verificar_corrigir_precos(request):
             'data_fim': data_fim,
             'convenio': convenio,
             'procedimento': procedimento,
+            'status_conferencia': status_conferencia,
             'so_divergentes': '1' if so_divergentes else '',
         })
         return redirect(f"{reverse('faturamento_medico:verificar_corrigir_precos')}?{qs}")
@@ -2514,6 +2516,10 @@ def verificar_corrigir_precos(request):
         for fat in faturamentos:
             for item in fat.itens_servico.all():
                 if procedimento and procedimento.lower() not in (item.servico or '').lower():
+                    continue
+
+                status_label, _status_css = item.status_conferencia_badge()
+                if status_conferencia and status_label != status_conferencia:
                     continue
 
                 valor_atual = Decimal(str(item.valor or 0))
@@ -2567,6 +2573,8 @@ def verificar_corrigir_precos(request):
                     'diferenca': diferenca,
                     'situacao': situacao,
                     'situacao_css': css,
+                    'status_conferencia': status_label,
+                    'status_conferencia_css': _status_css,
                     'pode_corrigir': pode_corrigir,
                     'codigo_tabela': cod_tab,
                     'descricao_tabela': desc_tab,
@@ -2581,8 +2589,10 @@ def verificar_corrigir_precos(request):
             'data_fim': data_fim,
             'convenio': convenio,
             'procedimento': procedimento,
+            'status_conferencia': status_conferencia,
             'so_divergentes': so_divergentes,
         },
+        'status_conferencia_choices': ItemServico.STATUS_CONFERENCIA_CHOICES,
     }
     return render(request, 'faturamento_medico/verificar_corrigir_precos.html', context)
 

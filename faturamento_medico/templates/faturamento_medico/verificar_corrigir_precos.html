@@ -40,11 +40,20 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label">Procedimento</label>
                                 <input type="text" name="procedimento" class="form-control"
                                        placeholder="Ex.: US - Transvaginal"
                                        value="{{ filtros.procedimento|default:'' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Status conferência</label>
+                                <select name="status_conferencia" class="form-select">
+                                    <option value="">Todos</option>
+                                    {% for value, label in status_conferencia_choices %}
+                                    <option value="{{ value }}" {% if filtros.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-1">
                                 <div class="form-check mt-4">
@@ -113,6 +122,7 @@
                         <input type="hidden" name="data_fim" value="{{ filtros.data_fim }}">
                         <input type="hidden" name="convenio" value="{{ filtros.convenio }}">
                         <input type="hidden" name="procedimento" value="{{ filtros.procedimento }}">
+                        <input type="hidden" name="status_conferencia" value="{{ filtros.status_conferencia }}">
                         {% if filtros.so_divergentes %}<input type="hidden" name="so_divergentes" value="1">{% endif %}
 
                         <div class="mb-3 d-flex gap-2 flex-wrap">
@@ -142,6 +152,7 @@
                                         <th class="text-end">VALOR TABELA</th>
                                         <th class="text-end">DIFERENÇA</th>
                                         <th>SITUAÇÃO</th>
+                                        <th>STATUS CONF.</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -183,6 +194,9 @@
                                         </td>
                                         <td class="text-center">
                                             <span class="badge bg-{{ linha.situacao_css }}">{{ linha.situacao }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-{{ linha.status_conferencia_css }}">{{ linha.status_conferencia }}</span>
                                         </td>
                                     </tr>
                                     {% endfor %}

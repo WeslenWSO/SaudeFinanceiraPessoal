@@ -27,35 +27,35 @@
                         <section class="fat-section">
                             <h6 class="fat-section-title">Identificação</h6>
                             <div class="row g-3">
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.guia.id_for_label }}">Guia</label>
                                     {{ form.guia }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.senha.id_for_label }}">Senha</label>
                                     {{ form.senha }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.carteirinha.id_for_label }}">Carteirinha</label>
                                     {{ form.carteirinha }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.codigo_relatorio.id_for_label }}">Código Relatório</label>
                                     {{ form.codigo_relatorio }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.agendado_via.id_for_label }}">Agendado Via</label>
                                     {{ form.agendado_via }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
                                     {{ form.nome }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.nome_associado.id_for_label }}">Nome do Associado</label>
                                     {{ form.nome_associado }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.convenio.id_for_label }}">Convênio (Viabilidade)</label>
                                     {{ form.convenio }}
                                 </div>
@@ -65,168 +65,38 @@
                         <section class="fat-section">
                             <h6 class="fat-section-title">Datas e valores</h6>
                             <div class="row g-3">
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.data.id_for_label }}">Data</label>
                                     {{ form.data }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.data_autorizacao.id_for_label }}">Data da Autorização</label>
                                     {{ form.data_autorizacao }}
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.total.id_for_label }}">Total</label>
                                     {{ form.total }}
-                                    <div class="form-text">Calculado automaticamente pelos itens de serviço</div>
+                                    <div class="form-text">Calculado automaticamente pelos itens dos exames</div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label" for="{{ form.urgencia.id_for_label }}">Urgência</label>
                                     {{ form.urgencia }}
                                 </div>
                             </div>
                         </section>
 
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Atendimento</h6>
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.local.id_for_label }}">Local</label>
-                                    {{ form.local }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
-                                    {{ form.prioridade }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.horario_inicio.id_for_label }}">Horário de Início</label>
-                                    {{ form.horario_inicio }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.horario_fim.id_for_label }}">Horário de Fim</label>
-                                    {{ form.horario_fim }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.status_agendamento.id_for_label }}">Status do Agendamento</label>
-                                    {{ form.status_agendamento }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.motivo_cancelamento.id_for_label }}">Motivo Cancelamento/Desistência/Deleção</label>
-                                    {{ form.motivo_cancelamento }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.medico.id_for_label }}">Médico</label>
-                                    {{ form.medico }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.medico_solicitante.id_for_label }}">Médico Solicitante</label>
-                                    {{ form.medico_solicitante }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.anestesista.id_for_label }}">Anestesista</label>
-                                    {{ form.anestesista }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.tecnico.id_for_label }}">Técnico</label>
-                                    {{ form.tecnico }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.checkin_por.id_for_label }}">Check-in Por</label>
-                                    {{ form.checkin_por }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.agendado_por.id_for_label }}">Agendado Por</label>
-                                    {{ form.agendado_por }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.tag.id_for_label }}">Tag</label>
-                                    {{ form.tag }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.receber_por.id_for_label }}">Receber Por</label>
-                                    {{ form.receber_por }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.apartamento_enfermaria.id_for_label }}">Apartamento ou Enfermaria</label>
-                                    {{ form.apartamento_enfermaria }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.cpf.id_for_label }}">CPF</label>
-                                    {{ form.cpf }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
-                                    {{ form.indicacao_clinica }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
-                                    {{ form.descricao }}
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
-                                    {{ form.observacao }}
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Documentação e fechamento</h6>
-                            <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Protocolo</label>
-                                    {{ form.guia_lancada }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
-                                    {{ form.lote }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">Número da Guia Lançada</label>
-                                    {{ form.numero_guia_lancada }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">Nota Fiscal</label>
-                                    {{ form.nota_fiscal }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.codigo_fechamento.id_for_label }}">Código do Fechamento</label>
-                                    {{ form.codigo_fechamento }}
-                                    <div class="form-text">Gerado no fechamento de repasse</div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Extração de documento</h6>
-                            <div class="row g-3 align-items-end">
-                                <div class="col-md-8">
-                                    <label class="form-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
-                                    {{ form.documento_upload }}
-                                    <div class="form-text">{{ form.documento_upload.help_text }}</div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" id="extrair-dados-btn" class="btn btn-info btn-sm">
-                                            <i class="fas fa-magic"></i> Extrair com IA
-                                        </button>
-                                        <button type="button" id="extrair-dados-ocr-btn" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-search"></i> Extrair com OCR
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
                         {% if form.instance.pk %}
-                        <section class="fat-section fat-section-itens">
+                        <section class="fat-section fat-section-itens mb-0">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="fat-section-title mb-0">
-                                    <i class="fas fa-list"></i> Itens de Serviço
+                                <h6 class="fat-section-title mb-0 border-0 pb-0">
+                                    <i class="fas fa-vial"></i> Itens dos exames
                                     {% if form.instance.itens_servico.exists %}
                                         <span class="badge bg-secondary">{{ form.instance.itens_servico.count }}</span>
                                     {% endif %}
                                 </h6>
                                 <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
                                    class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-plus"></i> Adicionar Item
+                                    <i class="fas fa-plus"></i> Adicionar exame
                                 </a>
                             </div>
                             {% if form.instance.itens_servico.exists %}
@@ -235,7 +105,7 @@
                                         <thead>
                                             <tr>
                                                 <th>Código</th>
-                                                <th>Serviço</th>
+                                                <th>Exame / Serviço</th>
                                                 <th>Modalidade</th>
                                                 <th>Contraste</th>
                                                 <th class="text-end">Valor</th>
@@ -266,7 +136,7 @@
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-light">
-                                                <th colspan="4">Total da Guia</th>
+                                                <th colspan="4">Total dos exames</th>
                                                 <th class="text-end">R$ {{ form.instance.total|floatformat:2 }}</th>
                                                 <th></th>
                                             </tr>
@@ -274,22 +144,153 @@
                                     </table>
                                 </div>
                             {% else %}
-                                <div class="text-center text-muted py-4">
-                                    <i class="fas fa-list fa-2x mb-2"></i>
-                                    <p class="mb-2">Nenhum item de serviço cadastrado ainda.</p>
+                                <div class="text-center text-muted py-3">
+                                    <i class="fas fa-vial fa-2x mb-2"></i>
+                                    <p class="mb-2">Nenhum exame cadastrado ainda.</p>
                                     <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
                                        class="btn btn-primary btn-sm">
-                                        <i class="fas fa-plus"></i> Adicionar Primeiro Item
+                                        <i class="fas fa-plus"></i> Adicionar primeiro exame
                                     </a>
                                 </div>
                             {% endif %}
                         </section>
                         {% else %}
-                        <div class="alert alert-info mb-0">
+                        <div class="alert alert-info py-2 mb-3">
                             <i class="fas fa-info-circle"></i>
-                            Após salvar o faturamento, você poderá adicionar os itens de serviço.
+                            Salve o faturamento para incluir os itens dos exames (o total será calculado automaticamente).
                         </div>
                         {% endif %}
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Atendimento</h6>
+                            <div class="row g-3">
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.local.id_for_label }}">Local</label>
+                                    {{ form.local }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
+                                    {{ form.prioridade }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.horario_inicio.id_for_label }}">Horário de Início</label>
+                                    {{ form.horario_inicio }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.horario_fim.id_for_label }}">Horário de Fim</label>
+                                    {{ form.horario_fim }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.status_agendamento.id_for_label }}">Status do Agendamento</label>
+                                    {{ form.status_agendamento }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.motivo_cancelamento.id_for_label }}">Motivo Cancelamento/Desistência/Deleção</label>
+                                    {{ form.motivo_cancelamento }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.medico.id_for_label }}">Médico</label>
+                                    {{ form.medico }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.medico_solicitante.id_for_label }}">Médico Solicitante</label>
+                                    {{ form.medico_solicitante }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.anestesista.id_for_label }}">Anestesista</label>
+                                    {{ form.anestesista }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.tecnico.id_for_label }}">Técnico</label>
+                                    {{ form.tecnico }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.checkin_por.id_for_label }}">Check-in Por</label>
+                                    {{ form.checkin_por }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.agendado_por.id_for_label }}">Agendado Por</label>
+                                    {{ form.agendado_por }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.tag.id_for_label }}">Tag</label>
+                                    {{ form.tag }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.receber_por.id_for_label }}">Receber Por</label>
+                                    {{ form.receber_por }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.apartamento_enfermaria.id_for_label }}">Apartamento ou Enfermaria</label>
+                                    {{ form.apartamento_enfermaria }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.cpf.id_for_label }}">CPF</label>
+                                    {{ form.cpf }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
+                                    {{ form.indicacao_clinica }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
+                                    {{ form.descricao }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
+                                    {{ form.observacao }}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Documentação e fechamento</h6>
+                            <div class="row g-3">
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Protocolo</label>
+                                    {{ form.guia_lancada }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
+                                    {{ form.lote }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">Número da Guia Lançada</label>
+                                    {{ form.numero_guia_lancada }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">Nota Fiscal</label>
+                                    {{ form.nota_fiscal }}
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="{{ form.codigo_fechamento.id_for_label }}">Código do Fechamento</label>
+                                    {{ form.codigo_fechamento }}
+                                    <div class="form-text">Gerado no fechamento de repasse</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="fat-section">
+                            <h6 class="fat-section-title">Extração de documento</h6>
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
+                                    {{ form.documento_upload }}
+                                    <div class="form-text">{{ form.documento_upload.help_text }}</div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button" id="extrair-dados-btn" class="btn btn-info btn-sm">
+                                            <i class="fas fa-magic"></i> Extrair com IA
+                                        </button>
+                                        <button type="button" id="extrair-dados-ocr-btn" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-search"></i> Extrair com OCR
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                     </div>
                     <div class="card-footer fat-form-footer">
                         <button type="submit" class="btn btn-primary">
@@ -346,18 +347,19 @@
 .fat-form-page .form-label {
     display: block;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #334155;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.25rem;
 }
 .fat-form-page .form-control,
 .fat-form-page .form-select {
     width: 100%;
-    min-height: 2.4rem;
+    max-width: 100%;
+    min-height: 2rem;
     border: 1px solid #cbd5e1;
     border-radius: 0.375rem;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.95rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.875rem;
     background-color: #fff;
 }
 .fat-form-page .form-control:focus,
@@ -370,8 +372,12 @@
     color: #475569;
 }
 .fat-form-page textarea.form-control {
-    min-height: 6rem;
+    max-width: 100%;
+    min-height: 4.5rem;
     resize: vertical;
+}
+.fat-form-page input[type="file"].form-control {
+    max-width: 100%;
 }
 .fat-form-page .form-text {
     display: block;
@@ -381,6 +387,14 @@
 }
 .fat-section-itens {
     background: #f8fafc;
+    margin-top: -0.75rem;
+    margin-bottom: 1.5rem;
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+.fat-section-itens + .fat-section,
+.fat-section + .alert + .fat-section {
+    margin-top: 0;
 }
 .fat-form-footer {
     background: #f7f9fc;
