@@ -25,7 +25,14 @@ from .models import (
 )
 from servicos_medicos.models import Convenio
 from empresa.models import Empresa
-from .forms import FaturamentoMedicoForm, DocumentoAnexadoForm, ItemServicoForm, ItemServicoFormSet, ServicoDisponivelForm
+from .forms import (
+    FaturamentoMedicoForm,
+    FaturamentoDocumentacaoForm,
+    DocumentoAnexadoForm,
+    ItemServicoForm,
+    ItemServicoFormSet,
+    ServicoDisponivelForm,
+)
 from .utils import processar_arquivos_com_gemini, processar_arquivos_com_ocr
 
 logger = logging.getLogger(__name__)
@@ -2756,6 +2763,38 @@ def editar_faturamento(request, pk):
     }
 
     return render(request, 'faturamento_medico/form.html', context)
+
+
+def editar_documentacao_faturamento(request, pk):
+    """Altera apenas protocolo, lote, guia lançada e nota fiscal."""
+    empresa_id = request.session.get('empresa_id')
+    qs = FaturamentoMedico.objects.all()
+    if empresa_id:
+        qs = qs.filter(empresa_id=empresa_id)
+    faturamento = get_object_or_404(qs, pk=pk)
+
+    voltar = (request.GET.get('next') or request.POST.get('voltar') or '').strip()
+    if not voltar:
+        voltar = request.META.get('HTTP_REFERER') or reverse('faturamento_medico:ftlistar')
+
+    if request.method == 'POST':
+        form = FaturamentoDocumentacaoForm(request.POST, instance=faturamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Documentação atualizada com sucesso!')
+            if voltar.startswith('/'):
+                return redirect(voltar)
+            return redirect('faturamento_medico:ftlistar')
+    else:
+        form = FaturamentoDocumentacaoForm(instance=faturamento)
+
+    context = {
+        'form': form,
+        'faturamento': faturamento,
+        'titulo': 'Documentação e fechamento',
+        'voltar': voltar,
+    }
+    return render(request, 'faturamento_medico/editar_documentacao.html', context)
 
 
 def excluir_faturamento(request, pk):

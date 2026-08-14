@@ -172,11 +172,11 @@
                                     <label class="form-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
                                     {{ form.prioridade }}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <label class="form-label" for="{{ form.horario_inicio.id_for_label }}">Horário de Início</label>
                                     {{ form.horario_inicio }}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <label class="form-label" for="{{ form.horario_fim.id_for_label }}">Horário de Fim</label>
                                     {{ form.horario_fim }}
                                 </div>
@@ -228,22 +228,22 @@
                                     <label class="form-label" for="{{ form.cpf.id_for_label }}">CPF</label>
                                     {{ form.cpf }}
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-3">
                                     <label class="form-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
                                     {{ form.indicacao_clinica }}
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-3">
                                     <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
                                     {{ form.descricao }}
                                 </div>
-                                <div class="col-12">
+                                <div class="col-md-6">
                                     <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
                                     {{ form.observacao }}
                                 </div>
                             </div>
                         </section>
 
-                        <section class="fat-section">
+                        <section class="fat-section fat-fields-compact">
                             <h6 class="fat-section-title">Documentação e fechamento</h6>
                             <div class="row g-3">
                                 <div class="col-md-2">
@@ -273,7 +273,7 @@
                         <section class="fat-section">
                             <h6 class="fat-section-title">Extração de documento</h6>
                             <div class="row g-3 align-items-end">
-                                <div class="col-md-8">
+                                <div class="col-md-4">
                                     <label class="form-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
                                     {{ form.documento_upload }}
                                     <div class="form-text">{{ form.documento_upload.help_text }}</div>
@@ -311,6 +311,9 @@
     --fat-accent: #2b4b7c;
     --fat-border: #e5e9f0;
     --fat-muted: #6c757d;
+    --fat-input-width: 10.5rem;
+    --fat-input-width-lg: 16rem;
+    --fat-input-width-xl: 24rem;
 }
 .fat-form-card {
     border: 1px solid var(--fat-border);
@@ -351,9 +354,14 @@
     color: #334155;
     margin-bottom: 0.25rem;
 }
+.fat-form-page .fat-section .row.g-3 > [class*="col-"] {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+}
 .fat-form-page .form-control,
 .fat-form-page .form-select {
-    width: 100%;
+    width: var(--fat-input-width);
     max-width: 100%;
     min-height: 2rem;
     border: 1px solid #cbd5e1;
@@ -361,6 +369,27 @@
     padding: 0.35rem 0.55rem;
     font-size: 0.875rem;
     background-color: #fff;
+}
+.fat-form-page .col-md-3 textarea.form-control,
+.fat-form-page .col-md-6 .form-control,
+.fat-form-page .col-md-6 textarea.form-control {
+    width: var(--fat-input-width-xl);
+}
+.fat-form-page .col-md-2 .form-control,
+.fat-form-page .col-md-2 .form-select {
+    width: var(--fat-input-width-lg);
+}
+.fat-fields-compact .form-control,
+.fat-fields-compact .form-select,
+.fat-fields-compact .col-md-2 .form-control,
+.fat-fields-compact .col-md-2 .form-select {
+    width: calc(var(--fat-input-width) * 0.85);
+}
+.fat-fields-compact .form-text {
+    max-width: calc(var(--fat-input-width) * 0.85);
+}
+.fat-form-page .col-md-1 .form-control {
+    width: 5.5rem;
 }
 .fat-form-page .form-control:focus,
 .fat-form-page .form-select:focus {
@@ -372,11 +401,13 @@
     color: #475569;
 }
 .fat-form-page textarea.form-control {
+    width: var(--fat-input-width-xl);
     max-width: 100%;
     min-height: 4.5rem;
     resize: vertical;
 }
 .fat-form-page input[type="file"].form-control {
+    width: var(--fat-input-width-xl);
     max-width: 100%;
 }
 .fat-form-page .form-text {
@@ -384,6 +415,7 @@
     margin-top: 0.25rem;
     font-size: 0.78rem;
     color: var(--fat-muted);
+    max-width: var(--fat-input-width);
 }
 .fat-section-itens {
     background: #f8fafc;
@@ -391,6 +423,9 @@
     margin-bottom: 1.5rem;
     border-top: none;
     border-radius: 0 0 0.5rem 0.5rem;
+}
+.fat-section-itens .table-responsive {
+    width: 100%;
 }
 .fat-section-itens + .fat-section,
 .fat-section + .alert + .fat-section {
