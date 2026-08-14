@@ -8,15 +8,103 @@
 {%endblock%}
 
 {% block conteudo %}
-<div class="container-fluid">
+<style>
+.fat-detalhes-page .card-body {
+    padding: 0.75rem 1rem;
+}
+.fat-detalhes-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.fat-detalhes-header .card-title {
+    font-size: 1.1rem;
+    margin: 0;
+}
+.fat-detalhes-header .btn {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.8rem;
+}
+.fat-detalhes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.3rem 0.75rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+.fat-detalhes-item {
+    display: flex;
+    gap: 0.35rem;
+    align-items: baseline;
+    min-width: 0;
+}
+.fat-detalhes-label {
+    font-weight: 600;
+    color: #475569;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.fat-detalhes-label::after {
+    content: ':';
+}
+.fat-detalhes-value {
+    color: #1e293b;
+    min-width: 0;
+    word-break: break-word;
+}
+.fat-detalhes-item--full {
+    grid-column: 1 / -1;
+}
+.fat-detalhes-meta {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e5e9f0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.3rem 0.75rem;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+.fat-detalhes-section {
+    margin-top: 0.75rem;
+}
+.fat-detalhes-section .card-header {
+    padding: 0.45rem 0.75rem;
+}
+.fat-detalhes-section .card-header .card-title {
+    font-size: 0.95rem;
+}
+.fat-detalhes-section .card-body {
+    padding: 0.5rem 0.75rem;
+}
+@media (max-width: 992px) {
+    .fat-detalhes-grid,
+    .fat-detalhes-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 576px) {
+    .fat-detalhes-grid,
+    .fat-detalhes-meta {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+<div class="container-fluid fat-detalhes-page">
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header fat-detalhes-header">
                     <h3 class="card-title">Detalhes do Faturamento Médico</h3>
-                    <div class="card-tools">
+                    <div class="card-tools d-flex flex-wrap gap-1">
+                        <a href="{% url 'faturamento_medico:editar_documentacao' faturamento.pk %}?next={{ request.get_full_path|urlencode }}"
+                           class="btn btn-outline-primary btn-sm" title="Protocolo, lote, guia, NF">
+                            <i class="fas fa-file-alt"></i> Documentação
+                        </a>
                         <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}" class="btn btn-info btn-sm">
-                            <i class="fas fa-paperclip"></i> Anexar Documento
+                            <i class="fas fa-paperclip"></i> Anexar
                         </a>
                         <a href="{% url 'faturamento_medico:editar' faturamento.pk %}" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit"></i> Editar
@@ -27,136 +115,181 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <dl class="row">
-                                <dt class="col-sm-4">Lote:</dt>
-                                <dd class="col-sm-8">{{ faturamento.lote|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Guia:</dt>
-                                <dd class="col-sm-8">{{ faturamento.guia|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Senha:</dt>
-                                <dd class="col-sm-8">{{ faturamento.senha|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Carteirinha:</dt>
-                                <dd class="col-sm-8">{{ faturamento.carteirinha|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Nome:</dt>
-                                <dd class="col-sm-8">{{ faturamento.nome|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Data Autorização:</dt>
-                                <dd class="col-sm-8">
-                                    {% if faturamento.data_autorizacao %}
-                                        {{ faturamento.data_autorizacao|date:"d/m/Y" }}
-                                    {% else %}
-                                        <span class="text-muted">Não informado</span>
-                                    {% endif %}
-                                </dd>
-
-                                <dt class="col-sm-4">Data:</dt>
-                                <dd class="col-sm-8">
-                                    {% if faturamento.data %}
-                                        {{ faturamento.data|date:"d/m/Y" }}
-                                    {% else %}
-                                        <span class="text-muted">Não informado</span>
-                                    {% endif %}
-                                </dd>
-                            </dl>
+                    <div class="fat-detalhes-grid">
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Lote</span>
+                            <span class="fat-detalhes-value">{{ faturamento.lote|default:"—" }}</span>
                         </div>
-                        <div class="col-md-6">
-                            <dl class="row">
-                                <dt class="col-sm-4">Porte:</dt>
-                                <dd class="col-sm-8">{{ faturamento.porte|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">QT:</dt>
-                                <dd class="col-sm-8">{{ faturamento.qt|default:0 }}</dd>
-
-                                <dt class="col-sm-4">Valor:</dt>
-                                <dd class="col-sm-8">R$ {{ faturamento.valor|floatformat:2 }}</dd>
-
-                                <dt class="col-sm-4">Total:</dt>
-                                <dd class="col-sm-8">R$ {{ faturamento.total|floatformat:2 }}</dd>
-
-                                <dt class="col-sm-4">Local:</dt>
-                                <dd class="col-sm-8">{{ faturamento.local|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Médico:</dt>
-                                <dd class="col-sm-8">{{ faturamento.medico|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Anestesista:</dt>
-                                <dd class="col-sm-8">{{ faturamento.anestesista|default:"Não informado" }}</dd>
-
-                                <dt class="col-sm-4">Convênio:</dt>
-                                <dd class="col-sm-8">{{ faturamento.convenio|default:"Não informado" }}</dd>
-                            </dl>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Guia</span>
+                            <span class="fat-detalhes-value">{{ faturamento.guia|default:"—" }}</span>
                         </div>
-                    </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Senha</span>
+                            <span class="fat-detalhes-value">{{ faturamento.senha|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Carteirinha</span>
+                            <span class="fat-detalhes-value">{{ faturamento.carteirinha|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Protocolo</span>
+                            <span class="fat-detalhes-value">{{ faturamento.guia_lancada|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Nº Guia Lançada</span>
+                            <span class="fat-detalhes-value">{{ faturamento.numero_guia_lancada|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Nota Fiscal</span>
+                            <span class="fat-detalhes-value">{{ faturamento.nota_fiscal|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Cód. Relatório</span>
+                            <span class="fat-detalhes-value">{{ faturamento.codigo_relatorio|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Cód. Fechamento</span>
+                            <span class="fat-detalhes-value">{{ faturamento.codigo_fechamento|default:"—" }}</span>
+                        </div>
 
-                    <div class="row">
-                        <div class="col-md-12">
-                            <dl class="row">
-                                <dt class="col-sm-2">Receber Por:</dt>
-                                <dd class="col-sm-10">{{ faturamento.receber_por|default:"Não informado" }}</dd>
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Nome</span>
+                            <span class="fat-detalhes-value">{{ faturamento.nome|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Nome Associado</span>
+                            <span class="fat-detalhes-value">{{ faturamento.nome_associado|default:"—" }}</span>
+                        </div>
 
-                                <dt class="col-sm-2">Apartamento ou Enfermaria:</dt>
-                                <dd class="col-sm-10">{{ faturamento.apartamento_enfermaria|default:"Não informado" }}</dd>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Data Autorização</span>
+                            <span class="fat-detalhes-value">
+                                {% if faturamento.data_autorizacao %}{{ faturamento.data_autorizacao|date:"d/m/Y" }}{% else %}—{% endif %}
+                            </span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Data</span>
+                            <span class="fat-detalhes-value">
+                                {% if faturamento.data %}{{ faturamento.data|date:"d/m/Y" }}{% else %}—{% endif %}
+                            </span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Convênio</span>
+                            <span class="fat-detalhes-value">{{ faturamento.convenio|default:"—" }}</span>
+                        </div>
 
-                                <dt class="col-sm-2">Urgência:</dt>
-                                <dd class="col-sm-10">{{ faturamento.urgencia|default:"Não informado" }}</dd>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Porte</span>
+                            <span class="fat-detalhes-value">{{ faturamento.porte|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">QT</span>
+                            <span class="fat-detalhes-value">{{ faturamento.qt|default:0 }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Valor</span>
+                            <span class="fat-detalhes-value">R$ {{ faturamento.valor|floatformat:2 }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Total</span>
+                            <span class="fat-detalhes-value"><strong>R$ {{ faturamento.total|floatformat:2 }}</strong></span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Urgência</span>
+                            <span class="fat-detalhes-value">{{ faturamento.urgencia|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Apt/Enfermaria</span>
+                            <span class="fat-detalhes-value">{{ faturamento.apartamento_enfermaria|default:"—" }}</span>
+                        </div>
 
-                                <dt class="col-sm-2">Observação:</dt>
-                                <dd class="col-sm-10">{{ faturamento.observacao|default:"Não informado"|linebreaks }}</dd>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Local</span>
+                            <span class="fat-detalhes-value">{{ faturamento.local|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Médico</span>
+                            <span class="fat-detalhes-value">{{ faturamento.medico|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Méd. Solicitante</span>
+                            <span class="fat-detalhes-value">{{ faturamento.medico_solicitante|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Anestesista</span>
+                            <span class="fat-detalhes-value">{{ faturamento.anestesista|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Técnico</span>
+                            <span class="fat-detalhes-value">{{ faturamento.tecnico|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Receber Por</span>
+                            <span class="fat-detalhes-value">{{ faturamento.receber_por|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Check-in Por</span>
+                            <span class="fat-detalhes-value">{{ faturamento.checkin_por|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Agendado Por</span>
+                            <span class="fat-detalhes-value">{{ faturamento.agendado_por|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item">
+                            <span class="fat-detalhes-label">Agendado Via</span>
+                            <span class="fat-detalhes-value">{{ faturamento.agendado_via|default:"—" }}</span>
+                        </div>
 
-                                <dt class="col-sm-2">Protocolo:</dt>
-                                <dd class="col-sm-10">{{ faturamento.guia_lancada|default:"Não informado" }}</dd>
+                        {% if faturamento.indicacao_clinica %}
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Indicação Clínica</span>
+                            <span class="fat-detalhes-value">{{ faturamento.indicacao_clinica|linebreaksbr }}</span>
+                        </div>
+                        {% endif %}
+                        {% if faturamento.descricao %}
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Descrição</span>
+                            <span class="fat-detalhes-value">{{ faturamento.descricao|linebreaksbr }}</span>
+                        </div>
+                        {% endif %}
+                        {% if faturamento.observacao %}
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Observação</span>
+                            <span class="fat-detalhes-value">{{ faturamento.observacao|linebreaksbr }}</span>
+                        </div>
+                        {% endif %}
 
-                                <dt class="col-sm-2">Código Relatório:</dt>
-                                <dd class="col-sm-10">{{ faturamento.codigo_relatorio|default:"Não informado" }}</dd>
-
-                                {% if faturamento.link_laudo or faturamento.link_viewer or faturamento.link_fastshare %}
-                                <dt class="col-sm-2">Laudo MedCloud:</dt>
-                                <dd class="col-sm-10">
-                                    {% if faturamento.link_laudo %}
-                                        <a href="{{ faturamento.link_laudo }}" target="_blank" rel="noopener">Abrir laudo</a>
-                                    {% endif %}
-                                    {% if faturamento.link_viewer %}
-                                        {% if faturamento.link_laudo %} · {% endif %}
-                                        <a href="{{ faturamento.link_viewer }}" target="_blank" rel="noopener">Viewer</a>
-                                    {% endif %}
-                                    {% if faturamento.link_fastshare %}
-                                        {% if faturamento.link_laudo or faturamento.link_viewer %} · {% endif %}
-                                        <a href="{{ faturamento.link_fastshare }}" target="_blank" rel="noopener">FastShare</a>
-                                    {% endif %}
-                                    {% if faturamento.laudo_expires_at %}
-                                        <br><small class="text-muted">Expira: {{ faturamento.laudo_expires_at|date:"d/m/Y H:i" }}</small>
-                                    {% endif %}
-                                </dd>
+                        {% if faturamento.link_laudo or faturamento.link_viewer or faturamento.link_fastshare %}
+                        <div class="fat-detalhes-item fat-detalhes-item--full">
+                            <span class="fat-detalhes-label">Laudo MedCloud</span>
+                            <span class="fat-detalhes-value">
+                                {% if faturamento.link_laudo %}
+                                    <a href="{{ faturamento.link_laudo }}" target="_blank" rel="noopener">Laudo</a>
                                 {% endif %}
-
-                                <dt class="col-sm-2">Código do Fechamento:</dt>
-                                <dd class="col-sm-10">{{ faturamento.codigo_fechamento|default:"Não informado" }}</dd>
-                            </dl>
+                                {% if faturamento.link_viewer %}
+                                    {% if faturamento.link_laudo %} · {% endif %}
+                                    <a href="{{ faturamento.link_viewer }}" target="_blank" rel="noopener">Viewer</a>
+                                {% endif %}
+                                {% if faturamento.link_fastshare %}
+                                    {% if faturamento.link_laudo or faturamento.link_viewer %} · {% endif %}
+                                    <a href="{{ faturamento.link_fastshare }}" target="_blank" rel="noopener">FastShare</a>
+                                {% endif %}
+                                {% if faturamento.laudo_expires_at %}
+                                    <small class="text-muted"> (exp. {{ faturamento.laudo_expires_at|date:"d/m/Y H:i" }})</small>
+                                {% endif %}
+                            </span>
                         </div>
+                        {% endif %}
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <dl class="row">
-                                <dt class="col-sm-4">Data Criação:</dt>
-                                <dd class="col-sm-8">{{ faturamento.data_criacao|date:"d/m/Y H:i" }}</dd>
-                            </dl>
-                        </div>
-                        <div class="col-md-6">
-                            <dl class="row">
-                                <dt class="col-sm-4">Última Atualização:</dt>
-                                <dd class="col-sm-8">{{ faturamento.data_atualizacao|date:"d/m/Y H:i" }}</dd>
-                            </dl>
-                        </div>
+                    <div class="fat-detalhes-meta">
+                        <div><strong>Criação:</strong> {{ faturamento.data_criacao|date:"d/m/Y H:i" }}</div>
+                        <div><strong>Atualização:</strong> {{ faturamento.data_atualizacao|date:"d/m/Y H:i" }}</div>
                     </div>
 
                     <!-- Itens de Serviço -->
-                    <div class="row mt-4">
+                    <div class="row fat-detalhes-section">
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header">
@@ -236,7 +369,7 @@
                     </div>
 
                     <!-- Documentos Anexados -->
-                    <div class="row mt-4">
+                    <div class="row fat-detalhes-section">
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header">
