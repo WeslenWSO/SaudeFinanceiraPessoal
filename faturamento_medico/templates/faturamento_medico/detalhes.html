@@ -29,8 +29,8 @@
 }
 .fat-detalhes-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.3rem 0.75rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.3rem 0.6rem;
     font-size: 0.82rem;
     line-height: 1.35;
 }
@@ -57,13 +57,16 @@
 .fat-detalhes-item--full {
     grid-column: 1 / -1;
 }
+.fat-detalhes-item--span2 {
+    grid-column: span 2;
+}
 .fat-detalhes-meta {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
     border-top: 1px solid #e5e9f0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.3rem 0.75rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.3rem 0.6rem;
     font-size: 0.78rem;
     color: #64748b;
 }
@@ -153,15 +156,6 @@
                             <span class="fat-detalhes-value">{{ faturamento.codigo_fechamento|default:"—" }}</span>
                         </div>
 
-                        <div class="fat-detalhes-item fat-detalhes-item--full">
-                            <span class="fat-detalhes-label">Nome</span>
-                            <span class="fat-detalhes-value">{{ faturamento.nome|default:"—" }}</span>
-                        </div>
-                        <div class="fat-detalhes-item fat-detalhes-item--full">
-                            <span class="fat-detalhes-label">Nome Associado</span>
-                            <span class="fat-detalhes-value">{{ faturamento.nome_associado|default:"—" }}</span>
-                        </div>
-
                         <div class="fat-detalhes-item">
                             <span class="fat-detalhes-label">Data Autorização</span>
                             <span class="fat-detalhes-value">
@@ -177,6 +171,15 @@
                         <div class="fat-detalhes-item">
                             <span class="fat-detalhes-label">Convênio</span>
                             <span class="fat-detalhes-value">{{ faturamento.convenio|default:"—" }}</span>
+                        </div>
+
+                        <div class="fat-detalhes-item fat-detalhes-item--span2">
+                            <span class="fat-detalhes-label">Nome</span>
+                            <span class="fat-detalhes-value">{{ faturamento.nome|default:"—" }}</span>
+                        </div>
+                        <div class="fat-detalhes-item fat-detalhes-item--span2">
+                            <span class="fat-detalhes-label">Nome Associado</span>
+                            <span class="fat-detalhes-value">{{ faturamento.nome_associado|default:"—" }}</span>
                         </div>
 
                         <div class="fat-detalhes-item">
