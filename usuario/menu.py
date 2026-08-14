@@ -43,6 +43,7 @@ SECOES_MENU: tuple[MenuSecaoDef, ...] = (
 
 ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('dashboard', 'Dashboard', 'fa-cloud', url_name='dashboard:index'),
+    MenuItemDef('dashboard_academia', 'Dashboard de Academia', 'fa-dumbbell', url_name='indicadores:dashboard_academia'),
     MenuItemDef('dashboard_por_tipo', 'Dashboard — R/D/I/L', 'fa-chart-pie', 'relatorios', url_name='dashboard:por_tipo'),
     MenuItemDef('empresa', 'Empresa', 'fa-building', 'cadastro', url_name='empresa:lista'),
     MenuItemDef('fornecedor', 'Fornecedor', 'fa-truck', 'cadastro', url_name='fornecedor:fornList'),
@@ -55,6 +56,9 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
     MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'cadastro', url_name='faturamento_medico:ftlistar'),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-tasks', 'cadastro', url_name='agendador_tarefas:listar'),
+    MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
+    MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
+    MenuItemDef('atendentes_academia', 'Atendentes academia', 'fa-user-friends', 'cadastro', url_name='indicadores:atendente_listar'),
     MenuItemDef('convenios', 'Convênios', 'fa-hand-holding-medical', 'cadastro', url_name='servicos_medicos:convenio_list'),
     MenuItemDef('cabecalhos', 'Cabeçalhos', 'fa-heading', 'cadastro', url_name='servicos_medicos:cabecalho_list'),
     MenuItemDef('servicos_medicos', 'Serviços Médicos', 'fa-stethoscope', 'cadastro', url_name='servicos_medicos:servicos_list'),

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" class="card">
+  {% csrf_token %}
+  <div class="card-header">Atendente</div>
+  <div class="card-body">
+    {% for field in form %}
+    <div class="mb-3">{{ field.label_tag }}{{ field }}</div>
+    {% endfor %}
+  </div>
+  <div class="card-footer">
+    <button type="submit" class="btn btn-primary">Salvar</button>
+    <a href="{% url 'indicadores:atendente_listar' %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="mb-0"><i class="fas fa-calendar-day text-primary"></i> {{ descricao }}</h3>
+    <small class="text-muted d-block">{{ mes_label }}</small>
+    {% if periodo and qt_ativos_mes %}
+    <small class="text-muted">Churn mês (Dados do mês): <strong>{{ churn_mes_fmt }}%</strong> — {{ periodo.qt_cancelados }} cancel. ÷ {{ qt_ativos_mes }} ativos</small>
+    {% elif periodo %}
+    <small class="text-warning">Informe qt. ativos no Dashboard de Academia para calcular o churn.</small>
+    {% else %}
+    <small class="text-warning">Cadastre os dados do mês no Dashboard de Academia.</small>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'indicadores:atendente_listar' %}" class="btn btn-outline-secondary btn-sm">Atendentes</a>
+    <a href="{{ url_mes_anterior }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-chevron-left"></i></a>
+    <a href="{{ url_mes_proximo }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-chevron-right"></i></a>
+    <a href="{% url 'indicadores:lancamento_vendas_criar' %}?ano={{ ano }}&mes={{ mes }}" class="btn btn-primary btn-sm">
+      <i class="fas fa-plus"></i> Lançar dia
+    </a>
+    <a href="{% url 'indicadores:lancamento_cancelamentos_criar' %}?ano={{ ano }}&mes={{ mes }}" class="btn btn-danger btn-sm">
+      <i class="fas fa-plus"></i> Lançar cancelamentos
+    </a>
+  </div>
+</div>
+
+{% if messages %}
+  {% include 'parcial/_messages.html' %}
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered mb-0 align-middle" style="font-size: 0.78rem;">
+        <thead class="table-light">
+          <tr>
+            <th rowspan="2">Dia</th>
+            <th colspan="4" class="text-center bg-info bg-opacity-10">Vendas</th>
+            {% for a in atendentes %}
+            <th colspan="4" class="text-center">{{ a.nome|truncatechars:14 }}</th>
+            {% endfor %}
+            <th colspan="4" class="text-center bg-danger bg-opacity-10">Cancelamentos</th>
+            <th rowspan="2" class="text-end">Churn</th>
+            <th rowspan="2" class="text-end">Conv.</th>
+            <th rowspan="2" class="text-end">Saldo</th>
+            <th rowspan="2"></th>
+          </tr>
+          <tr>
+            <th class="text-end">Oport.</th>
+            <th class="text-end">Balcão</th>
+            <th class="text-end">Site</th>
+            <th class="text-end bg-info bg-opacity-10">Total</th>
+            {% for a in atendentes %}
+            <th class="text-end">Oport.</th>
+            <th class="text-end bg-info bg-opacity-10">Vnd</th>
+            <th class="text-end">Site</th>
+            <th class="text-end bg-danger bg-opacity-10">Canc</th>
+            {% endfor %}
+            <th class="text-end">Inad.</th>
+            <th class="text-end">Solic.</th>
+            <th class="text-end">Neg.</th>
+            <th class="text-end bg-danger bg-opacity-10">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          {% with item=linha.lanc %}
+          <tr>
+            <td class="text-nowrap">{{ item.data|date:'d/m/Y' }}</td>
+            <td class="text-end">{{ item.oport_balcao }}</td>
+            <td class="text-end">{{ item.balcao }}</td>
+            <td class="text-end">{{ item.site }}</td>
+            <td class="text-end fw-semibold bg-info bg-opacity-10">{{ item.total_dia }}</td>
+            {% for ia in linha.atend_itens %}
+            <td class="text-end">{% if ia %}{{ ia.oport }}{% else %}0{% endif %}</td>
+            <td class="text-end bg-info bg-opacity-10">{% if ia %}{{ ia.vendas }}{% else %}0{% endif %}</td>
+            <td class="text-end">{% if ia %}{{ ia.site }}{% else %}0{% endif %}</td>
+            <td class="text-end bg-danger bg-opacity-10">{% if ia %}{{ ia.cancel }}{% else %}0{% endif %}</td>
+            {% endfor %}
+            <td class="text-end">{{ item.cancel_inadimplentes }}</td>
+            <td class="text-end">{{ item.cancel_solicitados }}</td>
+            <td class="text-end">{{ item.cancel_negassist }}</td>
+            <td class="text-end fw-semibold bg-danger bg-opacity-10">{{ item.total_cancel_dia }}</td>
+            <td class="text-end">{{ linha.churn_dia|floatformat:2 }}</td>
+            <td class="text-end">{{ item.conversao_balcao_pct|floatformat:0 }}%</td>
+            <td class="text-end {% if item.saldo_comercial >= 0 %}text-primary{% else %}text-danger{% endif %}">{{ item.saldo_comercial }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{% url 'indicadores:lancamento_vendas_editar' item.pk %}" class="btn btn-primary btn-sm py-0" title="Vendas / atendentes"><i class="fa-solid fa-pen-to-square"></i></a>
+              <a href="{% url 'indicadores:lancamento_cancelamentos_editar' item.pk %}" class="btn btn-danger btn-sm py-0" title="Cancelamentos"><i class="fa-solid fa-ban"></i></a>
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr><td colspan="30" class="text-center text-muted py-4">Nenhum lançamento neste mês.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if linhas %}
+        <tfoot class="table-light fw-semibold">
+          <tr>
+            <td>TOTAL</td>
+            <td class="text-end">{{ totais.oport_balcao|default:0 }}</td>
+            <td class="text-end">{{ totais.balcao|default:0 }}</td>
+            <td class="text-end">{{ totais.site|default:0 }}</td>
+            <td class="text-end">{{ totais.total_dia|default:0 }}</td>
+            {% for ta in totais_atend_list %}
+            <td class="text-end">{{ ta.oport|default:0 }}</td>
+            <td class="text-end">{{ ta.vendas|default:0 }}</td>
+            <td class="text-end">{{ ta.site|default:0 }}</td>
+            <td class="text-end">{{ ta.cancel|default:0 }}</td>
+            {% endfor %}
+            <td class="text-end">{{ totais.cancel_inadimplentes|default:0 }}</td>
+            <td class="text-end">{{ totais.cancel_solicitados|default:0 }}</td>
+            <td class="text-end">{{ totais.cancel_negassist|default:0 }}</td>
+            <td class="text-end">{{ totais.total_cancel_dia|default:0 }}</td>
+            <td class="text-end" title="Churn do mês (Dashboard)">{{ churn_mes_fmt }}</td>
+            <td></td>
+            <td class="text-end">{{ totais.saldo_comercial|default:0 }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" novalidate class="card">
+  {% csrf_token %}
+  <div class="card-header">{{ descricao }}</div>
+  <div class="card-body">
+    {% if messages %}
+      {% include 'parcial/_messages.html' %}
+    {% endif %}
+    {% for field in form %}
+      <div class="mb-3">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.errors %}
+          <small class="text-danger">{{ field.errors|striptags }}</small>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <div class="card-footer form-buttons">
+    <input type="submit" value="Salvar" class="btn btn-primary"/>
+    <a href="{% url 'indicadores:listar' %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

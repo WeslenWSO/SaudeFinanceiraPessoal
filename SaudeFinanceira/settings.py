@@ -135,6 +135,7 @@ INSTALLED_APPS = [
     'emprestimos',
     'planejamento_orcamentario',
     'agendador_tarefas',
+    'indicadores',
     
 
 

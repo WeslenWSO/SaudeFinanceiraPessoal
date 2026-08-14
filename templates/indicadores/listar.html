@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{% url 'indicadores:criar' %}?area=MUSCULACAO" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-plus"></i> Musculação
+  </a>
+  <a href="{% url 'indicadores:criar' %}?area=ATENDENTE" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-plus"></i> Atendente
+  </a>
+</div>
+
+{% if messages %}
+  {% include 'parcial/_messages.html' %}
+{% endif %}
+
+{% for bloco in areas %}
+<div class="card mb-4">
+  <div class="card-header fw-semibold">{{ bloco.rotulo }}</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>Ordem</th>
+          <th>Indicador</th>
+          <th>Ativo</th>
+          <th class="text-end">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in bloco.itens %}
+        <tr class="{% if not item.ativo %}text-muted{% endif %}">
+          <td>{{ item.ordem }}</td>
+          <td>{{ item.nome }}</td>
+          <td>{% if item.ativo %}Sim{% else %}Não{% endif %}</td>
+          <td class="text-end">
+            <a href="{% url 'indicadores:editar' item.pk %}" class="btn btn-primary btn-sm" title="Editar">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </a>
+            <form method="post" action="{% url 'indicadores:excluir' item.pk %}" class="d-inline"
+                  onsubmit="return confirm('Excluir este indicador?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="text-muted text-center py-3">Nenhum indicador cadastrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -7,37 +7,16 @@
 
 {% block conteudo %}
 <style>
-.fm-row-actions { position: relative; display: inline-block; }
-.fm-row-actions > summary { list-style: none; cursor: pointer; }
-.fm-row-actions > summary::-webkit-details-marker { display: none; }
-.fm-row-actions-btn { min-width: 2.25rem; }
-.fm-row-actions-menu {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 0.25rem);
-    z-index: 40;
-    min-width: 9.5rem;
-    padding: 0.35rem 0;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.4rem;
-    box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12);
-}
-.fm-row-actions-item {
-    display: flex;
+.fm-row-actions-inline {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
     align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.45rem 0.85rem;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    text-decoration: none;
-    font-size: 0.875rem;
-    text-align: left;
-    cursor: pointer;
 }
-.fm-row-actions-item:hover { background: #f3f4f6; color: inherit; text-decoration: none; }
+.fm-row-actions-inline .btn {
+    padding: 0.2rem 0.45rem;
+    line-height: 1.2;
+}
 .fm-resumo-card { cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
 .fm-resumo-card:hover { box-shadow: 0 0.35rem 1rem rgba(0,0,0,.12); transform: translateY(-1px); }
 .fm-resumo-card .fm-resumo-filtros { cursor: default; }
@@ -514,19 +493,16 @@
                                     </td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
                                     <td class="text-nowrap">
-                                        <details class="fm-row-actions">
-                                            <summary class="btn btn-sm btn-outline-secondary fm-row-actions-btn" title="Ações" aria-label="Ações">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </summary>
-                                            <div class="fm-row-actions-menu" role="menu">
-                                                <a href="{% url 'faturamento_medico:detalhes' linha.faturamento.pk %}" class="fm-row-actions-item" role="menuitem">
-                                                    <i class="fas fa-eye text-info"></i> Detalhes
-                                                </a>
-                                                <a href="{% url 'faturamento_medico:editar' linha.faturamento.pk %}" class="fm-row-actions-item" role="menuitem">
-                                                    <i class="fas fa-edit text-warning"></i> Editar
-                                                </a>
-                                            </div>
-                                        </details>
+                                        <div class="fm-row-actions-inline">
+                                            <a href="{% url 'faturamento_medico:detalhes' linha.faturamento.pk %}"
+                                               class="btn btn-sm btn-outline-info" title="Detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'faturamento_medico:editar' linha.faturamento.pk %}"
+                                               class="btn btn-sm btn-outline-warning" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -562,20 +538,6 @@
 }
 </style>
 <script>
-document.querySelectorAll('.fm-row-actions').forEach(function(details) {
-    details.addEventListener('toggle', function() {
-        if (!this.open) return;
-        document.querySelectorAll('.fm-row-actions[open]').forEach(function(other) {
-            if (other !== details) other.removeAttribute('open');
-        });
-    });
-});
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.fm-row-actions')) return;
-    document.querySelectorAll('.fm-row-actions[open]').forEach(function(d) {
-        d.removeAttribute('open');
-    });
-});
 document.querySelectorAll('.fm-resumo-card').forEach(function(card) {
     card.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.key === ' ') {

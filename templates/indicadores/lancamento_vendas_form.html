@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" novalidate id="form-lancamento-academia">
+  {% csrf_token %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span class="fw-semibold">{{ descricao }}</span>
+      {% if modo == 'editar' %}
+      <a href="{% url 'indicadores:lancamento_vendas_listar' %}?ano={{ lancamento.data.year }}&mes={{ lancamento.data.month }}"
+         class="btn btn-outline-secondary btn-sm">Ver planilha do mês</a>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">{{ form.data.label }}</label>
+          {{ form.data }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3 border-info">
+    <div class="card-header fw-semibold bg-info bg-opacity-10">Vendas</div>
+    <div class="card-body">
+      <small class="text-muted d-block mb-2">Totais do dia (somente leitura — soma dos lançamentos por atendente).</small>
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">Oport. balcão</label>
+          <input type="text" class="form-control bg-light" readonly
+                 value="{{ resumo_vendas.oport_balcao }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Balcão</label>
+          <input type="text" class="form-control bg-light" readonly
+                 value="{{ resumo_vendas.balcao }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Site</label>
+          <input type="text" class="form-control bg-light" readonly
+                 value="{{ resumo_vendas.site }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Total vendas dia</label>
+          <input type="text" class="form-control bg-light" readonly
+                 value="{{ resumo_vendas.total_dia }}">
+          <small class="text-muted">Balcão + site</small>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Conversão balcão</label>
+          <input type="text" class="form-control bg-light" readonly
+                 value="{{ resumo_vendas.conversao_balcao_pct|floatformat:0 }}%">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header fw-semibold d-flex justify-content-between flex-wrap gap-2">
+      <span>Lançamento do atendente</span>
+      <a href="{% url 'indicadores:atendente_listar' %}" class="small">Cadastro de atendentes</a>
+    </div>
+    <div class="card-body">
+      <div class="row g-3 mb-2">
+        <div class="col-md-4">
+          <label class="form-label">{{ form.atendente.label }}</label>
+          {{ form.atendente }}
+          {% if form.atendente.errors %}<small class="text-danger">{{ form.atendente.errors|striptags }}</small>{% endif %}
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">{{ form.atend_oport.label }}</label>
+          {{ form.atend_oport }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ form.atend_balcao.label }}</label>
+          {{ form.atend_balcao }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ form.atend_site.label }}</label>
+          {{ form.atend_site }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ form.atend_cancel.label }}</label>
+          {{ form.atend_cancel }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if lancamento %}
+  <div class="card mb-3 border-danger">
+    <div class="card-header fw-semibold bg-danger bg-opacity-10">Totais do dia</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">Total cancel.</label>
+          <input type="text" class="form-control bg-light" readonly value="{{ lancamento.total_cancel_dia }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Saldo comercial</label>
+          <input type="text" class="form-control bg-light" readonly value="{{ lancamento.saldo_comercial }}">
+          <small class="text-muted">Vendas − cancelamentos</small>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="mb-3">
+    <button type="submit" class="btn btn-primary">Gravar atendente</button>
+    <a href="{% url 'indicadores:lancamento_vendas_listar' %}" class="btn btn-outline-secondary">Voltar</a>
+  </div>
+</form>
+
+{{ atendentes_dados|json_script:"atendentes-dados" }}
+
+<script>
+(function () {
+  var sel = document.getElementById('id_atendente');
+  var oport = document.getElementById('id_atend_oport');
+  var balcao = document.getElementById('id_atend_balcao');
+  var site = document.getElementById('id_atend_site');
+  var cancel = document.getElementById('id_atend_cancel');
+  var dadosEl = document.getElementById('atendentes-dados');
+  var dados = dadosEl ? JSON.parse(dadosEl.textContent) : {};
+
+  function carregarAtendente() {
+    if (!sel) return;
+    var d = dados[sel.value] || { oport: 0, vendas: 0, site: 0, cancel: 0 };
+    if (oport) oport.value = d.oport;
+    if (balcao) balcao.value = d.vendas;
+    if (site) site.value = d.site;
+    if (cancel) cancel.value = d.cancel;
+  }
+
+  if (sel) sel.addEventListener('change', carregarAtendente);
+  if (sel && sel.value) carregarAtendente();
+})();
+</script>
+{% endblock %}

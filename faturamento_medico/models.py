@@ -19,6 +19,7 @@ class FaturamentoMedico(models.Model):
     # Campos principais
     lote = models.CharField(verbose_name='Lote', max_length=50, blank=True, null=True)
     guia = models.CharField(verbose_name='Guia', max_length=50, blank=True, null=True)
+    senha = models.CharField(verbose_name='Senha', max_length=50, blank=True, default='')
     carteirinha = models.CharField(verbose_name='Carteirinha', max_length=50, blank=True, null=True)
     nome = models.CharField(verbose_name='Nome', max_length=200, blank=True, null=True)
     nome_associado = models.CharField(
@@ -98,7 +99,7 @@ class FaturamentoMedico(models.Model):
     tag = models.CharField(verbose_name='Tag', max_length=100, blank=True, null=True)
     indicacao_clinica = models.TextField(verbose_name='Indicação Clínica', blank=True, null=True)
     descricao = models.TextField(verbose_name='Descrição', blank=True, null=True)
-    guia_lancada = models.BigIntegerField(verbose_name='Guia Lançada', default=0, blank=True, null=True)
+    guia_lancada = models.CharField(verbose_name='Protocolo', max_length=50, blank=True, default='')
     numero_guia_lancada = models.CharField(verbose_name='Número da Guia Lançada', max_length=50, blank=True, null=True)
     nota_fiscal = models.CharField(verbose_name='Nota Fiscal', max_length=50, blank=True, null=True)
     codigo_relatorio = models.CharField(verbose_name='Código Relatório', max_length=50, blank=True, null=True)

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'indicadores:atendente_criar' %}" class="btn btn-primary btn-sm mb-3"><i class="fas fa-plus"></i> Novo atendente</a>
+{% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+<div class="card">
+  <div class="card-header">{{ descricao }}</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Nome</th><th>Ordem</th><th>Ativo</th><th></th></tr></thead>
+      <tbody>
+        {% for item in object_list %}
+        <tr>
+          <td>{{ item.nome }}</td>
+          <td>{{ item.ordem }}</td>
+          <td>{% if item.ativo %}Sim{% else %}Não{% endif %}</td>
+          <td class="text-end">
+            <a href="{% url 'indicadores:atendente_editar' item.pk %}" class="btn btn-primary btn-sm"><i class="fa-solid fa-pen-to-square"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted text-center py-3">Nenhum atendente.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -28,12 +28,12 @@
                             <h6 class="fat-section-title">Identificação</h6>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
-                                    {{ form.lote }}
-                                </div>
-                                <div class="col-md-3">
                                     <label class="form-label" for="{{ form.guia.id_for_label }}">Guia</label>
                                     {{ form.guia }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.senha.id_for_label }}">Senha</label>
+                                    {{ form.senha }}
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label" for="{{ form.carteirinha.id_for_label }}">Carteirinha</label>
@@ -171,8 +171,12 @@
                             <h6 class="fat-section-title">Documentação e fechamento</h6>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Guia Lançada</label>
+                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Protocolo</label>
                                     {{ form.guia_lancada }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
+                                    {{ form.lote }}
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">Número da Guia Lançada</label>

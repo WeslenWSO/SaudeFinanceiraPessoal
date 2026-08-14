@@ -31,7 +31,7 @@ class FaturamentoMedicoForm(forms.ModelForm):
     class Meta:
         model = FaturamentoMedico
         fields = [
-            'lote', 'guia', 'carteirinha', 'nome', 'nome_associado',
+            'lote', 'guia', 'senha', 'carteirinha', 'nome', 'nome_associado',
             'data_autorizacao', 'data', 'total',
             'local', 'medico', 'medico_solicitante', 'anestesista', 'tecnico',
             'checkin_por', 'agendado_por',
@@ -42,9 +42,13 @@ class FaturamentoMedicoForm(forms.ModelForm):
             'guia_lancada', 'numero_guia_lancada', 'nota_fiscal',
             'codigo_relatorio', 'agendado_via', 'codigo_fechamento',
         ]
+        labels = {
+            'guia_lancada': 'Protocolo',
+        }
         widgets = {
             'lote': forms.TextInput(attrs={'class': 'form-control'}),
             'guia': forms.TextInput(attrs={'class': 'form-control'}),
+            'senha': forms.TextInput(attrs={'class': 'form-control'}),
             'carteirinha': forms.TextInput(attrs={'class': 'form-control'}),
             'nome': forms.TextInput(attrs={'class': 'form-control'}),
             'nome_associado': forms.TextInput(attrs={'class': 'form-control'}),
@@ -76,7 +80,7 @@ class FaturamentoMedicoForm(forms.ModelForm):
             'indicacao_clinica': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'descricao': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
             'observacao': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'guia_lancada': forms.NumberInput(attrs={'min': '0', 'class': 'form-control'}),
+            'guia_lancada': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Número do protocolo'}),
             'numero_guia_lancada': forms.TextInput(attrs={'class': 'form-control'}),
             'nota_fiscal': forms.TextInput(attrs={'class': 'form-control'}),
             'codigo_relatorio': forms.TextInput(attrs={'class': 'form-control'}),

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<form method="post" novalidate id="form-cancelamentos-academia">
+  {% csrf_token %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span class="fw-semibold">{{ descricao }}</span>
+      <a href="{% if lancamento %}{% url 'indicadores:lancamento_vendas_listar' %}?ano={{ lancamento.data.year }}&mes={{ lancamento.data.month }}{% else %}{% url 'indicadores:lancamento_vendas_listar' %}?ano={{ ano }}&mes={{ mes }}{% endif %}"
+         class="btn btn-outline-secondary btn-sm">Ver planilha do mês</a>
+    </div>
+    <div class="card-body">
+      {% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">{{ form.data.label }}</label>
+          {{ form.data }}
+          {% if form.data.errors %}<small class="text-danger">{{ form.data.errors|striptags }}</small>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3 border-danger">
+    <div class="card-header fw-semibold bg-danger bg-opacity-10">Cancelamentos</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">{{ form.cancel_inadimplentes.label }}</label>
+          {{ form.cancel_inadimplentes }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ form.cancel_solicitados.label }}</label>
+          {{ form.cancel_solicitados }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ form.cancel_negassist.label }}</label>
+          {{ form.cancel_negassist }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Total</label>
+          <input type="text" class="form-control bg-light" readonly id="id_cancel_total"
+                 value="{% if lancamento %}{{ lancamento.total_cancel_dia }}{% else %}0{% endif %}">
+          <small class="text-muted">Inad. + Solic. + Neg.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <button type="submit" class="btn btn-danger">Gravar cancelamentos</button>
+    <a href="{% url 'indicadores:lancamento_vendas_listar' %}" class="btn btn-outline-secondary">Voltar</a>
+  </div>
+</form>
+
+<script>
+(function () {
+  var ids = ['id_cancel_inad', 'id_cancel_solic', 'id_cancel_neg'];
+  var totalEl = document.getElementById('id_cancel_total');
+  function atualizarTotal() {
+    var soma = 0;
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) soma += parseInt(el.value, 10) || 0;
+    });
+    if (totalEl) totalEl.value = soma;
+  }
+  ids.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', atualizarTotal);
+  });
+  atualizarTotal();
+})();
+</script>
+{% endblock %}

@@ -3066,7 +3066,7 @@ def exportar_excel(request):
                 faturamento.indicacao_clinica or '',
                 faturamento.descricao or '',
                 faturamento.data_autorizacao.strftime('%d/%m/%Y') if faturamento.data_autorizacao else '',
-                faturamento.guia_lancada or 0,
+                faturamento.guia_lancada or '',
                 faturamento.numero_guia_lancada or '',
                 faturamento.nota_fiscal or '',
                 faturamento.codigo_relatorio or '',
