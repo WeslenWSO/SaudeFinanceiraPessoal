@@ -30,6 +30,15 @@ from .forms import (
     ItemServicoFormSet,
     ServicoDisponivelForm,
 )
+from .models import (
+    DocumentoAnexado,
+    ExtratoPagamentoConvenio,
+    FaturamentoMedico,
+    ItemServico,
+    Lote,
+    MetaModalidadeSolicitante,
+    ServicoDisponivel,
+)
 from .utils import processar_arquivos_com_gemini, processar_arquivos_com_ocr
 
 logger = logging.getLogger(__name__)
