@@ -190,7 +190,7 @@ def _aplicar_filtros_faturamento_qs(qs, filtros):
         q_objects = Q()
         for conv in convenios:
             if conv:
-                q_objects |= Q(convenio__icontains=conv)
+                q_objects |= _q_convenio_filtro(conv)
         qs = qs.filter(q_objects)
     if lote == '__sem__':
         qs = qs.filter(Q(lote__isnull=True) | Q(lote=''))
@@ -211,6 +211,70 @@ def _aplicar_filtros_faturamento_qs(qs, filtros):
                 itens_servico__conferido=False,
             ).distinct()
     return qs
+
+
+def _q_convenio_filtro(nome: str) -> Q:
+    """Correspondência exata de convênio (FUSEX não inclui FUSEX ISENTO / FUSEX PASS)."""
+    conv = (nome or '').strip()
+    if not conv:
+        return Q()
+    return Q(convenio__iexact=conv)
+
+
+def _stats_de_grid_linhas(grid_linhas):
+    """Totais por convênio/anestesista a partir das linhas do grid (mesma base do RESUMO)."""
+    from collections import defaultdict
+
+    conv = defaultdict(lambda: {'total_valor': Decimal('0'), 'quantidade': 0})
+    anest = defaultdict(lambda: {'total_valor': Decimal('0'), 'quantidade': 0})
+    valor_total = Decimal('0')
+    fat_ids = set()
+
+    for linha in grid_linhas:
+        try:
+            valor = Decimal(str(linha.get('valor') or 0))
+        except (InvalidOperation, ValueError, TypeError):
+            valor = Decimal('0')
+        valor_total += valor
+
+        fat = linha.get('faturamento')
+        if fat is not None:
+            fat_ids.add(fat.id)
+
+        nome_conv = ((getattr(fat, 'convenio', None) if fat else None) or '').strip() or 'Não informado'
+        conv[nome_conv]['total_valor'] += valor
+        conv[nome_conv]['quantidade'] += 1
+
+        nome_anest = ((getattr(fat, 'anestesista', None) if fat else None) or '').strip()
+        if nome_anest:
+            anest[nome_anest]['total_valor'] += valor
+            anest[nome_anest]['quantidade'] += 1
+
+    stats_convenio = sorted(
+        [
+            {'convenio': k, 'total_valor': v['total_valor'], 'quantidade': v['quantidade']}
+            for k, v in conv.items()
+        ],
+        key=lambda s: -float(s['total_valor'] or 0),
+    )
+    stats_anestesista = sorted(
+        [
+            {'anestesista': k, 'total_valor': v['total_valor'], 'quantidade': v['quantidade']}
+            for k, v in anest.items()
+        ],
+        key=lambda s: -float(s['total_valor'] or 0),
+    )
+    for stat in stats_convenio:
+        stat['total_valor_fmt'] = _moeda_br(stat.get('total_valor') or 0)
+    for stat in stats_anestesista:
+        stat['total_valor_fmt'] = _moeda_br(stat.get('total_valor') or 0)
+
+    return {
+        'stats_convenio': stats_convenio,
+        'stats_anestesista': stats_anestesista,
+        'valor_total': valor_total,
+        'total_faturamentos': len(fat_ids),
+    }
 
 
 def _status_linha_faturamento(faturamento, item=None):
@@ -1411,37 +1475,11 @@ def listar_faturamentos(request):
     convenios = filtros['convenios']
     codigo_relatorio = filtros['codigo_relatorio']
 
-    # Estatísticas
-    total_faturamentos = faturamentos.count()
-    valor_total = sum(f.total for f in faturamentos if f.total)
-
-    # Estatísticas por convênio
-    from django.db.models import Sum, Count
-    stats_convenio = list(faturamentos.values('convenio').annotate(
-        total_valor=Sum('total'),
-        quantidade=Count('id')
-    ).order_by('-total_valor'))
-    for stat in stats_convenio:
-        stat['total_valor_fmt'] = _moeda_br(stat.get('total_valor') or 0)
-
     def _label_convenio_curto(nome, max_len=36):
         n = (nome or '').strip() or 'Não informado'
         if len(n) <= max_len:
             return n
         return n[: max_len - 1].rstrip() + '…'
-
-    grafico_convenio_labels = [_label_convenio_curto(s.get('convenio')) for s in stats_convenio]
-    grafico_convenio_keys = [(s.get('convenio') or '').strip() or 'Não informado' for s in stats_convenio]
-    grafico_convenio_valores = [float(s.get('total_valor') or 0) for s in stats_convenio]
-    grafico_convenio_qtde = [int(s.get('quantidade') or 0) for s in stats_convenio]
-
-    # Estatísticas por anestesista
-    stats_anestesista = list(faturamentos.values('anestesista').annotate(
-        total_valor=Sum('total'),
-        quantidade=Count('id')
-    ).exclude(anestesista__isnull=True).exclude(anestesista='').order_by('-total_valor'))
-    for stat in stats_anestesista:
-        stat['total_valor_fmt'] = _moeda_br(stat.get('total_valor') or 0)
 
     # Buscar convênios disponíveis para a empresa
     convenios_disponiveis = []
@@ -1603,13 +1641,8 @@ def listar_faturamentos(request):
     ]
     contagem_modalidade = {codigo: 0 for codigo, _ in MODALIDADES_RESUMO}
     resumo_quantidade_total = 0
-    resumo_valor_total = Decimal('0')
     for linha in grid_linhas:
         resumo_quantidade_total += 1
-        try:
-            resumo_valor_total += Decimal(str(linha.get('valor') or 0))
-        except (InvalidOperation, ValueError, TypeError):
-            pass
         codigo_mod = (linha.get('modalidade') or '').strip().upper()
         # CR e RX contam juntos como Raio X
         if codigo_mod == 'RX':
@@ -1625,6 +1658,18 @@ def listar_faturamentos(request):
         }
         for codigo, label in MODALIDADES_RESUMO
     ]
+
+    totais_grid = _stats_de_grid_linhas(grid_linhas)
+    stats_convenio = totais_grid['stats_convenio']
+    stats_anestesista = totais_grid['stats_anestesista']
+    valor_total = totais_grid['valor_total']
+    resumo_valor_total = valor_total
+    total_faturamentos = totais_grid['total_faturamentos']
+
+    grafico_convenio_labels = [_label_convenio_curto(s.get('convenio')) for s in stats_convenio]
+    grafico_convenio_keys = [(s.get('convenio') or '').strip() or 'Não informado' for s in stats_convenio]
+    grafico_convenio_valores = [float(s.get('total_valor') or 0) for s in stats_convenio]
+    grafico_convenio_qtde = [int(s.get('quantidade') or 0) for s in stats_convenio]
 
     MODALIDADES_LABEL_CURTO = {
         'US': 'Ultrassonografia',
@@ -1833,7 +1878,7 @@ def listar_cancelados(request):
         q_objects = Q()
         for conv in convenios:
             if conv:
-                q_objects |= Q(convenio__icontains=conv)
+                q_objects |= _q_convenio_filtro(conv)
         faturamentos = faturamentos.filter(q_objects)
     if status_agendamento:
         faturamentos = faturamentos.filter(status_agendamento__iexact=status_agendamento)
@@ -2569,7 +2614,7 @@ def verificar_corrigir_precos(request):
             .filter(empresa_id=empresa_id)
             .exclude(_q_status_agendamento_cancelados())
             .filter(data__gte=data_inicio, data__lte=data_fim)
-            .filter(convenio__icontains=convenio)
+            .filter(_q_convenio_filtro(convenio))
             .prefetch_related('itens_servico')
             .order_by('data', 'nome')
         )
@@ -3436,7 +3481,7 @@ def fechamento_repasse(request):
         q_objects = Q()
         for conv in convenios:
             if conv:
-                q_objects |= Q(convenio__icontains=conv)
+                q_objects |= _q_convenio_filtro(conv)
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
@@ -3692,7 +3737,7 @@ def exportar_excel_fechados(request):
         q_objects = Q()
         for conv in convenios:
             if conv:
-                q_objects |= Q(convenio__icontains=conv)
+                q_objects |= _q_convenio_filtro(conv)
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
@@ -4130,7 +4175,7 @@ def imprimir_repasses_fechados(request):
         q_objects = Q()
         for conv in convenios:
             if conv:
-                q_objects |= Q(convenio__icontains=conv)
+                q_objects |= _q_convenio_filtro(conv)
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
@@ -5316,7 +5361,7 @@ def listar_extrato_pagamento(request):
     if competencia:
         qs = qs.filter(competencia=competencia)
     if convenio:
-        qs = qs.filter(convenio__icontains=convenio)
+        qs = qs.filter(_q_convenio_filtro(convenio))
 
     totais = qs.aggregate(
         total_valor=Sum('valor'),

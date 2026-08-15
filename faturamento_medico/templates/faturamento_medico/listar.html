@@ -187,6 +187,7 @@
                                     </div>
                                     <small class="text-muted pb-1">
                                         Exibindo {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ grid_total }}
+                                        procedimentos · valor total filtrado: R$ {{ valor_total_fmt }}
                                     </small>
                                 </div>
                             </div>
@@ -356,7 +357,7 @@
                                             </tr>
                                             <tr>
                                                 <td class="text-center fw-bold resumo-ris-valor-label">VALOR TOTAL:</td>
-                                                <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
+                                                <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ valor_total_fmt }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -413,7 +414,7 @@
                             <div class="info-box">
                                 <span class="info-box-icon bg-success"><i class="fas fa-dollar-sign"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Valor Total</span>
+                                    <span class="info-box-text">Valor Total (procedimentos filtrados)</span>
                                     <span class="info-box-number">R$ {{ valor_total_fmt }}</span>
                                 </div>
                             </div>
@@ -449,6 +450,13 @@
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
+                                            <tfoot>
+                                                <tr class="table-light">
+                                                    <td class="fw-bold">TOTAL</td>
+                                                    <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
+                                                    <td class="text-right fw-bold">R$ {{ valor_total_fmt }}</td>
+                                                </tr>
+                                            </tfoot>
                                         </table>
                                     </div>
                                 </div>
