@@ -500,7 +500,12 @@ class Lote(models.Model):
         # Salva sem chamar save() novamente para evitar loop
         super().save(update_fields=['total_lote'])
 
-    def sincronizar_extrato_pagamento(self, *, lote_convenio: str = '', protocolo: str = ''):
+    def sincronizar_extrato_pagamento(
+        self,
+        *,
+        lote_convenio: str = '',
+        protocolo: str | None = None,
+    ):
         """Cria ou atualiza linha na tabela Extrato de Pagamento ao gerar/adicionar lote."""
         from django.db.models import Count
         from django.db.models.functions import TruncMonth
@@ -538,8 +543,7 @@ class Lote(models.Model):
             competencia = f'{ref.month:02d}/{ref.year}'
 
         convenio = (self.convenio or '').strip()
-        protocolo_val = (protocolo or '').strip()
-        if not protocolo_val:
+        if protocolo is None:
             protocolo_val = (
                 faturamentos.exclude(guia_lancada__isnull=True)
                 .exclude(guia_lancada='')
@@ -547,6 +551,8 @@ class Lote(models.Model):
                 .first()
                 or ''
             )
+        else:
+            protocolo_val = (protocolo or '').strip()
         lote_conv = (lote_convenio or '').strip()
         if not lote_conv:
             lote_conv = str(self.id)

@@ -51,6 +51,14 @@ def _moeda_br(valor):
     except (TypeError, ValueError):
         return '0,00'
 
+
+def _lote_protocolo_faturamento_grid(faturamento, ids_internos):
+    lote_val = (faturamento.lote or '').strip()
+    return {
+        'lote_convenio': '' if lote_val in ids_internos else lote_val,
+        'protocolo': (faturamento.guia_lancada or '').strip(),
+    }
+
 # Status de agendamento fora da lista principal de faturamento
 STATUS_AGENDAMENTO_CANCELADOS = (
     'Cancelado',
@@ -1659,6 +1667,7 @@ def listar_faturamentos(request):
                 'elegivel_lote': faturamento_elegivel_lote(
                     faturamento, ids_internos=ids_lotes_int
                 ),
+                **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
             })
             continue
         itens_filtrados = []
@@ -1689,6 +1698,7 @@ def listar_faturamentos(request):
                 'elegivel_lote': faturamento_elegivel_lote(
                     faturamento, ids_internos=ids_lotes_int
                 ),
+                **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
             })
 
     # Resumo por modalidade (conforme filtros / grid de procedimentos)
@@ -4531,7 +4541,27 @@ def vincular_lote_protocolo(request):
         messages.error(request, 'Seleção inválida.')
         return _redirect_ftlistar_com_filtros_sessao(request)
 
-    from faturamento_medico.services.gerar_lotes_geap import vincular_lote_protocolo_selecionados
+    from faturamento_medico.services.gerar_lotes_geap import (
+        preencher_lote_protocolo_faturamentos,
+        vincular_lote_protocolo_selecionados,
+    )
+
+    lote_convenio = (request.POST.get('lote_convenio') or '').strip()
+    protocolo = (request.POST.get('protocolo') or '').strip()
+    guia = (request.POST.get('guia') or '').strip()
+    if lote_convenio or protocolo or guia:
+        preenchidos = preencher_lote_protocolo_faturamentos(
+            empresa_id=empresa_id,
+            faturamento_ids=ids,
+            lote_convenio=lote_convenio,
+            protocolo=protocolo,
+            guia=guia,
+        )
+        if preenchidos:
+            messages.info(
+                request,
+                f'Dados informados em {preenchidos} faturamento(s) antes da vinculação.',
+            )
 
     stats = vincular_lote_protocolo_selecionados(empresa_id=empresa_id, faturamento_ids=ids)
     if stats['lotes_criados']:

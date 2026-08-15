@@ -161,6 +161,9 @@
                     {% if grid_total %}
                     <form method="POST" action="{% url 'faturamento_medico:gerar_lote' %}" id="form-lote">
                         {% csrf_token %}
+                        <input type="hidden" name="lote_convenio" id="input-lote-convenio-vincular" value="">
+                        <input type="hidden" name="protocolo" id="input-protocolo-vincular" value="">
+                        <input type="hidden" name="guia" id="input-guia-vincular" value="">
                         <div class="row mb-3 align-items-end">
                             <div class="col-md-4">
                                 <label for="lote_existente" class="form-label">Adicionar a Lote Existente (opcional):</label>
@@ -182,10 +185,10 @@
                                 <button type="submit" class="btn btn-success">
                                     <i class="fas fa-plus-circle"></i> Gerar/Adicionar Lote dos Selecionados
                                 </button>
-                                <button type="submit"
+                                <button type="button"
                                         class="btn btn-primary"
-                                        formaction="{% url 'faturamento_medico:vincular_lote_protocolo' %}"
-                                        title="Usa o lote e protocolo já informados no faturamento (convênio externo)">
+                                        id="btn-vincular-lote-protocolo"
+                                        title="Abre formulário para informar lote, guia e protocolo dos selecionados">
                                     <i class="fas fa-link"></i> Vincular Lote e Protocolo
                                 </button>
                             </div>
@@ -235,7 +238,13 @@
                                         data-status-css="{{ linha.status_conferencia_css }}">
                                         <td>
                                             {% if linha.mostrar_selecao_lote and linha.elegivel_lote %}
-                                                <input type="checkbox" name="faturamentos_selecionados" value="{{ linha.faturamento.id }}" class="faturamento-lote-checkbox">
+                                                <input type="checkbox"
+                                                       name="faturamentos_selecionados"
+                                                       value="{{ linha.faturamento.id }}"
+                                                       class="faturamento-lote-checkbox"
+                                                       data-lote="{{ linha.lote_convenio|default:'' }}"
+                                                       data-protocolo="{{ linha.protocolo|default:'' }}"
+                                                       data-guia="{{ linha.faturamento.guia|default:'' }}">
                                             {% endif %}
                                         </td>
                                         <td>{{ linha.faturamento.data|date:"d/m/Y" }}</td>
@@ -538,6 +547,43 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal lote e protocolo (convênio externo) -->
+                    <div class="modal fade" id="modalVincularLoteProtocolo" tabindex="-1" aria-labelledby="modalVincularLoteProtocoloLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalVincularLoteProtocoloLabel">
+                                        <i class="fas fa-link me-1"></i> Vincular Lote, Guia e Protocolo
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="text-muted small mb-3">
+                                        Informe os dados abaixo para aplicar a todos os exames selecionados e gerar o lote interno.
+                                    </p>
+                                    <div class="mb-3">
+                                        <label for="modal-lote-convenio" class="form-label">Lote do convênio <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="modal-lote-convenio" maxlength="50" placeholder="Ex.: 1678333" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="modal-guia" class="form-label">Número da guia</label>
+                                        <input type="text" class="form-control" id="modal-guia" maxlength="50" placeholder="Número da guia no convênio">
+                                    </div>
+                                    <div class="mb-0">
+                                        <label for="modal-protocolo" class="form-label">Protocolo</label>
+                                        <input type="text" class="form-control" id="modal-protocolo" maxlength="50" placeholder="Número do protocolo no portal">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-primary" id="btn-confirmar-vincular-lote">
+                                        <i class="fas fa-check"></i> Vincular
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1016,6 +1062,116 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectAllLoteCheckbox.checked = checkedBoxes.length === faturamentoLoteCheckboxes.length;
                 selectAllLoteCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < faturamentoLoteCheckboxes.length;
             });
+        });
+    }
+
+    const formLote = document.getElementById('form-lote');
+    const btnVincularLote = document.getElementById('btn-vincular-lote-protocolo');
+    const modalVincularEl = document.getElementById('modalVincularLoteProtocolo');
+    const urlVincularLote = '{% url "faturamento_medico:vincular_lote_protocolo" %}';
+
+    function getSelectedFaturamentoCheckboxes() {
+        return Array.from(document.querySelectorAll('.faturamento-lote-checkbox:checked'));
+    }
+
+    function valorUnanimoDataset(checkboxes, attr) {
+        const vals = [...new Set(
+            checkboxes
+                .map(cb => (cb.dataset[attr] || '').trim())
+                .filter(Boolean)
+        )];
+        return vals.length === 1 ? vals[0] : '';
+    }
+
+    function enviarVincularLoteProtocolo(lote, guia, protocolo) {
+        if (!formLote) return;
+        document.getElementById('input-lote-convenio-vincular').value = lote || '';
+        document.getElementById('input-guia-vincular').value = guia || '';
+        document.getElementById('input-protocolo-vincular').value = protocolo || '';
+        const originalAction = formLote.action;
+        formLote.action = urlVincularLote;
+        formLote.submit();
+        formLote.action = originalAction;
+    }
+
+    function prepararModalVincular(checkboxes) {
+        const inputLote = document.getElementById('modal-lote-convenio');
+        const inputGuia = document.getElementById('modal-guia');
+        const inputProtocolo = document.getElementById('modal-protocolo');
+        inputLote.value = valorUnanimoDataset(checkboxes, 'lote');
+        inputGuia.value = valorUnanimoDataset(checkboxes, 'guia');
+        inputProtocolo.value = valorUnanimoDataset(checkboxes, 'protocolo');
+    }
+
+    function camposComAlteracaoExistente(checkboxes, lote, guia, protocolo) {
+        const campos = [];
+        function vaiAlterar(attr, novoValor) {
+            if (!novoValor) return false;
+            return checkboxes.some(cb => {
+                const atual = (cb.dataset[attr] || '').trim();
+                return atual && atual !== novoValor;
+            });
+        }
+        if (vaiAlterar('lote', lote)) campos.push('lote do convênio');
+        if (vaiAlterar('guia', guia)) campos.push('número da guia');
+        if (vaiAlterar('protocolo', protocolo)) campos.push('protocolo');
+        return campos;
+    }
+
+    function confirmarAlteracaoExistente(checkboxes, lote, guia, protocolo) {
+        const campos = camposComAlteracaoExistente(checkboxes, lote, guia, protocolo);
+        if (!campos.length) return true;
+        const lista = campos.length === 1
+            ? campos[0]
+            : campos.slice(0, -1).join(', ') + ' e ' + campos[campos.length - 1];
+        return confirm(
+            'Alguns itens selecionados já possuem ' + lista + ' informado(s).\n\n' +
+            'Deseja alterar pelos valores informados?'
+        );
+    }
+
+    if (btnVincularLote && formLote) {
+        btnVincularLote.addEventListener('click', function() {
+            const selected = getSelectedFaturamentoCheckboxes();
+            if (!selected.length) {
+                alert('Selecione pelo menos um faturamento para vincular lote e protocolo.');
+                return;
+            }
+            prepararModalVincular(selected);
+            if (modalVincularEl && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalVincularEl).show();
+            } else if (modalVincularEl) {
+                modalVincularEl.classList.add('show');
+                modalVincularEl.style.display = 'block';
+            }
+        });
+    }
+
+    const btnConfirmarVincular = document.getElementById('btn-confirmar-vincular-lote');
+    if (btnConfirmarVincular) {
+        btnConfirmarVincular.addEventListener('click', function() {
+            const selected = getSelectedFaturamentoCheckboxes();
+            const inputLote = document.getElementById('modal-lote-convenio');
+            const inputGuia = document.getElementById('modal-guia');
+            const inputProtocolo = document.getElementById('modal-protocolo');
+            const lote = inputLote.value.trim();
+            const guia = inputGuia.value.trim();
+            const protocolo = inputProtocolo.value.trim();
+
+            if (!lote) {
+                alert('Informe o lote do convênio.');
+                inputLote.focus();
+                return;
+            }
+
+            if (!confirmarAlteracaoExistente(selected, lote, guia, protocolo)) {
+                return;
+            }
+
+            if (modalVincularEl && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalVincularEl).hide();
+            }
+            enviarVincularLoteProtocolo(lote, guia, protocolo);
         });
     }
 

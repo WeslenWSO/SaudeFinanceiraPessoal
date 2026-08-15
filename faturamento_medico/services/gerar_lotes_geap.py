@@ -31,6 +31,34 @@ def _valor_conferido_faturamento(fat: FaturamentoMedico) -> Decimal:
     return Decimal(str(total or 0))
 
 
+def _convenio_agrupa_somente_lote(convenio: str) -> bool:
+    """POSTAL SAÚDE agrupa extrato/lote interno apenas pelo lote do convênio."""
+    return 'POSTAL' in (convenio or '').upper()
+
+
+def _protocolo_faturamento(fat: FaturamentoMedico) -> str:
+    """Protocolo do convênio (campo guia_lancada)."""
+    return (fat.guia_lancada or '').strip()
+
+
+def _chave_lote_protocolo(
+    fat: FaturamentoMedico,
+    *,
+    ids_internos: set[str],
+) -> tuple[str, str]:
+    lote_conv = _lote_convenio_faturamento(fat, ids_internos=ids_internos)
+    if _convenio_agrupa_somente_lote(fat.convenio):
+        return lote_conv, ''
+    return lote_conv, _protocolo_faturamento(fat)
+
+
+def _lote_convenio_faturamento(fat: FaturamentoMedico, *, ids_internos: set[str]) -> str:
+    lote = (fat.lote or '').strip()
+    if not lote or lote in ids_internos:
+        return ''
+    return lote
+
+
 def _agrupar_por_lote_protocolo(
     faturamentos: list[FaturamentoMedico],
     *,
@@ -46,12 +74,12 @@ def _agrupar_por_lote_protocolo(
         if not faturamento_elegivel_lote(fat, ids_internos=ids_internos):
             erros.append(f'#{fat.id} pendente de conferência ou indisponível.')
             continue
-        lote_conv = (fat.lote or '').strip()
-        protocolo = (fat.guia_lancada or '').strip()
-        if not lote_conv or not protocolo:
-            erros.append(
-                f'#{fat.id} sem lote ou protocolo (guia lançada) preenchidos no faturamento.'
-            )
+        lote_conv, protocolo = _chave_lote_protocolo(fat, ids_internos=ids_internos)
+        if not lote_conv:
+            erros.append(f'#{fat.id} sem lote do convênio preenchido no faturamento.')
+            continue
+        if not _convenio_agrupa_somente_lote(fat.convenio) and not protocolo:
+            erros.append(f'#{fat.id} sem protocolo preenchido no faturamento.')
             continue
         if lote_conv in ids_internos:
             erros.append(f'#{fat.id} lote inválido ou já vinculado.')
@@ -86,11 +114,10 @@ def _criar_lotes_dos_grupos(
             continue
 
         lote = Lote.objects.create(empresa_id=empresa_id, convenio=convenio_nome)
-        fat_ids = [f.id for f in fats]
-        FaturamentoMedico.objects.filter(id__in=fat_ids).update(
-            lote=str(lote.id),
-            status='aguardando_pagamento',
-        )
+        for fat in fats:
+            fat.lote = str(lote.id)
+            fat.status = 'aguardando_pagamento'
+            fat.save(update_fields=['lote', 'status'])
         lote.total_lote = valor
         lote.save(update_fields=['total_lote'])
         lote.sincronizar_extrato_pagamento(lote_convenio=lote_conv, protocolo=protocolo)
@@ -101,6 +128,43 @@ def _criar_lotes_dos_grupos(
         )
 
     return stats
+
+
+def preencher_lote_protocolo_faturamentos(
+    *,
+    empresa_id: int,
+    faturamento_ids: list[int],
+    lote_convenio: str = '',
+    protocolo: str = '',
+    guia: str = '',
+) -> int:
+    """Preenche lote, guia e protocolo do convênio nos faturamentos selecionados."""
+    lote_convenio = (lote_convenio or '').strip()
+    protocolo = (protocolo or '').strip()
+    guia = (guia or '').strip()
+    if not lote_convenio and not protocolo and not guia:
+        return 0
+
+    ids_internos = ids_lotes_internos(empresa_id)
+    atualizados = 0
+    for fat in FaturamentoMedico.objects.filter(id__in=faturamento_ids, empresa_id=empresa_id):
+        update_fields: list[str] = []
+        lote_atual = (fat.lote or '').strip()
+        if lote_atual in ids_internos:
+            continue
+        if lote_convenio and lote_convenio != lote_atual:
+            fat.lote = lote_convenio[:50]
+            update_fields.append('lote')
+        if guia and (fat.guia or '').strip() != guia:
+            fat.guia = guia[:50]
+            update_fields.append('guia')
+        if protocolo and (fat.guia_lancada or '').strip() != protocolo:
+            fat.guia_lancada = protocolo[:50]
+            update_fields.append('guia_lancada')
+        if update_fields:
+            fat.save(update_fields=update_fields)
+            atualizados += 1
+    return atualizados
 
 
 def vincular_lote_protocolo_selecionados(
