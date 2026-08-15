@@ -5011,6 +5011,147 @@ def baixar_modelo_ris(request):
     return response
 
 
+def renomear_guias_geap(request):
+    """Renomeia PDFs de guias (DATA - CONVENIO - NOME) e devolve JSON para download."""
+    import base64
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'erro': 'Empresa não encontrada na sessão.'}, status=403)
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    if request.method == 'POST':
+        arquivos = request.FILES.getlist('arquivos')
+        if not arquivos:
+            return JsonResponse({'erro': 'Selecione pelo menos um arquivo PDF.'}, status=400)
+
+        convenio_padrao = (request.POST.get('convenio_padrao') or '').strip()
+        anexar_no_sistema = request.POST.get('anexar_no_sistema', '1') != '0'
+        from faturamento_medico.services.renomear_guias_geap import renomear_guias_geap_arquivos
+
+        resultados = renomear_guias_geap_arquivos(
+            arquivos,
+            convenio_padrao=convenio_padrao,
+            empresa_id=empresa_id,
+            anexar_no_sistema=anexar_no_sistema,
+        )
+        ok_count = sum(1 for r in resultados if r.ok)
+        anexo_count = sum(1 for r in resultados if r.anexo_ok)
+        payload = {
+            'ok_count': ok_count,
+            'erro_count': len(resultados) - ok_count,
+            'anexo_count': anexo_count,
+            'resultados': [
+                {
+                    'arquivo_original': r.arquivo_original,
+                    'arquivo_novo': r.arquivo_novo,
+                    'data_autorizacao': r.data_autorizacao,
+                    'nome_beneficiario': r.nome_beneficiario,
+                    'convenio': r.convenio,
+                    'tipo_guia': r.tipo_guia,
+                    'faturamento_id': r.faturamento_id,
+                    'anexo_ok': r.anexo_ok,
+                    'anexo_tentado': r.anexo_tentado,
+                    'anexo_mensagem': r.anexo_mensagem,
+                    'anexo_erro': r.anexo_erro,
+                    'anexo_sugestoes': r.anexo_sugestoes,
+                    'ok': r.ok,
+                    'erro': r.erro,
+                    'pdf_base64': base64.b64encode(r.pdf_bytes).decode('ascii') if r.ok else '',
+                }
+                for r in resultados
+            ],
+        }
+        return JsonResponse(payload)
+
+    return render(
+        request,
+        'faturamento_medico/renomear_guias_geap.html',
+        {'titulo': 'Renomear Guias'},
+    )
+
+
+def buscar_faturamentos_guia(request):
+    """Busca manual de faturamentos para vincular guia não encontrada."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'erro': 'Empresa não encontrada na sessão.'}, status=403)
+
+    from faturamento_medico.services.vincular_guia_anexo import (
+        buscar_faturamentos_manual,
+        sugestao_para_dict,
+    )
+
+    termo = (request.GET.get('termo') or request.POST.get('termo') or '').strip()
+    convenio = (request.GET.get('convenio') or request.POST.get('convenio') or '').strip()
+    data_guia = (request.GET.get('data_guia') or request.POST.get('data_guia') or '').strip()
+
+    if not termo and not convenio and not data_guia:
+        return JsonResponse({'erro': 'Informe paciente, convênio ou data para buscar.'}, status=400)
+
+    resultados = buscar_faturamentos_manual(
+        empresa_id=empresa_id,
+        termo=termo,
+        convenio=convenio,
+        data_guia_str=data_guia,
+    )
+    return JsonResponse({
+        'resultados': [sugestao_para_dict(s) for s in resultados],
+    })
+
+
+def anexar_guia_manual(request):
+    """Anexa PDF de guia a um faturamento escolhido manualmente."""
+    import base64
+    import json
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'erro': 'Empresa não encontrada na sessão.'}, status=403)
+
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            payload = json.loads(request.body.decode('utf-8'))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({'erro': 'JSON inválido.'}, status=400)
+    else:
+        payload = request.POST
+
+    faturamento_id = payload.get('faturamento_id')
+    nome_arquivo = (payload.get('nome_arquivo') or '').strip()
+    pdf_base64 = (payload.get('pdf_base64') or '').strip()
+
+    if not faturamento_id or not nome_arquivo or not pdf_base64:
+        return JsonResponse({'erro': 'Dados incompletos para anexar a guia.'}, status=400)
+
+    try:
+        faturamento_id = int(faturamento_id)
+        pdf_bytes = base64.b64decode(pdf_base64)
+    except (ValueError, TypeError):
+        return JsonResponse({'erro': 'Faturamento ou PDF inválido.'}, status=400)
+
+    from faturamento_medico.services.vincular_guia_anexo import anexar_guia_por_faturamento_id
+
+    resultado = anexar_guia_por_faturamento_id(
+        empresa_id=empresa_id,
+        faturamento_id=faturamento_id,
+        pdf_bytes=pdf_bytes,
+        nome_arquivo=nome_arquivo,
+    )
+    if not resultado.ok:
+        return JsonResponse({'ok': False, 'erro': resultado.erro}, status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'faturamento_id': resultado.faturamento_id,
+        'mensagem': resultado.mensagem,
+        'paciente': resultado.paciente,
+        'data_procedimento': resultado.data_procedimento,
+    })
+
+
 def importar_ris(request):
     """View para importar relatório no modelo próprio RIS (.xlsx)."""
     empresa_id = request.session.get('empresa_id')

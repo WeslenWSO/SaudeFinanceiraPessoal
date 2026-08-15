@@ -1,0 +1,1389 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+
+
+{% block title %}Renomear Guias{% endblock %}
+
+
+
+{%block nav_%}
+
+    {% include 'parcial/_nav.html' %}
+
+{%endblock%}
+
+
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="row">
+
+        <div class="col-lg-9">
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <h3 class="card-title mb-0">
+
+                        <i class="fas fa-i-cursor me-1"></i> Renomear Guias
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="alert alert-info">
+
+                        <i class="fas fa-info-circle"></i>
+
+                        Selecione a <strong>pasta</strong> com os PDFs das guias. Cada arquivo será renomeado para:
+
+                        <strong>Data - Convênio - Nome.pdf</strong>
+
+                        <br>
+
+                        <small class="text-muted d-block mt-2">Exemplos:</small>
+
+                        <ul class="small text-muted mb-0">
+
+                            <li><code>18-07-2026 - GEAP - GUILHERME DAVID MARQUES ALEXANDRE.pdf</code></li>
+
+                            <li><code>14-08-2026 - BRADESCO - RICARDO TABALIPA MENDES.pdf</code></li>
+
+                            <li><code>14-08-2026 - POSTAL - YASMIN GABRIELLY FELIX SENA.pdf</code></li>
+
+                            <li><code>15-08-2026 - CASSI - JOSE CARLOS FERREIRA.pdf</code></li>
+
+                            <li><code>13-08-2026 - FUSEX - JOAO PEDRO V MACEDO.pdf</code></li>
+
+                            <li><code>03-08-2026 - PM - JOZE ALTAMIR L DO NASCIMENTO.pdf</code></li>
+
+                            <li><code>11-08-2026 - BOMBEIRO - ANDRESSA OLIVEIRA DA LUZ DE SOUSA.pdf</code></li>
+
+                        </ul>
+
+                        <small class="text-muted d-block mt-2">
+
+                            O sistema detecta automaticamente TISS (GEAP, Bradesco, Postal, CASSI), FUSEX, PM e Bombeiro.
+
+                            Se encontrar paciente e convênio com data do procedimento entre a data da guia e
+
+                            <strong>20 dias depois</strong>, anexa o PDF ao faturamento no sistema.
+
+                            Se o OCR não ler o PDF, tenta via <strong>Gemini</strong> (cota diária no plano gratuito).
+
+                            Guias TISS digitais costumam funcionar só com OCR local, sem Gemini.
+
+                            Os arquivos serão <strong>renomeados na pasta</strong> selecionada (Chrome ou Edge).
+
+                            Funciona com o site no <strong>Render</strong>: a pasta é no seu PC; o servidor só lê o PDF e devolve o novo nome.
+
+                        </small>
+
+                        <small class="text-muted d-block mt-1">
+
+                            <i class="fas fa-check-circle text-success"></i>
+
+                            O arquivo <strong>original é substituído</strong> pelo novo nome — não cria cópia na pasta (não baixa outro PDF).
+
+                        </small>
+
+                    </div>
+
+
+
+                    <div class="form-check mb-3">
+
+                        <input class="form-check-input" type="checkbox" id="anexar-no-sistema" checked>
+
+                        <label class="form-check-label" for="anexar-no-sistema">
+
+                            Anexar automaticamente ao faturamento (cópia no sistema online; a pasta local só é renomeada)
+
+                        </label>
+
+                    </div>
+
+
+
+                    <div class="mb-3">
+
+                        <label for="convenio-padrao" class="form-label fw-semibold">Convênio padrão (opcional)</label>
+
+                        <input type="text"
+
+                               id="convenio-padrao"
+
+                               class="form-control form-control-sm"
+
+                               maxlength="30"
+
+                               placeholder="Ex.: GEAP — usado se a detecção automática falhar">
+
+                        <small class="text-muted">Somente para guias TISS quando o cabeçalho não for identificado.</small>
+
+                    </div>
+
+
+
+                    <div class="mb-3">
+
+                        <button type="button" class="btn btn-outline-primary" id="btn-selecionar-pasta">
+
+                            <i class="fas fa-folder-open"></i> Selecionar pasta com guias PDF
+
+                        </button>
+
+                        <span class="text-muted ms-2" id="resumo-arquivos">Nenhuma pasta selecionada</span>
+
+                        <div class="small text-muted mt-1" id="aviso-navegador"></div>
+
+                    </div>
+
+
+
+                    <div id="painel-arquivos" class="d-none mb-3">
+
+                        <label class="form-label fw-semibold">Arquivos selecionados</label>
+
+                        <div class="table-responsive border rounded" style="max-height: 260px; overflow-y: auto;">
+
+                            <table class="table table-sm table-hover mb-0">
+
+                                <thead class="table-light sticky-top">
+
+                                    <tr>
+
+                                        <th width="40">
+
+                                            <input type="checkbox" id="check-todos-pdfs" checked title="Marcar todos">
+
+                                        </th>
+
+                                        <th>Arquivo</th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody id="lista-pdfs"></tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <button type="button" class="btn btn-primary" id="btn-renomear" disabled>
+
+                        <i class="fas fa-i-cursor"></i> Renomear na pasta
+
+                    </button>
+
+                    <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary">Voltar</a>
+
+
+
+                    <div id="status-processamento" class="small text-muted mt-3"></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="row mt-3 d-none" id="painel-resultados">
+
+        <div class="col-lg-11">
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <h5 class="card-title mb-0">Resultado do processamento</h5>
+
+                </div>
+
+                <div class="card-body p-0">
+
+                    <div class="table-responsive">
+
+                        <table class="table table-sm table-striped mb-0">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>Arquivo original</th>
+
+                                    <th>Novo nome</th>
+
+                                    <th>Data</th>
+
+                                    <th>Convênio</th>
+
+                                    <th>Tipo</th>
+
+                                    <th>Nome</th>
+
+                                    <th>Anexo</th>
+
+                                    <th>Status</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="tbody-resultados"></tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="row mt-3 d-none" id="painel-guias-pendentes">
+
+        <div class="col-12">
+
+            <div class="card border-warning">
+
+                <div class="card-header bg-warning bg-opacity-10">
+
+                    <h5 class="card-title mb-0">
+
+                        <i class="fas fa-file-medical me-1"></i> Guias sem vínculo — selecione o procedimento
+
+                    </h5>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="d-flex flex-wrap gap-3" id="grid-guias-pendentes"></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<div class="modal fade" id="modal-buscar-paciente" tabindex="-1" aria-hidden="true">
+
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title">Buscar paciente e procedimentos</h5>
+
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <div class="row g-2 mb-3">
+
+                    <div class="col-md-5">
+
+                        <label class="form-label small">Paciente</label>
+
+                        <input type="text" class="form-control form-control-sm" id="busca-termo">
+
+                    </div>
+
+                    <div class="col-md-3">
+
+                        <label class="form-label small">Convênio</label>
+
+                        <input type="text" class="form-control form-control-sm" id="busca-convenio">
+
+                    </div>
+
+                    <div class="col-md-2">
+
+                        <label class="form-label small">Data guia</label>
+
+                        <input type="text" class="form-control form-control-sm" id="busca-data" placeholder="DD/MM/AAAA">
+
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end">
+
+                        <button type="button" class="btn btn-primary btn-sm w-100" id="btn-executar-busca">
+
+                            <i class="fas fa-search"></i> Buscar
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div id="busca-status" class="small text-muted mb-2"></div>
+
+                <div class="list-group" id="lista-busca-resultados"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<style>
+
+.guia-card {
+
+    width: 220px;
+
+    min-height: 310px;
+
+    border: 1px solid #adb5bd;
+
+    border-radius: 4px;
+
+    background: #fff;
+
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+
+    display: flex;
+
+    flex-direction: column;
+
+    overflow: hidden;
+
+}
+
+.guia-card-header {
+
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+
+    border-bottom: 1px solid #dee2e6;
+
+    padding: .55rem .65rem;
+
+    font-size: .72rem;
+
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: .03em;
+
+}
+
+.guia-card-body {
+
+    padding: .65rem;
+
+    flex: 1;
+
+    font-size: .78rem;
+
+}
+
+.guia-card-nome {
+
+    font-weight: 600;
+
+    font-size: .82rem;
+
+    line-height: 1.25;
+
+    min-height: 2.5em;
+
+}
+
+.guia-card-meta {
+
+    color: #6c757d;
+
+    font-size: .72rem;
+
+    margin-top: .35rem;
+
+}
+
+.guia-card-footer {
+
+    border-top: 1px dashed #dee2e6;
+
+    padding: .55rem .65rem;
+
+    background: #fcfcfc;
+
+}
+
+.guia-sugestao-btn {
+
+    display: block;
+
+    width: 100%;
+
+    text-align: left;
+
+    font-size: .72rem;
+
+    padding: .35rem .45rem;
+
+    margin-bottom: .35rem;
+
+}
+
+.guia-card.anexada {
+
+    border-color: #198754;
+
+    opacity: .85;
+
+}
+
+</style>
+
+
+
+<script>
+
+(function() {
+
+    const urlProcessar = '{% url "faturamento_medico:renomear_guias_geap" %}';
+
+    const urlBuscar = '{% url "faturamento_medico:buscar_faturamentos_guia" %}';
+
+    const urlAnexar = '{% url "faturamento_medico:anexar_guia_manual" %}';
+
+    const csrfToken = '{{ csrf_token }}';
+
+
+
+    const btnSelecionarPasta = document.getElementById('btn-selecionar-pasta');
+
+    const avisoNavegadorEl = document.getElementById('aviso-navegador');
+
+    const btnRenomear = document.getElementById('btn-renomear');
+
+    const resumoArquivos = document.getElementById('resumo-arquivos');
+
+    const painelArquivos = document.getElementById('painel-arquivos');
+
+    const listaPdfs = document.getElementById('lista-pdfs');
+
+    const checkTodos = document.getElementById('check-todos-pdfs');
+
+    const statusEl = document.getElementById('status-processamento');
+
+    const painelResultados = document.getElementById('painel-resultados');
+
+    const tbodyResultados = document.getElementById('tbody-resultados');
+
+    const convenioPadraoEl = document.getElementById('convenio-padrao');
+
+    const anexarNoSistemaEl = document.getElementById('anexar-no-sistema');
+
+    const painelGuiasPendentes = document.getElementById('painel-guias-pendentes');
+
+    const gridGuiasPendentes = document.getElementById('grid-guias-pendentes');
+
+    const modalBuscaEl = document.getElementById('modal-buscar-paciente');
+
+    const buscaTermoEl = document.getElementById('busca-termo');
+
+    const buscaConvenioEl = document.getElementById('busca-convenio');
+
+    const buscaDataEl = document.getElementById('busca-data');
+
+    const btnExecutarBusca = document.getElementById('btn-executar-busca');
+
+    const buscaStatusEl = document.getElementById('busca-status');
+
+    const listaBuscaResultados = document.getElementById('lista-busca-resultados');
+
+
+
+    let arquivosSelecionados = [];
+
+    let arquivosPasta = [];
+
+    let dirHandle = null;
+
+    let nomePasta = '';
+
+    let resultadosAtuais = [];
+
+    let indiceGuiaBusca = null;
+
+    let modalBusca = null;
+
+    if (modalBuscaEl && window.bootstrap) {
+
+        modalBusca = new bootstrap.Modal(modalBuscaEl);
+
+    }
+
+
+
+    function escapeHtml(text) {
+
+        return String(text || '')
+
+            .replace(/&/g, '&amp;')
+
+            .replace(/</g, '&lt;')
+
+            .replace(/>/g, '&gt;')
+
+            .replace(/"/g, '&quot;');
+
+    }
+
+
+
+    function base64ToBlob(base64, mime) {
+
+        const bin = atob(base64);
+
+        const bytes = new Uint8Array(bin.length);
+
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+        return new Blob([bytes], { type: mime || 'application/pdf' });
+
+    }
+
+
+
+    function renderListaPdfs() {
+
+        listaPdfs.innerHTML = '';
+
+        arquivosSelecionados.forEach((file, idx) => {
+
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+
+                <td><input type="checkbox" class="pdf-check" data-idx="${idx}" checked></td>
+
+                <td>${file.name}</td>
+
+            `;
+
+            listaPdfs.appendChild(tr);
+
+        });
+
+        painelArquivos.classList.toggle('d-none', arquivosSelecionados.length === 0);
+
+        btnRenomear.disabled = arquivosSelecionados.length === 0;
+
+        resumoArquivos.textContent = arquivosSelecionados.length
+
+            ? `${arquivosSelecionados.length} PDF(s) em ${nomePasta || 'pasta'}`
+
+            : (nomePasta ? `Nenhum PDF em ${nomePasta}` : 'Nenhuma pasta selecionada');
+
+    }
+
+
+
+    if (!window.showDirectoryPicker) {
+
+        avisoNavegadorEl.textContent = 'Renomear na pasta exige Chrome ou Edge (acesso à pasta no disco).';
+
+    }
+
+
+
+    async function carregarPdfsDaPasta(handle) {
+
+        const entradas = [];
+
+        for await (const [name, entry] of handle.entries()) {
+
+            if (entry.kind === 'file' && name.toLowerCase().endsWith('.pdf')) {
+
+                entradas.push({ name, handle: entry, file: await entry.getFile() });
+
+            }
+
+        }
+
+        entradas.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+        return entradas;
+
+    }
+
+
+
+    async function renomearArquivoNaPasta(nomeOriginal, nomeNovo, fileHandle) {
+
+        if (nomeOriginal === nomeNovo) return;
+
+        if (typeof fileHandle.move === 'function') {
+
+            await fileHandle.move(nomeNovo);
+
+            return;
+
+        }
+
+        const file = await fileHandle.getFile();
+
+        const newHandle = await dirHandle.getFileHandle(nomeNovo, { create: true });
+
+        const writable = await newHandle.createWritable();
+
+        try {
+
+            await writable.write(await file.arrayBuffer());
+
+            await writable.close();
+
+            await dirHandle.removeEntry(nomeOriginal);
+
+        } catch (err) {
+
+            try {
+
+                await dirHandle.removeEntry(nomeNovo, { recursive: false });
+
+            } catch (cleanupErr) {
+
+                console.warn('Falha ao limpar arquivo parcial:', cleanupErr);
+
+            }
+
+            throw err;
+
+        }
+
+    }
+
+
+
+    async function aplicarRenomeacaoNaPasta(resultados) {
+
+        if (!dirHandle) {
+
+            throw new Error('Selecione a pasta com as guias antes de renomear.');
+
+        }
+
+        const handlePorNome = new Map(arquivosPasta.map(p => [p.name, p.handle]));
+
+        let renomeados = 0;
+
+        const falhas = [];
+
+        for (const item of resultados) {
+
+            if (!item.ok || !item.arquivo_novo) continue;
+
+            const handle = handlePorNome.get(item.arquivo_original);
+
+            if (!handle) {
+
+                falhas.push({ arquivo: item.arquivo_original, erro: 'Arquivo não encontrado na pasta.' });
+
+                continue;
+
+            }
+
+            try {
+
+                await renomearArquivoNaPasta(item.arquivo_original, item.arquivo_novo, handle);
+
+                handlePorNome.delete(item.arquivo_original);
+
+                renomeados += 1;
+
+            } catch (err) {
+
+                falhas.push({ arquivo: item.arquivo_original, erro: err.message || 'Falha ao renomear.' });
+
+            }
+
+        }
+
+        arquivosPasta = await carregarPdfsDaPasta(dirHandle);
+
+        arquivosSelecionados = arquivosPasta.map(p => p.file);
+
+        renderListaPdfs();
+
+        return { renomeados, falhas };
+
+    }
+
+
+
+    btnSelecionarPasta.addEventListener('click', async function() {
+
+        if (!window.showDirectoryPicker) {
+
+            alert('Use Chrome ou Edge para selecionar a pasta e renomear os arquivos no disco.');
+
+            return;
+
+        }
+
+        try {
+
+            dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+            nomePasta = dirHandle.name || 'pasta';
+
+            arquivosPasta = await carregarPdfsDaPasta(dirHandle);
+
+            arquivosSelecionados = arquivosPasta.map(p => p.file);
+
+            if (!arquivosSelecionados.length) {
+
+                alert('Nenhum PDF encontrado nesta pasta.');
+
+            }
+
+            renderListaPdfs();
+
+            statusEl.textContent = '';
+
+            painelResultados.classList.add('d-none');
+
+            painelGuiasPendentes.classList.add('d-none');
+
+            gridGuiasPendentes.innerHTML = '';
+
+        } catch (err) {
+
+            if (err && err.name !== 'AbortError') {
+
+                alert(err.message || 'Não foi possível acessar a pasta.');
+
+            }
+
+        }
+
+    });
+
+
+
+    checkTodos.addEventListener('change', function() {
+
+        document.querySelectorAll('.pdf-check').forEach(cb => {
+
+            cb.checked = checkTodos.checked;
+
+        });
+
+    });
+
+
+
+    function renderGuiasPendentes(resultados) {
+
+        gridGuiasPendentes.innerHTML = '';
+
+        const pendentes = resultados
+
+            .map((item, idx) => ({ item, idx }))
+
+            .filter(({ item }) => item.ok && item.anexo_tentado && !item.anexo_ok);
+
+
+
+        if (!pendentes.length) {
+
+            painelGuiasPendentes.classList.add('d-none');
+
+            return;
+
+        }
+
+
+
+        pendentes.forEach(({ item, idx }) => {
+
+            const card = document.createElement('div');
+
+            card.className = 'guia-card';
+
+            card.dataset.idx = String(idx);
+
+
+
+            const sugestoes = item.anexo_sugestoes || [];
+
+            let sugestoesHtml = '';
+
+            if (sugestoes.length) {
+
+                sugestoesHtml = '<div class="small fw-semibold mb-1">Sugestões próximas:</div>';
+
+                sugestoes.forEach(s => {
+
+                    sugestoesHtml += `
+
+                        <button type="button" class="btn btn-outline-primary guia-sugestao-btn btn-anexar-sugestao"
+
+                                data-idx="${idx}" data-fat-id="${s.faturamento_id}">
+
+                            <strong>${escapeHtml(s.paciente)}</strong><br>
+
+                            <span class="text-muted">${escapeHtml(s.convenio)} · ${escapeHtml(s.data_procedimento)}</span><br>
+
+                            <span class="text-muted">${escapeHtml(s.procedimentos)}</span>
+
+                        </button>`;
+
+                });
+
+            } else {
+
+                sugestoesHtml = '<div class="small text-muted mb-2">Nenhuma sugestão automática.</div>';
+
+            }
+
+
+
+            card.innerHTML = `
+
+                <div class="guia-card-header">${escapeHtml(item.convenio)} · ${escapeHtml(item.data_autorizacao)}</div>
+
+                <div class="guia-card-body">
+
+                    <div class="guia-card-nome">${escapeHtml(item.nome_beneficiario)}</div>
+
+                    <div class="guia-card-meta">${escapeHtml(item.arquivo_novo)}</div>
+
+                    <div class="guia-card-meta mt-2">${escapeHtml(item.anexo_erro || 'Sem correspondência automática')}</div>
+
+                </div>
+
+                <div class="guia-card-footer">
+
+                    ${sugestoesHtml}
+
+                    <button type="button" class="btn btn-sm btn-warning w-100 btn-buscar-paciente" data-idx="${idx}">
+
+                        <i class="fas fa-search"></i> Buscar paciente / procedimentos
+
+                    </button>
+
+                </div>`;
+
+            gridGuiasPendentes.appendChild(card);
+
+        });
+
+
+
+        painelGuiasPendentes.classList.remove('d-none');
+
+    }
+
+
+
+    async function anexarGuiaAoFaturamento(idx, faturamentoId) {
+
+        const item = resultadosAtuais[idx];
+
+        if (!item || !item.pdf_base64) {
+
+            alert('PDF da guia não disponível.');
+
+            return false;
+
+        }
+
+
+
+        const resp = await fetch(urlAnexar, {
+
+            method: 'POST',
+
+            headers: {
+
+                'Content-Type': 'application/json',
+
+                'X-Requested-With': 'XMLHttpRequest',
+
+                'X-CSRFToken': csrfToken,
+
+            },
+
+            body: JSON.stringify({
+
+                faturamento_id: faturamentoId,
+
+                nome_arquivo: item.arquivo_novo,
+
+                pdf_base64: item.pdf_base64,
+
+            }),
+
+            credentials: 'same-origin',
+
+        });
+
+
+
+        const data = await resp.json();
+
+        if (!resp.ok || !data.ok) {
+
+            throw new Error(data.erro || 'Falha ao anexar guia.');
+
+        }
+
+
+
+        item.anexo_ok = true;
+
+        item.anexo_mensagem = data.mensagem;
+
+        item.faturamento_id = data.faturamento_id;
+
+        item.anexo_erro = '';
+
+        renderResultados(resultadosAtuais);
+
+        renderGuiasPendentes(resultadosAtuais);
+
+        return true;
+
+    }
+
+
+
+    function abrirModalBusca(idx) {
+
+        const item = resultadosAtuais[idx];
+
+        if (!item) return;
+
+        indiceGuiaBusca = idx;
+
+        buscaTermoEl.value = item.nome_beneficiario || '';
+
+        buscaConvenioEl.value = item.convenio || '';
+
+        buscaDataEl.value = item.data_autorizacao || '';
+
+        buscaStatusEl.textContent = '';
+
+        listaBuscaResultados.innerHTML = '';
+
+        if (modalBusca) modalBusca.show();
+
+    }
+
+
+
+    function renderResultadosBusca(resultados) {
+
+        listaBuscaResultados.innerHTML = '';
+
+        if (!resultados.length) {
+
+            buscaStatusEl.textContent = 'Nenhum procedimento encontrado.';
+
+            return;
+
+        }
+
+        buscaStatusEl.textContent = `${resultados.length} procedimento(s) encontrado(s).`;
+
+        resultados.forEach(s => {
+
+            const btn = document.createElement('button');
+
+            btn.type = 'button';
+
+            btn.className = 'list-group-item list-group-item-action';
+
+            btn.dataset.fatId = String(s.faturamento_id);
+
+            btn.innerHTML = `
+
+                <div class="d-flex w-100 justify-content-between">
+
+                    <strong>${escapeHtml(s.paciente)}</strong>
+
+                    <small>${escapeHtml(s.data_procedimento)}</small>
+
+                </div>
+
+                <small class="text-muted">${escapeHtml(s.convenio)}</small>
+
+                <div class="small">${escapeHtml(s.procedimentos)}</div>`;
+
+            btn.addEventListener('click', async function() {
+
+                if (indiceGuiaBusca === null) return;
+
+                btn.disabled = true;
+
+                try {
+
+                    await anexarGuiaAoFaturamento(indiceGuiaBusca, s.faturamento_id);
+
+                    if (modalBusca) modalBusca.hide();
+
+                    statusEl.textContent = `Guia anexada ao faturamento #${s.faturamento_id}.`;
+
+                } catch (err) {
+
+                    alert(err.message || 'Erro ao anexar.');
+
+                    btn.disabled = false;
+
+                }
+
+            });
+
+            listaBuscaResultados.appendChild(btn);
+
+        });
+
+    }
+
+
+
+    gridGuiasPendentes.addEventListener('click', async function(ev) {
+
+        const btnSug = ev.target.closest('.btn-anexar-sugestao');
+
+        if (btnSug) {
+
+            const idx = parseInt(btnSug.dataset.idx, 10);
+
+            const fatId = parseInt(btnSug.dataset.fatId, 10);
+
+            btnSug.disabled = true;
+
+            try {
+
+                await anexarGuiaAoFaturamento(idx, fatId);
+
+                statusEl.textContent = `Guia anexada ao faturamento #${fatId}.`;
+
+            } catch (err) {
+
+                alert(err.message || 'Erro ao anexar.');
+
+                btnSug.disabled = false;
+
+            }
+
+            return;
+
+        }
+
+        const btnBusca = ev.target.closest('.btn-buscar-paciente');
+
+        if (btnBusca) {
+
+            abrirModalBusca(parseInt(btnBusca.dataset.idx, 10));
+
+        }
+
+    });
+
+
+
+    btnExecutarBusca.addEventListener('click', async function() {
+
+        const params = new URLSearchParams({
+
+            termo: buscaTermoEl.value.trim(),
+
+            convenio: buscaConvenioEl.value.trim(),
+
+            data_guia: buscaDataEl.value.trim(),
+
+        });
+
+        buscaStatusEl.textContent = 'Buscando...';
+
+        listaBuscaResultados.innerHTML = '';
+
+        try {
+
+            const resp = await fetch(`${urlBuscar}?${params.toString()}`, {
+
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+
+                credentials: 'same-origin',
+
+            });
+
+            const data = await resp.json();
+
+            if (!resp.ok) throw new Error(data.erro || 'Falha na busca.');
+
+            renderResultadosBusca(data.resultados || []);
+
+        } catch (err) {
+
+            buscaStatusEl.textContent = '';
+
+            alert(err.message || 'Erro na busca.');
+
+        }
+
+    });
+
+
+
+    function renderResultados(resultados) {
+
+        tbodyResultados.innerHTML = '';
+
+        resultados.forEach(item => {
+
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+
+                <td>${item.arquivo_original || '-'}</td>
+
+                <td>${item.arquivo_novo || '-'}</td>
+
+                <td>${item.data_autorizacao || '-'}</td>
+
+                <td>${item.convenio || '-'}</td>
+
+                <td>${item.tipo_guia || '-'}</td>
+
+                <td>${item.nome_beneficiario || '-'}</td>
+
+                <td>
+
+                    ${item.anexo_ok
+
+                        ? `<span class="badge bg-success">Sim</span><small class="text-muted d-block">${item.anexo_mensagem || ''}</small>`
+
+                        : (item.ok
+
+                            ? `<span class="badge bg-warning text-dark">Não</span><small class="text-muted d-block">${item.anexo_erro || 'Sem correspondência'}</small>`
+
+                            : '-')}
+
+                </td>
+
+                <td>
+
+                    ${item.ok
+
+                        ? '<span class="badge bg-success">OK</span>'
+
+                        : `<span class="badge bg-danger">Erro</span><small class="text-danger d-block">${item.erro || ''}</small>`}
+
+                </td>
+
+            `;
+
+            tbodyResultados.appendChild(tr);
+
+        });
+
+        painelResultados.classList.remove('d-none');
+
+    }
+
+
+
+    btnRenomear.addEventListener('click', async function() {
+
+        const indices = [];
+
+        document.querySelectorAll('.pdf-check:checked').forEach(cb => {
+
+            const idx = parseInt(cb.dataset.idx, 10);
+
+            if (!Number.isNaN(idx) && arquivosSelecionados[idx]) indices.push(idx);
+
+        });
+
+
+
+        if (!indices.length) {
+
+            alert('Selecione pelo menos um PDF.');
+
+            return;
+
+        }
+
+        if (!dirHandle) {
+
+            alert('Selecione a pasta com as guias PDF.');
+
+            return;
+
+        }
+
+
+
+        btnRenomear.disabled = true;
+
+        statusEl.textContent = 'Processando guias...';
+
+
+
+        const formData = new FormData();
+
+        indices.forEach(idx => {
+
+            const file = arquivosSelecionados[idx];
+
+            formData.append('arquivos', file, file.name);
+
+        });
+
+        const convenioPadrao = (convenioPadraoEl.value || '').trim();
+
+        if (convenioPadrao) {
+
+            formData.append('convenio_padrao', convenioPadrao);
+
+        }
+
+        if (!anexarNoSistemaEl.checked) {
+
+            formData.append('anexar_no_sistema', '0');
+
+        }
+
+
+
+        try {
+
+            const resp = await fetch(urlProcessar, {
+
+                method: 'POST',
+
+                headers: {
+
+                    'X-Requested-With': 'XMLHttpRequest',
+
+                    'X-CSRFToken': csrfToken,
+
+                },
+
+                body: formData,
+
+                credentials: 'same-origin',
+
+            });
+
+
+
+            const data = await resp.json();
+
+            if (!resp.ok) {
+
+                throw new Error(data.erro || 'Falha ao processar os arquivos.');
+
+            }
+
+
+
+            renderResultados(data.resultados || []);
+
+            resultadosAtuais = data.resultados || [];
+
+            renderGuiasPendentes(resultadosAtuais);
+
+
+
+            const { renomeados, falhas } = await aplicarRenomeacaoNaPasta(resultadosAtuais);
+
+
+
+            const erros = data.erro_count || 0;
+
+            const anexos = data.anexo_count || 0;
+
+            let msg = `${renomeados} arquivo(s) renomeado(s) na pasta (sem cópia — o nome antigo deixa de existir).`;
+
+            if (falhas.length) {
+
+                msg += ` ${falhas.length} falha(s) ao renomear no disco.`;
+
+            }
+
+            if (erros) {
+
+                msg += ` ${erros} guia(s) com erro de leitura.`;
+
+            }
+
+            if (anexarNoSistemaEl.checked) {
+
+                msg += ` ${anexos} anexado(s) ao faturamento.`;
+
+            }
+
+            statusEl.textContent = msg;
+
+            if (falhas.length) {
+
+                console.warn('Falhas ao renomear na pasta:', falhas);
+
+            }
+
+        } catch (err) {
+
+            alert(err.message || 'Erro ao renomear guias.');
+
+            statusEl.textContent = '';
+
+        } finally {
+
+            btnRenomear.disabled = arquivosSelecionados.length === 0;
+
+        }
+
+    });
+
+})();
+
+</script>
+
+{% endblock %}
+
+

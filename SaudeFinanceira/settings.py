@@ -17,6 +17,25 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _load_dotenv_file() -> None:
+    """Carrega .env local (gitignored) sem sobrescrever variáveis já definidas."""
+    env_path = BASE_DIR / '.env'
+    if not env_path.is_file():
+        return
+    for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv_file()
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -407,6 +426,10 @@ NFSE_RIO_BRANCO_WS = {
 
 # API Key para Google Gemini (defina GEMINI_API_KEY no ambiente)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+# Tesseract OCR (Windows: caminho completo se não estiver no PATH)
+TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
+# Modelo Gemini (gemini-2.0-flash tem cota maior no plano gratuito que 2.5-flash)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
 # Configurações de upload de arquivos
 DATA_UPLOAD_MAX_NUMBER_FILES = 1000  # Limite de arquivos para importação XML
 
