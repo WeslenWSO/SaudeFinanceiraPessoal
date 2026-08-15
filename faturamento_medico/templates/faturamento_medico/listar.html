@@ -303,11 +303,11 @@
                         <nav class="mt-3" aria-label="Paginação da tabela">
                             <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
                                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page=1">&laquo;</a>
+                                    <a class="page-link" href="?{% if listagem_query_string %}{{ listagem_query_string }}&{% endif %}page=1">&laquo;</a>
                                 </li>
                                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                                     {% if page_obj.has_previous %}
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                    <a class="page-link" href="?{% if listagem_query_string %}{{ listagem_query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
                                     {% else %}
                                     <span class="page-link">Anterior</span>
                                     {% endif %}
@@ -317,19 +317,19 @@
                                     <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                                     {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                                        <a class="page-link" href="?{% if listagem_query_string %}{{ listagem_query_string }}&{% endif %}page={{ num }}">{{ num }}</a>
                                     </li>
                                     {% endif %}
                                 {% endfor %}
                                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                                     {% if page_obj.has_next %}
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Próximo</a>
+                                    <a class="page-link" href="?{% if listagem_query_string %}{{ listagem_query_string }}&{% endif %}page={{ page_obj.next_page_number }}">Próximo</a>
                                     {% else %}
                                     <span class="page-link">Próximo</span>
                                     {% endif %}
                                 </li>
                                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">&raquo;</a>
+                                    <a class="page-link" href="?{% if listagem_query_string %}{{ listagem_query_string }}&{% endif %}page={{ page_obj.paginator.num_pages }}">&raquo;</a>
                                 </li>
                             </ul>
                         </nav>

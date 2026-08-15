@@ -64,32 +64,42 @@ def _q_status_agendamento_cancelados():
 
 
 def _filtros_listagem_faturamento(request, use_session_fallback=False):
-    """Lê filtros da listagem (GET, com defaults de data iguais à tela)."""
+    """Lê filtros da listagem (GET; opcionalmente complementa com sessão)."""
     g = request.GET
     sess = request.session.get('faturamento_filters') or {} if use_session_fallback else {}
 
     def pick(key, default=''):
-        v = g.get(key)
-        if v is not None and str(v).strip():
-            return str(v).strip()
+        # Parâmetro presente na URL (mesmo vazio) tem prioridade sobre a sessão
+        if key in g:
+            v = g.get(key)
+            return str(v).strip() if v is not None else ''
         if use_session_fallback:
             sv = sess.get(key)
             if sv is not None and str(sv).strip():
                 return str(sv).strip()
         return default
 
-    convenios = [c.strip() for c in g.getlist('convenio') if c and str(c).strip()]
-    if not convenios and use_session_fallback:
+    if 'convenio' in g:
+        convenios = [c.strip() for c in g.getlist('convenio') if c and str(c).strip()]
+    elif use_session_fallback:
         convenios = [c for c in (sess.get('convenio') or []) if c and str(c).strip()]
+    else:
+        convenios = []
 
     hoje = date.today()
     data_inicio = pick('data_inicio')
     data_fim = pick('data_fim')
     if not data_inicio:
-        data_inicio = hoje.replace(day=1).strftime('%Y-%m-%d')
+        data_inicio = (
+            (sess.get('data_inicio') if use_session_fallback else None)
+            or hoje.replace(day=1).strftime('%Y-%m-%d')
+        )
     if not data_fim:
         proximo_mes = hoje.replace(day=28) + timedelta(days=4)
-        data_fim = (proximo_mes - timedelta(days=proximo_mes.day)).strftime('%Y-%m-%d')
+        data_fim = (
+            (sess.get('data_fim') if use_session_fallback else None)
+            or (proximo_mes - timedelta(days=proximo_mes.day)).strftime('%Y-%m-%d')
+        )
 
     return {
         'nome': pick('nome'),
@@ -127,13 +137,13 @@ _FAT_LISTAGEM_FILTER_KEYS = (
 
 
 def _tem_filtros_na_query(request):
-    """True se a URL traz parâmetros de filtro (exceto paginação)."""
+    """True se a URL traz parâmetros de filtro (mesmo vazios), exceto paginação."""
     if request.GET.get('limpar'):
         return False
     for key in _FAT_LISTAGEM_FILTER_KEYS:
-        if (request.GET.get(key) or '').strip():
+        if key in request.GET:
             return True
-    return bool(request.GET.getlist('convenio'))
+    return 'convenio' in request.GET
 
 
 def _filtros_dict_from_session(sess):
@@ -157,6 +167,39 @@ def _query_listagem_faturamento(filtros, *, per_page=None):
         extra = urlencode({'per_page': per_page})
         qs = f'{qs}&{extra}' if qs else extra
     return qs
+
+
+def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
+    request.session['faturamento_filters'] = {
+        'nome': filtros.get('nome') or '',
+        'guia': filtros.get('guia') or '',
+        'anestesista': filtros.get('anestesista') or '',
+        'status': filtros.get('status') or '',
+        'status_conferencia': filtros.get('status_conferencia') or '',
+        'lote': filtros.get('lote') or '',
+        'data_inicio': filtros.get('data_inicio') or '',
+        'data_fim': filtros.get('data_fim') or '',
+        'convenio': filtros.get('convenios') or [],
+        'codigo_relatorio': filtros.get('codigo_relatorio') or '',
+        'per_page': str(per_page),
+    }
+    request.session.modified = True
+
+
+def _url_ftlistar_com_filtros_sessao(request):
+    sess = request.session.get('faturamento_filters') or {}
+    url = reverse('faturamento_medico:ftlistar')
+    if not sess:
+        return url
+    qs = _query_listagem_faturamento(
+        _filtros_dict_from_session(sess),
+        per_page=sess.get('per_page'),
+    )
+    return f'{url}?{qs}' if qs else url
+
+
+def _redirect_ftlistar_com_filtros_sessao(request):
+    return redirect(_url_ftlistar_com_filtros_sessao(request))
 
 
 def _aplicar_filtros_faturamento_qs(qs, filtros):
@@ -1442,19 +1485,14 @@ def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
     if request.GET.get('limpar'):
         request.session.pop('faturamento_filters', None)
+        request.session.modified = True
         return redirect('faturamento_medico:ftlistar')
 
-    if not _tem_filtros_na_query(request):
+    tem_filtros_url = _tem_filtros_na_query(request)
+    if not tem_filtros_url:
         sess = request.session.get('faturamento_filters') or {}
         if sess:
-            qs = _query_listagem_faturamento(
-                _filtros_dict_from_session(sess),
-                per_page=sess.get('per_page'),
-            )
-            url = reverse('faturamento_medico:ftlistar')
-            if qs:
-                url = f'{url}?{qs}'
-            return redirect(url)
+            return redirect(_url_ftlistar_com_filtros_sessao(request))
 
     empresa_id = request.session.get('empresa_id')
     if empresa_id:
@@ -1462,7 +1500,7 @@ def listar_faturamentos(request):
     else:
         faturamentos = FaturamentoMedico.objects.all().order_by('-data')
 
-    filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
     faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
     nome = filtros['nome']
     guia = filtros['guia']
@@ -1761,20 +1799,8 @@ def listar_faturamentos(request):
     page_obj = paginator.get_page(request.GET.get('page') or 1)
     grid_linhas = list(page_obj.object_list)
 
-    # Armazenar filtros na sessão para preservar ao voltar de edição
-    request.session['faturamento_filters'] = {
-        'nome': nome or '',
-        'guia': guia or '',
-        'anestesista': anestesista or '',
-        'status': status or '',
-        'status_conferencia': status_conferencia or '',
-        'lote': lote or '',
-        'data_inicio': data_inicio or '',
-        'data_fim': data_fim or '',
-        'convenio': convenios or [],
-        'codigo_relatorio': codigo_relatorio or '',
-        'per_page': str(per_page),
-    }
+    # Armazenar filtros na sessão (preserva ao voltar de edição / gerar lote / menu)
+    _salvar_filtros_listagem_sessao(request, filtros, per_page=per_page)
 
     context = {
         'faturamentos': faturamentos,
@@ -1819,6 +1845,7 @@ def listar_faturamentos(request):
             'per_page': str(per_page),
         },
         'export_query_string': _query_export_faturamento(filtros),
+        'listagem_query_string': _query_listagem_faturamento(filtros, per_page=per_page),
     }
 
     return render(request, 'faturamento_medico/listar.html', context)
@@ -2810,14 +2837,7 @@ def criar_faturamento(request):
                 messages.success(request, f'Faturamento médico criado com sucesso! {len(documentos_gemini)} documento(s) processado(s) com Gemini.')
             else:
                 messages.success(request, 'Faturamento médico criado com sucesso!')
-    
-                messages.success(request, 'Faturamento médico criado com sucesso!')
-                # Redirecionar com filtros preservados
-                filters = request.session.get('faturamento_filters', {})
-                url = reverse('faturamento_medico:ftlistar')
-                if filters:
-                    url += '?' + urlencode(filters, doseq=True)
-                return redirect(url)
+            return _redirect_ftlistar_com_filtros_sessao(request)
         else:
             logger.warning(f"Form inválido: {form.errors}")
     else:
@@ -2847,12 +2867,7 @@ def editar_faturamento(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, 'Faturamento médico atualizado com sucesso!')
-            # Redirecionar com filtros preservados
-            filters = request.session.get('faturamento_filters', {})
-            url = reverse('faturamento_medico:ftlistar')
-            if filters:
-                url += '?' + urlencode(filters, doseq=True)
-            return redirect(url)
+            return _redirect_ftlistar_com_filtros_sessao(request)
     else:
         form = FaturamentoMedicoForm(instance=faturamento, empresa_id=empresa_id)
 
@@ -2884,7 +2899,7 @@ def editar_documentacao_faturamento(request, pk):
             messages.success(request, 'Documentação atualizada com sucesso!')
             if voltar.startswith('/'):
                 return redirect(voltar)
-            return redirect('faturamento_medico:ftlistar')
+            return _redirect_ftlistar_com_filtros_sessao(request)
     else:
         form = FaturamentoDocumentacaoForm(instance=faturamento)
 
@@ -2910,14 +2925,7 @@ def excluir_faturamento(request, pk):
         # Itens e documentos são removidos por CASCADE
         faturamento.delete()
         messages.success(request, f'Faturamento médico "{nome}" excluído com sucesso!')
-        filters = request.session.get('faturamento_filters', {})
-        url = reverse('faturamento_medico:ftlistar')
-        if filters:
-            # Remove valores vazios para não poluir a query
-            limpos = {k: v for k, v in filters.items() if v not in (None, '', [])}
-            if limpos:
-                url += '?' + urlencode(limpos, doseq=True)
-        return redirect(url)
+        return _redirect_ftlistar_com_filtros_sessao(request)
 
     context = {
         'faturamento': faturamento,
@@ -4284,7 +4292,7 @@ def gerar_lote(request):
     if not empresa_id:
         logger.warning("Empresa não encontrada na sessão")
         messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('faturamento_medico:ftlistar')
+        return _redirect_ftlistar_com_filtros_sessao(request)
 
     if request.method == 'POST':
         logger.info("Método POST detectado")
@@ -4296,7 +4304,7 @@ def gerar_lote(request):
         if not faturamento_ids:
             logger.warning("Nenhum faturamento selecionado")
             messages.error(request, 'Selecione pelo menos um faturamento para gerar o lote.')
-            return redirect('faturamento_medico:ftlistar')
+            return _redirect_ftlistar_com_filtros_sessao(request)
 
         # Buscar faturamentos selecionados
         faturamentos = FaturamentoMedico.objects.filter(
@@ -4308,7 +4316,7 @@ def gerar_lote(request):
         if not faturamentos.exists():
             logger.warning("Nenhum faturamento encontrado para os IDs")
             messages.error(request, 'Nenhum faturamento encontrado.')
-            return redirect('faturamento_medico:ftlistar')
+            return _redirect_ftlistar_com_filtros_sessao(request)
 
         if lote_existente_id:
             # Adicionar a lote existente
@@ -4318,14 +4326,14 @@ def gerar_lote(request):
             except Lote.DoesNotExist:
                 logger.error(f"Lote existente não encontrado: {lote_existente_id}")
                 messages.error(request, 'Lote selecionado não encontrado.')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
             # Verificar se os faturamentos têm o mesmo convênio do lote
             faturamentos_diferente_convenio = faturamentos.exclude(convenio=lote_existente.convenio)
             if faturamentos_diferente_convenio.exists():
                 logger.warning(f"Faturamentos com convênio diferente: {[f.id for f in faturamentos_diferente_convenio]}")
                 messages.error(request, 'Todos os faturamentos devem ter o mesmo convênio do lote selecionado.')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
             # Filtrar faturamentos sem lote ou com status != finalizado
             faturamentos_validos = faturamentos.filter(status__in=['pendente', 'enviado'])
@@ -4338,7 +4346,7 @@ def gerar_lote(request):
             if not faturamentos_validos.exists():
                 logger.warning("Nenhum faturamento válido para adicionar")
                 messages.error(request, 'Nenhum faturamento válido para adicionar ao lote.')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
             # Atualizar os faturamentos com o ID do lote e status para enviado
             fat_ids = [f.id for f in faturamentos_validos]
@@ -4348,7 +4356,7 @@ def gerar_lote(request):
             except Exception as e:
                 logger.error(f"Erro ao adicionar faturamentos ao lote {lote_existente.id}: {e}")
                 messages.error(request, f'Erro ao adicionar faturamentos ao lote: {e}')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
             # Atualizar o total do lote
             try:
@@ -4358,10 +4366,13 @@ def gerar_lote(request):
             except Exception as e:
                 logger.error(f"Erro ao atualizar total do lote {lote_existente.id}: {e}")
                 messages.error(request, f'Erro ao atualizar total do lote: {e}')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
-            url = reverse('faturamento_medico:ftlistar')
-            return HttpResponse(f'<script>alert("Faturamentos adicionados ao lote {lote_existente.id} com sucesso!"); window.location.href = "{url}";</script>')
+            url = _url_ftlistar_com_filtros_sessao(request)
+            return HttpResponse(
+                f'<script>alert("Faturamentos adicionados ao lote {lote_existente.id} com sucesso!"); '
+                f'window.location.href = "{url}";</script>'
+            )
         else:
             # Criar novo lote
             # Filtrar apenas faturamentos sem lote
@@ -4375,7 +4386,7 @@ def gerar_lote(request):
             if not faturamentos_sem_lote.exists():
                 logger.warning("Nenhum faturamento sem lote encontrado")
                 messages.error(request, 'Todos os faturamentos selecionados já estão incluídos em lotes.')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
             faturamentos = faturamentos_sem_lote
             logger.info(f"Faturamentos sem lote: {faturamentos.count()}")
@@ -4429,17 +4440,20 @@ def gerar_lote(request):
                 lotes_criados.append(lote.id)
 
             if lotes_criados:
-                url = reverse('faturamento_medico:ftlistar')
+                url = _url_ftlistar_com_filtros_sessao(request)
                 logger.info(f"Lotes criados: {lotes_criados}")
                 lotes_str = ', '.join(map(str, lotes_criados))
-                return HttpResponse(f'<script>alert("Lotes gerados com sucesso: {lotes_str}"); window.location.href = "{url}";</script>')
+                return HttpResponse(
+                    f'<script>alert("Lotes gerados com sucesso: {lotes_str}"); '
+                    f'window.location.href = "{url}";</script>'
+                )
             else:
                 logger.warning("Nenhum lote foi criado")
                 messages.error(request, 'Nenhum lote foi criado.')
-                return redirect('faturamento_medico:ftlistar')
+                return _redirect_ftlistar_com_filtros_sessao(request)
 
     logger.info("Método não é POST, redirecionando")
-    return redirect('faturamento_medico:ftlistar')
+    return _redirect_ftlistar_com_filtros_sessao(request)
 
 
 def importar_unimed(request):
