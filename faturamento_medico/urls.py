@@ -15,6 +15,7 @@ urlpatterns = [
     path('<int:pk>/detalhes/', views.detalhes_faturamento, name='detalhes'),
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('gerar-lote/', views.gerar_lote, name='gerar_lote'),
+    path('vincular-lote-protocolo/', views.vincular_lote_protocolo, name='vincular_lote_protocolo'),
     # URLs para documentos anexados
     path('<int:pk>/anexar-documento/', views.anexar_documento, name='anexar_documento'),
     path('documento/<int:pk>/download/', views.download_documento, name='download_documento'),

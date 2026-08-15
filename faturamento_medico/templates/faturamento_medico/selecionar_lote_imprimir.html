@@ -14,9 +14,14 @@
                         <label for="lote_id" class="form-label">Selecione o Lote:</label>
                         <select id="lote_id" class="form-select" required {% if not lotes %}disabled{% endif %}>
                             {% for lote in lotes %}
+                            {% with extrato=lote.linhas_extrato_pagamento.first %}
                             <option value="{{ lote.id }}" data-convenio="{{ lote.convenio|default:'' }}">
-                                Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|moeda_br }})
+                                Lote {{ lote.id }} - {{ lote.convenio }}
+                                {% if extrato and extrato.protocolo %}| prot. {{ extrato.protocolo }}{% endif %}
+                                {% if extrato and extrato.lote %}| lote conv. {{ extrato.lote }}{% endif %}
+                                (R$ {{ lote.total_lote|moeda_br }})
                             </option>
+                            {% endwith %}
                             {% empty %}
                             <option value="">Nenhum lote pendente de impressão</option>
                             {% endfor %}

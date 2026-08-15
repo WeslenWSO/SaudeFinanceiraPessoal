@@ -19,10 +19,7 @@ from collections import defaultdict
 from datetime import datetime, date, timedelta
 from difflib import SequenceMatcher
 from urllib.parse import urlencode
-from .models import (
-    FaturamentoMedico, DocumentoAnexado, ItemServico, ServicoDisponivel, Lote,
-    ExtratoPagamentoConvenio, MetaModalidadeSolicitante,
-)
+from .lote_utils import faturamento_elegivel_lote, faturamento_tem_lote_interno, ids_lotes_internos
 from servicos_medicos.models import Convenio
 from empresa.models import Empresa
 from .forms import (
@@ -1547,7 +1544,9 @@ def listar_faturamentos(request):
     lotes_filtro = []
     if empresa_id:
         lotes_disponiveis = [
-            lote for lote in Lote.objects.filter(empresa_id=empresa_id, baixado=False).order_by('-id')
+            lote for lote in Lote.objects.filter(empresa_id=empresa_id, baixado=False)
+            .prefetch_related('linhas_extrato_pagamento')
+            .order_by('-id')
             if lote.aberto_para_adicionar()
         ]
         lotes_filtro = list(Lote.objects.filter(empresa_id=empresa_id).order_by('-id'))
@@ -1571,6 +1570,7 @@ def listar_faturamentos(request):
     # Grid pós-filtragem (modelo RIS): uma linha por procedimento
     faturamentos = faturamentos.prefetch_related('itens_servico')
     grid_linhas = []
+    ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
 
     # Cache de preços da tabela por empresa/convênio (código e descrição)
     precos_por_codigo = set()
@@ -1644,6 +1644,12 @@ def listar_faturamentos(request):
                 'status_conferencia': status_label,
                 'status_conferencia_css': status_css,
                 'mostrar_selecao_lote': True,
+                'tem_lote_interno': faturamento_tem_lote_interno(
+                    faturamento, ids_internos=ids_lotes_int
+                ),
+                'elegivel_lote': faturamento_elegivel_lote(
+                    faturamento, ids_internos=ids_lotes_int
+                ),
             })
             continue
         itens_filtrados = []
@@ -1668,6 +1674,12 @@ def listar_faturamentos(request):
                 'status_conferencia': status_label,
                 'status_conferencia_css': status_css,
                 'mostrar_selecao_lote': idx == 0,
+                'tem_lote_interno': faturamento_tem_lote_interno(
+                    faturamento, ids_internos=ids_lotes_int
+                ),
+                'elegivel_lote': faturamento_elegivel_lote(
+                    faturamento, ids_internos=ids_lotes_int
+                ),
             })
 
     # Resumo por modalidade (conforme filtros / grid de procedimentos)
@@ -4107,7 +4119,11 @@ def selecionar_lote_imprimir(request):
             messages.success(request, f'Lote {lote.id} marcado como baixado e removido da lista de impressão.')
         return redirect('faturamento_medico:selecionar_lote_imprimir')
 
-    lotes = Lote.objects.filter(empresa_id=empresa_id, baixado=False).order_by('-id')
+    lotes = (
+        Lote.objects.filter(empresa_id=empresa_id, baixado=False)
+        .prefetch_related('linhas_extrato_pagamento')
+        .order_by('-id')
+    )
     context = {'lotes': lotes}
     return render(request, 'faturamento_medico/selecionar_lote_imprimir.html', context)
 
@@ -4343,15 +4359,24 @@ def gerar_lote(request):
                 messages.error(request, 'Todos os faturamentos devem ter o mesmo convênio do lote selecionado.')
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
-            # Filtrar faturamentos sem lote ou com status != finalizado
-            faturamentos_validos = faturamentos.filter(status='pendente')
-            faturamentos_invalidos = faturamentos.exclude(status='pendente')
+            # Filtrar faturamentos elegíveis (pendente, sem lote interno)
+            ids_internos = ids_lotes_internos(empresa_id)
+            faturamentos_validos = [
+                f for f in faturamentos
+                if faturamento_elegivel_lote(f, ids_internos=ids_internos)
+            ]
+            faturamentos_invalidos = [
+                f for f in faturamentos if f not in faturamentos_validos
+            ]
 
-            if faturamentos_invalidos.exists():
-                logger.warning(f"Faturamentos fora de pendente: {[f.id for f in faturamentos_invalidos]}")
-                messages.warning(request, 'Somente faturamentos pendentes (sem lote) podem ser adicionados a lotes.')
+            if faturamentos_invalidos:
+                logger.warning(f"Faturamentos inelegíveis: {[f.id for f in faturamentos_invalidos]}")
+                messages.warning(
+                    request,
+                    'Somente faturamentos pendentes, conferidos e sem lote interno podem entrar em lotes.',
+                )
 
-            if not faturamentos_validos.exists():
+            if not faturamentos_validos:
                 logger.warning("Nenhum faturamento válido para adicionar")
                 messages.error(request, 'Nenhum faturamento válido para adicionar ao lote.')
                 return _redirect_ftlistar_com_filtros_sessao(request)
@@ -4385,21 +4410,29 @@ def gerar_lote(request):
             )
         else:
             # Criar novo lote
-            # Filtrar apenas faturamentos sem lote
-            faturamentos_sem_lote = faturamentos.filter(lote__isnull=True) | faturamentos.filter(lote='')
-            faturamentos_com_lote = faturamentos.exclude(lote__isnull=True).exclude(lote='')
+            ids_internos = ids_lotes_internos(empresa_id)
+            faturamentos_sem_lote = [
+                f for f in faturamentos
+                if faturamento_elegivel_lote(f, ids_internos=ids_internos)
+            ]
+            faturamentos_com_lote = [
+                f for f in faturamentos if f not in faturamentos_sem_lote
+            ]
 
-            if faturamentos_com_lote.exists():
-                logger.warning(f"Alguns faturamentos já têm lote: {[f.id for f in faturamentos_com_lote]}")
-                messages.warning(request, f'Alguns faturamentos selecionados já estão incluídos em outro lote e foram ignorados.')
+            if faturamentos_com_lote:
+                logger.warning(f"Alguns faturamentos inelegíveis: {[f.id for f in faturamentos_com_lote]}")
+                messages.warning(
+                    request,
+                    'Alguns faturamentos selecionados já estão em lote interno ou não estão conferidos.',
+                )
 
-            if not faturamentos_sem_lote.exists():
-                logger.warning("Nenhum faturamento sem lote encontrado")
-                messages.error(request, 'Todos os faturamentos selecionados já estão incluídos em lotes.')
+            if not faturamentos_sem_lote:
+                logger.warning("Nenhum faturamento elegível encontrado")
+                messages.error(request, 'Nenhum faturamento elegível para gerar lote.')
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
             faturamentos = faturamentos_sem_lote
-            logger.info(f"Faturamentos sem lote: {faturamentos.count()}")
+            logger.info(f"Faturamentos elegíveis: {len(faturamentos)}")
 
             # Agrupar faturamentos por convênio
             faturamentos_por_convenio = {}
@@ -4465,6 +4498,45 @@ def gerar_lote(request):
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
     logger.info("Método não é POST, redirecionando")
+    return _redirect_ftlistar_com_filtros_sessao(request)
+
+
+def vincular_lote_protocolo(request):
+    """Vincula guias selecionadas usando lote e protocolo já informados no faturamento (convênio externo)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return _redirect_ftlistar_com_filtros_sessao(request)
+
+    if request.method != 'POST':
+        return _redirect_ftlistar_com_filtros_sessao(request)
+
+    faturamento_ids = request.POST.getlist('faturamentos_selecionados')
+    if not faturamento_ids:
+        messages.error(request, 'Selecione pelo menos um faturamento para vincular lote e protocolo.')
+        return _redirect_ftlistar_com_filtros_sessao(request)
+
+    try:
+        ids = [int(x) for x in faturamento_ids]
+    except (TypeError, ValueError):
+        messages.error(request, 'Seleção inválida.')
+        return _redirect_ftlistar_com_filtros_sessao(request)
+
+    from faturamento_medico.services.gerar_lotes_geap import vincular_lote_protocolo_selecionados
+
+    stats = vincular_lote_protocolo_selecionados(empresa_id=empresa_id, faturamento_ids=ids)
+    if stats['lotes_criados']:
+        lotes_str = ', '.join(str(x) for x in stats['lotes_criados'])
+        messages.success(
+            request,
+            f"Vinculados {stats['faturamentos']} guia(s) em {stats['grupos']} lote(s)/protocolo(s): {lotes_str}.",
+        )
+    else:
+        messages.warning(request, 'Nenhum lote vinculado. Verifique conferência, lote e protocolo nos faturamentos.')
+
+    for err in stats.get('erros') or []:
+        messages.info(request, err)
+
     return _redirect_ftlistar_com_filtros_sessao(request)
 
 

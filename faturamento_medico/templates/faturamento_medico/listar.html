@@ -162,21 +162,34 @@
                     <form method="POST" action="{% url 'faturamento_medico:gerar_lote' %}" id="form-lote">
                         {% csrf_token %}
                         <div class="row mb-3 align-items-end">
-                            <div class="col-md-5">
+                            <div class="col-md-4">
                                 <label for="lote_existente" class="form-label">Adicionar a Lote Existente (opcional):</label>
                                 <select name="lote_existente" id="lote_existente" class="form-select">
                                     <option value="">Criar Novo Lote</option>
                                     {% for lote in lotes_disponiveis %}
-                                        <option value="{{ lote.id }}">Lote {{ lote.id }} - {{ lote.convenio }} (R$ {{ lote.total_lote|floatformat:2 }})</option>
+                                        {% with extrato=lote.linhas_extrato_pagamento.first %}
+                                        <option value="{{ lote.id }}">
+                                            Lote {{ lote.id }} - {{ lote.convenio }}
+                                            {% if extrato and extrato.protocolo %}| prot. {{ extrato.protocolo }}{% endif %}
+                                            {% if extrato and extrato.lote %}| lote conv. {{ extrato.lote }}{% endif %}
+                                            (R$ {{ lote.total_lote|floatformat:2 }})
+                                        </option>
+                                        {% endwith %}
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-3 d-flex align-items-end">
+                            <div class="col-md-5 d-flex flex-wrap align-items-end gap-2">
                                 <button type="submit" class="btn btn-success">
                                     <i class="fas fa-plus-circle"></i> Gerar/Adicionar Lote dos Selecionados
                                 </button>
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        formaction="{% url 'faturamento_medico:vincular_lote_protocolo' %}"
+                                        title="Usa o lote e protocolo já informados no faturamento (convênio externo)">
+                                    <i class="fas fa-link"></i> Vincular Lote e Protocolo
+                                </button>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="d-flex flex-wrap align-items-end justify-content-md-end gap-2">
                                     <div>
                                         <label for="per_page_tabela" class="form-label small mb-1 fw-semibold">Qtde. a listar</label>
@@ -221,7 +234,7 @@
                                         data-status="{{ linha.status_conferencia }}"
                                         data-status-css="{{ linha.status_conferencia_css }}">
                                         <td>
-                                            {% if linha.mostrar_selecao_lote and linha.faturamento.status == 'pendente' and not linha.faturamento.lote %}
+                                            {% if linha.mostrar_selecao_lote and linha.elegivel_lote %}
                                                 <input type="checkbox" name="faturamentos_selecionados" value="{{ linha.faturamento.id }}" class="faturamento-lote-checkbox">
                                             {% endif %}
                                         </td>
