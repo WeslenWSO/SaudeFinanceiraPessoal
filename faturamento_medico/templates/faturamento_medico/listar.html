@@ -148,7 +148,7 @@
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-secondary me-1">Filtrar</button>
-                                <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary">Limpar</a>
+                                <a href="{% url 'faturamento_medico:ftlistar' %}?limpar=1" class="btn btn-outline-secondary">Limpar</a>
                             </div>
                         </div>
                         
@@ -713,10 +713,10 @@ document.addEventListener('DOMContentLoaded', function() {
         var resumo = document.getElementById('filtroResumoFat');
         if (!wrap || !btn || !painel) return;
 
-        var key = 'fat_medico_filtros_abertos';
         var params = new URLSearchParams(window.location.search);
         var temFiltro = false;
-        params.forEach(function(v) {
+        params.forEach(function(v, k) {
+            if (k === 'page' || k === 'per_page' || k === 'limpar') return;
             if (v && String(v).trim() !== '') temFiltro = true;
         });
         if (temFiltro && resumo) {
@@ -726,19 +726,9 @@ document.addEventListener('DOMContentLoaded', function() {
         function setOpen(open) {
             wrap.classList.toggle('is-collapsed', !open);
             btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) {}
         }
 
-        var saved = null;
-        try { saved = localStorage.getItem(key); } catch (e) {}
-        // Com filtro na URL, abre; senão respeita preferência (padrão aberto)
-        if (temFiltro) {
-            setOpen(true);
-        } else if (saved === '0') {
-            setOpen(false);
-        } else {
-            setOpen(true);
-        }
+        setOpen(true);
 
         btn.addEventListener('click', function() {
             setOpen(wrap.classList.contains('is-collapsed'));

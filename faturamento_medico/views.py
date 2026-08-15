@@ -120,6 +120,45 @@ def _query_export_faturamento(filtros):
     return urlencode(params)
 
 
+_FAT_LISTAGEM_FILTER_KEYS = (
+    'nome', 'guia', 'codigo_relatorio', 'anestesista',
+    'data_inicio', 'data_fim', 'status', 'status_conferencia', 'lote',
+)
+
+
+def _tem_filtros_na_query(request):
+    """True se a URL traz parâmetros de filtro (exceto paginação)."""
+    if request.GET.get('limpar'):
+        return False
+    for key in _FAT_LISTAGEM_FILTER_KEYS:
+        if (request.GET.get(key) or '').strip():
+            return True
+    return bool(request.GET.getlist('convenio'))
+
+
+def _filtros_dict_from_session(sess):
+    return {
+        'nome': sess.get('nome') or '',
+        'guia': sess.get('guia') or '',
+        'anestesista': sess.get('anestesista') or '',
+        'status': sess.get('status') or '',
+        'status_conferencia': sess.get('status_conferencia') or '',
+        'lote': sess.get('lote') or '',
+        'data_inicio': sess.get('data_inicio') or '',
+        'data_fim': sess.get('data_fim') or '',
+        'codigo_relatorio': sess.get('codigo_relatorio') or '',
+        'convenios': [c for c in (sess.get('convenio') or []) if c],
+    }
+
+
+def _query_listagem_faturamento(filtros, *, per_page=None):
+    qs = _query_export_faturamento(filtros)
+    if per_page:
+        extra = urlencode({'per_page': per_page})
+        qs = f'{qs}&{extra}' if qs else extra
+    return qs
+
+
 def _aplicar_filtros_faturamento_qs(qs, filtros):
     """Aplica os mesmos filtros da listagem ao queryset de faturamentos."""
     nome = filtros.get('nome') or ''
@@ -1337,13 +1376,29 @@ def _analisar_vaga_maquina(faturamento, modalidade, candidatos_ativos):
 
 def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
+    if request.GET.get('limpar'):
+        request.session.pop('faturamento_filters', None)
+        return redirect('faturamento_medico:ftlistar')
+
+    if not _tem_filtros_na_query(request):
+        sess = request.session.get('faturamento_filters') or {}
+        if sess:
+            qs = _query_listagem_faturamento(
+                _filtros_dict_from_session(sess),
+                per_page=sess.get('per_page'),
+            )
+            url = reverse('faturamento_medico:ftlistar')
+            if qs:
+                url = f'{url}?{qs}'
+            return redirect(url)
+
     empresa_id = request.session.get('empresa_id')
     if empresa_id:
         faturamentos = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
     else:
         faturamentos = FaturamentoMedico.objects.all().order_by('-data')
 
-    filtros = _filtros_listagem_faturamento(request)
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
     faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
     nome = filtros['nome']
     guia = filtros['guia']
