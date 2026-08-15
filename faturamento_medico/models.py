@@ -115,14 +115,17 @@ class FaturamentoMedico(models.Model):
     laudo_expires_at = models.DateTimeField(verbose_name='Expiração do Link do Laudo', blank=True, null=True)
     agendado_via = models.CharField(verbose_name='Agendado Via', max_length=50, blank=True, null=True)
     data_fechamento = models.DateField(verbose_name='Data de Fechamento', blank=True, null=True)
+    FATURAMENTO_STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('aguardando_pagamento', 'Aguardando pagamento'),
+        ('enviado', 'Enviado'),
+        ('finalizado', 'Finalizado'),
+    ]
+
     status = models.CharField(
         verbose_name='Status',
-        max_length=20,
-        choices=[
-            ('pendente', 'Pendente'),
-            ('enviado', 'Enviado'),
-            ('finalizado', 'Finalizado'),
-        ],
+        max_length=25,
+        choices=FATURAMENTO_STATUS_CHOICES,
         default='pendente'
     )
     codigo_fechamento = models.CharField(
@@ -458,7 +461,7 @@ class Lote(models.Model):
     baixado = models.BooleanField(
         verbose_name='Lote baixado',
         default=False,
-        help_text='Lote recebido e baixado — não aparece na seleção de impressão.',
+        help_text='Lote recebido e baixado — oculto na impressão e ao adicionar faturamentos.',
     )
 
     # Timestamps
@@ -472,6 +475,15 @@ class Lote(models.Model):
 
     def __str__(self):
         return f"Lote {self.id} - {self.convenio} - R$ {self.total_lote}"
+
+    def aberto_para_adicionar(self) -> bool:
+        """False se o lote foi baixado ou todos os faturamentos já estão finalizados."""
+        if self.baixado:
+            return False
+        fats = FaturamentoMedico.objects.filter(empresa_id=self.empresa_id, lote=str(self.id))
+        if not fats.exists():
+            return True
+        return fats.exclude(status='finalizado').exists()
 
     def save(self, *args, **kwargs):
         """Calcula o total do lote baseado nos faturamentos associados"""
@@ -649,13 +661,36 @@ class ExtratoPagamentoConvenio(models.Model):
         return self.data_recebimento is not None and (self.valor_recebido or 0) > 0
 
     def sincronizar_baixado_lote(self):
-        """Marca ou desmarca o lote de faturamento conforme recebimento baixado."""
+        """Marca lote e faturamentos conforme recebimento baixado no extrato."""
         lote = self.lote_faturamento
         if not lote:
             return
-        if lote.baixado != self.baixado:
-            lote.baixado = self.baixado
+        baixado = self.baixado
+        if lote.baixado != baixado:
+            lote.baixado = baixado
             lote.save(update_fields=['baixado', 'data_atualizacao'])
+        self.sincronizar_status_faturamentos_lote()
+
+    def sincronizar_status_faturamentos_lote(self):
+        """Ao receber extrato, finaliza faturamentos do lote; estorno volta a aguardando pagamento."""
+        lote = self.lote_faturamento
+        if not lote:
+            return
+        qs = FaturamentoMedico.objects.filter(
+            empresa_id=self.empresa_id,
+            lote=str(lote.id),
+        )
+        if self.baixado:
+            atualizar = qs.filter(status__in=['aguardando_pagamento', 'enviado', 'pendente'])
+            if self.data_recebimento:
+                atualizar.update(status='finalizado', data_fechamento=self.data_recebimento)
+            else:
+                atualizar.update(status='finalizado')
+        else:
+            qs.filter(
+                status='finalizado',
+                codigo_fechamento__isnull=True,
+            ).update(status='aguardando_pagamento', data_fechamento=None)
 
 
 class MedcloudConfig(models.Model):

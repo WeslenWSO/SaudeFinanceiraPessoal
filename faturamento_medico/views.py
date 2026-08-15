@@ -1546,8 +1546,11 @@ def listar_faturamentos(request):
     lotes_disponiveis = []
     lotes_filtro = []
     if empresa_id:
-        lotes_disponiveis = Lote.objects.filter(empresa_id=empresa_id).order_by('-id')
-        lotes_filtro = list(lotes_disponiveis)
+        lotes_disponiveis = [
+            lote for lote in Lote.objects.filter(empresa_id=empresa_id, baixado=False).order_by('-id')
+            if lote.aberto_para_adicionar()
+        ]
+        lotes_filtro = list(Lote.objects.filter(empresa_id=empresa_id).order_by('-id'))
         # Inclui valores de lote vindos da importação RIS (texto livre)
         ids_lote = {str(l.id) for l in lotes_filtro}
         lotes_extras = (
@@ -1826,6 +1829,7 @@ def listar_faturamentos(request):
         'grafico_convenio_qtde': json.dumps(grafico_convenio_qtde),
         'detalhe_convenio': json.dumps(detalhe_convenio, ensure_ascii=False),
         'status_conferencia_choices': ItemServico.STATUS_CONFERENCIA_CHOICES,
+        'status_faturamento_choices': FaturamentoMedico.FATURAMENTO_STATUS_CHOICES,
         'stats_convenio': stats_convenio,
         'stats_anestesista': stats_anestesista,
         'convenios_disponiveis': convenios_disponiveis,
@@ -3636,7 +3640,7 @@ def fechamento_repasse(request):
                             id=faturamento_id,
                             empresa_id=empresa_id,
                             codigo_fechamento__isnull=True,  # Só atualizar se não tiver código
-                            status__in=['pendente', 'enviado']  # Só atualizar se não estiver finalizado
+                            status__in=['pendente', 'enviado', 'aguardando_pagamento']
                         ).update(
                             data_fechamento=data_fechamento,
                             status='finalizado',
@@ -4328,6 +4332,10 @@ def gerar_lote(request):
                 messages.error(request, 'Lote selecionado não encontrado.')
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
+            if not lote_existente.aberto_para_adicionar():
+                messages.error(request, 'Este lote já foi finalizado/baixado e não aceita novos faturamentos.')
+                return _redirect_ftlistar_com_filtros_sessao(request)
+
             # Verificar se os faturamentos têm o mesmo convênio do lote
             faturamentos_diferente_convenio = faturamentos.exclude(convenio=lote_existente.convenio)
             if faturamentos_diferente_convenio.exists():
@@ -4336,22 +4344,24 @@ def gerar_lote(request):
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
             # Filtrar faturamentos sem lote ou com status != finalizado
-            faturamentos_validos = faturamentos.filter(status__in=['pendente', 'enviado'])
-            faturamentos_invalidos = faturamentos.exclude(status__in=['pendente', 'enviado'])
+            faturamentos_validos = faturamentos.filter(status='pendente')
+            faturamentos_invalidos = faturamentos.exclude(status='pendente')
 
             if faturamentos_invalidos.exists():
-                logger.warning(f"Faturamentos com status finalizado: {[f.id for f in faturamentos_invalidos]}")
-                messages.warning(request, 'Faturamentos finalizados não podem ser adicionados a lotes.')
+                logger.warning(f"Faturamentos fora de pendente: {[f.id for f in faturamentos_invalidos]}")
+                messages.warning(request, 'Somente faturamentos pendentes (sem lote) podem ser adicionados a lotes.')
 
             if not faturamentos_validos.exists():
                 logger.warning("Nenhum faturamento válido para adicionar")
                 messages.error(request, 'Nenhum faturamento válido para adicionar ao lote.')
                 return _redirect_ftlistar_com_filtros_sessao(request)
 
-            # Atualizar os faturamentos com o ID do lote e status para enviado
+            # Atualizar os faturamentos com o ID do lote e status aguardando pagamento
             fat_ids = [f.id for f in faturamentos_validos]
             try:
-                updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(lote=str(lote_existente.id), status='enviado')
+                updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(
+                    lote=str(lote_existente.id), status='aguardando_pagamento'
+                )
                 logger.info(f"Faturamentos adicionados ao lote {lote_existente.id}: {updated}")
             except Exception as e:
                 logger.error(f"Erro ao adicionar faturamentos ao lote {lote_existente.id}: {e}")
@@ -4417,10 +4427,12 @@ def gerar_lote(request):
                     messages.error(request, f'Erro ao criar lote para convênio {convenio}: {e}')
                     continue
 
-                # Atualizar os faturamentos com o ID do lote e status para enviado
+                # Atualizar os faturamentos com o ID do lote e status aguardando pagamento
                 fat_ids = [f.id for f in fats]
                 try:
-                    updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(lote=str(lote.id), status='enviado')
+                    updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(
+                        lote=str(lote.id), status='aguardando_pagamento'
+                    )
                     logger.info(f"Faturamentos atualizados para lote {lote.id}: {updated}")
                 except Exception as e:
                     logger.error(f"Erro ao atualizar faturamentos para lote {lote.id}: {e}")
@@ -5560,7 +5572,15 @@ def baixar_extrato_pagamento(request, pk):
             extrato.banco = banco
             extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
             extrato.sincronizar_baixado_lote()
-            messages.success(request, 'Baixa registrada com sucesso.')
+            n_final = FaturamentoMedico.objects.filter(
+                empresa_id=empresa_id,
+                lote=str(extrato.lote_faturamento_id),
+                status='finalizado',
+            ).count() if extrato.lote_faturamento_id else 0
+            msg = 'Baixa registrada com sucesso.'
+            if n_final:
+                msg += f' {n_final} faturamento(s) marcado(s) como Finalizado.'
+            messages.success(request, msg)
             return redirect('faturamento_medico:listar_extrato_pagamento')
         except (ValueError, InvalidOperation):
             messages.error(request, 'Data ou valor inválido.')
@@ -5593,7 +5613,7 @@ def estornar_baixa_extrato_pagamento(request, pk):
     extrato.banco = ''
     extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
     extrato.sincronizar_baixado_lote()
-    messages.success(request, 'Baixa estornada.')
+    messages.success(request, 'Baixa estornada. Faturamentos do lote voltaram para Aguardando pagamento.')
     return redirect('faturamento_medico:listar_extrato_pagamento')
 
 

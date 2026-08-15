@@ -123,8 +123,9 @@
                             <div class="col-md-2">
                                 <select name="status" class="form-control">
                                     <option value="">Todos os Status</option>
-                                    <option value="pendente" {% if filtros.status == 'pendente' %}selected{% endif %}>Pendente</option>
-                                    <option value="finalizado" {% if filtros.status == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                                    {% for value, label in status_faturamento_choices %}
+                                    <option value="{{ value }}" {% if filtros.status == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -220,7 +221,7 @@
                                         data-status="{{ linha.status_conferencia }}"
                                         data-status-css="{{ linha.status_conferencia_css }}">
                                         <td>
-                                            {% if linha.mostrar_selecao_lote and linha.faturamento.status != 'finalizado' %}
+                                            {% if linha.mostrar_selecao_lote and linha.faturamento.status == 'pendente' and not linha.faturamento.lote %}
                                                 <input type="checkbox" name="faturamentos_selecionados" value="{{ linha.faturamento.id }}" class="faturamento-lote-checkbox">
                                             {% endif %}
                                         </td>
