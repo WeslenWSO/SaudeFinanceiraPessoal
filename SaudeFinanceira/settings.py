@@ -13,6 +13,10 @@ import os
 from django.contrib.messages import constants
 from pathlib import Path
 
+from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+silenciar_logs_grpc_google()
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -424,12 +428,13 @@ NFSE_RIO_BRANCO_WS = {
 "verify_ssl": False,
 }
 
-# API Key para Google Gemini (defina GEMINI_API_KEY no ambiente)
+# API Key Google Gemini — .env local e variável no Render
+# Após comprar créditos: use chave nova do projeto com faturamento (chave gratuita mantém limite ~20/dia)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 # Tesseract OCR (Windows: caminho completo se não estiver no PATH)
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
-# Modelo Gemini (gemini-2.0-flash tem cota maior no plano gratuito que 2.5-flash)
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+# Modelo Gemini (com créditos: gemini-2.5-flash — igual ao app desktop Renome)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 # Configurações de upload de arquivos
 DATA_UPLOAD_MAX_NUMBER_FILES = 1000  # Limite de arquivos para importação XML
 

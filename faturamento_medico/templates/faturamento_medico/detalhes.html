@@ -94,6 +94,58 @@
         grid-template-columns: 1fr;
     }
 }
+
+#modalAlbumDocumentos .modal-dialog.modal-album-90 {
+    width: 90vw;
+    max-width: 90vw;
+    height: 90vh;
+    max-height: 90vh;
+    margin: 5vh auto;
+}
+
+#modalAlbumDocumentos .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalAlbumDocumentos .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalAlbumDocumentos .album-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+}
+
+#modalAlbumDocumentos .album-pdf-wrap {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalAlbumDocumentos .album-pdf-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: calc(90vh - 260px);
+    border: 0;
+}
+
+#modalAlbumDocumentos .album-content img {
+    max-height: calc(90vh - 260px);
+    max-width: 100%;
+    object-fit: contain;
+}
 </style>
 <div class="container-fluid fat-detalhes-page">
     <div class="row">
@@ -407,7 +459,9 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for documento in faturamento.documentos_anexados.all %}
-                                                    <tr>
+                                                    <tr data-doc-url="{% url 'faturamento_medico:download_documento' documento.pk %}"
+                                                        data-doc-ext="{{ documento.get_file_extension|lower|cut:'.' }}"
+                                                        data-doc-nome="{{ documento.nome|default:documento.arquivo.name }}">
                                                         <td>
                                                             <strong>{{ documento.nome|default:documento.arquivo.name|truncatechars:30 }}</strong>
                                                             {% if documento.descricao %}
@@ -495,7 +549,7 @@
 
 <!-- Modal para Álbum de Documentos -->
 <div class="modal fade" id="modalAlbumDocumentos" tabindex="-1" role="dialog" aria-labelledby="modalAlbumDocumentosLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-dialog modal-xl modal-album-90" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalAlbumDocumentosLabel">
@@ -522,7 +576,7 @@
                 </div>
 
                 <!-- Container do documento -->
-                <div id="albumContainer" class="album-content" style="min-height: 600px; display: flex; align-items: center; justify-content: center;">
+                <div id="albumContainer" class="album-content">
                     <!-- Conteúdo será inserido via JavaScript -->
                 </div>
 
@@ -614,96 +668,49 @@ function visualizarDocumento(url, extensao, nome) {
 
 // Função para abrir o álbum no documento específico
 function abrirAlbumNoDocumento(urlDocumento) {
-    // Primeiro coletar os documentos
-    abrirAlbumDocumentos();
-
-    // Encontrar o índice do documento com a URL especificada
-    let indiceEncontrado = 0;
-    for (let i = 0; i < documentosAlbum.length; i++) {
-        if (documentosAlbum[i].url === urlDocumento) {
-            indiceEncontrado = i;
-            break;
-        }
+    coletarDocumentosAlbum();
+    let indiceEncontrado = documentosAlbum.findIndex(d => d.url === urlDocumento);
+    if (indiceEncontrado < 0) {
+        documentosAlbum.push({
+            url: urlDocumento,
+            extensao: 'pdf',
+            nome: 'Documento PDF',
+            downloadUrl: urlDocumento,
+            index: documentosAlbum.length,
+        });
+        indiceEncontrado = documentosAlbum.length - 1;
     }
-
-    // Mostrar o documento encontrado
     indiceAtual = indiceEncontrado;
     mostrarDocumentoAlbum(indiceAtual);
     atualizarControlesAlbum();
+    abrirModalAlbumUi();
 }
 
-// Função para abrir o álbum de documentos
-function abrirAlbumDocumentos(indiceInicial = 0) {
-    // Coletar todos os documentos da tabela
+function coletarDocumentosAlbum() {
     documentosAlbum = [];
-    const linhasDocumentos = document.querySelectorAll('#documentosTable tbody tr');
-
-    console.log('Linhas encontradas:', linhasDocumentos.length);
+    const linhasDocumentos = document.querySelectorAll('#documentosTable tbody tr[data-doc-url]');
+    const extensoesSuportadas = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
 
     linhasDocumentos.forEach((linha, index) => {
-        // Procurar por qualquer link de download na última célula
-        const linkDownload = linha.querySelector('td:last-child a[title="Download"]');
-
-        if (linkDownload) {
-            // Obter informações do documento
-            const nomeElement = linha.querySelector('td:first-child strong');
-            const tipoElement = linha.querySelector('td:nth-child(2) .badge');
-            const extensao = tipoElement ? tipoElement.textContent.toLowerCase().trim().replace(/^\./, '') : '';
-
-            console.log('Documento', index + 1, '- Extensão encontrada:', extensao);
-
-            let url = linkDownload.href;
-            let nome = nomeElement ? nomeElement.textContent.trim() : `Documento ${index + 1}`;
-
-            // Se tem botão de visualizar, usar as informações dele
-            const btnVisualizar = linha.querySelector('td:last-child button[title="Visualizar"]');
-            if (btnVisualizar) {
-                const onclickAttr = btnVisualizar.getAttribute('onclick');
-                if (onclickAttr) {
-                    const match = onclickAttr.match(/visualizarDocumento\('([^']*)',\s*'([^']*)',\s*'([^']*)'\)/);
-                    if (match) {
-                        url = match[1];
-                        nome = match[3];
-                    }
-                }
-            }
-
-            // Lista de extensões suportadas
-            const extensoesSuportadas = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
-
-            // Verificar se a extensão é suportada
-            if (extensoesSuportadas.includes(extensao)) {
-                console.log('Documento adicionado ao álbum:', nome, '- Extensão:', extensao);
-                documentosAlbum.push({
-                    url: url,
-                    extensao: extensao,
-                    nome: nome,
-                    downloadUrl: linkDownload.href,
-                    index: index
-                });
-            } else {
-                console.log('Documento ignorado - extensão não suportada:', extensao);
-            }
-        } else {
-            console.log('Documento', index + 1, '- Link de download não encontrado');
+        const url = linha.dataset.docUrl;
+        const extensao = (linha.dataset.docExt || '').toLowerCase().replace(/^\./, '');
+        const nome = (linha.dataset.docNome || '').trim() || `Documento ${index + 1}`;
+        if (!url || !extensoesSuportadas.includes(extensao)) {
+            return;
         }
+        documentosAlbum.push({
+            url: url,
+            extensao: extensao,
+            nome: nome,
+            downloadUrl: url,
+            index: index,
+        });
     });
 
-    console.log('Total de documentos no álbum:', documentosAlbum.length);
+    return documentosAlbum.length;
+}
 
-    if (documentosAlbum.length === 0) {
-        alert('Nenhum documento visualizável encontrado.\n\nCertifique-se de que os documentos são do tipo: JPG, PNG, GIF ou PDF.\n\nVerifique o console do navegador (F12) para mais detalhes.');
-        return;
-    }
-
-    // Iniciar com o documento especificado ou o primeiro
-    indiceAtual = Math.min(indiceInicial, documentosAlbum.length - 1);
-    mostrarDocumentoAlbum(indiceAtual);
-
-    // Atualizar controles
-    atualizarControlesAlbum();
-
-    // Abrir modal do álbum
+function abrirModalAlbumUi() {
     if (typeof $ !== 'undefined' && $.fn.modal) {
         $('#modalAlbumDocumentos').modal('show');
     } else {
@@ -712,8 +719,6 @@ function abrirAlbumDocumentos(indiceInicial = 0) {
             modal.classList.add('show');
             modal.style.display = 'block';
             document.body.classList.add('modal-open');
-
-            // Adicionar backdrop
             let backdrop = document.querySelector('.modal-backdrop');
             if (!backdrop) {
                 backdrop = document.createElement('div');
@@ -722,6 +727,19 @@ function abrirAlbumDocumentos(indiceInicial = 0) {
             }
         }
     }
+}
+
+// Função para abrir o álbum de documentos
+function abrirAlbumDocumentos(indiceInicial = 0) {
+    if (coletarDocumentosAlbum() === 0) {
+        alert('Nenhum documento visualizável encontrado.\n\nCertifique-se de que os documentos são do tipo: JPG, PNG, GIF ou PDF.');
+        return;
+    }
+
+    indiceAtual = Math.min(indiceInicial, documentosAlbum.length - 1);
+    mostrarDocumentoAlbum(indiceAtual);
+    atualizarControlesAlbum();
+    abrirModalAlbumUi();
 }
 
 // Função para mostrar documento no álbum
@@ -747,14 +765,18 @@ function mostrarDocumentoAlbum(indice) {
     if (documento.extensao === 'pdf') {
         const urlInline = documento.url + (documento.url.includes('?') ? '&' : '?') + 'inline=true';
         container.innerHTML = `
-            <iframe src="${urlInline}" width="100%" height="600px" style="border: none;">
-                Seu navegador não suporta visualização de PDF.
-                <a href="${documento.url}" target="_blank">Clique aqui para baixar o arquivo</a>
-            </iframe>
+            <div class="album-pdf-wrap">
+                <iframe src="${urlInline}" class="album-pdf-frame" title="${documento.nome}"></iframe>
+                <div class="text-center py-2">
+                    <a href="${urlInline}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-external-link-alt"></i> Abrir PDF em nova aba
+                    </a>
+                </div>
+            </div>
         `;
     } else if (['jpg', 'jpeg', 'png', 'gif'].includes(documento.extensao)) {
         container.innerHTML = `
-            <img src="${documento.url}" alt="${documento.nome}" class="img-fluid" style="max-height: 600px; max-width: 100%; object-fit: contain;">
+            <img src="${documento.url}" alt="${documento.nome}" class="img-fluid">
         `;
     } else {
         container.innerHTML = `

@@ -6,6 +6,9 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+    silenciar_logs_grpc_google()
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SaudeFinanceira.settings')
     # Compat: stub lazy_annotations em django.utils.inspect se não existir (evita ImportError no servidor)
     try:

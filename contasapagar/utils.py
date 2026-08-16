@@ -98,6 +98,10 @@ CATEGORIA_ENCARGOS_PRO_LABORE = "Encargos Funcionários - Pro-labore"
 CATEGORIA_ENCARGOS_SALARIO = "Encargos Funcionários - Salario"
 
 
+from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+silenciar_logs_grpc_google()
+
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True

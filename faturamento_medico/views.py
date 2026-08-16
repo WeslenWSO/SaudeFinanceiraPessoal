@@ -4,8 +4,10 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.utils.formats import number_format
-from django.http import HttpResponse, Http404, JsonResponse
+from django.http import HttpResponse, Http404, JsonResponse, FileResponse
 from django.urls import reverse
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.http import require_GET
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from io import BytesIO
@@ -13,6 +15,7 @@ from decimal import Decimal, InvalidOperation
 import uuid
 import logging
 import json
+import os
 import re
 import unicodedata
 from collections import defaultdict
@@ -1495,6 +1498,26 @@ def _analisar_vaga_maquina(faturamento, modalidade, candidatos_ativos):
     }
 
 
+def _anexos_grid_faturamento(faturamento):
+    """Dados de documentos anexados para a coluna de ações do grid."""
+    docs = list(faturamento.documentos_anexados.all())
+    payload = []
+    for doc in docs:
+        nome_arquivo = (doc.nome or '').strip()
+        if not nome_arquivo and doc.arquivo:
+            nome_arquivo = doc.arquivo.name.split('/')[-1]
+        payload.append({
+            'id': doc.pk,
+            'nome': nome_arquivo or 'Documento',
+            'ext': (doc.get_file_extension() or '').lstrip('.').lower(),
+            'url': reverse('faturamento_medico:download_documento', args=[doc.pk]),
+        })
+    return {
+        'qtd_anexos': len(docs),
+        'anexos_json': json.dumps(payload, ensure_ascii=False),
+    }
+
+
 def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
     if request.GET.get('limpar'):
@@ -1585,7 +1608,7 @@ def listar_faturamentos(request):
                 })())
 
     # Grid pós-filtragem (modelo RIS): uma linha por procedimento
-    faturamentos = faturamentos.prefetch_related('itens_servico')
+    faturamentos = faturamentos.prefetch_related('itens_servico', 'documentos_anexados')
     grid_linhas = []
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
 
@@ -1668,6 +1691,7 @@ def listar_faturamentos(request):
                     faturamento, ids_internos=ids_lotes_int
                 ),
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
+                **_anexos_grid_faturamento(faturamento),
             })
             continue
         itens_filtrados = []
@@ -1699,6 +1723,7 @@ def listar_faturamentos(request):
                     faturamento, ids_internos=ids_lotes_int
                 ),
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
+                **_anexos_grid_faturamento(faturamento),
             })
 
     # Resumo por modalidade (conforme filtros / grid de procedimentos)
@@ -3323,34 +3348,42 @@ def anexar_documento(request, pk):
     return render(request, 'faturamento_medico/anexar_documento.html', context)
 
 
+@require_GET
+@xframe_options_sameorigin
 def download_documento(request, pk):
-    """View para fazer download/visualizar de um documento anexado"""
+    """View para fazer download/visualizar de um documento anexado."""
     documento = get_object_or_404(DocumentoAnexado, pk=pk)
 
-    try:
-        with open(documento.arquivo.path, 'rb') as f:
-            # Determinar o content_type baseado na extensão
-            extensao = documento.arquivo.name.split('.')[-1].lower()
-            if extensao == 'pdf':
-                content_type = 'application/pdf'
-            elif extensao in ['jpg', 'jpeg']:
-                content_type = 'image/jpeg'
-            elif extensao == 'png':
-                content_type = 'image/png'
-            elif extensao == 'gif':
-                content_type = 'image/gif'
-            else:
-                content_type = 'application/octet-stream'
+    extensao = (documento.get_file_extension() or '').lstrip('.').lower()
+    if not extensao and documento.arquivo:
+        extensao = documento.arquivo.name.rsplit('.', 1)[-1].lower()
 
-            response = HttpResponse(f.read(), content_type=content_type)
-            # Se for para visualização inline (ex: PDFs no modal), usar inline
-            if request.GET.get('inline') == 'true':
-                response['Content-Disposition'] = f'inline; filename="{documento.arquivo.name.split("/")[-1]}"'
-            else:
-                response['Content-Disposition'] = f'attachment; filename="{documento.arquivo.name.split("/")[-1]}"'
-            return response
+    content_types = {
+        'pdf': 'application/pdf',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+    }
+    content_type = content_types.get(extensao, 'application/octet-stream')
+    filename = (documento.nome or '').strip()
+    if not filename and documento.arquivo:
+        filename = os.path.basename(documento.arquivo.name)
+    if not filename:
+        filename = f'documento-{pk}'
+
+    try:
+        file_obj = documento.arquivo.open('rb')
     except FileNotFoundError:
-        raise Http404("Arquivo não encontrado")
+        raise Http404('Arquivo não encontrado') from None
+    except OSError as exc:
+        logger.warning('Erro ao abrir documento anexado #%s: %s', pk, exc)
+        raise Http404('Arquivo não encontrado') from exc
+
+    response = FileResponse(file_obj, content_type=content_type)
+    disposition = 'inline' if request.GET.get('inline') == 'true' else 'attachment'
+    response['Content-Disposition'] = f'{disposition}; filename="{filename}"'
+    return response
 
 
 def excluir_documento(request, pk):

@@ -15,6 +15,10 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+silenciar_logs_grpc_google()
+
 try:
     import google.generativeai as genai
     from google.api_core import exceptions as google_api_exceptions

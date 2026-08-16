@@ -19,6 +19,17 @@
     padding: 0.2rem 0.45rem;
     line-height: 1.2;
 }
+.btn-anexo-info {
+    position: relative;
+}
+.fm-anexo-badge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    font-size: 0.6rem;
+    padding: 0.12em 0.35em;
+    line-height: 1;
+}
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -293,6 +304,18 @@
                                         <td>{{ linha.faturamento.convenio|default:"-" }}</td>
                                         <td class="text-nowrap">
                                             <div class="fm-row-actions-inline">
+                                                {% if linha.qtd_anexos %}
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-success btn-anexo-info"
+                                                        title="{{ linha.qtd_anexos }} arquivo(s) anexado(s)"
+                                                        data-paciente="{{ linha.paciente|escape }}"
+                                                        data-anexos='{{ linha.anexos_json|escapejs }}'
+                                                        data-detalhes-url="{% url 'faturamento_medico:detalhes' linha.faturamento.pk %}"
+                                                        onclick="abrirModalAnexos(this)">
+                                                    <i class="fas fa-paperclip"></i>
+                                                    <span class="badge bg-success fm-anexo-badge">{{ linha.qtd_anexos }}</span>
+                                                </button>
+                                                {% endif %}
                                                 {% if linha.item %}
                                                 <a href="{% url 'faturamento_medico:lancar_glosa_item' linha.item.id %}?next={{ request.get_full_path|urlencode }}"
                                                    class="btn btn-sm btn-outline-danger"
@@ -520,6 +543,41 @@
                     </div>
 
                     <!-- Modal drill-down convênio -->
+                    <div class="modal fade" id="modalAnexosFaturamento" tabindex="-1" aria-labelledby="modalAnexosFaturamentoLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalAnexosFaturamentoLabel">
+                                        <i class="fas fa-paperclip me-1"></i> Documentos anexados
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="small text-muted mb-2" id="modal-anexos-paciente"></p>
+                                    <div class="list-group mb-3" id="modal-anexos-lista"></div>
+                                    <div id="modal-anexos-preview-wrap" class="d-none border rounded bg-light p-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <strong class="small" id="modal-anexos-preview-titulo"></strong>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="modal-anexos-fechar-preview">
+                                                Fechar preview
+                                            </button>
+                                        </div>
+                                        <iframe id="modal-anexos-preview-iframe"
+                                                class="w-100 border-0 bg-white"
+                                                style="height: 420px;"
+                                                title="Pré-visualização do documento"></iframe>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <a href="#" class="btn btn-outline-primary btn-sm" id="modal-anexos-link-detalhes" target="_blank" rel="noopener">
+                                        <i class="fas fa-external-link-alt"></i> Abrir faturamento
+                                    </a>
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="modal fade" id="modalConvenioDetalhe" tabindex="-1" aria-labelledby="modalConvenioDetalheLabel" aria-hidden="true">
                         <div class="modal-dialog modal-xl modal-dialog-centered">
                             <div class="modal-content">
@@ -1236,6 +1294,91 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         select.dataset.previous = select.value;
     });
+
+    window.abrirModalAnexos = function(btn) {
+        const listaEl = document.getElementById('modal-anexos-lista');
+        const pacienteEl = document.getElementById('modal-anexos-paciente');
+        const tituloEl = document.getElementById('modalAnexosFaturamentoLabel');
+        const linkDetalhes = document.getElementById('modal-anexos-link-detalhes');
+        const previewWrap = document.getElementById('modal-anexos-preview-wrap');
+        const previewIframe = document.getElementById('modal-anexos-preview-iframe');
+        const previewTitulo = document.getElementById('modal-anexos-preview-titulo');
+        if (!listaEl || !btn) return;
+
+        let anexos = [];
+        try {
+            anexos = JSON.parse(btn.dataset.anexos || '[]');
+        } catch (err) {
+            anexos = [];
+        }
+
+        const paciente = btn.dataset.paciente || '';
+        if (pacienteEl) {
+            pacienteEl.textContent = paciente ? `Paciente: ${paciente}` : '';
+        }
+        if (tituloEl) {
+            tituloEl.innerHTML = `<i class="fas fa-paperclip me-1"></i> Documentos anexados (${anexos.length})`;
+        }
+        if (linkDetalhes) {
+            linkDetalhes.href = btn.dataset.detalhesUrl || '#';
+        }
+        if (previewWrap) previewWrap.classList.add('d-none');
+        if (previewIframe) previewIframe.src = 'about:blank';
+
+        listaEl.innerHTML = '';
+        anexos.forEach(function(doc) {
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center gap-2';
+
+            const info = document.createElement('div');
+            info.className = 'small';
+            info.innerHTML = `<strong>${doc.nome || 'Documento'}</strong><br><span class="text-muted">${(doc.ext || '').toUpperCase()}</span>`;
+
+            const acoes = document.createElement('div');
+            acoes.className = 'btn-group btn-group-sm';
+            if (doc.ext === 'pdf' || ['jpg', 'jpeg', 'png', 'gif'].includes(doc.ext)) {
+                const btnVer = document.createElement('button');
+                btnVer.type = 'button';
+                btnVer.className = 'btn btn-outline-info';
+                btnVer.title = 'Visualizar';
+                btnVer.innerHTML = '<i class="fas fa-eye"></i>';
+                btnVer.addEventListener('click', function() {
+                    if (!previewWrap || !previewIframe || !previewTitulo) return;
+                    previewTitulo.textContent = doc.nome || 'Documento';
+                    previewIframe.src = doc.url + (doc.url.indexOf('?') >= 0 ? '&' : '?') + 'inline=true';
+                    previewWrap.classList.remove('d-none');
+                });
+                acoes.appendChild(btnVer);
+            }
+            const btnBaixar = document.createElement('a');
+            btnBaixar.href = doc.url;
+            btnBaixar.className = 'btn btn-outline-success';
+            btnBaixar.title = 'Download';
+            btnBaixar.target = '_blank';
+            btnBaixar.rel = 'noopener';
+            btnBaixar.innerHTML = '<i class="fas fa-download"></i>';
+            acoes.appendChild(btnBaixar);
+
+            item.appendChild(info);
+            item.appendChild(acoes);
+            listaEl.appendChild(item);
+        });
+
+        const modalEl = document.getElementById('modalAnexosFaturamento');
+        if (modalEl && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    };
+
+    const btnFecharPreview = document.getElementById('modal-anexos-fechar-preview');
+    if (btnFecharPreview) {
+        btnFecharPreview.addEventListener('click', function() {
+            const previewWrap = document.getElementById('modal-anexos-preview-wrap');
+            const previewIframe = document.getElementById('modal-anexos-preview-iframe');
+            if (previewWrap) previewWrap.classList.add('d-none');
+            if (previewIframe) previewIframe.src = 'about:blank';
+        });
+    }
 });
 </script>
 {% endblock %}

@@ -42,7 +42,7 @@
 
                         <i class="fas fa-info-circle"></i>
 
-                        Selecione a <strong>pasta</strong> com os PDFs das guias. Cada arquivo será renomeado para:
+                        Selecione um ou mais <strong>arquivos PDF</strong> das guias. Cada um será renomeado para:
 
                         <strong>Data - Convênio - Nome.pdf</strong>
 
@@ -76,13 +76,14 @@
 
                             <strong>20 dias depois</strong>, anexa o PDF ao faturamento no sistema.
 
-                            Se o OCR não ler o PDF, tenta via <strong>Gemini</strong> (cota diária no plano gratuito).
+                            Se o OCR não ler o PDF, tenta via <strong>Gemini</strong>.
 
-                            Guias TISS digitais costumam funcionar só com OCR local, sem Gemini.
+                            Com créditos pagos: use <code>GEMINI_API_KEY</code> nova (projeto faturado) no <code>.env</code> e no Render
+                            (<code>GEMINI_MODEL=gemini-2.5-flash</code>, igual ao app desktop Renome).
 
-                            Os arquivos serão <strong>renomeados na pasta</strong> selecionada (Chrome ou Edge).
+                            Os arquivos serão <strong>renomeados no disco</strong>, no mesmo local (Chrome ou Edge).
 
-                            Funciona com o site no <strong>Render</strong>: a pasta é no seu PC; o servidor só lê o PDF e devolve o novo nome.
+                            Se não renomear automaticamente (Google Drive/OneDrive), marque os documentos na tabela e use <strong>Baixar selecionados</strong> ou <strong>Salvar selecionados na pasta</strong>.
 
                         </small>
 
@@ -90,7 +91,7 @@
 
                             <i class="fas fa-check-circle text-success"></i>
 
-                            O arquivo <strong>original é substituído</strong> pelo novo nome — não cria cópia na pasta (não baixa outro PDF).
+                            O arquivo <strong>original é substituído</strong> pelo novo nome — não cria cópia (não baixa outro PDF).
 
                         </small>
 
@@ -104,7 +105,7 @@
 
                         <label class="form-check-label" for="anexar-no-sistema">
 
-                            Anexar automaticamente ao faturamento (cópia no sistema online; a pasta local só é renomeada)
+                            Anexar automaticamente ao faturamento (cópia no sistema online; o arquivo local só é renomeado)
 
                         </label>
 
@@ -134,13 +135,23 @@
 
                     <div class="mb-3">
 
-                        <button type="button" class="btn btn-outline-primary" id="btn-selecionar-pasta">
+                        <input type="file"
 
-                            <i class="fas fa-folder-open"></i> Selecionar pasta com guias PDF
+                               id="input-arquivos"
+
+                               class="d-none"
+
+                               accept=".pdf,application/pdf"
+
+                               multiple>
+
+                        <button type="button" class="btn btn-outline-primary" id="btn-selecionar-arquivos">
+
+                            <i class="fas fa-file-pdf"></i> Selecionar arquivos PDF
 
                         </button>
 
-                        <span class="text-muted ms-2" id="resumo-arquivos">Nenhuma pasta selecionada</span>
+                        <span class="text-muted ms-2" id="resumo-arquivos">Nenhum arquivo selecionado</span>
 
                         <div class="small text-muted mt-1" id="aviso-navegador"></div>
 
@@ -184,7 +195,7 @@
 
                     <button type="button" class="btn btn-primary" id="btn-renomear" disabled>
 
-                        <i class="fas fa-i-cursor"></i> Renomear na pasta
+                        <i class="fas fa-i-cursor"></i> Renomear arquivos
 
                     </button>
 
@@ -210,9 +221,25 @@
 
             <div class="card">
 
-                <div class="card-header">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
 
                     <h5 class="card-title mb-0">Resultado do processamento</h5>
+
+                    <div class="d-flex flex-wrap gap-2">
+
+                        <button type="button" class="btn btn-sm btn-outline-primary d-none" id="btn-baixar-selecionados" title="Baixar PDFs marcados com o novo nome">
+
+                            <i class="fas fa-download"></i> Baixar selecionados
+
+                        </button>
+
+                        <button type="button" class="btn btn-sm btn-success d-none" id="btn-salvar-pasta" title="Gravar PDFs marcados na pasta do PC (Google Drive, etc.)">
+
+                            <i class="fas fa-folder-open"></i> Salvar selecionados na pasta
+
+                        </button>
+
+                    </div>
 
                 </div>
 
@@ -225,6 +252,12 @@
                             <thead>
 
                                 <tr>
+
+                                    <th width="40" class="text-center">
+
+                                        <input type="checkbox" id="check-todos-resultados" checked title="Marcar todos">
+
+                                    </th>
 
                                     <th>Arquivo original</th>
 
@@ -239,6 +272,8 @@
                                     <th>Nome</th>
 
                                     <th>Anexo</th>
+
+                                    <th>Disco</th>
 
                                     <th>Status</th>
 
@@ -280,7 +315,47 @@
 
                 <div class="card-body">
 
-                    <div class="d-flex flex-wrap gap-3" id="grid-guias-pendentes"></div>
+                    <div class="row g-3 align-items-stretch">
+
+                        <div class="col-lg-5">
+
+                            <div class="d-flex flex-wrap gap-3" id="grid-guias-pendentes"></div>
+
+                        </div>
+
+                        <div class="col-lg-7">
+
+                            <div class="guia-preview-panel h-100" id="guia-preview-panel">
+
+                                <div class="guia-preview-header" id="guia-preview-titulo">
+
+                                    Pré-visualização da guia
+
+                                </div>
+
+                                <div class="guia-preview-body">
+
+                                    <div class="guia-preview-placeholder text-muted" id="guia-preview-vazio">
+
+                                        <i class="fas fa-file-pdf fa-2x mb-2"></i>
+
+                                        <div>Clique em uma guia à esquerda para visualizar o PDF.</div>
+
+                                    </div>
+
+                                    <iframe id="guia-preview-iframe"
+
+                                            class="guia-preview-iframe d-none"
+
+                                            title="Pré-visualização da guia PDF"></iframe>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
@@ -384,6 +459,24 @@
 
     overflow: hidden;
 
+    cursor: pointer;
+
+    transition: box-shadow .15s ease, border-color .15s ease;
+
+}
+
+.guia-card:hover {
+
+    box-shadow: 0 4px 10px rgba(0,0,0,.12);
+
+}
+
+.guia-card.guia-card-ativa {
+
+    border-color: #0d6efd;
+
+    box-shadow: 0 0 0 2px rgba(13,110,253,.2);
+
 }
 
 .guia-card-header {
@@ -470,6 +563,86 @@
 
 }
 
+.guia-preview-panel {
+
+    border: 1px solid #dee2e6;
+
+    border-radius: 6px;
+
+    background: #fff;
+
+    min-height: 520px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    overflow: hidden;
+
+}
+
+.guia-preview-header {
+
+    background: #f8f9fa;
+
+    border-bottom: 1px solid #dee2e6;
+
+    padding: .65rem .85rem;
+
+    font-size: .82rem;
+
+    font-weight: 600;
+
+}
+
+.guia-preview-body {
+
+    position: relative;
+
+    flex: 1;
+
+    min-height: 460px;
+
+    background: #f1f3f5;
+
+}
+
+.guia-preview-placeholder {
+
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    text-align: center;
+
+    padding: 1rem;
+
+    font-size: .85rem;
+
+}
+
+.guia-preview-iframe {
+
+    width: 100%;
+
+    height: 100%;
+
+    min-height: 460px;
+
+    border: 0;
+
+    background: #fff;
+
+}
+
 </style>
 
 
@@ -488,7 +661,9 @@
 
 
 
-    const btnSelecionarPasta = document.getElementById('btn-selecionar-pasta');
+    const btnSelecionarArquivos = document.getElementById('btn-selecionar-arquivos');
+
+    const inputArquivos = document.getElementById('input-arquivos');
 
     const avisoNavegadorEl = document.getElementById('aviso-navegador');
 
@@ -516,6 +691,12 @@
 
     const gridGuiasPendentes = document.getElementById('grid-guias-pendentes');
 
+    const guiaPreviewTitulo = document.getElementById('guia-preview-titulo');
+
+    const guiaPreviewIframe = document.getElementById('guia-preview-iframe');
+
+    const guiaPreviewVazio = document.getElementById('guia-preview-vazio');
+
     const modalBuscaEl = document.getElementById('modal-buscar-paciente');
 
     const buscaTermoEl = document.getElementById('busca-termo');
@@ -530,17 +711,26 @@
 
     const listaBuscaResultados = document.getElementById('lista-busca-resultados');
 
+    const btnSalvarPasta = document.getElementById('btn-salvar-pasta');
+
+    const btnBaixarSelecionados = document.getElementById('btn-baixar-selecionados');
+
+    const checkTodosResultados = document.getElementById('check-todos-resultados');
+
 
 
     let arquivosSelecionados = [];
 
-    let arquivosPasta = [];
+    /** @type {{name: string, handle: FileSystemFileHandle|null, file: File}[]} */
+    let arquivosComHandle = [];
 
-    let dirHandle = null;
-
-    let nomePasta = '';
+    let podeRenomearNoDisco = false;
 
     let resultadosAtuais = [];
+
+    let previewBlobUrl = null;
+
+    let previewGuiaIdx = null;
 
     let indiceGuiaBusca = null;
 
@@ -570,15 +760,483 @@
 
 
 
-    function base64ToBlob(base64, mime) {
+    function getIndicesResultadosSelecionados() {
+
+        const indices = [];
+
+        document.querySelectorAll('.resultado-check:checked').forEach(cb => {
+
+            const idx = parseInt(cb.dataset.idx, 10);
+
+            if (!Number.isNaN(idx)) indices.push(idx);
+
+        });
+
+        return indices;
+
+    }
+
+
+
+    function resultadosMarcados(resultados) {
+
+        const indices = new Set(getIndicesResultadosSelecionados());
+
+        if (!indices.size) {
+
+            return [];
+
+        }
+
+        return (resultados || []).filter((_, i) => indices.has(i));
+
+    }
+
+
+
+    function atualizarCheckTodosResultados() {
+
+        const all = document.querySelectorAll('.resultado-check');
+
+        const checked = document.querySelectorAll('.resultado-check:checked');
+
+        if (!checkTodosResultados || !all.length) {
+
+            if (checkTodosResultados) {
+
+                checkTodosResultados.checked = false;
+
+                checkTodosResultados.indeterminate = false;
+
+            }
+
+            return;
+
+        }
+
+        checkTodosResultados.checked = checked.length === all.length;
+
+        checkTodosResultados.indeterminate = checked.length > 0 && checked.length < all.length;
+
+    }
+
+
+
+    function atualizarBotoesResultados(resultados) {
+
+        const temOk = (resultados || []).some(r => r.ok && r.pdf_base64);
+
+        if (btnBaixarSelecionados) {
+
+            btnBaixarSelecionados.classList.toggle('d-none', !temOk);
+
+            btnBaixarSelecionados.disabled = !temOk;
+
+        }
+
+        if (btnSalvarPasta) {
+
+            btnSalvarPasta.classList.toggle('d-none', !temOk);
+
+            btnSalvarPasta.disabled = !temOk;
+
+        }
+
+    }
+
+
+
+    function baixarResultadosSelecionados(resultados) {
+
+        const itens = resultadosMarcados(resultados).filter(r => r.ok && r.pdf_base64 && r.arquivo_novo);
+
+        if (!itens.length) {
+
+            alert('Selecione pelo menos um documento processado com sucesso.');
+
+            return 0;
+
+        }
+
+        itens.forEach((item, i) => {
+
+            window.setTimeout(() => {
+
+                const bytes = base64ToBytes(item.pdf_base64);
+
+                const blob = new Blob([bytes], { type: 'application/pdf' });
+
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+
+                a.href = url;
+
+                a.download = item.arquivo_novo;
+
+                document.body.appendChild(a);
+
+                a.click();
+
+                a.remove();
+
+                URL.revokeObjectURL(url);
+
+            }, i * 350);
+
+        });
+
+        return itens.length;
+
+    }
+
+
+
+    if (checkTodosResultados) {
+
+        checkTodosResultados.addEventListener('change', function() {
+
+            document.querySelectorAll('.resultado-check').forEach(cb => {
+
+                cb.checked = checkTodosResultados.checked;
+
+            });
+
+        });
+
+    }
+
+
+
+    tbodyResultados.addEventListener('change', function(e) {
+
+        if (e.target.classList.contains('resultado-check')) {
+
+            atualizarCheckTodosResultados();
+
+        }
+
+    });
+
+
+
+    if (btnBaixarSelecionados) {
+
+        btnBaixarSelecionados.addEventListener('click', function() {
+
+            const qtd = baixarResultadosSelecionados(resultadosAtuais);
+
+            if (qtd > 0) {
+
+                statusEl.textContent = `${qtd} arquivo(s) baixado(s). Coloque cada convênio na pasta correspondente.`;
+
+            }
+
+        });
+
+    }
+
+
+
+    function base64ToBytes(base64) {
 
         const bin = atob(base64);
 
         const bytes = new Uint8Array(bin.length);
 
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
 
-        return new Blob([bytes], { type: mime || 'application/pdf' });
+        return bytes;
+
+    }
+
+
+
+    async function encontrarArquivoNaPasta(dir, nomeAlvo) {
+
+        try {
+
+            return await dir.getFileHandle(nomeAlvo);
+
+        } catch (err) {
+
+            /* tenta correspondência normalizada */
+
+        }
+
+        const alvo = normalizarNomeArquivo(nomeAlvo);
+
+        for await (const [nome, entry] of dir.entries()) {
+
+            if (entry.kind !== 'file') continue;
+
+            if (!nome.toLowerCase().endsWith('.pdf')) continue;
+
+            if (normalizarNomeArquivo(nome) === alvo) {
+
+                return entry;
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+
+
+    async function escolherPastaDestino(forceNova) {
+
+        if (!window.showDirectoryPicker) {
+
+            alert('Use Chrome ou Edge para gravar os arquivos renomeados na pasta do PC.');
+
+            return null;
+
+        }
+
+        if (!forceNova && dirHandleRenomeFallback) {
+
+            return dirHandleRenomeFallback;
+
+        }
+
+        try {
+
+            dirHandleRenomeFallback = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+            return dirHandleRenomeFallback;
+
+        } catch (err) {
+
+            if (err && err.name === 'AbortError') {
+
+                return null;
+
+            }
+
+            throw err;
+
+        }
+
+    }
+
+
+
+    async function salvarRenomeadosNaPasta(resultados, dir) {
+
+        const itens = (resultados || []).filter(r => r.ok && r.arquivo_novo && r.pdf_base64);
+
+        if (!itens.length) {
+
+            alert('Nenhum PDF processado com sucesso para gravar na pasta.');
+
+            return { salvos: 0, falhas: [] };
+
+        }
+
+        if (!dir) {
+
+            throw new Error('Selecione a pasta de destino.');
+
+        }
+
+
+
+        let salvos = 0;
+
+        const falhas = [];
+
+
+
+        for (const item of itens) {
+
+            if (item.renomeado_disco) {
+
+                salvos += 1;
+
+                continue;
+
+            }
+
+            try {
+
+                const bytes = base64ToBytes(item.pdf_base64);
+
+                const nomeNovo = item.arquivo_novo;
+
+                const nomeOriginal = item.arquivo_original;
+
+
+
+                if (nomeOriginal !== nomeNovo) {
+
+                    const oldHandle = await encontrarArquivoNaPasta(dir, nomeOriginal);
+
+                    if (oldHandle && typeof oldHandle.move === 'function') {
+
+                        try {
+
+                            if (await garantirPermissaoEscrita(oldHandle)) {
+
+                                await oldHandle.move(nomeNovo);
+
+                                item.renomeado_disco = true;
+
+                                salvos += 1;
+
+                                continue;
+
+                            }
+
+                        } catch (moveErr) {
+
+                            /* grava cópia com novo nome */
+
+                        }
+
+                    }
+
+                }
+
+
+
+                const newHandle = await dir.getFileHandle(nomeNovo, { create: true });
+
+                if (!(await garantirPermissaoEscrita(newHandle))) {
+
+                    throw new Error('Sem permissão de escrita na pasta.');
+
+                }
+
+                const writable = await newHandle.createWritable();
+
+                await writable.write(bytes);
+
+                await writable.close();
+
+
+
+                if (nomeOriginal !== nomeNovo) {
+
+                    try {
+
+                        await dir.removeEntry(nomeOriginal);
+
+                    } catch (removeErr) {
+
+                        const oldHandle = await encontrarArquivoNaPasta(dir, nomeOriginal);
+
+                        if (oldHandle && normalizarNomeArquivo(nomeOriginal) !== normalizarNomeArquivo(nomeNovo)) {
+
+                            try {
+
+                                await dir.removeEntry(oldHandle.name);
+
+                            } catch (ignoreErr) {
+
+                                /* original pode já ter sido substituído */
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+
+
+                item.renomeado_disco = true;
+
+                salvos += 1;
+
+            } catch (err) {
+
+                falhas.push({
+
+                    arquivo: item.arquivo_original,
+
+                    erro: err.message || 'Falha ao gravar na pasta.',
+
+                });
+
+            }
+
+        }
+
+
+
+        return { salvos, falhas };
+
+    }
+
+
+
+    if (btnSalvarPasta) {
+
+        btnSalvarPasta.addEventListener('click', async function() {
+
+            btnSalvarPasta.disabled = true;
+
+            try {
+
+                const dir = await escolherPastaDestino(false);
+
+                if (!dir) {
+
+                    return;
+
+                }
+
+                statusEl.textContent = 'Gravando arquivos renomeados na pasta...';
+
+                const marcados = resultadosMarcados(resultadosAtuais);
+
+                if (!marcados.length) {
+
+                    alert('Selecione pelo menos um documento processado com sucesso.');
+
+                    return;
+
+                }
+
+                const { salvos, falhas } = await salvarRenomeadosNaPasta(marcados, dir);
+
+                renderResultados(resultadosAtuais);
+
+                let msg = `${salvos} arquivo(s) gravado(s) na pasta com o novo nome.`;
+
+                if (falhas.length) {
+
+                    msg += ` ${falhas.length} falha(s).`;
+
+                    alert(
+
+                        'Alguns arquivos não foram gravados:\n\n' +
+
+                        falhas.map(f => `• ${f.arquivo}\n  ${f.erro}`).join('\n\n')
+
+                    );
+
+                }
+
+                statusEl.textContent = msg + ' Aguarde a sincronização do Google Drive, se for o caso.';
+
+            } catch (err) {
+
+                alert(err.message || 'Erro ao salvar na pasta.');
+
+                statusEl.textContent = '';
+
+            } finally {
+
+                btnSalvarPasta.disabled = !resultadosAtuais.some(r => r.ok && r.pdf_base64);
+
+            }
+
+        });
 
     }
 
@@ -610,81 +1268,175 @@
 
         resumoArquivos.textContent = arquivosSelecionados.length
 
-            ? `${arquivosSelecionados.length} PDF(s) em ${nomePasta || 'pasta'}`
+            ? `${arquivosSelecionados.length} arquivo(s) selecionado(s)${podeRenomearNoDisco ? '' : ' (renomear no disco: use Chrome/Edge)'}`
 
-            : (nomePasta ? `Nenhum PDF em ${nomePasta}` : 'Nenhuma pasta selecionada');
-
-    }
-
-
-
-    if (!window.showDirectoryPicker) {
-
-        avisoNavegadorEl.textContent = 'Renomear na pasta exige Chrome ou Edge (acesso à pasta no disco).';
+            : 'Nenhum arquivo selecionado';
 
     }
 
 
 
-    async function carregarPdfsDaPasta(handle) {
+    const pdfPickerTypes = [{
 
-        const entradas = [];
+        description: 'PDF',
 
-        for await (const [name, entry] of handle.entries()) {
+        accept: { 'application/pdf': ['.pdf'] },
 
-            if (entry.kind === 'file' && name.toLowerCase().endsWith('.pdf')) {
+    }];
 
-                entradas.push({ name, handle: entry, file: await entry.getFile() });
 
-            }
+
+    async function selecionarArquivosComPermissao() {
+
+        if (!window.showOpenFilePicker) {
+
+            return false;
 
         }
 
-        entradas.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+        const handles = await window.showOpenFilePicker({
 
-        return entradas;
+            multiple: true,
+
+            mode: 'readwrite',
+
+            types: pdfPickerTypes,
+
+        });
+
+        arquivosComHandle = [];
+
+        for (const handle of handles) {
+
+            const file = await handle.getFile();
+
+            if (!file.name.toLowerCase().endsWith('.pdf')) continue;
+
+            arquivosComHandle.push({ name: file.name, handle, file });
+
+        }
+
+        arquivosComHandle.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+        arquivosSelecionados = arquivosComHandle.map(p => p.file);
+
+        podeRenomearNoDisco = arquivosComHandle.length > 0 && arquivosComHandle.every(p => p.handle);
+
+        dirHandleRenomeFallback = null;
+
+        return true;
 
     }
 
 
 
-    async function renomearArquivoNaPasta(nomeOriginal, nomeNovo, fileHandle) {
+    function selecionarArquivosInput(fileList) {
+
+        arquivosComHandle = [];
+
+        arquivosSelecionados = Array.from(fileList || []).filter(
+
+            f => f.name.toLowerCase().endsWith('.pdf')
+
+        );
+
+        arquivosComHandle = arquivosSelecionados.map(file => ({
+
+            name: file.name,
+
+            handle: null,
+
+            file,
+
+        }));
+
+        podeRenomearNoDisco = false;
+
+        dirHandleRenomeFallback = null;
+
+    }
+
+
+
+    if (!window.showOpenFilePicker) {
+
+        avisoNavegadorEl.textContent = 'Para renomear no disco, use Chrome ou Edge. Outros navegadores só processam sem renomear o arquivo.';
+
+    }
+
+
+
+    async function garantirPermissaoEscrita(fileHandle) {
+
+        if (!fileHandle) return false;
+
+        let perm = await fileHandle.queryPermission({ mode: 'readwrite' });
+
+        if (perm === 'granted') return true;
+
+        perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+
+        return perm === 'granted';
+
+    }
+
+
+
+    function normalizarNomeArquivo(nome) {
+
+        return String(nome || '')
+
+            .normalize('NFC')
+
+            .trim()
+
+            .toLowerCase()
+
+            .replace(/\s+/g, ' ');
+
+    }
+
+
+
+    let dirHandleRenomeFallback = null;
+
+
+
+    async function renomearArquivoNoDisco(nomeOriginal, nomeNovo, fileHandle) {
 
         if (nomeOriginal === nomeNovo) return;
 
-        if (typeof fileHandle.move === 'function') {
+        if (!fileHandle) {
 
-            await fileHandle.move(nomeNovo);
-
-            return;
+            throw new Error('Sem permissão para renomear este arquivo no disco.');
 
         }
 
-        const file = await fileHandle.getFile();
+        if (!(await garantirPermissaoEscrita(fileHandle))) {
 
-        const newHandle = await dirHandle.getFileHandle(nomeNovo, { create: true });
+            throw new Error('Permissão de escrita negada para o arquivo.');
 
-        const writable = await newHandle.createWritable();
+        }
+
+        if (typeof fileHandle.move !== 'function') {
+
+            throw new Error('Renomear no disco não suportado neste navegador.');
+
+        }
 
         try {
 
-            await writable.write(await file.arrayBuffer());
+            await fileHandle.move(nomeNovo);
 
-            await writable.close();
+            const atualizado = await fileHandle.getFile();
 
-            await dirHandle.removeEntry(nomeOriginal);
+            if (normalizarNomeArquivo(atualizado.name) !== normalizarNomeArquivo(nomeNovo)) {
 
-        } catch (err) {
-
-            try {
-
-                await dirHandle.removeEntry(nomeNovo, { recursive: false });
-
-            } catch (cleanupErr) {
-
-                console.warn('Falha ao limpar arquivo parcial:', cleanupErr);
+                throw new Error('O sistema de arquivos não confirmou o novo nome.');
 
             }
+
+        } catch (err) {
 
             throw err;
 
@@ -694,29 +1446,51 @@
 
 
 
-    async function aplicarRenomeacaoNaPasta(resultados) {
+    async function aplicarRenomeacaoArquivos(resultados, indicesSelecionados) {
 
-        if (!dirHandle) {
+        if (!podeRenomearNoDisco) {
 
-            throw new Error('Selecione a pasta com as guias antes de renomear.');
+            throw new Error('Renomear no disco exige Chrome ou Edge ao selecionar os arquivos pelo botão.');
 
         }
 
-        const handlePorNome = new Map(arquivosPasta.map(p => [p.name, p.handle]));
+        const handlePorNome = new Map(
+
+            arquivosComHandle.map(p => [normalizarNomeArquivo(p.name), p])
+
+        );
 
         let renomeados = 0;
 
         const falhas = [];
 
-        for (const item of resultados) {
+        for (let i = 0; i < resultados.length; i += 1) {
+
+            const item = resultados[i];
 
             if (!item.ok || !item.arquivo_novo) continue;
 
-            const handle = handlePorNome.get(item.arquivo_original);
+            if (normalizarNomeArquivo(item.arquivo_original) === normalizarNomeArquivo(item.arquivo_novo)) {
+
+                continue;
+
+            }
+
+            const idxSel = Array.isArray(indicesSelecionados) ? indicesSelecionados[i] : null;
+
+            let entry = (idxSel !== null && idxSel !== undefined) ? arquivosComHandle[idxSel] : null;
+
+            if (!entry || !entry.handle) {
+
+                entry = handlePorNome.get(normalizarNomeArquivo(item.arquivo_original)) || null;
+
+            }
+
+            const handle = entry ? entry.handle : null;
 
             if (!handle) {
 
-                falhas.push({ arquivo: item.arquivo_original, erro: 'Arquivo não encontrado na pasta.' });
+                falhas.push({ arquivo: item.arquivo_original, erro: 'Arquivo não encontrado na seleção.' });
 
                 continue;
 
@@ -724,9 +1498,21 @@
 
             try {
 
-                await renomearArquivoNaPasta(item.arquivo_original, item.arquivo_novo, handle);
+                await renomearArquivoNoDisco(item.arquivo_original, item.arquivo_novo, handle);
 
-                handlePorNome.delete(item.arquivo_original);
+                if (entry) {
+
+                    entry.name = item.arquivo_novo;
+
+                    entry.file = await handle.getFile();
+
+                    handlePorNome.set(normalizarNomeArquivo(item.arquivo_novo), entry);
+
+                    handlePorNome.delete(normalizarNomeArquivo(item.arquivo_original));
+
+                }
+
+                item.renomeado_disco = true;
 
                 renomeados += 1;
 
@@ -738,9 +1524,7 @@
 
         }
 
-        arquivosPasta = await carregarPdfsDaPasta(dirHandle);
-
-        arquivosSelecionados = arquivosPasta.map(p => p.file);
+        arquivosSelecionados = arquivosComHandle.map(p => p.file);
 
         renderListaPdfs();
 
@@ -750,29 +1534,25 @@
 
 
 
-    btnSelecionarPasta.addEventListener('click', async function() {
-
-        if (!window.showDirectoryPicker) {
-
-            alert('Use Chrome ou Edge para selecionar a pasta e renomear os arquivos no disco.');
-
-            return;
-
-        }
+    btnSelecionarArquivos.addEventListener('click', async function() {
 
         try {
 
-            dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            if (window.showOpenFilePicker) {
 
-            nomePasta = dirHandle.name || 'pasta';
+                await selecionarArquivosComPermissao();
 
-            arquivosPasta = await carregarPdfsDaPasta(dirHandle);
+            } else {
 
-            arquivosSelecionados = arquivosPasta.map(p => p.file);
+                inputArquivos.click();
+
+                return;
+
+            }
 
             if (!arquivosSelecionados.length) {
 
-                alert('Nenhum PDF encontrado nesta pasta.');
+                alert('Selecione apenas arquivos PDF.');
 
             }
 
@@ -784,17 +1564,45 @@
 
             painelGuiasPendentes.classList.add('d-none');
 
+            limparPreviewGuia();
+
             gridGuiasPendentes.innerHTML = '';
 
         } catch (err) {
 
             if (err && err.name !== 'AbortError') {
 
-                alert(err.message || 'Não foi possível acessar a pasta.');
+                alert(err.message || 'Não foi possível acessar os arquivos.');
 
             }
 
         }
+
+    });
+
+
+
+    inputArquivos.addEventListener('change', function() {
+
+        selecionarArquivosInput(inputArquivos.files);
+
+        if (inputArquivos.files && inputArquivos.files.length && !arquivosSelecionados.length) {
+
+            alert('Selecione apenas arquivos PDF.');
+
+        }
+
+        renderListaPdfs();
+
+        statusEl.textContent = '';
+
+        painelResultados.classList.add('d-none');
+
+        painelGuiasPendentes.classList.add('d-none');
+
+        limparPreviewGuia();
+
+        gridGuiasPendentes.innerHTML = '';
 
     });
 
@@ -812,7 +1620,153 @@
 
 
 
+    function limparPreviewGuia() {
+
+        if (previewBlobUrl) {
+
+            URL.revokeObjectURL(previewBlobUrl);
+
+            previewBlobUrl = null;
+
+        }
+
+        if (guiaPreviewIframe) {
+
+            guiaPreviewIframe.src = 'about:blank';
+
+            guiaPreviewIframe.classList.add('d-none');
+
+        }
+
+        if (guiaPreviewVazio) {
+
+            guiaPreviewVazio.classList.remove('d-none');
+
+        }
+
+        if (guiaPreviewTitulo) {
+
+            guiaPreviewTitulo.textContent = 'Pré-visualização da guia';
+
+        }
+
+        document.querySelectorAll('.guia-card.guia-card-ativa').forEach(el => {
+
+            el.classList.remove('guia-card-ativa');
+
+        });
+
+        previewGuiaIdx = null;
+
+    }
+
+
+
+    function mostrarPreviewGuia(idx) {
+
+        const item = resultadosAtuais[idx];
+
+        if (!item || !item.pdf_base64) {
+
+            limparPreviewGuia();
+
+            if (guiaPreviewVazio) {
+
+                guiaPreviewVazio.innerHTML = `
+
+                    <i class="fas fa-file-pdf fa-2x mb-2"></i>
+
+                    <div>PDF indisponível para esta guia.</div>`;
+
+            }
+
+            return;
+
+        }
+
+
+
+        limparPreviewGuia();
+
+        previewGuiaIdx = idx;
+
+
+
+        try {
+
+            const binary = atob(item.pdf_base64);
+
+            const bytes = new Uint8Array(binary.length);
+
+            for (let i = 0; i < binary.length; i += 1) {
+
+                bytes[i] = binary.charCodeAt(i);
+
+            }
+
+            previewBlobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+
+        } catch (err) {
+
+            if (guiaPreviewVazio) {
+
+                guiaPreviewVazio.classList.remove('d-none');
+
+                guiaPreviewVazio.innerHTML = `
+
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2 text-warning"></i>
+
+                    <div>Não foi possível carregar a pré-visualização.</div>`;
+
+            }
+
+            return;
+
+        }
+
+
+
+        document.querySelectorAll('.guia-card').forEach(el => {
+
+            el.classList.toggle('guia-card-ativa', el.dataset.idx === String(idx));
+
+        });
+
+
+
+        if (guiaPreviewTitulo) {
+
+            guiaPreviewTitulo.textContent = item.arquivo_novo || item.arquivo_original || 'Pré-visualização da guia';
+
+        }
+
+        if (guiaPreviewVazio) {
+
+            guiaPreviewVazio.classList.add('d-none');
+
+            guiaPreviewVazio.innerHTML = `
+
+                <i class="fas fa-file-pdf fa-2x mb-2"></i>
+
+                <div>Clique em uma guia à esquerda para visualizar o PDF.</div>`;
+
+        }
+
+        if (guiaPreviewIframe) {
+
+            guiaPreviewIframe.src = previewBlobUrl;
+
+            guiaPreviewIframe.classList.remove('d-none');
+
+        }
+
+    }
+
+
+
     function renderGuiasPendentes(resultados) {
+
+        limparPreviewGuia();
 
         gridGuiasPendentes.innerHTML = '';
 
@@ -833,6 +1787,8 @@
         }
 
 
+
+        let primeiroIdx = null;
 
         pendentes.forEach(({ item, idx }) => {
 
@@ -906,11 +1862,35 @@
 
             gridGuiasPendentes.appendChild(card);
 
+            card.addEventListener('click', function(ev) {
+
+                if (ev.target.closest('.btn-anexar-sugestao, .btn-buscar-paciente')) {
+
+                    return;
+
+                }
+
+                mostrarPreviewGuia(idx);
+
+            });
+
+            if (primeiroIdx === null) {
+
+                primeiroIdx = idx;
+
+            }
+
         });
 
 
 
         painelGuiasPendentes.classList.remove('d-none');
+
+        if (primeiroIdx !== null) {
+
+            mostrarPreviewGuia(primeiroIdx);
+
+        }
 
     }
 
@@ -1172,11 +2152,21 @@
 
         tbodyResultados.innerHTML = '';
 
-        resultados.forEach(item => {
+        resultados.forEach((item, idx) => {
 
             const tr = document.createElement('tr');
 
             tr.innerHTML = `
+
+                <td class="text-center">
+
+                    ${item.ok && item.pdf_base64
+
+                        ? `<input type="checkbox" class="form-check-input resultado-check" data-idx="${idx}" checked>`
+
+                        : ''}
+
+                </td>
 
                 <td>${item.arquivo_original || '-'}</td>
 
@@ -1204,6 +2194,20 @@
 
                 </td>
 
+                <td class="text-center">
+
+                    ${item.renomeado_disco
+
+                        ? '<span class="badge bg-success">Sim</span>'
+
+                        : (item.ok
+
+                            ? '<span class="badge bg-secondary">Não</span>'
+
+                            : '-')}
+
+                </td>
+
                 <td>
 
                     ${item.ok
@@ -1221,6 +2225,10 @@
         });
 
         painelResultados.classList.remove('d-none');
+
+        atualizarCheckTodosResultados();
+
+        atualizarBotoesResultados(resultados);
 
     }
 
@@ -1248,9 +2256,9 @@
 
         }
 
-        if (!dirHandle) {
+        if (!arquivosSelecionados.length) {
 
-            alert('Selecione a pasta com as guias PDF.');
+            alert('Selecione os arquivos PDF das guias.');
 
             return;
 
@@ -1330,7 +2338,23 @@
 
 
 
-            const { renomeados, falhas } = await aplicarRenomeacaoNaPasta(resultadosAtuais);
+            let renomeados = 0;
+
+            let falhas = [];
+
+            if (podeRenomearNoDisco) {
+
+                const renomeacao = await aplicarRenomeacaoArquivos(resultadosAtuais, indices);
+
+                renomeados = renomeacao.renomeados;
+
+                falhas = renomeacao.falhas;
+
+            } else if ((data.ok_count || 0) > 0) {
+
+                /* renome automático indisponível — usar Salvar na pasta */
+
+            }
 
 
 
@@ -1338,11 +2362,23 @@
 
             const anexos = data.anexo_count || 0;
 
-            let msg = `${renomeados} arquivo(s) renomeado(s) na pasta (sem cópia — o nome antigo deixa de existir).`;
+            let msg = '';
 
-            if (falhas.length) {
 
-                msg += ` ${falhas.length} falha(s) ao renomear no disco.`;
+
+            if (podeRenomearNoDisco) {
+
+                msg = `${renomeados} arquivo(s) renomeado(s) no disco.`;
+
+                if (falhas.length) {
+
+                    msg += ` ${falhas.length} falha(s) ao renomear no disco.`;
+
+                }
+
+            } else {
+
+                msg = 'Processamento concluído no sistema.';
 
             }
 
@@ -1358,11 +2394,45 @@
 
             }
 
-            statusEl.textContent = msg;
+
+
+            const pendentesDisco = resultadosAtuais.filter(
+
+                r => r.ok && r.pdf_base64 && !r.renomeado_disco
+
+            ).length;
+
+            if (pendentesDisco > 0) {
+
+                msg += ` ${pendentesDisco} arquivo(s) pendente(s) na pasta — marque e use Salvar selecionados na pasta.`;
+
+            }
+
+
+
+            statusEl.textContent = msg + (resultadosAtuais.some(r => r.renomeado_disco)
+
+                ? ' Aguarde a sincronização se a pasta for Google Drive/OneDrive.'
+
+                : '');
+
+            renderResultados(resultadosAtuais);
+
+
 
             if (falhas.length) {
 
-                console.warn('Falhas ao renomear na pasta:', falhas);
+                console.warn('Falhas ao renomear no disco:', falhas);
+
+                alert(
+
+                    'Alguns arquivos não foram renomeados automaticamente.\n\n' +
+
+                    falhas.map(f => `• ${f.arquivo}\n  ${f.erro}`).join('\n\n') +
+
+                    '\n\nMarque os documentos e use Baixar selecionados ou Salvar selecionados na pasta.'
+
+                );
 
             }
 

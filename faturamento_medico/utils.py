@@ -7,6 +7,10 @@ from typing import List, Dict, Any
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
+from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+silenciar_logs_grpc_google()
+
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True

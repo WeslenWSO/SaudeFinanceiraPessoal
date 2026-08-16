@@ -7,8 +7,13 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import pdfplumber
+
+from SaudeFinanceira.google_grpc_env import silenciar_logs_grpc_google
+
+silenciar_logs_grpc_google()
 
 try:
     import google.generativeai as genai
@@ -110,9 +115,16 @@ _RE_FUSEX_PACIENTE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _RE_PM_NOME = re.compile(
-    r'Nome\s+do\s+Benefici[aá]rio\s*[:\-]?\s*(.+?)(?=\n|$)',
+    r'(?:1\s*[-–.]?\s*)?Nome\s+do\s+Benefici[aá]rio\s*[:\-]?\s*'
+    r'(.+?)'
+    r'(?=\s*Sexo\b|\s*Nome\s+do\s+Associado\b|\s*Matr[ií]cula\b|\s*Parentesco\b|\n\s*\d+\s*[-–.]|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_PM_DATA_LOCAL = re.compile(
+    r'Local\s+e\s+Data\s*[:\-]?\s*.+?(\d{1,2})\s+de\s+([A-Za-zçÇáéíóúãõâêô]+)\s+de\s+(\d{4})',
     re.IGNORECASE,
 )
+_RE_PM_STOP_SEXO = re.compile(r'\bSexo\b', re.IGNORECASE)
 _RE_BOMBEIRO_TITULAR = re.compile(
     r'Titular\s*[:\-]?\s*(.+?)(?=\n|Dependente|$)',
     re.IGNORECASE,
@@ -126,6 +138,30 @@ _RE_DEPENDENTE_MESMO_TITULAR = re.compile(
     r'^(?:O\s+MESMO(?:\s+TITULAR)?|TITULAR)\.?$',
     re.IGNORECASE,
 )
+
+_MESES_PT = {
+    'janeiro': '01',
+    'fevereiro': '02',
+    'marco': '03',
+    'março': '03',
+    'abril': '04',
+    'maio': '05',
+    'junho': '06',
+    'julho': '07',
+    'agosto': '08',
+    'setembro': '09',
+    'outubro': '10',
+    'novembro': '11',
+    'dezembro': '12',
+}
+
+_PALAVRAS_INVALIDAS_NOME = frozenset({
+    'SEXO', 'MASC', 'FEM', 'MASCULINO', 'FEMININO', 'TITULAR', 'DEPENDENTE',
+    'MATRICULA', 'ASSOCIADO', 'BENEFICIARIO', 'MUC', 'ENCAMINHAMOS', 'NOME',
+    'LOCAL', 'DATA', 'GOVERNO', 'ACRE', 'PMAC', 'FUNDO', 'SAUDE', 'POLICIA',
+    'MILITAR', 'ENCAMINHAMENTO', 'GUIA', 'PRESTACAO', 'SERVICOS', 'PROFISSIONAIS',
+    'INSTITUICAO', 'INSTITUIÇÃO', 'RIO', 'BRANCO',
+})
 
 _TISS_CONVENIOS = (
     ('POSTAL', ('POSTAL SAÚDE', 'POSTAL SAUDE', 'POSTAL SAU')),
@@ -162,13 +198,27 @@ def _normalizar_data(valor: str) -> str:
     valor = (valor or '').strip().replace('.', '/').replace('-', '/')
     m = re.match(r'(\d{2})/(\d{2})/(\d{4})', valor)
     if m:
-        return f'{m.group(1)}/{m.group(2)}/{m.group(3)}'
+        return _data_valida(f'{m.group(1)}/{m.group(2)}/{m.group(3)}')
     m = re.match(r'(\d{2})/(\d{2})/(\d{2})', valor)
     if m:
         ano = int(m.group(3))
         ano_full = 2000 + ano if ano < 100 else ano
-        return f'{m.group(1)}/{m.group(2)}/{ano_full}'
-    return valor
+        return _data_valida(f'{m.group(1)}/{m.group(2)}/{ano_full}')
+    return ''
+
+
+def _data_valida(data: str) -> str:
+    m = re.match(r'(\d{2})/(\d{2})/(\d{4})$', (data or '').strip())
+    if not m:
+        return ''
+    dia, mes, ano = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if ano < 2000 or ano > 2100:
+        return ''
+    try:
+        datetime(ano, mes, dia)
+    except ValueError:
+        return ''
+    return f'{m.group(1)}/{m.group(2)}/{m.group(3)}'
 
 
 def _data_para_arquivo(data: str) -> str:
@@ -178,8 +228,50 @@ def _data_para_arquivo(data: str) -> str:
 def _limpar_nome_beneficiario(valor: str) -> str:
     nome = re.sub(r'\s+', ' ', (valor or '').strip())
     nome = _RE_CAMPOS_INVALIDOS_ARQUIVO.sub('', nome)
+    nome = re.sub(r'^[\s\)\(\[\]\{\}:;.,\-–_/\\|]+', '', nome)
+    nome = re.sub(r'[\s\)\(\[\]\{\}:;.,\-–_/\\|]+$', '', nome)
     nome = re.sub(r'\s+', ' ', nome).strip(' .-')
     return nome.upper()
+
+
+def _nome_parece_pessoa(nome: str) -> bool:
+    nome = _limpar_nome_beneficiario(nome)
+    if not nome or len(nome) < 6:
+        return False
+    if re.search(r'[\(\)\[\]\{\}]', nome):
+        return False
+    if re.search(r'\bSEXO\b', nome):
+        return False
+    palavras = [
+        p for p in nome.split()
+        if re.fullmatch(r'[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}', p)
+    ]
+    if len(palavras) < 2 or sum(len(p) for p in palavras) < 6:
+        return False
+    return not any(p in _PALAVRAS_INVALIDAS_NOME for p in palavras)
+
+
+def _campos_completos(data: str, nome: str, convenio: str) -> bool:
+    return bool(_data_valida(_normalizar_data(data)) and _nome_parece_pessoa(nome) and (convenio or '').strip())
+
+
+def _candidato_nome_pm(valor: str) -> str:
+    parte = _RE_PM_STOP_SEXO.split(valor, maxsplit=1)[0]
+    return _limpar_nome_beneficiario(parte)
+
+
+def _extrair_data_pm(texto: str) -> str:
+    data = _extrair_data_emissao(texto)
+    if data:
+        return data
+    m = _RE_PM_DATA_LOCAL.search(texto)
+    if not m:
+        return ''
+    dia, mes_nome, ano = m.group(1), m.group(2), m.group(3)
+    mes = _MESES_PT.get(mes_nome.lower().replace('ç', 'c'), '')
+    if not mes:
+        return ''
+    return _data_valida(f'{int(dia):02d}/{mes}/{ano}')
 
 
 def _extrair_data_emissao(texto: str) -> str:
@@ -262,11 +354,47 @@ def extrair_campos_pm(texto: str) -> tuple[str, str]:
     if not texto or len(texto.strip()) < 20:
         return '', ''
     texto_norm = _normalizar_texto(texto)
-    data = _extrair_data_emissao(texto_norm)
+    data = _extrair_data_pm(texto_norm)
     nome = ''
+
     m_nome = _RE_PM_NOME.search(texto_norm)
     if m_nome:
-        nome = _limpar_nome_beneficiario(m_nome.group(1))
+        candidato = _candidato_nome_pm(m_nome.group(1))
+        if _nome_parece_pessoa(candidato):
+            nome = candidato
+
+    if not nome:
+        linhas = texto_norm.split('\n')
+        for i, linha in enumerate(linhas):
+            if not re.search(r'Benefici[aá]rio', linha, re.IGNORECASE):
+                continue
+            if re.search(r'Nome\s+do\s+Benefici', linha, re.IGNORECASE):
+                partes = re.split(
+                    r'(?:1\s*[-–.]?\s*)?Nome\s+do\s+Benefici[aá]rio\s*[:\-]?\s*',
+                    linha,
+                    maxsplit=1,
+                    flags=re.IGNORECASE,
+                )
+                if len(partes) > 1:
+                    candidato = _candidato_nome_pm(partes[1])
+                    if _nome_parece_pessoa(candidato):
+                        nome = candidato
+                        break
+            for j in range(i + 1, min(i + 4, len(linhas))):
+                linha_c = linhas[j].strip()
+                if not linha_c or re.search(
+                    r'^(Sexo|Nome\s+do\s+Associado|Matr|Parentesco|Presta)',
+                    linha_c,
+                    re.IGNORECASE,
+                ):
+                    continue
+                candidato = _limpar_nome_beneficiario(linha_c)
+                if _nome_parece_pessoa(candidato):
+                    nome = candidato
+                    break
+            if nome:
+                break
+
     return data, nome
 
 
@@ -349,25 +477,42 @@ def _is_erro_cota_gemini(exc: BaseException) -> bool:
     return '429' in str(exc) or 'quota' in msg or 'rate limit' in msg or 'rate-limit' in msg
 
 
+def _is_erro_modelo_gemini(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return '404' in str(exc) or 'not found' in msg or 'not supported' in msg
+
+
 def _mensagem_erro_gemini(exc: BaseException) -> str:
     if _is_erro_cota_gemini(exc):
         return (
-            'Cota diária do Gemini esgotada (plano gratuito). '
-            'Guias TISS digitais funcionam via OCR local; manuscritas precisam esperar ou usar plano pago. '
-            'Defina GEMINI_MODEL=gemini-2.0-flash no .env se ainda não definiu.'
+            'Cota do Gemini atingida (limite da chave gratuita: ~20 req/dia por modelo). '
+            'Se você já comprou créditos, a chave antiga pode continuar no tier gratuito — '
+            'gere uma nova API key em https://aistudio.google.com/apikey (projeto com faturamento), '
+            'atualize GEMINI_API_KEY no .env e no Render, reinicie o servidor e teste de novo.'
         )
-    return str(exc)
+    msg = str(exc)
+    if 'api key' in msg.lower() or 'invalid' in msg.lower() and 'key' in msg.lower():
+        return (
+            'GEMINI_API_KEY inválida ou revogada. '
+            'Confira a chave no .env (e no Render) após comprar créditos.'
+        )
+    return msg
 
 
 def _modelos_gemini() -> list[str]:
     try:
         from django.conf import settings
 
-        principal = (getattr(settings, 'GEMINI_MODEL', None) or 'gemini-2.0-flash').strip()
+        principal = (getattr(settings, 'GEMINI_MODEL', None) or 'gemini-2.5-flash').strip()
     except Exception:
-        principal = 'gemini-2.0-flash'
+        principal = 'gemini-2.5-flash'
     modelos = [principal]
-    for fallback in ('gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'):
+    for fallback in (
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-latest',
+        'gemini-flash-lite-latest',
+    ):
         if fallback not in modelos:
             modelos.append(fallback)
     return modelos
@@ -423,8 +568,8 @@ def _extrair_com_gemini(pdf_bytes: bytes) -> tuple[str, str, str, str, str]:
                 ultimo_erro = 'Resposta inválida do Gemini.'
             except Exception as exc:
                 ultimo_erro = _mensagem_erro_gemini(exc)
-                if _is_erro_cota_gemini(exc):
-                    logger.warning('Cota Gemini (%s): %s', nome_modelo, exc)
+                if _is_erro_cota_gemini(exc) or _is_erro_modelo_gemini(exc):
+                    logger.warning('Modelo Gemini indisponível (%s): %s', nome_modelo, exc)
                     continue
                 logger.warning('Falha Gemini (%s): %s', nome_modelo, exc)
 
@@ -450,19 +595,19 @@ def _ler_texto_pdf_ocr(pdf_bytes: bytes) -> str:
     if not OCR_AVAILABLE or pdfium is None or not _configurar_tesseract():
         return ''
     try:
-        pdf = pdfium.PdfDocument(pdf_bytes)
-        textos = []
-        for idx in range(min(len(pdf), 2)):
-            page = pdf[idx]
-            bitmap = page.render(scale=300 / 72)
-            pil_image = bitmap.to_pil()
-            if not isinstance(pil_image, Image.Image):
-                pil_image = Image.frombytes(pil_image.mode, pil_image.size, pil_image.tobytes())
-            try:
-                textos.append(pytesseract.image_to_string(pil_image, lang='por+eng'))
-            except Exception:
-                textos.append(pytesseract.image_to_string(pil_image, lang='por'))
-        return '\n'.join(textos)
+        with pdfium.PdfDocument(pdf_bytes) as pdf:
+            textos = []
+            for idx in range(min(len(pdf), 2)):
+                page = pdf[idx]
+                bitmap = page.render(scale=300 / 72)
+                pil_image = bitmap.to_pil()
+                if not isinstance(pil_image, Image.Image):
+                    pil_image = Image.frombytes(pil_image.mode, pil_image.size, pil_image.tobytes())
+                try:
+                    textos.append(pytesseract.image_to_string(pil_image, lang='por+eng'))
+                except Exception:
+                    textos.append(pytesseract.image_to_string(pil_image, lang='por'))
+            return '\n'.join(textos)
     except Exception as exc:
         logger.warning('Falha OCR: %s', exc)
         return ''
@@ -510,8 +655,12 @@ def processar_arquivo(
 
     tipo = detectar_tipo_guia(texto)
     data, nome, convenio = _extrair_por_tipo(texto, tipo, convenio_padrao) if tipo else ('', '', '')
+    data, nome = _normalizar_data(data), _limpar_nome_beneficiario(nome)
+    if not _campos_completos(data, nome, convenio):
+        data = data if _data_valida(data) else ''
+        nome = nome if _nome_parece_pessoa(nome) else ''
 
-    if not data or not nome or not convenio:
+    if not _campos_completos(data, nome, convenio):
         if _configurar_tesseract():
             texto_ocr = _ler_texto_pdf_ocr(pdf_bytes)
             ocr_usado = bool(texto_ocr.strip())
@@ -523,25 +672,28 @@ def processar_arquivo(
                 )
                 if not tipo:
                     tipo = detectar_tipo_guia(texto_ocr)
-                data = data or d2
-                nome = nome or n2
+                d2, n2 = _normalizar_data(d2), _limpar_nome_beneficiario(n2)
+                data = data or (d2 if _data_valida(d2) else '')
+                nome = nome or (n2 if _nome_parece_pessoa(n2) else '')
                 convenio = convenio or c2
 
-    if not data or not nome or not convenio:
+    if not _campos_completos(data, nome, convenio):
         texto_merged = '\n'.join(p for p in (texto, texto_ocr) if p and p.strip())
         if texto_merged.strip():
             tipo_m = tipo or detectar_tipo_guia(texto_merged)
             d3, n3, c3 = _extrair_por_tipo(texto_merged, tipo_m, convenio_padrao)
             if not tipo and tipo_m:
                 tipo = tipo_m
-            data = data or d3
-            nome = nome or n3
+            d3, n3 = _normalizar_data(d3), _limpar_nome_beneficiario(n3)
+            data = data or (d3 if _data_valida(d3) else '')
+            nome = nome or (n3 if _nome_parece_pessoa(n3) else '')
             convenio = convenio or c3
 
-    if not data or not nome or not convenio:
+    if not _campos_completos(data, nome, convenio):
         data_g, nome_g, conv_g, tipo_g, gemini_erro = _extrair_com_gemini(pdf_bytes)
-        data = data or data_g
-        nome = nome or nome_g
+        data_g, nome_g = _normalizar_data(data_g), _limpar_nome_beneficiario(nome_g)
+        data = data or (data_g if _data_valida(data_g) else '')
+        nome = nome or (nome_g if _nome_parece_pessoa(nome_g) else '')
         convenio = convenio or conv_g or (convenio_padrao or '').strip().upper()
         if not tipo and tipo_g:
             tipo = tipo_g
@@ -549,26 +701,19 @@ def processar_arquivo(
     if not convenio and convenio_padrao:
         convenio = convenio_padrao.strip().upper()
 
-    if not data:
-        msg = 'Data não encontrada.'
+    data = _normalizar_data(data)
+    nome = _limpar_nome_beneficiario(nome)
+
+    if not _campos_completos(data, nome, convenio):
+        if not data:
+            msg = 'Data não encontrada ou inválida.'
+        elif not nome:
+            msg = 'Nome do beneficiário não encontrado.'
+        else:
+            msg = 'Convênio não identificado.'
         if ocr_usado:
             msg += ' OCR não localizou;'
         msg += ' tentativa via Gemini também falhou.'
-        if gemini_erro:
-            msg += f' ({gemini_erro})'
-        resultado.erro = msg
-        return resultado
-    if not nome:
-        msg = 'Nome do beneficiário não encontrado.'
-        if ocr_usado:
-            msg += ' OCR não localizou;'
-        msg += ' tentativa via Gemini também falhou.'
-        if gemini_erro:
-            msg += f' ({gemini_erro})'
-        resultado.erro = msg
-        return resultado
-    if not convenio:
-        msg = 'Convênio não identificado.'
         if gemini_erro:
             msg += f' ({gemini_erro})'
         resultado.erro = msg
