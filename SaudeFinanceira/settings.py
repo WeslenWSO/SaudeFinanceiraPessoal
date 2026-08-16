@@ -457,6 +457,9 @@ TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 # Configurações de upload de arquivos
 DATA_UPLOAD_MAX_NUMBER_FILES = 1000  # Limite de arquivos para importação XML
+# Renomear guias / importações: vários PDFs por requisição (Render + Django default 2,5 MB estoura)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB — corpo total da requisição
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB por arquivo antes de ir para disco temporário
 
 # Depuração da importação NFSe: logs detalhados de forma_pagamento/discriminacao (só quando True)
 NFS_IMPORT_DEBUG = os.environ.get("NFS_IMPORT_DEBUG", "false").lower() in ("1", "true", "yes")

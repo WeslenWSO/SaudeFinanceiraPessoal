@@ -57,4 +57,10 @@ class HandleSessionInterruptedMiddleware:
         try:
             return self.get_response(request)
         except SessionInterrupted:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.http import JsonResponse
+                return JsonResponse(
+                    {'erro': 'Sessão expirada. Faça login novamente e tente de novo.'},
+                    status=401,
+                )
             return redirect('/login/')

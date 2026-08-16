@@ -5046,7 +5046,7 @@ def baixar_modelo_ris(request):
 
 def renomear_guias_geap(request):
     """Renomeia PDFs de guias (DATA - CONVENIO - NOME) e devolve JSON para download."""
-    import base64
+    import traceback
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
@@ -5056,48 +5056,62 @@ def renomear_guias_geap(request):
         return redirect('faturamento_medico:ftlistar')
 
     if request.method == 'POST':
-        arquivos = request.FILES.getlist('arquivos')
-        if not arquivos:
-            return JsonResponse({'erro': 'Selecione pelo menos um arquivo PDF.'}, status=400)
+        try:
+            arquivos = request.FILES.getlist('arquivos')
+            if not arquivos:
+                return JsonResponse({'erro': 'Selecione pelo menos um arquivo PDF.'}, status=400)
 
-        convenio_padrao = (request.POST.get('convenio_padrao') or '').strip()
-        anexar_no_sistema = request.POST.get('anexar_no_sistema', '1') != '0'
-        from faturamento_medico.services.renomear_guias_geap import renomear_guias_geap_arquivos
+            convenio_padrao = (request.POST.get('convenio_padrao') or '').strip()
+            anexar_no_sistema = request.POST.get('anexar_no_sistema', '1') != '0'
+            from faturamento_medico.services.renomear_guias_geap import renomear_guias_geap_arquivos
 
-        resultados = renomear_guias_geap_arquivos(
-            arquivos,
-            convenio_padrao=convenio_padrao,
-            empresa_id=empresa_id,
-            anexar_no_sistema=anexar_no_sistema,
-        )
-        ok_count = sum(1 for r in resultados if r.ok)
-        anexo_count = sum(1 for r in resultados if r.anexo_ok)
-        payload = {
-            'ok_count': ok_count,
-            'erro_count': len(resultados) - ok_count,
-            'anexo_count': anexo_count,
-            'resultados': [
+            resultados = renomear_guias_geap_arquivos(
+                arquivos,
+                convenio_padrao=convenio_padrao,
+                empresa_id=empresa_id,
+                anexar_no_sistema=anexar_no_sistema,
+            )
+            ok_count = sum(1 for r in resultados if r.ok)
+            anexo_count = sum(1 for r in resultados if r.anexo_ok)
+            payload = {
+                'ok_count': ok_count,
+                'erro_count': len(resultados) - ok_count,
+                'anexo_count': anexo_count,
+                'resultados': [
+                    {
+                        'arquivo_original': r.arquivo_original,
+                        'arquivo_novo': r.arquivo_novo,
+                        'data_autorizacao': r.data_autorizacao,
+                        'nome_beneficiario': r.nome_beneficiario,
+                        'convenio': r.convenio,
+                        'tipo_guia': r.tipo_guia,
+                        'faturamento_id': r.faturamento_id,
+                        'anexo_ok': r.anexo_ok,
+                        'anexo_tentado': r.anexo_tentado,
+                        'anexo_mensagem': r.anexo_mensagem,
+                        'anexo_erro': r.anexo_erro,
+                        'anexo_sugestoes': r.anexo_sugestoes,
+                        'ok': r.ok,
+                        'erro': r.erro,
+                        # PDF já está no navegador — evita JSON gigante (timeout no Render)
+                        'pdf_base64': '',
+                    }
+                    for r in resultados
+                ],
+            }
+            return JsonResponse(payload)
+        except Exception as exc:
+            logger.exception('renomear_guias_geap POST falhou')
+            return JsonResponse(
                 {
-                    'arquivo_original': r.arquivo_original,
-                    'arquivo_novo': r.arquivo_novo,
-                    'data_autorizacao': r.data_autorizacao,
-                    'nome_beneficiario': r.nome_beneficiario,
-                    'convenio': r.convenio,
-                    'tipo_guia': r.tipo_guia,
-                    'faturamento_id': r.faturamento_id,
-                    'anexo_ok': r.anexo_ok,
-                    'anexo_tentado': r.anexo_tentado,
-                    'anexo_mensagem': r.anexo_mensagem,
-                    'anexo_erro': r.anexo_erro,
-                    'anexo_sugestoes': r.anexo_sugestoes,
-                    'ok': r.ok,
-                    'erro': r.erro,
-                    'pdf_base64': base64.b64encode(r.pdf_bytes).decode('ascii') if r.ok else '',
-                }
-                for r in resultados
-            ],
-        }
-        return JsonResponse(payload)
+                    'erro': (
+                        'Erro ao processar os arquivos. '
+                        'Tente menos PDFs por vez ou aguarde e repita.'
+                    ),
+                    'detalhe': str(exc),
+                },
+                status=500,
+            )
 
     return render(
         request,
