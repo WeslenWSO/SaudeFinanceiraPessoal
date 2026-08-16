@@ -501,9 +501,9 @@ def _mensagem_erro_gemini(exc: BaseException) -> str:
 
 def _modelos_gemini() -> list[str]:
     try:
-        from django.conf import settings
+        from SaudeFinanceira.gemini_config import get_gemini_model
 
-        principal = (getattr(settings, 'GEMINI_MODEL', None) or 'gemini-2.5-flash').strip()
+        principal = get_gemini_model()
     except Exception:
         principal = 'gemini-2.5-flash'
     modelos = [principal]
@@ -537,9 +537,9 @@ def _extrair_com_gemini(pdf_bytes: bytes) -> tuple[str, str, str, str, str]:
     if not GEMINI_AVAILABLE or genai is None:
         return '', '', '', '', 'Gemini não disponível no servidor.'
     try:
-        from django.conf import settings
+        from SaudeFinanceira.gemini_config import get_gemini_api_key
 
-        api_key = getattr(settings, 'GEMINI_API_KEY', None)
+        api_key = get_gemini_api_key()
         if not api_key:
             return '', '', '', '', 'GEMINI_API_KEY não configurada.'
 

@@ -40,6 +40,16 @@ def _load_dotenv_file() -> None:
 
 _load_dotenv_file()
 
+# Postgres local (opcional): USE_POSTGRES=true + POSTGRES_DB=SaudeFinanceiraPessoal
+# Render / produção: DATABASE_URL ou arquivo render_db.url (gitignored)
+if not os.environ.get('DATABASE_URL', '').strip():
+    _render_db_url = BASE_DIR / 'render_db.url'
+    if _render_db_url.is_file():
+        os.environ.setdefault(
+            'DATABASE_URL',
+            _render_db_url.read_text(encoding='utf-8').strip(),
+        )
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -226,6 +236,16 @@ if _database_url:
         conn_max_age=600,
         ssl_require=_database_url.startswith('postgres'),
     )
+elif os.environ.get('USE_POSTGRES', '').strip().lower() in ('1', 'true', 'yes'):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'SaudeFinanceiraPessoal').strip() or 'SaudeFinanceiraPessoal',
+        'USER': os.environ.get('POSTGRES_USER', 'postgres').strip() or 'postgres',
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost').strip() or 'localhost',
+        'PORT': os.environ.get('POSTGRES_PORT', '5432').strip() or '5432',
+        'CONN_MAX_AGE': 600,
+    }
 
 
 # Password validation

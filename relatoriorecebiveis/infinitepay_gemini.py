@@ -95,7 +95,9 @@ def validate_gemini_api_key(api_key: str | None = None) -> tuple[bool, str]:
     if not GEMINI_AVAILABLE:
         return False, 'Pacote google-generativeai não instalado; não é possível usar Gemini.'
 
-    key = (api_key if api_key is not None else getattr(settings, 'GEMINI_API_KEY', None)) or ''
+    from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+    key = (api_key if api_key is not None else get_gemini_api_key()) or ''
     key = str(key).strip()
     if not key:
         return False, 'GEMINI_API_KEY não está configurada em settings (ou está vazia).'
@@ -141,7 +143,9 @@ def parse_infinitepay_pdf_with_gemini(
         warnings.append('Pacote google-generativeai não instalado; não é possível usar Gemini.')
         return [], warnings
 
-    api_key = getattr(settings, 'GEMINI_API_KEY', None)
+    from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+    api_key = get_gemini_api_key()
     if not api_key:
         warnings.append('GEMINI_API_KEY não configurada em settings.')
         return [], warnings

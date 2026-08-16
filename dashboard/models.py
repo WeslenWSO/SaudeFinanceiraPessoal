@@ -92,3 +92,37 @@ class ContaAzulConfig(models.Model):
         if self.token_valido():
             return 'ok'
         return 'renovar_automatico'
+
+
+class GeminiConfig(models.Model):
+    """Chave Gemini global (fallback quando GEMINI_API_KEY não está no ambiente)."""
+
+    api_key = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        verbose_name='API Key Gemini',
+        help_text='Usada em produção se a variável GEMINI_API_KEY não estiver no Render.',
+    )
+    model_name = models.CharField(
+        max_length=80,
+        blank=True,
+        default='gemini-2.5-flash',
+        verbose_name='Modelo Gemini',
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuração Gemini'
+        verbose_name_plural = 'Configurações Gemini'
+
+    def __str__(self):
+        return 'Gemini (global)'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def api_key_configurada(self) -> bool:
+        return bool((self.api_key or '').strip())

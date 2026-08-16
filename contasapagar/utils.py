@@ -154,9 +154,12 @@ class PDFExtractor:
 
         # Configurar Gemini usando a chave da API do settings
         print("DEBUG: Verificando configuração da API key do Gemini")
-        if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
+        from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+        api_key = get_gemini_api_key()
+        if api_key:
             print("DEBUG: API key encontrada, configurando Gemini")
-            genai.configure(api_key=settings.GEMINI_API_KEY)
+            genai.configure(api_key=api_key)
         else:
             print("DEBUG: GEMINI_API_KEY não configurada no settings")
             raise ImportError("GEMINI_API_KEY não configurada no settings")
@@ -1461,33 +1464,36 @@ def processar_relatorio_liquidos_pdf(pdf_file, empresa: Empresa) -> tuple:
                     len(documents),
                 )
 
-        if not documents and GEMINI_AVAILABLE and getattr(
-            settings, "GEMINI_API_KEY", None
-        ):
-            try:
-                pdf_file.seek(0)
-                extractor = PDFExtractor(pdf_file)
-                gem_all = extractor._extract_with_gemini()
-                documents = [
-                    d
-                    for d in (gem_all or [])
-                    if d.get("tipo") in ("empregado", "contribuinte")
-                ]
-                if documents:
-                    fonte = "Gemini API (GEMINI_API_KEY)"
-                    logger.info(
-                        "Relatório líquidos: %s linhas via Gemini", len(documents)
-                    )
-            except Exception as ex:
-                logger.warning("Relatório líquidos: fallback Gemini falhou: %s", ex)
+        if not documents and GEMINI_AVAILABLE:
+            from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+            if get_gemini_api_key():
+                try:
+                    pdf_file.seek(0)
+                    extractor = PDFExtractor(pdf_file)
+                    gem_all = extractor._extract_with_gemini()
+                    documents = [
+                        d
+                        for d in (gem_all or [])
+                        if d.get("tipo") in ("empregado", "contribuinte")
+                    ]
+                    if documents:
+                        fonte = "Gemini API (GEMINI_API_KEY)"
+                        logger.info(
+                            "Relatório líquidos: %s linhas via Gemini", len(documents)
+                        )
+                except Exception as ex:
+                    logger.warning("Relatório líquidos: fallback Gemini falhou: %s", ex)
 
         if not documents:
+            from SaudeFinanceira.gemini_config import get_gemini_api_key
+
             msg = (
                 "Não foi possível ler linhas de Empregados/Contribuintes. "
                 "Se o PDF for escaneado (só imagem), o pdfplumber não enxerga texto — "
                 "configure GEMINI_API_KEY em settings.py para leitura via API Gemini."
             )
-            if not getattr(settings, "GEMINI_API_KEY", None):
+            if not get_gemini_api_key():
                 msg += (
                     " Ou exporte o relatório com texto selecionável (não é OCR nativo no sistema)."
                 )

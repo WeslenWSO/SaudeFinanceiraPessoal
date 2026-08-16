@@ -51,6 +51,10 @@ Save.
 | `DJANGO_DEBUG` | `false` |
 | `ALLOWED_HOSTS` | `financaspessoais-eloo.onrender.com,.onrender.com` |
 | `CSRF_TRUSTED_ORIGINS` | `https://financaspessoais-eloo.onrender.com` |
+| `GEMINI_API_KEY` | Chave do Google AI Studio (mesma do `.env` local) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` |
+
+**Gemini (renomear guias, OCR):** sem `GEMINI_API_KEY` no Render, o sistema tenta a chave salva no Postgres (`python manage.py configurar_gemini --from-env` no PC). Após alterar variáveis, faça **Manual Deploy** ou **Restart**.
 
 Save.
 

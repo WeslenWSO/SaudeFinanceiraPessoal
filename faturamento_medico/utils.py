@@ -44,7 +44,9 @@ def processar_arquivos_com_gemini(arquivos: List[InMemoryUploadedFile], tipo_doc
             return {"error": "Gemini AI não está disponível. Instale google-generativeai."}
 
         # Configurar API do Gemini
-        api_key = getattr(settings, 'GEMINI_API_KEY', None)
+        from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+        api_key = get_gemini_api_key()
         if not api_key:
             logger.warning("GEMINI_API_KEY não configurada")
             return {}
