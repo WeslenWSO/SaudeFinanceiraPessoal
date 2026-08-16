@@ -1228,17 +1228,13 @@
 
                         try {
 
-                            if (await garantirPermissaoEscrita(oldHandle)) {
+                            await oldHandle.move(nomeNovo);
 
-                                await oldHandle.move(nomeNovo);
+                            item.renomeado_disco = true;
 
-                                item.renomeado_disco = true;
+                            salvos += 1;
 
-                                salvos += 1;
-
-                                continue;
-
-                            }
+                            continue;
 
                         } catch (moveErr) {
 
@@ -1253,12 +1249,6 @@
 
 
                 const newHandle = await dir.getFileHandle(nomeNovo, { create: true });
-
-                if (!(await garantirPermissaoEscrita(newHandle))) {
-
-                    throw new Error('Sem permissão de escrita na pasta.');
-
-                }
 
                 const writable = await newHandle.createWritable();
 
@@ -1335,6 +1325,14 @@
                 const dir = await escolherPastaDestino(false);
 
                 if (!dir) {
+
+                    return;
+
+                }
+
+                if (!(await garantirPermissaoEscrita(dir, true))) {
+
+                    alert('Permissão de escrita negada para a pasta escolhida.');
 
                     return;
 
@@ -1516,7 +1514,7 @@
 
 
 
-    async function garantirPermissaoEscrita(fileHandle) {
+    async function garantirPermissaoEscrita(fileHandle, podePedirPermissao = false) {
 
         if (!fileHandle) return false;
 
@@ -1524,9 +1522,63 @@
 
         if (perm === 'granted') return true;
 
-        perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+        if (!podePedirPermissao || perm === 'denied') {
+
+            return false;
+
+        }
+
+        try {
+
+            perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+
+        } catch (err) {
+
+            return false;
+
+        }
 
         return perm === 'granted';
+
+    }
+
+
+
+    async function garantirPermissoesRenomeDisco(indices) {
+
+        if (!podeRenomearNoDisco) {
+
+            return { ok: true, negados: 0, total: 0 };
+
+        }
+
+        const handles = [];
+
+        const vistos = new Set();
+
+        for (const idx of indices) {
+
+            const entry = arquivosComHandle[idx];
+
+            if (!entry || !entry.handle || vistos.has(entry.handle)) continue;
+
+            vistos.add(entry.handle);
+
+            handles.push(entry.handle);
+
+        }
+
+        let negados = 0;
+
+        for (const handle of handles) {
+
+            const ok = await garantirPermissaoEscrita(handle, true);
+
+            if (!ok) negados += 1;
+
+        }
+
+        return { ok: negados === 0, negados, total: handles.length };
 
     }
 
@@ -1562,9 +1614,13 @@
 
         }
 
-        if (!(await garantirPermissaoEscrita(fileHandle))) {
+        if (!(await garantirPermissaoEscrita(fileHandle, false))) {
 
-            throw new Error('Permissão de escrita negada para o arquivo.');
+            throw new Error(
+
+                'Permissão de escrita não concedida. Clique em Renomear novamente ou use Salvar selecionados na pasta.'
+
+            );
 
         }
 
@@ -2417,6 +2473,28 @@
 
 
         btnRenomear.disabled = true;
+
+
+
+        if (podeRenomearNoDisco) {
+
+            statusEl.textContent = 'Confirmando permissão para renomear no disco...';
+
+            const permissoes = await garantirPermissoesRenomeDisco(indices);
+
+            if (permissoes.negados > 0) {
+
+                statusEl.textContent =
+
+                    `${permissoes.negados} de ${permissoes.total} arquivo(s) sem permissão de escrita — ` +
+
+                    'após processar, use Salvar selecionados na pasta.';
+
+            }
+
+        }
+
+
 
         const TAMANHO_LOTE = 5;
 
