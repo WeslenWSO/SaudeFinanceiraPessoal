@@ -2279,6 +2279,15 @@ def listar_exames_por_solicitante(request):
     incluir_lista_detalhada = bool(solicitantes_sel)
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
+    notas_por_data = {}
+    if incluir_lista_detalhada:
+        from faturamento_medico.services.vincular_nota_solicitante import (
+            buscar_notas_paciente,
+            carregar_notas_por_data,
+            serializar_nota_linha,
+        )
+        notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+
     for faturamento in qs:
         solicitante = _canonico_solicitante(faturamento.medico_solicitante, mapa_solicitante)
         itens = list(faturamento.itens_servico.all())
@@ -2296,6 +2305,16 @@ def listar_exames_por_solicitante(request):
                 return
             status_label, status_css = _status_linha_faturamento(faturamento, item)
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
+            notas_vinculadas = []
+            if notas_por_data:
+                notas_vinculadas = [
+                    serializar_nota_linha(nota)
+                    for nota in buscar_notas_paciente(
+                        notas_por_data,
+                        faturamento.nome or '',
+                        faturamento.data,
+                    )
+                ]
             grid_linhas.append({
                 'data': faturamento.data,
                 'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
@@ -2310,6 +2329,7 @@ def listar_exames_por_solicitante(request):
                 'valor_fmt': _moeda_br(valor),
                 'solicitante': solicitante,
                 'convenio': faturamento.convenio or '-',
+                'notas_vinculadas': notas_vinculadas,
             })
 
         if not itens:

@@ -425,6 +425,7 @@
                                     <th>Modalidade</th>
                                     <th>Status agendamento</th>
                                     <th class="text-end">Valor</th>
+                                    <th>NF / Pagamento</th>
                                     <th>Solicitante</th>
                                     <th>Convênio</th>
                                 </tr>
@@ -440,6 +441,23 @@
                                         <span class="badge bg-{{ linha.status_agendamento_css }}">{{ linha.status_agendamento }}</span>
                                     </td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                                    <td>
+                                        {% if linha.notas_vinculadas %}
+                                        {% for nota in linha.notas_vinculadas %}
+                                        <div class="{% if not forloop.last %}mb-1{% endif %}">
+                                            <a href="{{ nota.url }}" target="_blank" rel="noopener"
+                                               title="NF {{ nota.numero }} — {{ nota.data_emissao_fmt }}">
+                                                NF {{ nota.numero }}
+                                            </a>
+                                            {% if nota.forma_pagamento != '-' %}
+                                            <span class="badge bg-info text-dark">{{ nota.forma_pagamento }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ linha.solicitante }}</td>
                                     <td>{{ linha.convenio }}</td>
                                 </tr>
