@@ -588,7 +588,7 @@
                                         {% else %}
                                         <button type="button"
                                                 class="btn btn-link btn-sm p-0 js-ver-notas-multi"
-                                                data-notas="{{ linha.notas_json|escapejs }}">
+                                                data-notas="{{ linha.notas_json|escape }}">
                                             {{ linha.qtd_notas }} notas — ver detalhes
                                         </button>
                                         {% endif %}
@@ -936,11 +936,24 @@ initMultiPicker({
 
     document.querySelectorAll('.js-ver-notas-multi').forEach(function(btn) {
         btn.addEventListener('click', function() {
+            var bruto = btn.getAttribute('data-notas') || '[]';
+            var notas = [];
             try {
-                abrirModalMultiplas(JSON.parse(btn.getAttribute('data-notas') || '[]'));
+                notas = JSON.parse(bruto);
             } catch (e) {
-                abrirModalMultiplas([]);
+                notas = [];
             }
+            if (!Array.isArray(notas) || !notas.length) {
+                if (tbodyMulti) {
+                    tbodyMulti.innerHTML =
+                        '<tr><td colspan="4" class="text-muted text-center py-3">Não foi possível carregar as notas desta linha.</td></tr>';
+                }
+                if (modalMulti && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalMulti).show();
+                }
+                return;
+            }
+            abrirModalMultiplas(notas);
         });
     });
 
