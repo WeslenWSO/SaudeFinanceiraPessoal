@@ -196,7 +196,10 @@
                                     <div id="solicitanteSelecionados" class="fm-solicitante-selecionados mb-2"></div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="small text-muted" id="contagemSolicitante"></span>
-                                        <button type="button" class="btn btn-link btn-sm p-0" id="limparSolicitantes">Limpar</button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="selecionarTodosSolicitantes">Selecionar todos</button>
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="limparSolicitantes">Limpar</button>
+                                        </div>
                                     </div>
                                     <div class="fm-solicitante-lista" id="listaSolicitantes">
                                         {% for s in solicitantes_disponiveis %}
@@ -245,7 +248,10 @@
                                     <div id="medicoSelecionados" class="fm-solicitante-selecionados mb-2"></div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="small text-muted" id="contagemMedico"></span>
-                                        <button type="button" class="btn btn-link btn-sm p-0" id="limparMedicos">Limpar</button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="selecionarTodosMedicos">Selecionar todos</button>
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="limparMedicos">Limpar</button>
+                                        </div>
                                     </div>
                                     <div class="fm-solicitante-lista" id="listaMedicos">
                                         {% for nome in medicos_disponiveis %}
@@ -728,6 +734,9 @@ function initMultiPicker(opts) {
     var chips = document.getElementById(opts.chipsId);
     var contagem = document.getElementById(opts.contagemId);
     var limparBtn = document.getElementById(opts.limparId);
+    var selecionarTodosBtn = opts.selecionarTodosId
+        ? document.getElementById(opts.selecionarTodosId)
+        : null;
     if (!lista || !busca) return;
 
     var itens = Array.prototype.slice.call(lista.querySelectorAll('.fm-solicitante-item'));
@@ -737,6 +746,16 @@ function initMultiPicker(opts) {
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function itensVisiveis() {
+        return itens.filter(function(item) { return !item.classList.contains('hidden'); });
+    }
+
+    function checkboxesVisiveis() {
+        return itensVisiveis()
+            .map(function(item) { return item.querySelector('input[type="checkbox"]'); })
+            .filter(function(cb) { return cb; });
     }
 
     function checkboxesMarcados() {
@@ -792,6 +811,13 @@ function initMultiPicker(opts) {
             atualizarContagem();
         });
     }
+    if (selecionarTodosBtn) {
+        selecionarTodosBtn.addEventListener('click', function() {
+            checkboxesVisiveis().forEach(function(cb) { cb.checked = true; });
+            renderChips();
+            atualizarContagem();
+        });
+    }
 
     renderChips();
     atualizarContagem();
@@ -802,14 +828,16 @@ initMultiPicker({
     buscaId: 'buscaSolicitante',
     chipsId: 'solicitanteSelecionados',
     contagemId: 'contagemSolicitante',
-    limparId: 'limparSolicitantes'
+    limparId: 'limparSolicitantes',
+    selecionarTodosId: 'selecionarTodosSolicitantes'
 });
 initMultiPicker({
     listaId: 'listaMedicos',
     buscaId: 'buscaMedico',
     chipsId: 'medicoSelecionados',
     contagemId: 'contagemMedico',
-    limparId: 'limparMedicos'
+    limparId: 'limparMedicos',
+    selecionarTodosId: 'selecionarTodosMedicos'
 });
 
 (function initNotasSolicitante() {
