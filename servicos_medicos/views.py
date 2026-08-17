@@ -158,6 +158,12 @@ class TabelaPrecoList(ListView):
         cabecalho_id = self.request.GET.get('cabecalho_id')
         if cabecalho_id:
             qs = qs.filter(cabecalho_id=cabecalho_id)
+        search_query = (self.request.GET.get('q') or '').strip()
+        if search_query:
+            qs = qs.filter(
+                Q(codigo_servico__codigo__icontains=search_query)
+                | Q(codigo_servico__servicos__icontains=search_query)
+            )
         qs = qs.select_related('empresa', 'convenio', 'cabecalho', 'codigo_servico').order_by("-id")
         return qs
 
@@ -171,6 +177,7 @@ class TabelaPrecoList(ListView):
         else:
             context["cabecalhos"] = Cabecalho.objects.none()
         context["cabecalho_selecionado"] = self.request.GET.get('cabecalho_id', '')
+        context["search_query"] = (self.request.GET.get('q') or '').strip()
         context["per_page"] = str(self.get_paginate_by(self.object_list))
         context["paginate_options"] = self.PAGINATE_OPTIONS
         return context
