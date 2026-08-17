@@ -119,6 +119,43 @@ def resolver_notas_linha(
     return []
 
 
+def _score_nota_vinculo(
+    nota: NotaFiscalServico,
+    nome_paciente: str,
+    termo: str,
+) -> float:
+    """Pontua candidata: termo de busca (cliente/discriminação/NF) ou nome do paciente."""
+    termo = (termo or '').strip()
+    numero = (nota.numero_nota or '').strip()
+    cliente = (nota.cliente or '').strip()
+    discriminacao = (nota.discriminacao or '').strip()
+
+    if termo:
+        termo_upper = termo.upper()
+        if termo in numero:
+            return 1.0
+        if termo_upper in cliente.upper():
+            return 0.95
+        if termo_upper in discriminacao.upper():
+            return 0.92
+        sim_cliente = _similaridade(termo, cliente)
+        if sim_cliente >= 0.75:
+            return max(0.85, sim_cliente)
+        sim_disc = _similaridade(termo, discriminacao)
+        if sim_disc >= 0.75:
+            return max(0.85, sim_disc)
+        return 0.0
+
+    if nome_paciente and nome_paciente != '-':
+        sim_cliente = _similaridade(nome_paciente, cliente)
+        if sim_cliente >= SIMILARIDADE_MIN_PACIENTE:
+            return sim_cliente
+        sim_disc = _similaridade(nome_paciente, discriminacao)
+        if sim_disc >= SIMILARIDADE_MIN_PACIENTE:
+            return sim_disc
+    return 0.0
+
+
 def buscar_notas_para_vinculo(
     empresa_id: int | None,
     nome_paciente: str,
@@ -126,9 +163,11 @@ def buscar_notas_para_vinculo(
     termo: str = '',
     limite: int = 20,
 ) -> list[dict]:
-    """Lista NFSe candidatas à vinculação manual (busca por nome/número)."""
+    """Lista NFSe candidatas à vinculação manual (busca por nome, discriminação ou número)."""
     if not empresa_id:
         return []
+    from django.db.models import Q
+
     qs = NotaFiscalServico.objects.filter(
         empresa_id=empresa_id,
         data_cancelamento__isnull=True,
@@ -139,21 +178,17 @@ def buscar_notas_para_vinculo(
             data_emissao__lte=data_exame + timedelta(days=JANELA_DIAS_APOS_EXAME),
         )
     termo = (termo or '').strip()
+    if termo:
+        qs = qs.filter(
+            Q(numero_nota__icontains=termo)
+            | Q(cliente__icontains=termo)
+            | Q(discriminacao__icontains=termo)
+        )
     candidatas: list[tuple[float, NotaFiscalServico]] = []
-    for nota in qs.order_by('-data_emissao')[:500]:
-        score = 0.0
-        if nome_paciente and nome_paciente != '-':
-            score = max(score, _similaridade(nome_paciente, nota.cliente or ''))
-        if termo:
-            if termo in (nota.numero_nota or ''):
-                score = max(score, 1.0)
-            elif termo.upper() in (nota.cliente or '').upper():
-                score = max(score, 0.9)
-            elif _similaridade(termo, nota.cliente or '') >= 0.75:
-                score = max(score, 0.85)
-        elif score >= SIMILARIDADE_MIN_PACIENTE:
-            score = max(score, SIMILARIDADE_MIN_PACIENTE)
-        if score >= 0.75 or (termo and score > 0):
+    limite_scan = 500 if not termo else max(limite * 5, 100)
+    for nota in qs.order_by('-data_emissao')[:limite_scan]:
+        score = _score_nota_vinculo(nota, nome_paciente, termo)
+        if score > 0:
             candidatas.append((score, nota))
     candidatas.sort(key=lambda x: (-x[0], -(x[1].data_emissao.toordinal() if x[1].data_emissao else 0)))
     return [serializar_nota_linha(n, manual=False) for _, n in candidatas[:limite]]
