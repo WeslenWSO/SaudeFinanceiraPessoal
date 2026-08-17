@@ -128,6 +128,28 @@
     font-weight: 600;
     margin-bottom: 0.35rem;
 }
+.fm-lista-grafias-apelido {
+    max-height: min(55vh, 28rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #e9ecef;
+    border-radius: 0.35rem;
+    padding: 0.35rem;
+    background: #fafafa;
+}
+#modalCadastroApelido .modal-body {
+    max-height: calc(100vh - 10rem);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+#modalCadastroApelido .fm-apelido-conteudo-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -597,7 +619,7 @@
 </div>
 
 <div class="modal fade" id="modalCadastroApelido" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <form method="post" id="formCadastroApelido">
                 {% csrf_token %}
@@ -625,13 +647,24 @@
                         <div class="form-text">Nome único exibido no filtro e nos cards.</div>
                     </div>
                     <div id="grafiasVinculadasApelido" class="d-none"></div>
+                    <div class="fm-apelido-conteudo-scroll">
                     {% if sugestoes_apelido %}
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
                         <span class="small fw-semibold">Grafias sugeridas no período</span>
-                        <button type="button" class="btn btn-link btn-sm p-0" id="marcarTodasGrafias">Marcar todas</button>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="small text-muted" id="contagemGrafiasApelido"></span>
+                            <button type="button" class="btn btn-link btn-sm p-0" id="marcarTodasGrafias">Marcar todas</button>
+                        </div>
                     </div>
+                    <input type="search"
+                           id="buscaGrafiasApelido"
+                           class="form-control form-control-sm mb-2"
+                           placeholder="Pesquisar grafia ou nome sugerido..."
+                           autocomplete="off">
+                    <div id="listaGrafiasApelido" class="fm-lista-grafias-apelido">
                     {% for grupo in sugestoes_apelido %}
-                    <fieldset class="fm-grupo-apelido js-grupo-sugestao">
+                    <fieldset class="fm-grupo-apelido js-grupo-sugestao"
+                              data-busca="{{ grupo.nome_sugerido|lower }} {% for grafia in grupo.grafias %}{{ grafia|lower }} {% endfor %}">
                         <legend class="d-flex justify-content-between align-items-center gap-2">
                             <span>{{ grupo.nome_sugerido }}</span>
                             <button type="button"
@@ -651,12 +684,14 @@
                         {% endfor %}
                     </fieldset>
                     {% endfor %}
+                    </div>
                     {% else %}
                     <div class="alert alert-light border mb-0 js-sem-sugestoes">
                         Todas as grafias do período já possuem apelido cadastrado.
                         Use o botão <strong>Apelido</strong> em um card para editar grafias existentes.
                     </div>
                     {% endif %}
+                    </div>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
@@ -1013,7 +1048,45 @@ initMultiPicker({
     var vinculadasEl = document.getElementById('grafiasVinculadasApelido');
     var btnSalvar = document.getElementById('btnSalvarApelido');
     var marcarTodasBtn = document.getElementById('marcarTodasGrafias');
+    var buscaGrafias = document.getElementById('buscaGrafiasApelido');
+    var contagemGrafias = document.getElementById('contagemGrafiasApelido');
+    var listaGrafias = document.getElementById('listaGrafiasApelido');
     if (!modal || !form) return;
+
+    function normalizar(texto) {
+        return (texto || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function gruposSugestao() {
+        if (!listaGrafias) return [];
+        return Array.prototype.slice.call(listaGrafias.querySelectorAll('.js-grupo-sugestao'));
+    }
+
+    function filtrarGrafiasApelido() {
+        var termo = normalizar((buscaGrafias && buscaGrafias.value) || '');
+        var grupos = gruposSugestao();
+        var visiveis = 0;
+        grupos.forEach(function(grupo) {
+            var texto = normalizar(grupo.getAttribute('data-busca') || grupo.textContent);
+            var match = !termo || texto.indexOf(termo) !== -1;
+            grupo.classList.toggle('d-none', !match);
+            if (match) visiveis += 1;
+        });
+        if (contagemGrafias) {
+            contagemGrafias.textContent = visiveis + ' visível(is) de ' + grupos.length;
+        }
+    }
+
+    function grafiasVisiveis() {
+        var seletor = '.js-grupo-sugestao:not(.d-none) .js-grafia-apelido';
+        if (listaGrafias) {
+            return Array.prototype.slice.call(listaGrafias.querySelectorAll(seletor));
+        }
+        return Array.prototype.slice.call(form.querySelectorAll(seletor));
+    }
 
     function grafiasMarcadas() {
         return Array.prototype.slice.call(
@@ -1037,6 +1110,8 @@ initMultiPicker({
         form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
             cb.checked = false;
         });
+        if (buscaGrafias) buscaGrafias.value = '';
+        filtrarGrafiasApelido();
         atualizarBotaoSalvar();
     }
 
@@ -1113,11 +1188,13 @@ initMultiPicker({
 
     if (marcarTodasBtn) {
         marcarTodasBtn.addEventListener('click', function() {
-            form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
-                cb.checked = true;
-            });
+            grafiasVisiveis().forEach(function(cb) { cb.checked = true; });
             atualizarBotaoSalvar();
         });
+    }
+
+    if (buscaGrafias) {
+        buscaGrafias.addEventListener('input', filtrarGrafiasApelido);
     }
 
     form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
@@ -1129,11 +1206,13 @@ initMultiPicker({
 
     modal.addEventListener('show.bs.modal', function(e) {
         if (e.relatedTarget && e.relatedTarget.classList.contains('js-editar-apelido')) {
+            filtrarGrafiasApelido();
             return;
         }
         limparFormularioApelido();
     });
 
+    filtrarGrafiasApelido();
     atualizarBotaoSalvar();
 })();
 </script>
