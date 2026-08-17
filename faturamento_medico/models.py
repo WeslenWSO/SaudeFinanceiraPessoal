@@ -816,3 +816,34 @@ class MetaModalidadeSolicitante(models.Model):
 
     def __str__(self):
         return f'{self.solicitante} — {self.get_modalidade_display()}: {self.meta}/mês'
+
+
+class ApelidoSolicitante(models.Model):
+    """Apelido único para um ou mais nomes (grafias) do médico solicitante no RIS."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='apelidos_solicitante',
+        verbose_name='Empresa',
+    )
+    apelido = models.CharField(verbose_name='Apelido', max_length=200)
+    grafia = models.CharField(
+        verbose_name='Grafia no RIS',
+        max_length=200,
+        help_text='Nome exato do campo médico solicitante no faturamento.',
+    )
+
+    class Meta:
+        verbose_name = 'Apelido de solicitante'
+        verbose_name_plural = 'Apelidos de solicitante'
+        ordering = ['apelido', 'grafia']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'grafia'],
+                name='uniq_apelido_solicitante_empresa_grafia',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.apelido} ← {self.grafia}'

@@ -116,6 +116,18 @@
     margin-bottom: 0.35rem;
 }
 .fm-nota-candidata:hover { background: #eef4ff; border-color: #cfe2ff; }
+.fm-grupo-apelido {
+    border: 1px solid #e9ecef;
+    border-radius: 0.35rem;
+    padding: 0.5rem 0.65rem;
+    margin-bottom: 0.5rem;
+    background: #fafafa;
+}
+.fm-grupo-apelido legend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -162,7 +174,19 @@
                                 <div class="form-text">Vazio = exclui cancelados/desistência.</div>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small mb-0 text-muted">Solicitante (múltiplo)</label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label small mb-0 text-muted">Solicitante (múltiplo)</label>
+                                    <button type="button"
+                                            class="btn btn-outline-success btn-sm py-0 px-2"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalCadastroApelido"
+                                            title="Agrupar grafias do RIS em um apelido">
+                                        <i class="fas fa-user-tag"></i> Cadastrar apelido
+                                        {% if qtd_grafias_sem_apelido %}
+                                        <span class="badge bg-warning text-dark">{{ qtd_grafias_sem_apelido }}</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
                                 <div class="fm-solicitante-picker" id="pickerSolicitante">
                                     <input type="search"
                                            id="buscaSolicitante"
@@ -186,11 +210,19 @@
                                             <span>{{ s.nome }}{% if s.qtd_variantes > 1 %} <span class="text-muted">({{ s.qtd_variantes }} grafias)</span>{% endif %}</span>
                                         </label>
                                         {% empty %}
-                                        <div class="p-2 small text-muted">Nenhum solicitante no período</div>
+                                        <div class="p-2 small text-muted">
+                                            Nenhum apelido cadastrado.
+                                            <button type="button"
+                                                    class="btn btn-link btn-sm p-0 align-baseline"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalCadastroApelido">
+                                                Cadastrar apelido
+                                            </button>
+                                        </div>
                                         {% endfor %}
                                     </div>
                                 </div>
-                                <div class="form-text">Busque o nome e marque um ou mais solicitantes.</div>
+                                <div class="form-text">Somente solicitantes com apelido cadastrado.</div>
                             </div>
                             <div class="col-md-2 d-flex gap-2 align-items-end">
                                 <button type="submit" class="btn btn-secondary">
@@ -272,13 +304,22 @@
                                         </button>
                                         {% endif %}
                                     </span>
-                                    <button type="button"
-                                            class="btn btn-outline-primary btn-sm py-0 px-2"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#modalMetas{{ forloop.counter }}"
-                                            title="Definir metas por tipo de exame">
-                                        Metas
-                                    </button>
+                                    <div class="d-flex gap-1 flex-shrink-0">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm py-0 px-2 js-editar-apelido"
+                                                data-apelido="{{ card.nome }}"
+                                                data-grafias="{{ card.variantes|join:'|' }}"
+                                                title="Editar apelido e grafias">
+                                            Apelido
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm py-0 px-2"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalMetas{{ forloop.counter }}"
+                                                title="Definir metas por tipo de exame">
+                                            Metas
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-body py-2">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -534,8 +575,9 @@
                     </div>
                     {% elif not incluir_lista_detalhada and total_exames %}
                     <div class="alert alert-light border mb-0">
-                        Selecione um ou mais <strong>solicitantes</strong> acima e clique em <strong>Filtrar</strong>
-                        para exibir a lista detalhada de exames. Os cards acima já mostram os totais por médico.
+                        Selecione um ou mais <strong>solicitantes</strong> ou <strong>médicos</strong> acima
+                        e clique em <strong>Filtrar</strong> para exibir a lista detalhada de exames.
+                        Os cards acima já mostram os totais por solicitante com apelido cadastrado.
                     </div>
                     {% else %}
                     <div class="alert alert-info mb-0">
@@ -544,6 +586,79 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCadastroApelido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="post" id="formCadastroApelido">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="salvar_apelido">
+                <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+                <input type="hidden" name="apelido_anterior" id="apelidoAnterior" value="">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title" id="tituloModalApelido">Cadastrar apelido do solicitante</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body py-2">
+                    <p class="small text-muted mb-3">
+                        Selecione uma ou mais grafias encontradas no RIS e defina um único apelido
+                        para agrupá-las no filtro e nos relatórios.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small mb-1" for="campoApelido">Apelido</label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               id="campoApelido"
+                               name="apelido"
+                               maxlength="200"
+                               placeholder="Ex.: MARCO ANTONIO M. PIMENTA"
+                               required>
+                        <div class="form-text">Nome único exibido no filtro e nos cards.</div>
+                    </div>
+                    <div id="grafiasVinculadasApelido" class="d-none"></div>
+                    {% if sugestoes_apelido %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-semibold">Grafias sugeridas no período</span>
+                        <button type="button" class="btn btn-link btn-sm p-0" id="marcarTodasGrafias">Marcar todas</button>
+                    </div>
+                    {% for grupo in sugestoes_apelido %}
+                    <fieldset class="fm-grupo-apelido js-grupo-sugestao">
+                        <legend class="d-flex justify-content-between align-items-center gap-2">
+                            <span>{{ grupo.nome_sugerido }}</span>
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm py-0 px-2 js-usar-sugestao-apelido"
+                                    data-apelido="{{ grupo.nome_sugerido }}">
+                                Usar sugestão
+                            </button>
+                        </legend>
+                        {% for grafia in grupo.grafias %}
+                        <label class="fm-solicitante-item">
+                            <input type="checkbox"
+                                   class="js-grafia-apelido"
+                                   name="grafias"
+                                   value="{{ grafia }}">
+                            <span>{{ grafia }}</span>
+                        </label>
+                        {% endfor %}
+                    </fieldset>
+                    {% endfor %}
+                    {% else %}
+                    <div class="alert alert-light border mb-0 js-sem-sugestoes">
+                        Todas as grafias do período já possuem apelido cadastrado.
+                        Use o botão <strong>Apelido</strong> em um card para editar grafias existentes.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm" id="btnSalvarApelido">
+                        Salvar apelido
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -859,6 +974,139 @@ initMultiPicker({
             }
         });
     }
+})();
+
+(function initApelidoSolicitante() {
+    var modal = document.getElementById('modalCadastroApelido');
+    var form = document.getElementById('formCadastroApelido');
+    var campoApelido = document.getElementById('campoApelido');
+    var apelidoAnterior = document.getElementById('apelidoAnterior');
+    var tituloModal = document.getElementById('tituloModalApelido');
+    var vinculadasEl = document.getElementById('grafiasVinculadasApelido');
+    var btnSalvar = document.getElementById('btnSalvarApelido');
+    var marcarTodasBtn = document.getElementById('marcarTodasGrafias');
+    if (!modal || !form) return;
+
+    function grafiasMarcadas() {
+        return Array.prototype.slice.call(
+            form.querySelectorAll('.js-grafia-apelido:checked')
+        ).length;
+    }
+
+    function atualizarBotaoSalvar() {
+        if (!btnSalvar) return;
+        btnSalvar.disabled = !campoApelido.value.trim() || grafiasMarcadas() === 0;
+    }
+
+    function limparFormularioApelido() {
+        if (campoApelido) campoApelido.value = '';
+        if (apelidoAnterior) apelidoAnterior.value = '';
+        if (tituloModal) tituloModal.textContent = 'Cadastrar apelido do solicitante';
+        if (vinculadasEl) {
+            vinculadasEl.innerHTML = '';
+            vinculadasEl.classList.add('d-none');
+        }
+        form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
+            cb.checked = false;
+        });
+        atualizarBotaoSalvar();
+    }
+
+    function marcarGrafia(valor, marcado) {
+        form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
+            if (cb.value === valor) cb.checked = !!marcado;
+        });
+    }
+
+    function renderGrafiasVinculadas(apelido, grafias) {
+        if (!vinculadasEl) return;
+        vinculadasEl.innerHTML = '';
+        if (!grafias.length) {
+            vinculadasEl.classList.add('d-none');
+            return;
+        }
+        vinculadasEl.classList.remove('d-none');
+        var fieldset = document.createElement('fieldset');
+        fieldset.className = 'fm-grupo-apelido';
+        fieldset.innerHTML = '<legend>Grafias vinculadas a "' + apelido + '"</legend>';
+        grafias.forEach(function(grafia) {
+            var label = document.createElement('label');
+            label.className = 'fm-solicitante-item';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'js-grafia-apelido';
+            cb.name = 'grafias';
+            cb.value = grafia;
+            cb.checked = true;
+            cb.addEventListener('change', atualizarBotaoSalvar);
+            var span = document.createElement('span');
+            span.textContent = grafia;
+            label.appendChild(cb);
+            label.appendChild(span);
+            fieldset.appendChild(label);
+            marcarGrafia(grafia, true);
+        });
+        vinculadasEl.appendChild(fieldset);
+    }
+
+    document.querySelectorAll('.js-editar-apelido').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            limparFormularioApelido();
+            var apelido = btn.getAttribute('data-apelido') || '';
+            var grafias = (btn.getAttribute('data-grafias') || '')
+                .split('|')
+                .map(function(item) { return item.trim(); })
+                .filter(Boolean);
+            if (campoApelido) campoApelido.value = apelido;
+            if (apelidoAnterior) apelidoAnterior.value = apelido;
+            if (tituloModal) tituloModal.textContent = 'Editar apelido — ' + apelido;
+            renderGrafiasVinculadas(apelido, grafias);
+            grafias.forEach(function(grafia) { marcarGrafia(grafia, true); });
+            atualizarBotaoSalvar();
+            if (window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modal).show();
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-usar-sugestao-apelido').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var apelido = btn.getAttribute('data-apelido') || '';
+            if (campoApelido) campoApelido.value = apelido;
+            var fieldset = btn.closest('.js-grupo-sugestao');
+            if (fieldset) {
+                fieldset.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
+                    cb.checked = true;
+                });
+            }
+            atualizarBotaoSalvar();
+        });
+    });
+
+    if (marcarTodasBtn) {
+        marcarTodasBtn.addEventListener('click', function() {
+            form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
+                cb.checked = true;
+            });
+            atualizarBotaoSalvar();
+        });
+    }
+
+    form.querySelectorAll('.js-grafia-apelido').forEach(function(cb) {
+        cb.addEventListener('change', atualizarBotaoSalvar);
+    });
+    if (campoApelido) {
+        campoApelido.addEventListener('input', atualizarBotaoSalvar);
+    }
+
+    modal.addEventListener('show.bs.modal', function(e) {
+        if (e.relatedTarget && e.relatedTarget.classList.contains('js-editar-apelido')) {
+            return;
+        }
+        limparFormularioApelido();
+    });
+
+    atualizarBotaoSalvar();
 })();
 </script>
 {% endblock %}

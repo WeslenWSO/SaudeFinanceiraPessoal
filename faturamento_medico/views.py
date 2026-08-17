@@ -34,6 +34,7 @@ from .forms import (
     ServicoDisponivelForm,
 )
 from .models import (
+    ApelidoSolicitante,
     DocumentoAnexado,
     ExtratoPagamentoConvenio,
     FaturamentoMedico,
@@ -552,12 +553,69 @@ def _escolher_nome_exibicao_solicitante(
     return max(candidatos, key=len)
 
 
-def _construir_grupos_solicitante(
+def _carregar_mapa_apelidos(empresa_id):
+    """Retorna (grafia -> apelido, apelido -> info com lista de grafias)."""
+    if not empresa_id:
+        return {}, {}
+    grafia_para_apelido: dict[str, str] = {}
+    apelido_info: dict[str, dict] = {}
+    for row in ApelidoSolicitante.objects.filter(empresa_id=empresa_id).order_by('apelido', 'grafia'):
+        grafia = (row.grafia or '').strip()
+        apelido = (row.apelido or '').strip()
+        if not grafia or not apelido:
+            continue
+        grafia_para_apelido[grafia] = apelido
+        info = apelido_info.setdefault(apelido, {'apelido': apelido, 'grafias': []})
+        if grafia not in info['grafias']:
+            info['grafias'].append(grafia)
+    for info in apelido_info.values():
+        info['grafias'].sort(key=str.lower)
+    return grafia_para_apelido, apelido_info
+
+
+def _listar_apelidos_disponiveis(apelido_info: dict[str, dict]) -> list[dict]:
+    return [
+        {
+            'nome': apelido,
+            'variantes': info.get('grafias') or [],
+            'qtd_variantes': len(info.get('grafias') or []),
+            'tem_apelido': True,
+        }
+        for apelido, info in sorted(apelido_info.items(), key=lambda x: x[0].lower())
+    ]
+
+
+def _sugerir_grupos_apelido(raws, grafia_para_apelido, frequencias=None) -> list[dict]:
+    """Sugere agrupamentos automáticos para grafias ainda sem apelido."""
+    nao_cadastrados = sorted({
+        (raw or '').strip()
+        for raw in raws
+        if (raw or '').strip() and (raw or '').strip() not in grafia_para_apelido
+    }, key=str.lower)
+    if not nao_cadastrados:
+        return []
+    _, auto_grupos = _construir_grupos_solicitante_auto(nao_cadastrados, frequencias)
+    sugestoes = []
+    for nome, info in sorted(auto_grupos.items(), key=lambda x: x[0].lower()):
+        if nome == SOLICITANTE_NAO_INFORMADO:
+            continue
+        grafias = [v for v in (info.get('variantes') or []) if v]
+        if not grafias:
+            continue
+        sugestoes.append({
+            'nome_sugerido': nome,
+            'grafias': grafias,
+            'qtd': len(grafias),
+        })
+    return sugestoes
+
+
+def _construir_grupos_solicitante_auto(
     raws,
     frequencias: dict[str, int] | None = None,
 ) -> tuple[dict[str, str], dict[str, dict]]:
     """
-    Agrupa nomes repetidos do solicitante.
+    Agrupa nomes repetidos do solicitante por heurística (sem apelido cadastrado).
     Retorna (raw -> nome canônico, grupos por nome canônico).
     """
     por_chave = defaultdict(list)
@@ -627,10 +685,55 @@ def _construir_grupos_solicitante(
     return mapeamento, grupos
 
 
-def _canonico_solicitante(raw, mapeamento: dict[str, str]) -> str:
+def _construir_grupos_solicitante(
+    raws,
+    frequencias: dict[str, int] | None = None,
+    empresa_id=None,
+    grafia_para_apelido: dict[str, str] | None = None,
+    apelido_info: dict[str, dict] | None = None,
+) -> tuple[dict[str, str], dict[str, dict]]:
+    """
+    Agrupa solicitantes priorizando apelidos cadastrados.
+    Grafias sem apelido não entram nos grupos de exibição.
+    """
+    if grafia_para_apelido is None or apelido_info is None:
+        grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+
+    mapeamento: dict[str, str] = {}
+    grupos: dict[str, dict] = {}
+
+    for apelido, info in apelido_info.items():
+        variantes = list(info.get('grafias') or [])
+        grupos[apelido] = {
+            'nome': apelido,
+            'variantes': variantes,
+            'qtd_variantes': len(variantes),
+            'tem_apelido': True,
+        }
+        for grafia in variantes:
+            mapeamento[grafia] = apelido
+
+    mapeamento[''] = SOLICITANTE_NAO_INFORMADO
+    if SOLICITANTE_NAO_INFORMADO not in grupos:
+        grupos[SOLICITANTE_NAO_INFORMADO] = {
+            'nome': SOLICITANTE_NAO_INFORMADO,
+            'variantes': [''],
+            'qtd_variantes': 0,
+            'tem_apelido': False,
+        }
+    return mapeamento, grupos
+
+
+def _canonico_solicitante(
+    raw,
+    mapeamento: dict[str, str],
+    grafia_para_apelido: dict[str, str] | None = None,
+):
     original = (raw or '').strip()
     if not original:
         return SOLICITANTE_NAO_INFORMADO
+    if grafia_para_apelido is not None and original not in grafia_para_apelido:
+        return None
     return mapeamento.get(original, original)
 
 
@@ -857,6 +960,78 @@ def _metas_form_solicitante(solicitante, metas_map, grupos=None):
         }
         for codigo, label in METAS_MODALIDADES_SOLICITANTE
     ]
+
+
+def _salvar_apelido_solicitante(request):
+    from django.db import transaction
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('faturamento_medico:listar_exames_por_solicitante')
+
+    apelido = (request.POST.get('apelido') or '').strip()
+    grafias = sorted({
+        g.strip()
+        for g in request.POST.getlist('grafias')
+        if g and str(g).strip()
+    }, key=str.lower)
+    apelido_anterior = (request.POST.get('apelido_anterior') or '').strip()
+
+    redirect_qs = (request.POST.get('redirect_qs') or '').strip()
+    url = reverse('faturamento_medico:listar_exames_por_solicitante')
+    destino = f'{url}?{redirect_qs}' if redirect_qs else url
+
+    if not apelido:
+        messages.error(request, 'Informe o apelido do solicitante.')
+        return redirect(destino)
+    if not grafias:
+        messages.error(request, 'Selecione ao menos uma grafia do RIS.')
+        return redirect(destino)
+
+    conflitos = ApelidoSolicitante.objects.filter(
+        empresa_id=empresa_id,
+        grafia__in=grafias,
+    ).exclude(apelido=apelido)
+    if apelido_anterior and apelido_anterior != apelido:
+        conflitos = conflitos.exclude(apelido=apelido_anterior)
+    if conflitos.exists():
+        nomes = ', '.join(sorted({c.grafia for c in conflitos[:5]}))
+        messages.error(
+            request,
+            f'Alguma grafia já pertence a outro apelido: {nomes}.',
+        )
+        return redirect(destino)
+
+    with transaction.atomic():
+        if apelido_anterior and apelido_anterior != apelido:
+            ApelidoSolicitante.objects.filter(
+                empresa_id=empresa_id,
+                apelido=apelido_anterior,
+            ).update(apelido=apelido)
+            MetaModalidadeSolicitante.objects.filter(
+                empresa_id=empresa_id,
+                solicitante=apelido_anterior,
+            ).update(solicitante=apelido)
+
+        chave_apelido = apelido_anterior or apelido
+        ApelidoSolicitante.objects.filter(
+            empresa_id=empresa_id,
+            apelido=chave_apelido,
+        ).exclude(grafia__in=grafias).delete()
+
+        for grafia in grafias:
+            ApelidoSolicitante.objects.update_or_create(
+                empresa_id=empresa_id,
+                grafia=grafia,
+                defaults={'apelido': apelido},
+            )
+
+    messages.success(
+        request,
+        f'Apelido "{apelido}" salvo com {len(grafias)} grafia(s).',
+    )
+    return redirect(destino)
 
 
 def _salvar_metas_modalidade_solicitante(request):
@@ -2256,6 +2431,9 @@ def listar_cancelados(request):
 def listar_exames_por_solicitante(request):
     """Relatório de exames agrupados por médico solicitante."""
     if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip()
+        if acao == 'salvar_apelido':
+            return _salvar_apelido_solicitante(request)
         return _salvar_metas_modalidade_solicitante(request)
 
     empresa_id = request.session.get('empresa_id')
@@ -2289,13 +2467,25 @@ def listar_exames_por_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
+    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
         freq_solicitante.keys(),
         freq_solicitante,
+        empresa_id=empresa_id,
+        grafia_para_apelido=grafia_para_apelido,
+        apelido_info=apelido_info,
     )
-    solicitantes_disponiveis = [
-        info for _, info in sorted(grupos_solicitante.items(), key=lambda x: x[0].lower())
-    ]
+    solicitantes_disponiveis = _listar_apelidos_disponiveis(apelido_info)
+    sugestoes_apelido = _sugerir_grupos_apelido(
+        freq_solicitante.keys(),
+        grafia_para_apelido,
+        freq_solicitante,
+    )
+    qtd_grafias_sem_apelido = len({
+        (raw or '').strip()
+        for raw in freq_solicitante.keys()
+        if (raw or '').strip() and (raw or '').strip() not in grafia_para_apelido
+    })
     medicos_disponiveis = _listar_nomes_medico_periodo(qs_periodo)
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
@@ -2309,7 +2499,7 @@ def listar_exames_por_solicitante(request):
     metas_map = _carregar_metas_solicitante(empresa_id)
 
     grid_linhas = []
-    incluir_lista_detalhada = bool(solicitantes_sel)
+    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel)
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     notas_por_data = {}
@@ -2322,11 +2512,25 @@ def listar_exames_por_solicitante(request):
         notas_por_data = carregar_notas_por_data(empresa_id, di, df)
 
     for faturamento in qs:
-        solicitante = _canonico_solicitante(faturamento.medico_solicitante, mapa_solicitante)
+        raw_solicitante = (faturamento.medico_solicitante or '').strip()
+        solicitante_apelido = _canonico_solicitante(
+            faturamento.medico_solicitante,
+            mapa_solicitante,
+            grafia_para_apelido,
+        )
+        solicitante_linha = (
+            solicitante_apelido
+            or raw_solicitante
+            or SOLICITANTE_NAO_INFORMADO
+        )
+        if solicitante_apelido is None and not incluir_lista_detalhada:
+            continue
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
-            card = cards_map[solicitante]
+            if solicitante_apelido is None:
+                return
+            card = cards_map[solicitante_apelido]
             _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
             if periodo_multimes and faturamento.data:
                 chave_mes = (faturamento.data.year, faturamento.data.month)
@@ -2361,7 +2565,7 @@ def listar_exames_por_solicitante(request):
                 'status_agendamento_css': status_ag_css,
                 'valor': valor,
                 'valor_fmt': _moeda_br(valor),
-                'solicitante': solicitante,
+                'solicitante': solicitante_linha,
                 'medico': _rotulo_medico_faturamento(faturamento),
                 'convenio': faturamento.convenio or '-',
                 'notas_vinculadas': notas_vinculadas,
@@ -2469,6 +2673,8 @@ def listar_exames_por_solicitante(request):
         'total_exames': total_exames,
         'valor_total_fmt': _moeda_br(valor_total),
         'solicitantes_disponiveis': solicitantes_disponiveis,
+        'sugestoes_apelido': sugestoes_apelido,
+        'qtd_grafias_sem_apelido': qtd_grafias_sem_apelido,
         'medicos_disponiveis': medicos_disponiveis,
         'status_disponiveis': status_disponiveis,
         'filtros': {

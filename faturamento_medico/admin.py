@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import (
+    ApelidoSolicitante,
     FaturamentoMedico,
     MedcloudConfig,
     MedcloudConvenioParceiro,
@@ -51,6 +52,14 @@ class MedcloudConfigAdmin(admin.ModelAdmin):
     def his_configurado(self, obj):
         creds = credenciais_da_empresa(obj.empresa)
         return bool(creds and creds.his_api_key)
+
+
+@admin.register(ApelidoSolicitante)
+class ApelidoSolicitanteAdmin(admin.ModelAdmin):
+    list_display = ('apelido', 'grafia', 'empresa')
+    list_filter = ('empresa',)
+    search_fields = ('apelido', 'grafia')
+    ordering = ('apelido', 'grafia')
 
 
 @admin.register(FaturamentoMedico)
