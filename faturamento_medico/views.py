@@ -685,6 +685,66 @@ def _construir_grupos_solicitante_auto(
     return mapeamento, grupos
 
 
+def _expandir_apelidos_com_grafias_periodo(
+    grafia_para_apelido: dict[str, str],
+    apelido_info: dict[str, dict],
+    raws,
+) -> tuple[dict[str, str], dict[str, dict]]:
+    """Inclui grafias do período com a mesma chave de agrupamento do apelido."""
+    expandido_grafia = dict(grafia_para_apelido)
+    expandido_info = {
+        apelido: {
+            'apelido': apelido,
+            'grafias': list(info.get('grafias') or []),
+        }
+        for apelido, info in apelido_info.items()
+    }
+    chaves_por_apelido: dict[str, set[str]] = {}
+    for apelido, info in expandido_info.items():
+        chaves_por_apelido[apelido] = {
+            _chave_agrupamento_solicitante(grafia)
+            for grafia in info['grafias']
+            if grafia
+        }
+
+    for raw in raws:
+        grafia = (raw or '').strip()
+        if not grafia:
+            continue
+        chave_grafia = _chave_agrupamento_solicitante(grafia)
+        chave_lookup = grafia.casefold()
+        if any(
+            chave_lookup == (cadastrada or '').strip().casefold()
+            for cadastrada in expandido_grafia.keys()
+        ):
+            continue
+        for apelido, chaves in chaves_por_apelido.items():
+            if chave_grafia not in chaves:
+                continue
+            expandido_grafia[grafia] = apelido
+            cadastradas = expandido_info[apelido]['grafias']
+            if grafia not in cadastradas:
+                cadastradas.append(grafia)
+            break
+
+    for info in expandido_info.values():
+        info['grafias'] = sorted(set(info.get('grafias') or []), key=str.lower)
+    return expandido_grafia, expandido_info
+
+
+def _lookup_apelido_grafia(grafia: str, grafia_para_apelido: dict[str, str]) -> str | None:
+    original = (grafia or '').strip()
+    if not original:
+        return None
+    if original in grafia_para_apelido:
+        return grafia_para_apelido[original]
+    chave = original.casefold()
+    for cadastrada, apelido in grafia_para_apelido.items():
+        if (cadastrada or '').strip().casefold() == chave:
+            return apelido
+    return None
+
+
 def _construir_grupos_solicitante(
     raws,
     frequencias: dict[str, int] | None = None,
@@ -732,8 +792,14 @@ def _canonico_solicitante(
     original = (raw or '').strip()
     if not original:
         return SOLICITANTE_NAO_INFORMADO
-    if grafia_para_apelido is not None and original not in grafia_para_apelido:
+    if grafia_para_apelido is not None and _lookup_apelido_grafia(original, grafia_para_apelido) is None:
         return None
+    if original in mapeamento:
+        return mapeamento[original]
+    chave = original.casefold()
+    for grafia, apelido in mapeamento.items():
+        if (grafia or '').strip().casefold() == chave:
+            return apelido
     return mapeamento.get(original, original)
 
 
@@ -2468,6 +2534,11 @@ def listar_exames_por_solicitante(request):
             freq_solicitante[nome] += 1
 
     grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
+        grafia_para_apelido,
+        apelido_info,
+        freq_solicitante.keys(),
+    )
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
         freq_solicitante.keys(),
         freq_solicitante,
@@ -2651,6 +2722,43 @@ def listar_exames_por_solicitante(request):
             card['resumo_metas'] = _resumo_metas_solicitante(metas_list)
             card['mes_label'] = _rotulo_mes_ano(ano, mes)
         cards_resumo.append(card)
+
+    if solicitantes_sel:
+        nomes_cards = {card['nome'] for card in cards_resumo}
+        dados_vazio = _novo_resumo_solicitante(codigos_modalidade, periodo_multimes)
+        for selecionado in solicitantes_sel:
+            if selecionado in nomes_cards or selecionado == SOLICITANTE_NAO_INFORMADO:
+                continue
+            metas_ref = _metas_solicitante_grupo(metas_map, selecionado, grupos_solicitante)
+            realizado_map = _realizado_por_modalidade(dados_vazio)
+            modalidades = _montar_modalidades_card(
+                dados_vazio, codigos_modalidade, labels_modalidade,
+            )
+            _enriquecer_modalidades_com_meta(modalidades, realizado_map, metas_ref)
+            metas_list = _lista_metas_from_dict(metas_ref, realizado_map)
+            card_vazio = {
+                'nome': selecionado,
+                'total': 0,
+                'valor_fmt': _moeda_br(0),
+                'variantes': grupos_solicitante.get(selecionado, {}).get('variantes', []),
+                'qtd_variantes': grupos_solicitante.get(selecionado, {}).get('qtd_variantes', 0),
+                'periodo_multimes': periodo_multimes,
+                'metas_form': _metas_form_solicitante(selecionado, metas_map, grupos_solicitante),
+                'metas_ref': metas_ref,
+                'sem_exames': True,
+            }
+            if periodo_multimes:
+                card_vazio['meses'] = []
+                card_vazio['modalidades'] = []
+                card_vazio['metas'] = []
+                card_vazio['resumo_metas'] = None
+            else:
+                card_vazio['modalidades'] = modalidades
+                card_vazio['meses'] = []
+                card_vazio['metas'] = metas_list
+                card_vazio['resumo_metas'] = _resumo_metas_solicitante(metas_list)
+                card_vazio['mes_label'] = _rotulo_mes_ano(di.year, di.month)
+            cards_resumo.append(card_vazio)
 
     cards_resumo.sort(key=lambda c: (-c['total'], c['nome'].lower()))
 
