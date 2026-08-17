@@ -107,6 +107,15 @@
 .fm-badge-grafias:hover {
     background-color: #5c636a !important;
 }
+.fm-celula-nf .badge { font-size: 0.72rem; }
+.fm-nota-candidata {
+    cursor: pointer;
+    border: 1px solid #e9ecef;
+    border-radius: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    margin-bottom: 0.35rem;
+}
+.fm-nota-candidata:hover { background: #eef4ff; border-color: #cfe2ff; }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -441,21 +450,42 @@
                                         <span class="badge bg-{{ linha.status_agendamento_css }}">{{ linha.status_agendamento }}</span>
                                     </td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
-                                    <td>
-                                        {% if linha.notas_vinculadas %}
-                                        {% for nota in linha.notas_vinculadas %}
-                                        <div class="{% if not forloop.last %}mb-1{% endif %}">
+                                    <td class="fm-celula-nf" data-faturamento-id="{{ linha.faturamento_id }}">
+                                        {% if linha.qtd_notas == 0 %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge bg-warning text-dark align-self-start">Sem NF</span>
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm py-0 px-2 js-vincular-nf"
+                                                    data-faturamento-id="{{ linha.faturamento_id }}"
+                                                    data-paciente="{{ linha.paciente }}"
+                                                    data-data="{{ linha.data_iso }}">
+                                                Vincular NF
+                                            </button>
+                                        </div>
+                                        {% elif linha.qtd_notas == 1 %}
+                                        {% with nota=linha.notas_vinculadas.0 %}
+                                        <div>
                                             <a href="{{ nota.url }}" target="_blank" rel="noopener"
                                                title="NF {{ nota.numero }} — {{ nota.data_emissao_fmt }}">
                                                 NF {{ nota.numero }}
                                             </a>
+                                            <span class="text-muted">· R$ {{ nota.valor_fmt }}</span>
+                                            {% if nota.manual %}
+                                            <span class="badge bg-secondary">Manual</span>
+                                            {% endif %}
                                             {% if nota.forma_pagamento != '-' %}
-                                            <span class="badge bg-info text-dark">{{ nota.forma_pagamento }}</span>
+                                            <div class="mt-1">
+                                                <span class="badge bg-info text-dark">{{ nota.forma_pagamento }}</span>
+                                            </div>
                                             {% endif %}
                                         </div>
-                                        {% endfor %}
+                                        {% endwith %}
                                         {% else %}
-                                        <span class="text-muted">—</span>
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 js-ver-notas-multi"
+                                                data-notas="{{ linha.notas_json|escapejs }}">
+                                            {{ linha.qtd_notas }} notas — ver detalhes
+                                        </button>
                                         {% endif %}
                                     </td>
                                     <td>{{ linha.solicitante }}</td>
@@ -480,6 +510,65 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalNotasMultiplas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title">Notas fiscais encontradas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body py-2">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nota</th>
+                                <th>Cliente</th>
+                                <th class="text-end">Valor</th>
+                                <th>Forma pagamento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalNotasMultiplasBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalVincularNF" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title">Vincular nota fiscal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body py-2">
+                <p class="small text-muted mb-2">
+                    Paciente: <strong id="vincularNFPaciente"></strong>
+                    · Exame: <strong id="vincularNFData"></strong>
+                </p>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="search"
+                           id="vincularNFBusca"
+                           class="form-control"
+                           placeholder="Buscar por número da NF ou nome do cliente..."
+                           autocomplete="off">
+                    <button type="button" class="btn btn-secondary" id="vincularNFBuscarBtn">Buscar</button>
+                </div>
+                <div id="vincularNFLista" class="small text-muted">Carregando candidatas...</div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function initBuscaSolicitante() {
     var lista = document.getElementById('listaSolicitantes');
@@ -554,6 +643,170 @@
 
     renderChips();
     atualizarContagem();
+})();
+
+(function initNotasSolicitante() {
+    var modalMulti = document.getElementById('modalNotasMultiplas');
+    var tbodyMulti = document.getElementById('modalNotasMultiplasBody');
+    var modalVincular = document.getElementById('modalVincularNF');
+    var vincularPaciente = document.getElementById('vincularNFPaciente');
+    var vincularData = document.getElementById('vincularNFData');
+    var vincularBusca = document.getElementById('vincularNFBusca');
+    var vincularBuscarBtn = document.getElementById('vincularNFBuscarBtn');
+    var vincularListaEl = document.getElementById('vincularNFLista');
+    var buscarUrl = "{% url 'faturamento_medico:buscar_notas_vinculo_solicitante' %}";
+    var vincularUrl = "{% url 'faturamento_medico:vincular_nota_solicitante_faturamento' %}";
+    var csrfToken = '{{ csrf_token }}';
+    var vinculoAtual = { faturamentoId: null, paciente: '', data: '', celula: null };
+
+    function escapeHtml(texto) {
+        return String(texto || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function renderCelulaNF(celula, nota) {
+        if (!celula || !nota) return;
+        var manual = nota.manual ? '<span class="badge bg-secondary">Manual</span> ' : '';
+        var pagamento = nota.forma_pagamento && nota.forma_pagamento !== '-'
+            ? '<div class="mt-1"><span class="badge bg-info text-dark">' + escapeHtml(nota.forma_pagamento) + '</span></div>'
+            : '';
+        celula.innerHTML =
+            '<div>' +
+            '<a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a> ' +
+            '<span class="text-muted">· R$ ' + escapeHtml(nota.valor_fmt) + '</span> ' +
+            manual + pagamento +
+            '</div>';
+    }
+
+    function atualizarLinhasMesmoFaturamento(faturamentoId, nota) {
+        document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + faturamentoId + '"]').forEach(function(celula) {
+            renderCelulaNF(celula, nota);
+        });
+    }
+
+    function abrirModalMultiplas(notas) {
+        if (!tbodyMulti) return;
+        tbodyMulti.innerHTML = '';
+        notas.forEach(function(nota) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a><div class="text-muted small">' + escapeHtml(nota.data_emissao_fmt) + '</div></td>' +
+                '<td>' + escapeHtml(nota.cliente) + '</td>' +
+                '<td class="text-end">R$ ' + escapeHtml(nota.valor_fmt) + '</td>' +
+                '<td>' + escapeHtml(nota.forma_pagamento) + '</td>';
+            tbodyMulti.appendChild(tr);
+        });
+        if (modalMulti && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalMulti).show();
+        }
+    }
+
+    document.querySelectorAll('.js-ver-notas-multi').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            try {
+                abrirModalMultiplas(JSON.parse(btn.getAttribute('data-notas') || '[]'));
+            } catch (e) {
+                abrirModalMultiplas([]);
+            }
+        });
+    });
+
+    function carregarCandidatasVinculo() {
+        if (!vinculoAtual.faturamentoId || !vincularListaEl) return;
+        vincularListaEl.textContent = 'Buscando...';
+        var params = new URLSearchParams({
+            paciente: vinculoAtual.paciente,
+            data_exame: vinculoAtual.data,
+            q: (vincularBusca && vincularBusca.value) ? vincularBusca.value.trim() : ''
+        });
+        fetch(buscarUrl + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                var notas = data.notas || [];
+                if (!notas.length) {
+                    vincularListaEl.innerHTML = '<div class="text-muted">Nenhuma NF encontrada no intervalo do exame (+15 dias).</div>';
+                    return;
+                }
+                vincularListaEl.innerHTML = '';
+                notas.forEach(function(nota) {
+                    var item = document.createElement('div');
+                    item.className = 'fm-nota-candidata';
+                    item.innerHTML =
+                        '<div class="d-flex justify-content-between gap-2">' +
+                        '<div><strong>NF ' + escapeHtml(nota.numero) + '</strong> · ' + escapeHtml(nota.cliente) + '</div>' +
+                        '<div>R$ ' + escapeHtml(nota.valor_fmt) + '</div>' +
+                        '</div>' +
+                        '<div class="text-muted">' + escapeHtml(nota.data_emissao_fmt) + ' · ' + escapeHtml(nota.forma_pagamento) + '</div>';
+                    item.addEventListener('click', function() {
+                        var body = new URLSearchParams({
+                            faturamento_id: String(vinculoAtual.faturamentoId),
+                            nota_id: String(nota.pk)
+                        });
+                        fetch(vincularUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: body.toString()
+                        })
+                            .then(function(resp) { return resp.json(); })
+                            .then(function(res) {
+                                if (!res.ok) {
+                                    alert(res.error || 'Não foi possível vincular a NF.');
+                                    return;
+                                }
+                                renderCelulaNF(vinculoAtual.celula, res.nota);
+                                atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, res.nota);
+                                if (modalVincular && window.bootstrap) {
+                                    bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
+                                }
+                            })
+                            .catch(function() {
+                                alert('Erro ao vincular a NF.');
+                            });
+                    });
+                    vincularListaEl.appendChild(item);
+                });
+            })
+            .catch(function() {
+                vincularListaEl.textContent = 'Erro ao buscar notas fiscais.';
+            });
+    }
+
+    document.querySelectorAll('.js-vincular-nf').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            vinculoAtual.faturamentoId = btn.getAttribute('data-faturamento-id');
+            vinculoAtual.paciente = btn.getAttribute('data-paciente') || '';
+            vinculoAtual.data = btn.getAttribute('data-data') || '';
+            vinculoAtual.celula = btn.closest('.fm-celula-nf');
+            if (vincularPaciente) vincularPaciente.textContent = vinculoAtual.paciente;
+            if (vincularData) vincularData.textContent = vinculoAtual.data || '-';
+            if (vincularBusca) vincularBusca.value = '';
+            if (modalVincular && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalVincular).show();
+            }
+            carregarCandidatasVinculo();
+        });
+    });
+
+    if (vincularBuscarBtn) {
+        vincularBuscarBtn.addEventListener('click', carregarCandidatasVinculo);
+    }
+    if (vincularBusca) {
+        vincularBusca.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                carregarCandidatasVinculo();
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

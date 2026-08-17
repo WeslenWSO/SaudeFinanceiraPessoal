@@ -7,7 +7,7 @@ from django.utils.formats import number_format
 from django.http import HttpResponse, Http404, JsonResponse, FileResponse
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from io import BytesIO
@@ -516,8 +516,10 @@ def _solicitantes_mesma_pessoa(chave_a: str, chave_b: str) -> bool:
 
 def _chave_agrupamento_solicitante(texto: str) -> str:
     """
-    Chave de agrupamento: primeiro nome + sobrenome (ex.: MARCO|PIMENTEL).
-    Grafias do mesmo sobrenome (PIMENTEL/PIMENTA) ainda podem ser unidas depois.
+    Chave de agrupamento do solicitante.
+    Usa primeiro + segundo nome (MARCO|ANTONIO) para unir grafias do mesmo médico
+    com sobrenomes diferentes (PIMENTA/PIMENTEL/MENEZES).
+    Sobrenomes isolados na lista de exclusão (ex.: SILVA) ficam em grupo aparte.
     """
     chave = _chave_nome_solicitante(texto)
     if chave in ('__sem__', '__vazio__'):
@@ -529,6 +531,11 @@ def _chave_agrupamento_solicitante(texto: str) -> str:
     if len(primeiro) >= 6 and primeiro.endswith('S'):
         primeiro = primeiro[:-1]
     sobrenome = partes[-1]
+    sobrenomes_grupo_proprio = {'SILVA'}
+    if len(partes) >= 3 and sobrenome in sobrenomes_grupo_proprio:
+        return f'{primeiro}|{sobrenome}'
+    if len(partes) >= 2:
+        return f'{primeiro}|{partes[1]}'
     return f'{primeiro}|{sobrenome}'
 
 
@@ -2282,9 +2289,9 @@ def listar_exames_por_solicitante(request):
     notas_por_data = {}
     if incluir_lista_detalhada:
         from faturamento_medico.services.vincular_nota_solicitante import (
-            buscar_notas_paciente,
             carregar_notas_por_data,
-            serializar_nota_linha,
+            notas_linha_para_json,
+            resolver_notas_linha,
         )
         notas_por_data = carregar_notas_por_data(empresa_id, di, df)
 
@@ -2306,18 +2313,19 @@ def listar_exames_por_solicitante(request):
             status_label, status_css = _status_linha_faturamento(faturamento, item)
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             notas_vinculadas = []
-            if notas_por_data:
-                notas_vinculadas = [
-                    serializar_nota_linha(nota)
-                    for nota in buscar_notas_paciente(
-                        notas_por_data,
-                        faturamento.nome or '',
-                        faturamento.data,
-                    )
-                ]
+            if notas_por_data is not None:
+                notas_vinculadas = resolver_notas_linha(
+                    notas_por_data,
+                    empresa_id,
+                    faturamento.nome or '',
+                    faturamento.data,
+                    faturamento.nota_fiscal,
+                )
             grid_linhas.append({
                 'data': faturamento.data,
                 'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
+                'data_iso': faturamento.data.isoformat() if faturamento.data else '',
+                'faturamento_id': faturamento.pk,
                 'paciente': faturamento.nome or '-',
                 'procedimento': procedimento,
                 'modalidade': modalidade or '-',
@@ -2330,6 +2338,8 @@ def listar_exames_por_solicitante(request):
                 'solicitante': solicitante,
                 'convenio': faturamento.convenio or '-',
                 'notas_vinculadas': notas_vinculadas,
+                'qtd_notas': len(notas_vinculadas),
+                'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
             })
 
         if not itens:
@@ -2445,6 +2455,56 @@ def listar_exames_por_solicitante(request):
         'redirect_qs': request.GET.urlencode(),
     }
     return render(request, 'faturamento_medico/listar_exames_por_solicitante.html', context)
+
+
+@require_GET
+def buscar_notas_vinculo_solicitante(request):
+    """AJAX: candidatas à vinculação manual de NFSe na lista por solicitante."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    from faturamento_medico.services.vincular_nota_solicitante import buscar_notas_para_vinculo
+
+    data_exame = _parse_data_filtro(request.GET.get('data_exame'))
+    notas = buscar_notas_para_vinculo(
+        empresa_id,
+        (request.GET.get('paciente') or '').strip(),
+        data_exame,
+        (request.GET.get('q') or '').strip(),
+    )
+    return JsonResponse({'notas': notas})
+
+
+@require_POST
+def vincular_nota_solicitante_faturamento(request):
+    """AJAX: salva vínculo manual NFSe → faturamento (campo nota_fiscal)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    try:
+        faturamento_id = int(request.POST.get('faturamento_id') or 0)
+        nota_id = int(request.POST.get('nota_id') or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Parâmetros inválidos.'}, status=400)
+    if not faturamento_id or not nota_id:
+        return JsonResponse({'error': 'Informe faturamento e nota.'}, status=400)
+
+    from notasfiscais.models import NotaFiscalServico
+    from faturamento_medico.services.vincular_nota_solicitante import serializar_nota_linha
+
+    faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
+    nota = get_object_or_404(
+        NotaFiscalServico,
+        pk=nota_id,
+        empresa_id=empresa_id,
+        data_cancelamento__isnull=True,
+    )
+    faturamento.nota_fiscal = nota.numero_nota
+    faturamento.save(update_fields=['nota_fiscal'])
+    return JsonResponse({
+        'ok': True,
+        'nota': serializar_nota_linha(nota, manual=True),
+    })
 
 
 FUZZY_NOME_MIN_RATIO = 0.90
