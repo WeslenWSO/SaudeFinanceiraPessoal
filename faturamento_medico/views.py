@@ -5808,8 +5808,12 @@ def importar_ris(request):
                 if eh_cancelado:
                     linhas_canceladas += 1
 
+                medico_solicitante = _celula_texto(get(row, 'medico_solicitante'), 200) or ''
                 # Separa cancelados da lista principal no agrupamento
-                chave = f"{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|{status_raw or 'ok'}"
+                chave = (
+                    f"{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|"
+                    f"{status_raw or 'ok'}|{medico_solicitante}"
+                )
                 modalidade = _celula_texto(get(row, 'modalidade'), 20)
                 agendado_via = _celula_texto(get(row, 'agendado_via'), 50) or 'RIS'
                 if chave not in grupos:

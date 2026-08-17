@@ -94,7 +94,11 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
         if _eh_status_agendamento_cancelado(status_raw):
             linhas_canceladas += 1
 
-        chave = f'{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|{status_raw or "ok"}'
+        medico_solicitante = _celula_texto(get(row, 'medico_solicitante'), 200) or ''
+        chave = (
+            f'{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|'
+            f'{status_raw or "ok"}|{medico_solicitante}'
+        )
         modalidade = _celula_texto(get(row, 'modalidade'), 20)
         agendado_via = _celula_texto(get(row, 'agendado_via'), 50) or 'RIS'
 
