@@ -516,8 +516,8 @@ def _solicitantes_mesma_pessoa(chave_a: str, chave_b: str) -> bool:
 
 def _chave_agrupamento_solicitante(texto: str) -> str:
     """
-    Chave de agrupamento: primeiro + segundo nome (ex.: MARCO|ANTONIO).
-    Une MARCO/MARCOS, PIMENTEL/MENEZES etc. quando o nome base coincide.
+    Chave de agrupamento: primeiro nome + sobrenome (ex.: MARCO|PIMENTEL).
+    Grafias do mesmo sobrenome (PIMENTEL/PIMENTA) ainda podem ser unidas depois.
     """
     chave = _chave_nome_solicitante(texto)
     if chave in ('__sem__', '__vazio__'):
@@ -528,22 +528,27 @@ def _chave_agrupamento_solicitante(texto: str) -> str:
     primeiro = partes[0]
     if len(primeiro) >= 6 and primeiro.endswith('S'):
         primeiro = primeiro[:-1]
-    return f'{primeiro}|{partes[1]}'
+    sobrenome = partes[-1]
+    return f'{primeiro}|{sobrenome}'
 
 
-def _escolher_nome_exibicao_solicitante(nomes: list[str]) -> str:
-    """Escolhe o nome mais completo/frequente para exibir no grupo."""
-    if not nomes:
+def _escolher_nome_exibicao_solicitante(
+    nomes: list[str],
+    frequencias: dict[str, int] | None = None,
+) -> str:
+    """Escolhe o nome canônico do grupo (mais frequente no período)."""
+    candidatos = sorted({(nome or '').strip() for nome in nomes if (nome or '').strip()})
+    if not candidatos:
         return SOLICITANTE_NAO_INFORMADO
-    contagem = defaultdict(int)
-    for nome in nomes:
-        limpo = (nome or '').strip()
-        if limpo:
-            contagem[limpo] += 1
-    return max(contagem.keys(), key=lambda n: (contagem[n], len(n)))
+    if frequencias:
+        return max(candidatos, key=lambda n: (frequencias.get(n, 0), len(n)))
+    return max(candidatos, key=len)
 
 
-def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]]:
+def _construir_grupos_solicitante(
+    raws,
+    frequencias: dict[str, int] | None = None,
+) -> tuple[dict[str, str], dict[str, dict]]:
     """
     Agrupa nomes repetidos do solicitante.
     Retorna (raw -> nome canônico, grupos por nome canônico).
@@ -570,14 +575,19 @@ def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]
         if ra != rb:
             pai[rb] = ra
 
-    for i, ca in enumerate(chaves):
-        rep_a = max(por_chave[ca], key=len)
-        nome_a = _chave_nome_solicitante(rep_a)
-        for cb in chaves[i + 1:]:
-            rep_b = max(por_chave[cb], key=len)
-            nome_b = _chave_nome_solicitante(rep_b)
-            if _solicitantes_mesma_pessoa(nome_a, nome_b):
-                _unir(ca, cb)
+    chave_nome = {
+        chave: _chave_nome_solicitante(max(por_chave[chave], key=len))
+        for chave in chaves
+    }
+    buckets = defaultdict(list)
+    for chave in chaves:
+        buckets[chave.split('|', 1)[0]].append(chave)
+    for bucket in buckets.values():
+        for i, ca in enumerate(bucket):
+            nome_a = chave_nome[ca]
+            for cb in bucket[i + 1:]:
+                if _solicitantes_mesma_pessoa(nome_a, chave_nome[cb]):
+                    _unir(ca, cb)
 
     grupos_raw = defaultdict(list)
     for chave, nomes in por_chave.items():
@@ -595,7 +605,7 @@ def _construir_grupos_solicitante(raws) -> tuple[dict[str, str], dict[str, dict]
             canonico = SOLICITANTE_NAO_INFORMADO
             variantes = ['']
         else:
-            canonico = _escolher_nome_exibicao_solicitante(variantes)
+            canonico = _escolher_nome_exibicao_solicitante(variantes, frequencias)
         if canonico in grupos:
             variantes = sorted(set(grupos[canonico]['variantes'] + variantes))
         grupos[canonico] = {
@@ -2242,8 +2252,15 @@ def listar_exames_por_solicitante(request):
         for status in qs_periodo.values_list('status_agendamento', flat=True).distinct()
     }, key=str.lower)
 
+    freq_solicitante = defaultdict(int)
+    for raw in qs_periodo.values_list('medico_solicitante', flat=True):
+        nome = (raw or '').strip()
+        if nome:
+            freq_solicitante[nome] += 1
+
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
-        qs_periodo.values_list('medico_solicitante', flat=True).distinct()
+        freq_solicitante.keys(),
+        freq_solicitante,
     )
     solicitantes_disponiveis = [
         info for _, info in sorted(grupos_solicitante.items(), key=lambda x: x[0].lower())
@@ -2259,13 +2276,24 @@ def listar_exames_por_solicitante(request):
     metas_map = _carregar_metas_solicitante(empresa_id)
 
     grid_linhas = []
+    incluir_lista_detalhada = bool(solicitantes_sel)
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     for faturamento in qs:
         solicitante = _canonico_solicitante(faturamento.medico_solicitante, mapa_solicitante)
         itens = list(faturamento.itens_servico.all())
 
+        def _acumular_card(modalidade, valor):
+            card = cards_map[solicitante]
+            _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
+            if periodo_multimes and faturamento.data:
+                chave_mes = (faturamento.data.year, faturamento.data.month)
+                _acumular_modalidade_resumo(card['meses'][chave_mes], modalidade, valor, codigos_modalidade)
+
         def _registrar_linha(procedimento, modalidade, valor, item=None):
+            _acumular_card(modalidade, valor)
+            if not incluir_lista_detalhada:
+                return
             status_label, status_css = _status_linha_faturamento(faturamento, item)
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             grid_linhas.append({
@@ -2283,11 +2311,6 @@ def listar_exames_por_solicitante(request):
                 'solicitante': solicitante,
                 'convenio': faturamento.convenio or '-',
             })
-            card = cards_map[solicitante]
-            _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
-            if periodo_multimes and faturamento.data:
-                chave_mes = (faturamento.data.year, faturamento.data.month)
-                _acumular_modalidade_resumo(card['meses'][chave_mes], modalidade, valor, codigos_modalidade)
 
         if not itens:
             _registrar_linha(
@@ -2370,18 +2393,23 @@ def listar_exames_por_solicitante(request):
 
     cards_resumo.sort(key=lambda c: (-c['total'], c['nome'].lower()))
 
-    totais_solicitante = {card['nome']: card['total'] for card in cards_resumo}
-    grid_linhas.sort(key=lambda linha: (
-        -totais_solicitante.get(linha['solicitante'], 0),
-        -(linha['data'].toordinal() if linha['data'] else 0),
-        linha['paciente'].lower(),
-    ))
+    total_exames = sum(card['total'] for card in cards_resumo)
+    if incluir_lista_detalhada:
+        totais_solicitante = {card['nome']: card['total'] for card in cards_resumo}
+        grid_linhas.sort(key=lambda linha: (
+            -totais_solicitante.get(linha['solicitante'], 0),
+            -(linha['data'].toordinal() if linha['data'] else 0),
+            linha['paciente'].lower(),
+        ))
+        valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
+    else:
+        valor_total = sum(cards_map[card['nome']]['valor'] for card in cards_resumo)
 
-    valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
     context = {
         'grid_linhas': grid_linhas,
         'cards_resumo': cards_resumo,
-        'total_exames': len(grid_linhas),
+        'incluir_lista_detalhada': incluir_lista_detalhada,
+        'total_exames': total_exames,
         'valor_total_fmt': _moeda_br(valor_total),
         'solicitantes_disponiveis': solicitantes_disponiveis,
         'status_disponiveis': status_disponiveis,

@@ -100,6 +100,13 @@
 }
 .fm-mod-badge.meta-atingida { background: #d1e7dd; color: #146c43; }
 .fm-mod-badge.meta-pendente { background: #fff3cd; color: #997404; }
+.fm-badge-grafias {
+    cursor: pointer;
+    vertical-align: middle;
+}
+.fm-badge-grafias:hover {
+    background-color: #5c636a !important;
+}
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -208,12 +215,17 @@
                         {% for card in cards_resumo %}
                         <div class="col-md-6 {% if periodo_multimes %}col-xl-6{% else %}col-lg-4 col-xl-3{% endif %}">
                             <div class="card fm-card-solicitante shadow-sm">
-                                <div class="card-header py-2 d-flex justify-content-between align-items-start gap-2"
-                                     {% if card.qtd_variantes > 1 %}title="{{ card.variantes|join:', ' }}"{% endif %}>
+                                <div class="card-header py-2 d-flex justify-content-between align-items-start gap-2">
                                     <span>
                                         {{ card.nome }}
                                         {% if card.qtd_variantes > 1 %}
-                                        <span class="badge bg-secondary ms-1">{{ card.qtd_variantes }} grafias</span>
+                                        <button type="button"
+                                                class="badge bg-secondary ms-1 border-0 fm-badge-grafias"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalVariantes{{ forloop.counter }}"
+                                                title="Ver grafias agrupadas">
+                                            {{ card.qtd_variantes }} grafias
+                                        </button>
                                         {% endif %}
                                     </span>
                                     <button type="button"
@@ -335,6 +347,33 @@
                     </div>
 
                     {% for card in cards_resumo %}
+                    {% if card.qtd_variantes > 1 %}
+                    <div class="modal fade" id="modalVariantes{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header py-2">
+                                    <h5 class="modal-title">Grafias — {{ card.nome }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body py-2">
+                                    <p class="small text-muted mb-2">
+                                        {{ card.qtd_variantes }} nome(s) encontrado(s) no RIS e agrupado(s) neste solicitante:
+                                    </p>
+                                    <ul class="list-group list-group-flush">
+                                        {% for variante in card.variantes %}
+                                        {% if variante %}
+                                        <li class="list-group-item px-0 py-2">{{ variante }}</li>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                <div class="modal-footer py-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="modal fade" id="modalMetas{{ forloop.counter }}" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog">
                             <div class="modal-content">
@@ -407,6 +446,11 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                    {% elif not incluir_lista_detalhada and total_exames %}
+                    <div class="alert alert-light border mb-0">
+                        Selecione um ou mais <strong>solicitantes</strong> acima e clique em <strong>Filtrar</strong>
+                        para exibir a lista detalhada de exames. Os cards acima já mostram os totais por médico.
                     </div>
                     {% else %}
                     <div class="alert alert-info mb-0">
