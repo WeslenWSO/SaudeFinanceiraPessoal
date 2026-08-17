@@ -158,13 +158,13 @@ def resolver_notas_linha(
     data_exame: date | None,
     numero_nota_salvo: str | None = None,
 ) -> list[dict]:
-    """Busca automática + fallback do vínculo manual salvo no faturamento."""
-    notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
-    if notas:
-        return [serializar_nota_linha(n, manual=False) for n in notas]
+    """Vínculo manual salvo tem prioridade; senão busca automática por paciente na NF."""
     nota_manual = buscar_nota_manual_salva(empresa_id, numero_nota_salvo)
     if nota_manual:
         return [serializar_nota_linha(nota_manual, manual=True)]
+    notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
+    if notas:
+        return [serializar_nota_linha(n, manual=False) for n in notas]
     return []
 
 

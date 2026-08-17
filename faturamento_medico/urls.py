@@ -17,6 +17,11 @@ urlpatterns = [
         views.vincular_nota_solicitante_faturamento,
         name='vincular_nota_solicitante_faturamento',
     ),
+    path(
+        'exames-por-solicitante/desvincular-nota/',
+        views.desvincular_nota_solicitante_faturamento,
+        name='desvincular_nota_solicitante_faturamento',
+    ),
     path('verificar-corrigir-precos/', views.verificar_corrigir_precos, name='verificar_corrigir_precos'),
     path('criar/', views.criar_faturamento, name='criar'),
     path('<int:pk>/editar/', views.editar_faturamento, name='editar'),

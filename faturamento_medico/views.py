@@ -2850,6 +2850,25 @@ def vincular_nota_solicitante_faturamento(request):
     })
 
 
+@require_POST
+def desvincular_nota_solicitante_faturamento(request):
+    """AJAX: remove vínculo manual NFSe → faturamento (limpa campo nota_fiscal)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    try:
+        faturamento_id = int(request.POST.get('faturamento_id') or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Parâmetros inválidos.'}, status=400)
+    if not faturamento_id:
+        return JsonResponse({'error': 'Informe o faturamento.'}, status=400)
+
+    faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
+    faturamento.nota_fiscal = ''
+    faturamento.save(update_fields=['nota_fiscal'])
+    return JsonResponse({'ok': True})
+
+
 FUZZY_NOME_MIN_RATIO = 0.90
 
 
