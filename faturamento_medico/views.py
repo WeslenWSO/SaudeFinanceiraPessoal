@@ -347,17 +347,52 @@ def _status_linha_faturamento(faturamento, item=None):
     return 'PENDENTE', 'secondary'
 
 
-def _modalidade_faturamento_item(faturamento, item=None):
-    if item and item.modalidade:
-        return item.modalidade
-    obs = faturamento.observacao or ''
-    if 'Modalidade:' in obs:
-        for parte in obs.splitlines():
-            if parte.strip().lower().startswith('modalidade:'):
-                valor = parte.split(':', 1)[-1].strip()
-                if valor:
-                    return valor
+def _inferir_modalidade(procedimento, modalidade=''):
+    """Código de modalidade (US, MR, …) a partir do campo ou do nome do procedimento."""
+    mod = (modalidade or '').strip().upper()
+    if mod and mod != '-':
+        cod = _normalizar_codigo_modalidade(mod)
+        if cod != 'OUTROS':
+            return cod
+    p = (procedimento or '').lower()
+    if p.startswith('rm ') or 'resson' in p:
+        return 'MR'
+    if p.startswith('tc ') or 'tomograf' in p:
+        return 'CT'
+    if (
+        p.startswith('us ')
+        or 'ultrassom' in p
+        or 'ultrassonograf' in p
+        or 'doppler' in p
+        or 'ecodoppl' in p
+    ):
+        return 'US'
+    if p.startswith('rx ') or ' raio' in p or p.startswith('raio'):
+        return 'CR'
+    if 'mamograf' in p:
+        return 'MG'
+    if 'eletrocardiograma' in p or p.startswith('ecg'):
+        return 'EC'
+    if 'eletroencefalograma' in p or p.startswith('eeg'):
+        return 'EG'
     return '-'
+
+
+def _modalidade_faturamento_item(faturamento, item=None):
+    mod = ''
+    if item and item.modalidade:
+        mod = item.modalidade
+    if not mod:
+        obs = faturamento.observacao or ''
+        if 'Modalidade:' in obs:
+            for parte in obs.splitlines():
+                if parte.strip().lower().startswith('modalidade:'):
+                    valor = parte.split(':', 1)[-1].strip()
+                    if valor:
+                        mod = valor
+                        break
+    procedimento = (item.servico if item else faturamento.servico) or ''
+    return _inferir_modalidade(procedimento, mod)
 
 
 MODALIDADES_SOLICITANTE = (
@@ -382,7 +417,26 @@ METAS_MODALIDADES_SOLICITANTE = (
 
 def _normalizar_codigo_modalidade(codigo):
     cod = (codigo or '').strip().upper()
-    if cod == 'RX':
+    cod = unicodedata.normalize('NFKD', cod)
+    cod = ''.join(c for c in cod if not unicodedata.combining(c))
+    aliases = {
+        'RX': 'CR',
+        'RAIO X': 'CR',
+        'RAIO-X': 'CR',
+        'RAIOX': 'CR',
+        'RESSONANCIA': 'MR',
+        'ULTRASSONOGRAFIA': 'US',
+        'ULTRASSOM': 'US',
+        'TOMOGRAFIA': 'CT',
+        'MAMOGRAFIA': 'MG',
+        'ELETROENCEFALOGRAMA': 'EG',
+        'EEG': 'EG',
+        'ELETROCARDIOGRAMA': 'EC',
+        'ECG': 'EC',
+    }
+    if cod in aliases:
+        cod = aliases[cod]
+    elif cod == 'RX':
         cod = 'CR'
     return cod if cod and cod != '-' else 'OUTROS'
 
@@ -1653,16 +1707,7 @@ def listar_faturamentos(request):
         return False
 
     def _modalidade_item(faturamento, item=None):
-        if item and item.modalidade:
-            return item.modalidade
-        obs = faturamento.observacao or ''
-        if 'Modalidade:' in obs:
-            for parte in obs.splitlines():
-                if parte.strip().lower().startswith('modalidade:'):
-                    valor = parte.split(':', 1)[-1].strip()
-                    if valor:
-                        return valor
-        return '-'
+        return _modalidade_faturamento_item(faturamento, item)
 
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
