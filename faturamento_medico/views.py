@@ -650,6 +650,29 @@ def _filtrar_por_solicitantes(qs, solicitantes_sel, grupos: dict[str, dict]):
     return qs.filter(q_sol) if q_sol else qs
 
 
+def _filtrar_por_medicos(qs, medicos_sel):
+    if not medicos_sel:
+        return qs
+    q_med = Q()
+    for selecionado in medicos_sel:
+        if selecionado == SOLICITANTE_NAO_INFORMADO:
+            q_med |= Q(medico__isnull=True) | Q(medico='')
+            continue
+        q_med |= Q(medico__iexact=selecionado)
+    return qs.filter(q_med) if q_med else qs
+
+
+def _listar_nomes_medico_periodo(qs_periodo) -> list[str]:
+    return sorted({
+        (nome or '').strip() or SOLICITANTE_NAO_INFORMADO
+        for nome in qs_periodo.values_list('medico', flat=True).distinct()
+    }, key=str.lower)
+
+
+def _rotulo_medico_faturamento(faturamento) -> str:
+    nome = (faturamento.medico or '').strip()
+    return nome or SOLICITANTE_NAO_INFORMADO
+
 MESES_PT = (
     '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
@@ -2249,6 +2272,7 @@ def listar_exames_por_solicitante(request):
         di, df = df, di
 
     solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
+    medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
@@ -2272,9 +2296,11 @@ def listar_exames_por_solicitante(request):
     solicitantes_disponiveis = [
         info for _, info in sorted(grupos_solicitante.items(), key=lambda x: x[0].lower())
     ]
+    medicos_disponiveis = _listar_nomes_medico_periodo(qs_periodo)
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
+    qs = _filtrar_por_medicos(qs, medicos_sel)
 
     qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
@@ -2336,6 +2362,7 @@ def listar_exames_por_solicitante(request):
                 'valor': valor,
                 'valor_fmt': _moeda_br(valor),
                 'solicitante': solicitante,
+                'medico': _rotulo_medico_faturamento(faturamento),
                 'convenio': faturamento.convenio or '-',
                 'notas_vinculadas': notas_vinculadas,
                 'qtd_notas': len(notas_vinculadas),
@@ -2442,11 +2469,13 @@ def listar_exames_por_solicitante(request):
         'total_exames': total_exames,
         'valor_total_fmt': _moeda_br(valor_total),
         'solicitantes_disponiveis': solicitantes_disponiveis,
+        'medicos_disponiveis': medicos_disponiveis,
         'status_disponiveis': status_disponiveis,
         'filtros': {
             'data_inicio': di.isoformat(),
             'data_fim': df.isoformat(),
             'solicitante': solicitantes_sel,
+            'medico': medicos_sel,
             'status_agendamento': status_agendamento_sel,
         },
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',

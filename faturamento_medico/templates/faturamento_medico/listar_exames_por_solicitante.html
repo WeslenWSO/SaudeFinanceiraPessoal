@@ -201,6 +201,38 @@
                                 </a>
                             </div>
                         </div>
+                        <div class="row g-2 align-items-end mt-2">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-0 text-muted">Médico (múltiplo)</label>
+                                <div class="fm-solicitante-picker" id="pickerMedico">
+                                    <input type="search"
+                                           id="buscaMedico"
+                                           class="form-control form-control-sm mb-2"
+                                           placeholder="Pesquisar nome do médico..."
+                                           autocomplete="off">
+                                    <div id="medicoSelecionados" class="fm-solicitante-selecionados mb-2"></div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted" id="contagemMedico"></span>
+                                        <button type="button" class="btn btn-link btn-sm p-0" id="limparMedicos">Limpar</button>
+                                    </div>
+                                    <div class="fm-solicitante-lista" id="listaMedicos">
+                                        {% for nome in medicos_disponiveis %}
+                                        <label class="fm-solicitante-item"
+                                               data-busca="{{ nome|lower }}">
+                                            <input type="checkbox"
+                                                   name="medico"
+                                                   value="{{ nome }}"
+                                                   {% if nome in filtros.medico %}checked{% endif %}>
+                                            <span>{{ nome }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <div class="p-2 small text-muted">Nenhum médico no período</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="form-text">Médico executor do exame (campo Médico do faturamento).</div>
+                            </div>
+                        </div>
                     </form>
 
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -208,6 +240,9 @@
                             Período: <strong>{{ periodo_fmt }}</strong>
                             {% if filtros.solicitante %}
                             · {{ filtros.solicitante|length }} solicitante(s) selecionado(s)
+                            {% endif %}
+                            {% if filtros.medico %}
+                            · {{ filtros.medico|length }} médico(s) selecionado(s)
                             {% endif %}
                             {% if filtros.status_agendamento %}
                             · {{ filtros.status_agendamento|length }} status selecionado(s)
@@ -436,6 +471,7 @@
                                     <th class="text-end">Valor</th>
                                     <th>NF / Pagamento</th>
                                     <th>Solicitante</th>
+                                    <th>Médico</th>
                                     <th>Convênio</th>
                                 </tr>
                             </thead>
@@ -489,6 +525,7 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ linha.solicitante }}</td>
+                                    <td>{{ linha.medico }}</td>
                                     <td>{{ linha.convenio }}</td>
                                 </tr>
                                 {% endfor %}
@@ -570,12 +607,12 @@
 </div>
 
 <script>
-(function initBuscaSolicitante() {
-    var lista = document.getElementById('listaSolicitantes');
-    var busca = document.getElementById('buscaSolicitante');
-    var chips = document.getElementById('solicitanteSelecionados');
-    var contagem = document.getElementById('contagemSolicitante');
-    var limparBtn = document.getElementById('limparSolicitantes');
+function initMultiPicker(opts) {
+    var lista = document.getElementById(opts.listaId);
+    var busca = document.getElementById(opts.buscaId);
+    var chips = document.getElementById(opts.chipsId);
+    var contagem = document.getElementById(opts.contagemId);
+    var limparBtn = document.getElementById(opts.limparId);
     if (!lista || !busca) return;
 
     var itens = Array.prototype.slice.call(lista.querySelectorAll('.fm-solicitante-item'));
@@ -643,7 +680,22 @@
 
     renderChips();
     atualizarContagem();
-})();
+}
+
+initMultiPicker({
+    listaId: 'listaSolicitantes',
+    buscaId: 'buscaSolicitante',
+    chipsId: 'solicitanteSelecionados',
+    contagemId: 'contagemSolicitante',
+    limparId: 'limparSolicitantes'
+});
+initMultiPicker({
+    listaId: 'listaMedicos',
+    buscaId: 'buscaMedico',
+    chipsId: 'medicoSelecionados',
+    contagemId: 'contagemMedico',
+    limparId: 'limparMedicos'
+});
 
 (function initNotasSolicitante() {
     var modalMulti = document.getElementById('modalNotasMultiplas');
