@@ -754,7 +754,7 @@
                     <input type="search"
                            id="vincularNFBusca"
                            class="form-control"
-                           placeholder="Buscar por número da NF, nome do cliente ou discriminação..."
+                           placeholder="Buscar por número da NF, paciente (discriminação), cliente ou texto da NF..."
                            autocomplete="off">
                     <button type="button" class="btn btn-secondary" id="vincularNFBuscarBtn">Buscar</button>
                 </div>
@@ -929,7 +929,7 @@ initMultiPicker({
             var tr = document.createElement('tr');
             tr.innerHTML =
                 '<td><a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a><div class="text-muted small">' + escapeHtml(nota.data_emissao_fmt) + '</div></td>' +
-                '<td>' + escapeHtml(nota.cliente) + '</td>' +
+                '<td>' + escapeHtml(nota.paciente_nota || nota.cliente) + (nota.paciente_nota && nota.paciente_nota !== nota.cliente ? '<div class="text-muted small">Cliente: ' + escapeHtml(nota.cliente) + '</div>' : '') + '</td>' +
                 '<td class="text-end">R$ ' + escapeHtml(nota.valor_fmt) + '</td>' +
                 '<td>' + escapeHtml(nota.forma_pagamento) + '</td>';
             tbodyMulti.appendChild(tr);
@@ -986,7 +986,7 @@ initMultiPicker({
                     item.className = 'fm-nota-candidata';
                     item.innerHTML =
                         '<div class="d-flex justify-content-between gap-2">' +
-                        '<div><strong>NF ' + escapeHtml(nota.numero) + '</strong> · ' + escapeHtml(nota.cliente) + '</div>' +
+                        '<div><strong>NF ' + escapeHtml(nota.numero) + '</strong> · ' + escapeHtml(nota.paciente_nota || nota.cliente) + '</div>' +
                         '<div>R$ ' + escapeHtml(nota.valor_fmt) + '</div>' +
                         '</div>' +
                         '<div class="text-muted">' + escapeHtml(nota.data_emissao_fmt) + ' · ' + escapeHtml(nota.forma_pagamento) + '</div>';

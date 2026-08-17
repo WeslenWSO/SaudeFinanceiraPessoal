@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -13,6 +14,52 @@ from notasfiscais.models import NotaFiscalServico
 
 JANELA_DIAS_APOS_EXAME = 15
 SIMILARIDADE_MIN_PACIENTE = 0.82
+
+_RE_INICIO_PACIENTE = re.compile(
+    r'(?:EXAME REALIZADO PELO\s+O?\s*PACIENTE|PACIENTE)\s*:',
+    re.IGNORECASE,
+)
+_RE_FIM_PACIENTE = re.compile(
+    r'PARCERIA\s*:|CPF\s*:|PAGAMENTO\s*:',
+    re.IGNORECASE,
+)
+
+
+def _extrair_paciente_discriminacao(discriminacao: str | None) -> str:
+    """
+    Extrai o nome do paciente da discriminação da NFSe.
+    Usa o trecho entre PACIENTE: (ou EXAME REALIZADO PELO PACIENTE:) e PARCERIA:.
+    """
+    if not discriminacao:
+        return ''
+    texto = re.sub(r'\s+', ' ', discriminacao.replace('\n', ' ')).strip()
+    inicio = _RE_INICIO_PACIENTE.search(texto)
+    if not inicio:
+        return ''
+    resto = texto[inicio.end():]
+    fim = _RE_FIM_PACIENTE.search(resto)
+    if not fim:
+        return ''
+    nome = resto[:fim.start()].strip(' /-')
+    nome = re.split(r'\s+CPF\s*:', nome, flags=re.I)[0].strip(' /-')
+    return nome
+
+
+def _nome_paciente_nota(nota: NotaFiscalServico) -> str:
+    """Nome do paciente na NF: prioriza discriminação (PACIENTE…PARCERIA), senão cliente."""
+    paciente = _extrair_paciente_discriminacao(nota.discriminacao)
+    if paciente:
+        return paciente
+    return (nota.cliente or '').strip()
+
+
+def _nota_coincide_paciente(nota: NotaFiscalServico, nome_paciente: str) -> bool:
+    if not (nome_paciente or '').strip() or nome_paciente == '-':
+        return False
+    paciente_nota = _nome_paciente_nota(nota)
+    if not paciente_nota:
+        return False
+    return _similaridade(nome_paciente, paciente_nota) >= SIMILARIDADE_MIN_PACIENTE
 
 
 def _forma_pagamento_nota(nota: NotaFiscalServico) -> str:
@@ -31,12 +78,14 @@ def _valor_fmt_nota(nota: NotaFiscalServico) -> str:
 def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict:
     forma = _forma_pagamento_nota(nota)
     numero = (nota.numero_nota or '').strip() or f'#{nota.pk}'
+    paciente_nota = _nome_paciente_nota(nota)
     return {
         'pk': nota.pk,
         'numero': numero,
         'url': reverse('notasfiscais:detail', args=[nota.pk]),
         'forma_pagamento': forma or '-',
         'cliente': (nota.cliente or '').strip() or '-',
+        'paciente_nota': paciente_nota or (nota.cliente or '').strip() or '-',
         'valor_fmt': _valor_fmt_nota(nota),
         'data_emissao_fmt': nota.data_emissao.strftime('%d/%m/%Y') if nota.data_emissao else '-',
         'manual': manual,
@@ -77,7 +126,7 @@ def buscar_notas_paciente(
     for offset in range(janela_dias + 1):
         dia = data_exame + timedelta(days=offset)
         for nota in notas_por_data.get(dia, []):
-            if _similaridade(nome_paciente, nota.cliente or '') >= SIMILARIDADE_MIN_PACIENTE:
+            if _nota_coincide_paciente(nota, nome_paciente):
                 matches.append(nota)
     matches.sort(key=lambda n: (abs((n.data_emissao - data_exame).days), n.numero_nota or ''))
     return matches
@@ -124,20 +173,25 @@ def _score_nota_vinculo(
     nome_paciente: str,
     termo: str,
 ) -> float:
-    """Pontua candidata: termo de busca (cliente/discriminação/NF) ou nome do paciente."""
+    """Pontua candidata: termo de busca ou nome do paciente (discriminação PACIENTE…PARCERIA)."""
     termo = (termo or '').strip()
     numero = (nota.numero_nota or '').strip()
     cliente = (nota.cliente or '').strip()
+    paciente_nota = _nome_paciente_nota(nota)
     discriminacao = (nota.discriminacao or '').strip()
 
     if termo:
         termo_upper = termo.upper()
         if termo in numero:
             return 1.0
+        if paciente_nota and termo_upper in paciente_nota.upper():
+            return 0.97
         if termo_upper in cliente.upper():
             return 0.95
         if termo_upper in discriminacao.upper():
             return 0.92
+        if paciente_nota and _similaridade(termo, paciente_nota) >= 0.75:
+            return max(0.88, _similaridade(termo, paciente_nota))
         sim_cliente = _similaridade(termo, cliente)
         if sim_cliente >= 0.75:
             return max(0.85, sim_cliente)
@@ -147,12 +201,14 @@ def _score_nota_vinculo(
         return 0.0
 
     if nome_paciente and nome_paciente != '-':
-        sim_cliente = _similaridade(nome_paciente, cliente)
-        if sim_cliente >= SIMILARIDADE_MIN_PACIENTE:
-            return sim_cliente
-        sim_disc = _similaridade(nome_paciente, discriminacao)
-        if sim_disc >= SIMILARIDADE_MIN_PACIENTE:
-            return sim_disc
+        if paciente_nota:
+            sim = _similaridade(nome_paciente, paciente_nota)
+            if sim >= SIMILARIDADE_MIN_PACIENTE:
+                return sim
+        if cliente:
+            sim_cliente = _similaridade(nome_paciente, cliente)
+            if sim_cliente >= SIMILARIDADE_MIN_PACIENTE:
+                return sim_cliente * 0.9
     return 0.0
 
 
