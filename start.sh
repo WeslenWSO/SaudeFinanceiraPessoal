@@ -4,16 +4,20 @@ set -o errexit
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
-python - <<'PY' || true
+python - <<'PY'
 import os
 import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
 django.setup()
 from django.conf import settings
 from django.contrib.auth.models import User
+from pathlib import Path
+media = Path(settings.MEDIA_ROOT)
+media.mkdir(parents=True, exist_ok=True)
 db = settings.DATABASES["default"]
 engine = db.get("ENGINE", "")
 host = db.get("HOST", "") or "(local)"
+print(f"[startup] MEDIA_ROOT={media} exists={media.is_dir()}")
 print(f"[startup] ENGINE={engine.split('.')[-1]} HOST={host}")
 print(f"[startup] auth_user count: {User.objects.count()}")
 PY

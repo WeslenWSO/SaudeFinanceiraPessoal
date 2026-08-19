@@ -29,3 +29,9 @@ services:
         value: https://financaspessoais-eloo.onrender.com
       - key: GEMINI_API_KEY
         sync: false
+      - key: MEDIA_ROOT
+        value: /var/data/media
+    disk:
+      name: media-uploads
+      mountPath: /var/data
+      sizeGB: 10
