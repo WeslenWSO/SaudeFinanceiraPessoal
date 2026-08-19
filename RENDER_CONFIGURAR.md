@@ -180,6 +180,21 @@ python manage.py diagnostico_banco --skip-checks
 
 4. Se faltar `saude`, use `garantir_usuario` (secao 7).
 
-### Opcional — disco persistente (uploads)
+### Opcional — disco persistente (uploads / PDFs)
 
-Arquivos em `media/` somem a cada redeploy no Render. No plano Standard voce pode anexar um **Disk** ao web service e montar em `/opt/render/project/src/media` (Settings -> Disks). So necessario se voce faz upload de PDFs/XMLs que precisam ficar guardados no servidor.
+Arquivos em `media/` somem a cada redeploy **sem** disco persistente. No plano Standard:
+
+1. Confirme `render.yaml` com disco em `/var/data` e `MEDIA_ROOT=/var/data/media`
+2. Dashboard -> **Blueprints** -> **Sync** **ou** **Disks** -> Add Disk -> mount `/var/data` (10 GB)
+3. Environment: `MEDIA_ROOT=/var/data/media`, `RENDER=true`
+4. **Manual Deploy** e confira nos logs: `[startup] MEDIA_ROOT=/var/data/media exists=True writable=True`
+
+Guia completo: [`RENDER_DISCO_MEDIA.md`](RENDER_DISCO_MEDIA.md)
+
+Shell:
+
+```bash
+python manage.py verificar_anexos_media
+```
+
+Anexos perdidos antes do disco: reenviar manualmente (lista com `--somente-faltando`).

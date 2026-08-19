@@ -31,6 +31,8 @@ services:
         sync: false
       - key: MEDIA_ROOT
         value: /var/data/media
+      - key: RENDER
+        value: "true"
     disk:
       name: media-uploads
       mountPath: /var/data

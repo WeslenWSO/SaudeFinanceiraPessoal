@@ -321,6 +321,16 @@ elif _on_render or _render_host:
 else:
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Storage S3/R2 (opcional, futuro): USE_S3_STORAGE=true + django-storages + AWS_* no Render.
+# Enquanto inativo, anexos usam FileField em MEDIA_ROOT (Render Disk /var/data/media).
+USE_S3_STORAGE = os.environ.get('USE_S3_STORAGE', '').strip().lower() in ('1', 'true', 'yes')
+if USE_S3_STORAGE:
+    # Requer: pip install django-storages[boto3] e variáveis AWS_STORAGE_BUCKET_NAME, etc.
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+    AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', '') or None
+
 # NFS-e ambiente nacional (SEFIN), mTLS com certificado A1 (.pfx) no servidor.
 # Variáveis de ambiente (opcionais; por empresa ver campos em Empresa):
 #   NFSE_NACIONAL_BASE_URL — produção: https://sefin.nfse.gov.br | homologação: https://sefin.producaorestrita.nfse.gov.br
