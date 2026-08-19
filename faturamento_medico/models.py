@@ -437,6 +437,9 @@ class ItemServico(models.Model):
         guia = ''
         if getattr(self, 'faturamento_id', None):
             guia = (self.faturamento.guia or '').strip()
+        from faturamento_medico.procedimento_utils import eh_procedimento_transvaginal
+        if eh_procedimento_transvaginal(self.servico):
+            return 'PENDENTE'
         if not guia:
             return 'FALTA DE GUIA'
         return 'PENDENTE'

@@ -4024,6 +4024,13 @@ def adicionar_item_servico(request, pk):
                         valor=valor,
                         qt=qt
                     )
+                    from faturamento_medico.services.transvaginal_lancamento import (
+                        separar_item_transvaginal,
+                    )
+                    item = faturamento.itens_servico.order_by('-id').first()
+                    if item:
+                        separar_item_transvaginal(item)
+                        faturamento = item.faturamento
                     # Atualiza o total do faturamento
                     faturamento.atualizar_total()
                     messages.success(request, 'Item de serviço adicionado com sucesso!')
@@ -5931,10 +5938,12 @@ def importar_ris(request):
                     linhas_canceladas += 1
 
                 medico_solicitante = _celula_texto(get(row, 'medico_solicitante'), 200) or ''
+                from faturamento_medico.procedimento_utils import eh_procedimento_transvaginal
+                flag_transvaginal = '1' if eh_procedimento_transvaginal(procedimento) else '0'
                 # Separa cancelados da lista principal no agrupamento
                 chave = (
                     f"{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|"
-                    f"{status_raw or 'ok'}|{medico_solicitante}"
+                    f"{status_raw or 'ok'}|{medico_solicitante}|tv{flag_transvaginal}"
                 )
                 modalidade = _celula_texto(get(row, 'modalidade'), 20)
                 agendado_via = _celula_texto(get(row, 'agendado_via'), 50) or 'RIS'

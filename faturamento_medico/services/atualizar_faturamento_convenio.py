@@ -13,6 +13,12 @@ from pathlib import Path
 from django.db.models import Q
 
 from faturamento_medico.models import FaturamentoMedico, ItemServico
+from faturamento_medico.procedimento_utils import eh_procedimento_transvaginal
+from faturamento_medico.services.transvaginal_lancamento import (
+    linha_planilha_sem_guia,
+    obter_faturamento_transvaginal,
+    separar_item_transvaginal,
+)
 
 CODIGO_MATERIAIS = '88888'
 CODIGO_MEDICAMENTO = '99999'
@@ -487,6 +493,8 @@ def _criar_item_faltante(
 ) -> ItemServico | None:
     codigo = _codigo_servico_linha(linha)
     servico = (linha.procedimento or '').strip()[:200]
+    if eh_procedimento_transvaginal(servico):
+        fat = obter_faturamento_transvaginal(fat)
     if dry_run:
         item = ItemServico(
             faturamento=fat,
@@ -635,6 +643,8 @@ def _valor_item(item: ItemServico) -> Decimal:
 
 def _aplicar_documentacao_faturamento(fat: FaturamentoMedico, linha: LinhaPlanilha) -> list[str]:
     """Atualiza guia, guia lançada, lote e protocolo no faturamento."""
+    if eh_procedimento_transvaginal(linha.procedimento):
+        linha = linha_planilha_sem_guia(linha)
     update_fields: list[str] = []
     if linha.guia and (fat.guia or '').strip() != linha.guia:
         fat.guia = linha.guia[:50]
@@ -666,6 +676,11 @@ def _aplicar_linha_item(
     ids_usados: set[int],
 ) -> None:
     fat: FaturamentoMedico = item.faturamento
+    if eh_procedimento_transvaginal(linha.procedimento):
+        linha = linha_planilha_sem_guia(linha)
+        if not dry_run:
+            item = separar_item_transvaginal(item)
+            fat = item.faturamento
     assoc = _associado_final(linha.paciente, linha.nome_associado)
     ja_conferido = item.status_conferencia == 'CONFERIDO' or item.conferido
     valor_atual = _valor_item(item)
