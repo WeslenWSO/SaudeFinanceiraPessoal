@@ -152,10 +152,10 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <select name="status_conferencia" class="form-control">
+                                <select name="status_conferencia" class="form-control" multiple title="Ctrl+clique para selecionar vários status">
                                     <option value="">Status Conferência (todos)</option>
                                     {% for value, label in status_conferencia_choices %}
-                                    <option value="{{ value }}" {% if filtros.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
+                                    <option value="{{ value }}" {% if value in filtros.status_conferencia %}selected{% endif %}>{{ label }}</option>
                                     {% endfor %}
                                 </select>
                             </div>

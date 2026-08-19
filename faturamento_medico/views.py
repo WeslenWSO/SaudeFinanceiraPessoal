@@ -115,6 +115,46 @@ def _q_status_agendamento_cancelados():
     return q
 
 
+def _normalizar_status_conferencia_filtro(valor):
+    """Converte string ou lista em lista de status de conferência."""
+    if not valor:
+        return []
+    if isinstance(valor, (list, tuple)):
+        return [str(s).strip() for s in valor if s and str(s).strip()]
+    s = str(valor).strip()
+    return [s] if s else []
+
+
+def _status_conferencia_linha_aceita(status_label, status_filtro):
+    """True se a linha passa no filtro (lista vazia = todos)."""
+    lista = _normalizar_status_conferencia_filtro(status_filtro)
+    if not lista:
+        return True
+    return (status_label or '').strip() in lista
+
+
+def _q_filtro_status_conferencia(status, empresa_id=None):
+    """Retorna Q para filtrar faturamentos por um status de conferência."""
+    status = (status or '').strip()
+    if not status:
+        return Q()
+    if status == 'CONFERIDO':
+        return (
+            Q(itens_servico__status_conferencia='CONFERIDO')
+            | Q(itens_servico__conferido=True)
+        ) & ~Q(itens_servico__status_conferencia='LOTE OK')
+    if status == 'LOTE OK':
+        ids_int = ids_lotes_internos(empresa_id) if empresa_id else set()
+        q_lote = Q(itens_servico__status_conferencia='LOTE OK')
+        if ids_int:
+            q_lote |= Q(itens_servico__conferido=True, lote__in=ids_int)
+        return q_lote
+    return Q(
+        itens_servico__status_conferencia=status,
+        itens_servico__conferido=False,
+    )
+
+
 def _filtros_listagem_faturamento(request, use_session_fallback=False):
     """Lê filtros da listagem (GET; opcionalmente complementa com sessão)."""
     g = request.GET
@@ -138,6 +178,13 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
     else:
         convenios = []
 
+    if 'status_conferencia' in g:
+        status_conferencia = _normalizar_status_conferencia_filtro(g.getlist('status_conferencia'))
+    elif use_session_fallback:
+        status_conferencia = _normalizar_status_conferencia_filtro(sess.get('status_conferencia'))
+    else:
+        status_conferencia = []
+
     hoje = date.today()
     data_inicio = pick('data_inicio')
     data_fim = pick('data_fim')
@@ -158,7 +205,7 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
         'guia': pick('guia'),
         'anestesista': pick('anestesista'),
         'status': pick('status'),
-        'status_conferencia': pick('status_conferencia'),
+        'status_conferencia': status_conferencia,
         'lote': pick('lote'),
         'data_inicio': data_inicio,
         'data_fim': data_fim,
@@ -171,12 +218,14 @@ def _query_export_faturamento(filtros):
     """Monta query string do export Excel a partir dos filtros efetivos da listagem."""
     params = []
     for key in (
-        'nome', 'guia', 'anestesista', 'status', 'status_conferencia', 'lote',
+        'nome', 'guia', 'anestesista', 'status', 'lote',
         'data_inicio', 'data_fim', 'codigo_relatorio',
     ):
         val = filtros.get(key)
         if val:
             params.append((key, val))
+    for st in _normalizar_status_conferencia_filtro(filtros.get('status_conferencia')):
+        params.append(('status_conferencia', st))
     for conv in filtros.get('convenios') or []:
         params.append(('convenio', conv))
     return urlencode(params)
@@ -204,7 +253,7 @@ def _filtros_dict_from_session(sess):
         'guia': sess.get('guia') or '',
         'anestesista': sess.get('anestesista') or '',
         'status': sess.get('status') or '',
-        'status_conferencia': sess.get('status_conferencia') or '',
+        'status_conferencia': _normalizar_status_conferencia_filtro(sess.get('status_conferencia')),
         'lote': sess.get('lote') or '',
         'data_inicio': sess.get('data_inicio') or '',
         'data_fim': sess.get('data_fim') or '',
@@ -227,7 +276,7 @@ def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
         'guia': filtros.get('guia') or '',
         'anestesista': filtros.get('anestesista') or '',
         'status': filtros.get('status') or '',
-        'status_conferencia': filtros.get('status_conferencia') or '',
+        'status_conferencia': _normalizar_status_conferencia_filtro(filtros.get('status_conferencia')),
         'lote': filtros.get('lote') or '',
         'data_inicio': filtros.get('data_inicio') or '',
         'data_fim': filtros.get('data_fim') or '',
@@ -260,7 +309,7 @@ def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
     guia = filtros.get('guia') or ''
     anestesista = filtros.get('anestesista') or ''
     status = filtros.get('status') or ''
-    status_conferencia = filtros.get('status_conferencia') or ''
+    status_conferencia = filtros.get('status_conferencia') or []
     lote = filtros.get('lote') or ''
     data_inicio = filtros.get('data_inicio') or ''
     data_fim = filtros.get('data_fim') or ''
@@ -295,22 +344,10 @@ def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
     qs = qs.exclude(_q_status_agendamento_cancelados())
 
     if status_conferencia:
-        if status_conferencia == 'CONFERIDO':
-            qs = qs.filter(
-                Q(itens_servico__status_conferencia='CONFERIDO')
-                | Q(itens_servico__conferido=True)
-            ).exclude(itens_servico__status_conferencia='LOTE OK').distinct()
-        elif status_conferencia == 'LOTE OK':
-            ids_int = ids_lotes_internos(empresa_id) if empresa_id else set()
-            q_lote = Q(itens_servico__status_conferencia='LOTE OK')
-            if ids_int:
-                q_lote |= Q(itens_servico__conferido=True, lote__in=ids_int)
-            qs = qs.filter(q_lote).distinct()
-        else:
-            qs = qs.filter(
-                itens_servico__status_conferencia=status_conferencia,
-                itens_servico__conferido=False,
-            ).distinct()
+        q_status = Q()
+        for st in _normalizar_status_conferencia_filtro(status_conferencia):
+            q_status |= _q_filtro_status_conferencia(st, empresa_id)
+        qs = qs.filter(q_status).distinct()
     return qs
 
 
@@ -2042,7 +2079,7 @@ def listar_faturamentos(request):
             status_label, status_css = _status_linha_faturamento(
                 faturamento, ids_internos=ids_lotes_int
             )
-            if status_conferencia and status_label != status_conferencia:
+            if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
             grid_linhas.append({
                 'faturamento': faturamento,
@@ -2074,7 +2111,7 @@ def listar_faturamentos(request):
             status_label, status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
             )
-            if status_conferencia and status_label != status_conferencia:
+            if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
             itens_filtrados.append((item, status_label, status_css))
         for idx, (item, status_label, status_css) in enumerate(itens_filtrados):
@@ -3685,7 +3722,7 @@ def exportar_excel(request):
     if status:
         filtros_excel.append(f"Status: {status}")
     if status_conferencia:
-        filtros_excel.append(f"Status Conferência: {status_conferencia}")
+        filtros_excel.append(f"Status Conferência: {', '.join(_normalizar_status_conferencia_filtro(status_conferencia))}")
     if lote == '__sem__':
         filtros_excel.append("Lote: Sem lote")
     elif lote:
@@ -3772,7 +3809,7 @@ def exportar_excel(request):
             status_label, _ = _status_linha_faturamento(
                 faturamento, ids_internos=ids_lotes_int
             )
-            if status_conferencia and status_label != status_conferencia:
+            if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
             itens = [None]
         else:
@@ -3781,7 +3818,7 @@ def exportar_excel(request):
                 status_label, _ = _status_linha_faturamento(
                     faturamento, item, ids_internos=ids_lotes_int
                 )
-                if status_conferencia and status_label != status_conferencia:
+                if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                     continue
                 itens_filtrados.append(item)
             if not itens_filtrados:
