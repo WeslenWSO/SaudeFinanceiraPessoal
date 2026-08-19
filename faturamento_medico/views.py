@@ -254,7 +254,7 @@ def _redirect_ftlistar_com_filtros_sessao(request):
     return redirect(_url_ftlistar_com_filtros_sessao(request))
 
 
-def _aplicar_filtros_faturamento_qs(qs, filtros):
+def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
     """Aplica os mesmos filtros da listagem ao queryset de faturamentos."""
     nome = filtros.get('nome') or ''
     guia = filtros.get('guia') or ''
@@ -302,10 +302,10 @@ def _aplicar_filtros_faturamento_qs(qs, filtros):
             ).exclude(itens_servico__status_conferencia='LOTE OK').distinct()
         elif status_conferencia == 'LOTE OK':
             ids_int = ids_lotes_internos(empresa_id) if empresa_id else set()
-            qs = qs.filter(
-                Q(itens_servico__status_conferencia='LOTE OK')
-                | Q(itens_servico__conferido=True, lote__in=ids_int)
-            ).distinct()
+            q_lote = Q(itens_servico__status_conferencia='LOTE OK')
+            if ids_int:
+                q_lote |= Q(itens_servico__conferido=True, lote__in=ids_int)
+            qs = qs.filter(q_lote).distinct()
         else:
             qs = qs.filter(
                 itens_servico__status_conferencia=status_conferencia,
@@ -1919,7 +1919,7 @@ def listar_faturamentos(request):
         faturamentos = FaturamentoMedico.objects.all().order_by('-data')
 
     filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
-    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
+    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros, empresa_id=empresa_id)
     nome = filtros['nome']
     guia = filtros['guia']
     anestesista = filtros['anestesista']
@@ -3595,7 +3595,7 @@ def exportar_excel(request):
         faturamentos = FaturamentoMedico.objects.none()
 
     filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
-    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros)
+    faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros, empresa_id=empresa_id)
     nome = filtros['nome']
     guia = filtros['guia']
     anestesista = filtros['anestesista']
