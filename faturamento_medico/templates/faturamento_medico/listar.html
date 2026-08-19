@@ -256,7 +256,7 @@
                                 </thead>
                                 <tbody>
                                     {% for linha in grid_linhas %}
-                                    <tr class="{% if linha.destacar_linha_nota_lote %}row-com-nota-lote{% elif linha.conferido %}table-success{% elif linha.status_conferencia == 'FALTA TABELA DE CONTRASTE' %}row-status-contraste{% endif %}"
+                                    <tr class="{% if linha.destacar_linha_nota_lote %}row-com-nota-lote{% elif linha.status_conferencia == 'LOTE OK' %}table-primary{% elif linha.conferido %}table-success{% elif linha.status_conferencia == 'FALTA TABELA DE CONTRASTE' %}row-status-contraste{% endif %}"
                                         data-status="{{ linha.status_conferencia }}"
                                         data-status-css="{{ linha.status_conferencia_css }}"
                                         data-destacar-nota-lote="{% if linha.destacar_linha_nota_lote %}1{% else %}0{% endif %}">
@@ -793,6 +793,15 @@
     background-color: #d1e7dd;
     border-color: #198754;
     color: #0f5132;
+}
+.grid-ris .status-conferencia-select.status-lote-ok,
+.grid-ris .badge-lote-ok {
+    background-color: #cfe2ff;
+    border-color: #0d6efd;
+    color: #084298;
+}
+.grid-ris .status-conferencia-select.status-lote-ok {
+    font-weight: 700;
 }
 .grid-ris .status-conferencia-select.status-danger {
     background-color: #f8d7da;

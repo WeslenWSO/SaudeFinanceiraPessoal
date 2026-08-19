@@ -23,7 +23,12 @@ from collections import defaultdict
 from datetime import datetime, date, timedelta
 from difflib import SequenceMatcher
 from urllib.parse import urlencode
-from .lote_utils import faturamento_elegivel_lote, faturamento_tem_lote_interno, ids_lotes_internos
+from .lote_utils import (
+    faturamento_elegivel_lote,
+    faturamento_tem_lote_interno,
+    ids_lotes_internos,
+    marcar_itens_faturamento_lote_ok,
+)
 from servicos_medicos.models import Convenio
 from empresa.models import Empresa
 from .forms import (
@@ -294,6 +299,12 @@ def _aplicar_filtros_faturamento_qs(qs, filtros):
             qs = qs.filter(
                 Q(itens_servico__status_conferencia='CONFERIDO')
                 | Q(itens_servico__conferido=True)
+            ).exclude(itens_servico__status_conferencia='LOTE OK').distinct()
+        elif status_conferencia == 'LOTE OK':
+            ids_int = ids_lotes_internos(empresa_id) if empresa_id else set()
+            qs = qs.filter(
+                Q(itens_servico__status_conferencia='LOTE OK')
+                | Q(itens_servico__conferido=True, lote__in=ids_int)
             ).distinct()
         else:
             qs = qs.filter(
@@ -367,9 +378,15 @@ def _stats_de_grid_linhas(grid_linhas):
     }
 
 
-def _status_linha_faturamento(faturamento, item=None):
+def _status_linha_faturamento(faturamento, item=None, ids_internos=None):
+    tem_lote = faturamento_tem_lote_interno(faturamento, ids_internos=ids_internos)
     if item is not None:
-        return item.status_conferencia_badge()
+        status_label, status_css = item.status_conferencia_badge()
+        if tem_lote and (
+            status_label in ('CONFERIDO', 'LOTE OK') or item.conferido
+        ):
+            return 'LOTE OK', ItemServico.STATUS_CONFERENCIA_CSS['LOTE OK']
+        return status_label, status_css
     if not (faturamento.guia or '').strip():
         return 'FALTA DE GUIA', 'warning'
     if not faturamento.total:
@@ -2022,7 +2039,9 @@ def listar_faturamentos(request):
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
         if not itens:
-            status_label, status_css = _status_linha_faturamento(faturamento)
+            status_label, status_css = _status_linha_faturamento(
+                faturamento, ids_internos=ids_lotes_int
+            )
             if status_conferencia and status_label != status_conferencia:
                 continue
             grid_linhas.append({
@@ -2052,7 +2071,9 @@ def listar_faturamentos(request):
             continue
         itens_filtrados = []
         for item in itens:
-            status_label, status_css = _status_linha_faturamento(faturamento, item)
+            status_label, status_css = _status_linha_faturamento(
+                faturamento, item, ids_internos=ids_lotes_int
+            )
             if status_conferencia and status_label != status_conferencia:
                 continue
             itens_filtrados.append((item, status_label, status_css))
@@ -2602,6 +2623,7 @@ def listar_exames_por_solicitante(request):
 
     grid_linhas = []
     incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel)
+    ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     notas_por_data = {}
@@ -2642,7 +2664,9 @@ def listar_exames_por_solicitante(request):
             _acumular_card(modalidade, valor)
             if not incluir_lista_detalhada:
                 return
-            status_label, status_css = _status_linha_faturamento(faturamento, item)
+            status_label, status_css = _status_linha_faturamento(
+                faturamento, item, ids_internos=ids_lotes_int
+            )
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             notas_vinculadas = []
             if notas_por_data is not None:
@@ -3741,17 +3765,22 @@ def exportar_excel(request):
         cell.fill = header_fill
 
     row_num = 8
+    ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
         if not itens:
-            status_label, _ = _status_linha_faturamento(faturamento)
+            status_label, _ = _status_linha_faturamento(
+                faturamento, ids_internos=ids_lotes_int
+            )
             if status_conferencia and status_label != status_conferencia:
                 continue
             itens = [None]
         else:
             itens_filtrados = []
             for item in itens:
-                status_label, _ = _status_linha_faturamento(faturamento, item)
+                status_label, _ = _status_linha_faturamento(
+                    faturamento, item, ids_internos=ids_lotes_int
+                )
                 if status_conferencia and status_label != status_conferencia:
                     continue
                 itens_filtrados.append(item)
@@ -3761,7 +3790,9 @@ def exportar_excel(request):
 
         for item in itens:
             if item is not None:
-                status_label, _ = item.status_conferencia_badge()
+                status_label, _ = _status_linha_faturamento(
+                    faturamento, item, ids_internos=ids_lotes_int
+                )
                 conferido = 'Sim' if item.conferido else 'Não'
                 procedimento = item.servico or ''
                 modalidade = item.modalidade or ''
@@ -5022,6 +5053,8 @@ def gerar_lote(request):
                 updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(
                     lote=str(lote_existente.id), status='aguardando_pagamento'
                 )
+                for fat in FaturamentoMedico.objects.filter(id__in=fat_ids):
+                    marcar_itens_faturamento_lote_ok(fat)
                 logger.info(f"Faturamentos adicionados ao lote {lote_existente.id}: {updated}")
             except Exception as e:
                 logger.error(f"Erro ao adicionar faturamentos ao lote {lote_existente.id}: {e}")
@@ -5101,6 +5134,8 @@ def gerar_lote(request):
                     updated = FaturamentoMedico.objects.filter(id__in=fat_ids).update(
                         lote=str(lote.id), status='aguardando_pagamento'
                     )
+                    for fat in FaturamentoMedico.objects.filter(id__in=fat_ids):
+                        marcar_itens_faturamento_lote_ok(fat)
                     logger.info(f"Faturamentos atualizados para lote {lote.id}: {updated}")
                 except Exception as e:
                     logger.error(f"Erro ao atualizar faturamentos para lote {lote.id}: {e}")
@@ -6144,8 +6179,11 @@ def toggle_conferencia_item(request, pk):
         item.conferido = not item.conferido
 
     if item.conferido:
-        item.status_conferencia = 'CONFERIDO'
-    elif item.status_conferencia == 'CONFERIDO':
+        if faturamento_tem_lote_interno(item.faturamento):
+            item.status_conferencia = 'LOTE OK'
+        else:
+            item.status_conferencia = 'CONFERIDO'
+    elif item.status_conferencia in ('CONFERIDO', 'LOTE OK'):
         item.status_conferencia = 'PENDENTE'
 
     item.save(update_fields=['conferido', 'status_conferencia', 'total'])

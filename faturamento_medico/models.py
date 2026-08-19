@@ -358,6 +358,7 @@ class ItemServico(models.Model):
     STATUS_CONFERENCIA_CHOICES = [
         ('PENDENTE', 'PENDENTE'),
         ('CONFERIDO', 'CONFERIDO'),
+        ('LOTE OK', 'LOTE OK'),
         ('FALTA DE GUIA', 'FALTA DE GUIA'),
         ('FALTA DE VALOR NA TABELA', 'FALTA DE VALOR NA TABELA'),
         ('FALTA TABELA DE CONTRASTE', 'FALTA TABELA DE CONTRASTE'),
@@ -365,6 +366,7 @@ class ItemServico(models.Model):
     ]
     STATUS_CONFERENCIA_CSS = {
         'CONFERIDO': 'success',
+        'LOTE OK': 'lote-ok',
         'FALTA DE GUIA': 'warning',
         'FALTA DE VALOR NA TABELA': 'danger',
         'FALTA TABELA DE CONTRASTE': 'contraste',
@@ -406,7 +408,7 @@ class ItemServico(models.Model):
         """Calcula o total automaticamente"""
         from decimal import Decimal
         self.total = Decimal(self.qt) * Decimal(str(self.valor)) * Decimal(str(self.percentual))
-        if self.conferido:
+        if self.conferido and (self.status_conferencia or '').strip() != 'LOTE OK':
             self.status_conferencia = 'CONFERIDO'
             update_fields = kwargs.get('update_fields')
             if update_fields is not None:
@@ -420,7 +422,7 @@ class ItemServico(models.Model):
         quando o status armazenado for vazio.
         """
         status = (self.status_conferencia or '').strip() or 'PENDENTE'
-        if self.conferido:
+        if self.conferido and status != 'LOTE OK':
             status = 'CONFERIDO'
         css = self.STATUS_CONFERENCIA_CSS.get(status, 'secondary')
         return (status, css)
@@ -446,7 +448,7 @@ class ItemServico(models.Model):
         if status not in validos:
             status = 'PENDENTE'
         self.status_conferencia = status
-        self.conferido = (status == 'CONFERIDO')
+        self.conferido = status in ('CONFERIDO', 'LOTE OK')
         self.save(update_fields=['status_conferencia', 'conferido'])
         return self.status_conferencia_badge()
 

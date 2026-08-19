@@ -12,6 +12,7 @@ from faturamento_medico.lote_utils import (
     faturamento_elegivel_lote,
     faturamento_tem_lote_interno,
     ids_lotes_internos,
+    marcar_itens_faturamento_lote_ok,
 )
 from faturamento_medico.models import FaturamentoMedico, ItemServico, Lote
 
@@ -19,14 +20,14 @@ from faturamento_medico.models import FaturamentoMedico, ItemServico, Lote
 def _valor_conferido_faturamento(fat: FaturamentoMedico) -> Decimal:
     total = (
         ItemServico.objects.filter(faturamento=fat)
-        .filter(Q(conferido=True) | Q(status_conferencia='CONFERIDO'))
+        .filter(Q(conferido=True) | Q(status_conferencia__in=('CONFERIDO', 'LOTE OK')))
         .aggregate(s=Sum('total'))['s']
     )
     if total is not None:
         return Decimal(str(total))
     total = (
         ItemServico.objects.filter(faturamento=fat)
-        .filter(Q(conferido=True) | Q(status_conferencia='CONFERIDO'))
+        .filter(Q(conferido=True) | Q(status_conferencia__in=('CONFERIDO', 'LOTE OK')))
         .aggregate(s=Sum('valor'))['s']
     )
     return Decimal(str(total or 0))
@@ -125,6 +126,7 @@ def _criar_lotes_dos_grupos(
                 fat.lote = str(lote_existente.id)
                 fat.status = 'aguardando_pagamento'
                 fat.save(update_fields=['lote', 'status'])
+                marcar_itens_faturamento_lote_ok(fat)
             lote_existente.atualizar_total()
             lote_existente.sincronizar_extrato_pagamento(lote_convenio=lote_conv, protocolo=protocolo)
             stats['lotes_criados'].append(lote_existente.id)
@@ -139,6 +141,7 @@ def _criar_lotes_dos_grupos(
             fat.lote = str(lote.id)
             fat.status = 'aguardando_pagamento'
             fat.save(update_fields=['lote', 'status'])
+            marcar_itens_faturamento_lote_ok(fat)
         lote.total_lote = valor
         lote.save(update_fields=['total_lote'])
         lote.sincronizar_extrato_pagamento(lote_convenio=lote_conv, protocolo=protocolo)

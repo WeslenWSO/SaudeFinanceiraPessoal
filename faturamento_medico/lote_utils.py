@@ -145,3 +145,24 @@ def faturamento_elegivel_lote(faturamento: FaturamentoMedico, *, ids_internos: s
     if faturamento_tem_lote_interno(faturamento, ids_internos=ids_internos):
         return False
     return faturamento.itens_servico.filter(conferido=True).exists()
+
+
+def marcar_itens_faturamento_lote_ok(faturamento: FaturamentoMedico) -> int:
+    """Marca itens conferidos como LOTE OK após vincular lote interno."""
+    from django.db.models import Q
+
+    from .models import ItemServico
+
+    atualizados = 0
+    qs = ItemServico.objects.filter(faturamento=faturamento).filter(
+        Q(conferido=True)
+        | Q(status_conferencia__in=('CONFERIDO', 'LOTE OK'))
+    )
+    for item in qs:
+        if item.status_conferencia == 'LOTE OK' and item.conferido:
+            continue
+        item.status_conferencia = 'LOTE OK'
+        item.conferido = True
+        item.save(update_fields=['status_conferencia', 'conferido'])
+        atualizados += 1
+    return atualizados
