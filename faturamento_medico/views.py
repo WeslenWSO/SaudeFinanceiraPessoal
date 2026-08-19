@@ -4690,17 +4690,29 @@ def selecionar_lote_imprimir(request):
         Lote.objects.filter(empresa_id=empresa_id, baixado=False)
         .prefetch_related('linhas_extrato_pagamento')
         .order_by('-id')
+        .distinct()
     )
-    context = {'lotes': lotes}
+    from faturamento_medico.lote_utils import agrupar_lotes_para_impressao
+
+    lotes_grupo = agrupar_lotes_para_impressao(lotes)
+    context = {'lotes': lotes, 'lotes_grupo': lotes_grupo}
     return render(request, 'faturamento_medico/selecionar_lote_imprimir.html', context)
 
 
 def imprimir_lote(request, lote_id):
     """View para imprimir relatório de lote em HTML (layout padrão)."""
+    from faturamento_medico.lote_utils import parse_lote_ids
+
+    lote_ids_raw = request.GET.get('lote_ids') or request.GET.get('lote_id')
     if lote_id == 0:
-        lote_id = request.GET.get('lote_id')
-        if not lote_id:
+        if not lote_ids_raw:
             return HttpResponse('Lote não selecionado')
+    elif not lote_ids_raw:
+        lote_ids_raw = str(lote_id)
+
+    lote_ids = parse_lote_ids(lote_ids_raw)
+    if not lote_ids:
+        return HttpResponse('Lote não selecionado')
 
     empresa_id = request.GET.get('empresa_id') or request.session.get('empresa_id')
     if not empresa_id:
@@ -4709,7 +4721,9 @@ def imprimir_lote(request, lote_id):
     from .lote_relatorio import montar_contexto_relatorio_lote
 
     try:
-        context = montar_contexto_relatorio_lote(lote_id, empresa_id, layout='padrao')
+        context = montar_contexto_relatorio_lote(
+            lote_ids[0], empresa_id, layout='padrao', lote_ids=lote_ids,
+        )
     except Lote.DoesNotExist:
         return HttpResponse('Lote não encontrado')
     except PermissionError:
@@ -4720,10 +4734,18 @@ def imprimir_lote(request, lote_id):
 
 def imprimir_lote_convenio_publico(request, lote_id):
     """Relatório de lote — layout para FUSEX, PM, Bombeiro e PP Saúde."""
+    from faturamento_medico.lote_utils import parse_lote_ids
+
+    lote_ids_raw = request.GET.get('lote_ids') or request.GET.get('lote_id')
     if lote_id == 0:
-        lote_id = request.GET.get('lote_id')
-        if not lote_id:
+        if not lote_ids_raw:
             return HttpResponse('Lote não selecionado')
+    elif not lote_ids_raw:
+        lote_ids_raw = str(lote_id)
+
+    lote_ids = parse_lote_ids(lote_ids_raw)
+    if not lote_ids:
+        return HttpResponse('Lote não selecionado')
 
     empresa_id = request.GET.get('empresa_id') or request.session.get('empresa_id')
     if not empresa_id:
@@ -4732,7 +4754,9 @@ def imprimir_lote_convenio_publico(request, lote_id):
     from .lote_relatorio import montar_contexto_relatorio_lote
 
     try:
-        context = montar_contexto_relatorio_lote(lote_id, empresa_id, layout='publico')
+        context = montar_contexto_relatorio_lote(
+            lote_ids[0], empresa_id, layout='publico', lote_ids=lote_ids,
+        )
     except Lote.DoesNotExist:
         return HttpResponse('Lote não encontrado')
     except PermissionError:

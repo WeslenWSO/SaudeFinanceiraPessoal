@@ -8,6 +8,7 @@ from decimal import Decimal
 from django.db.models import Q, Sum
 
 from faturamento_medico.lote_utils import (
+    buscar_lote_interno_aberto_por_extrato,
     faturamento_elegivel_lote,
     faturamento_tem_lote_interno,
     ids_lotes_internos,
@@ -110,6 +111,26 @@ def _criar_lotes_dos_grupos(
             stats['detalhes'].append(
                 f'DRY-RUN lote conv. {lote_conv} | protocolo {protocolo} | '
                 f'{len(fats)} guia(s) | R$ {valor:.2f}'
+            )
+            continue
+
+        lote_existente = buscar_lote_interno_aberto_por_extrato(
+            empresa_id=empresa_id,
+            convenio=convenio_nome,
+            lote_convenio=lote_conv,
+            protocolo=protocolo,
+        )
+        if lote_existente:
+            for fat in fats:
+                fat.lote = str(lote_existente.id)
+                fat.status = 'aguardando_pagamento'
+                fat.save(update_fields=['lote', 'status'])
+            lote_existente.atualizar_total()
+            lote_existente.sincronizar_extrato_pagamento(lote_convenio=lote_conv, protocolo=protocolo)
+            stats['lotes_criados'].append(lote_existente.id)
+            stats['detalhes'].append(
+                f'Lote interno #{lote_existente.id} (existente) | lote conv. {lote_conv} | '
+                f'protocolo {protocolo} | +{len(fats)} guia(s) | R$ {lote_existente.total_lote:.2f}'
             )
             continue
 

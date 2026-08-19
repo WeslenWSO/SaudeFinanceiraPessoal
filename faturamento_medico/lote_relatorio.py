@@ -80,6 +80,14 @@ def _validar_acesso_lote(lote_id, empresa_id):
     return lote
 
 
+def _validar_acesso_lotes(lote_ids, empresa_id):
+    ids = [int(i) for i in lote_ids]
+    lotes = list(Lote.objects.filter(id__in=ids, empresa_id=int(empresa_id)).order_by('-id'))
+    if len(lotes) != len(ids):
+        raise Lote.DoesNotExist
+    return lotes
+
+
 def _modalidade_item(faturamento, item=None):
     if item and item.modalidade:
         return item.modalidade
@@ -165,11 +173,18 @@ def _local_empresa(empresa):
     return endereco.splitlines()[0].strip()
 
 
-def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao'):
-    lote = _validar_acesso_lote(lote_id, empresa_id)
+def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote_ids=None):
+    from .lote_utils import parse_lote_ids
+
+    ids = parse_lote_ids(lote_ids) if lote_ids else parse_lote_ids(lote_id)
+    if not ids:
+        raise Lote.DoesNotExist
+    lotes = _validar_acesso_lotes(ids, empresa_id)
+    lote = lotes[0]
     empresa = Empresa.objects.get(id=empresa_id)
 
-    faturamentos = FaturamentoMedico.objects.filter(lote=str(lote.id)).order_by('data', 'guia', 'nome')
+    chaves_lote = [str(lid) for lid in ids]
+    faturamentos = FaturamentoMedico.objects.filter(lote__in=chaves_lote).order_by('data', 'guia', 'nome')
     items = (
         ItemServico.objects.filter(faturamento__in=faturamentos)
         .select_related('faturamento')

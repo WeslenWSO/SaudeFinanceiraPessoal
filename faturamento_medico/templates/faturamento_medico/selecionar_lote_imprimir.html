@@ -12,21 +12,22 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="lote_id" class="form-label">Selecione o Lote:</label>
-                        <select id="lote_id" class="form-select" required {% if not lotes %}disabled{% endif %}>
-                            {% for lote in lotes %}
-                            {% with extrato=lote.linhas_extrato_pagamento.first %}
-                            <option value="{{ lote.id }}" data-convenio="{{ lote.convenio|default:'' }}">
-                                Lote {{ lote.id }} - {{ lote.convenio }}
-                                {% if extrato and extrato.protocolo %}| prot. {{ extrato.protocolo }}{% endif %}
-                                {% if extrato and extrato.lote %}| lote conv. {{ extrato.lote }}{% endif %}
-                                (R$ {{ lote.total_lote|moeda_br }})
+                        <select id="lote_id" class="form-select" required {% if not lotes_grupo %}disabled{% endif %}>
+                            {% for grupo in lotes_grupo %}
+                            <option value="{{ grupo.lote_ids_csv }}" data-convenio="{{ grupo.convenio|default:'' }}">
+                                Lote {{ grupo.lote_id_label }} - {{ grupo.convenio }}
+                                {% if grupo.protocolo %}| prot. {{ grupo.protocolo }}{% endif %}
+                                {% if grupo.lote_convenio %}| lote conv. {{ grupo.lote_convenio }}{% endif %}
+                                {% if grupo.qtd_lotes > 1 %}
+                                · {{ grupo.qtd_lotes }} lotes agrupados
+                                {% endif %}
+                                (R$ {{ grupo.total|moeda_br }})
                             </option>
-                            {% endwith %}
                             {% empty %}
                             <option value="">Nenhum lote pendente de impressão</option>
                             {% endfor %}
                         </select>
-                        {% if not lotes %}
+                        {% if not lotes_grupo %}
                         <p class="text-muted small mt-2 mb-0">
                             Todos os lotes foram recebidos e baixados, ou ainda não há lotes cadastrados.
                         </p>
@@ -36,16 +37,16 @@
                     <div class="d-flex flex-wrap gap-2 align-items-start">
                         <form method="get" id="form-imprimir-padrao" action="{% url 'faturamento_medico:imprimir_lote' 0 %}" target="_blank" class="d-inline">
                             <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
-                            <input type="hidden" name="lote_id" id="lote_id_padrao" value="">
-                            <button type="submit" class="btn btn-primary" {% if not lotes %}disabled{% endif %}>
+                            <input type="hidden" name="lote_ids" id="lote_ids_padrao" value="">
+                            <button type="submit" class="btn btn-primary" {% if not lotes_grupo %}disabled{% endif %}>
                                 <i class="fas fa-print"></i> Imprimir Relatório
                             </button>
                         </form>
 
                         <form method="get" id="form-imprimir-publico" action="{% url 'faturamento_medico:imprimir_lote_convenio_publico' 0 %}" target="_blank" class="d-inline">
                             <input type="hidden" name="empresa_id" value="{{ request.session.empresa_id }}">
-                            <input type="hidden" name="lote_id" id="lote_id_publico" value="">
-                            <button type="submit" class="btn btn-success" {% if not lotes %}disabled{% endif %}>
+                            <input type="hidden" name="lote_ids" id="lote_ids_publico" value="">
+                            <button type="submit" class="btn btn-success" {% if not lotes_grupo %}disabled{% endif %}>
                                 <i class="fas fa-file-medical"></i> Imprimir Relatório (Convênio Público)
                             </button>
                         </form>
@@ -87,8 +88,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const select = document.getElementById('lote_id');
-    const hiddenPadrao = document.getElementById('lote_id_padrao');
-    const hiddenPublico = document.getElementById('lote_id_publico');
+    const hiddenPadrao = document.getElementById('lote_ids_padrao');
+    const hiddenPublico = document.getElementById('lote_ids_publico');
 
     function syncLoteId() {
         const val = select.value;
