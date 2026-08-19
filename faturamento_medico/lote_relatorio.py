@@ -173,29 +173,39 @@ def _local_empresa(empresa):
     return endereco.splitlines()[0].strip()
 
 
-def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote_ids=None):
-    from .lote_utils import parse_lote_ids
+def _protocolo_lote(lote: Lote) -> str:
+    extrato = lote.linhas_extrato_pagamento.first()
+    if extrato and (extrato.protocolo or '').strip():
+        return extrato.protocolo.strip()
+    prot = (
+        FaturamentoMedico.objects.filter(lote=str(lote.id))
+        .exclude(guia_lancada__isnull=True)
+        .exclude(guia_lancada='')
+        .values_list('guia_lancada', flat=True)
+        .first()
+    )
+    return (prot or '').strip()
 
-    ids = parse_lote_ids(lote_ids) if lote_ids else parse_lote_ids(lote_id)
-    if not ids:
-        raise Lote.DoesNotExist
-    lotes = _validar_acesso_lotes(ids, empresa_id)
-    lote = lotes[0]
-    empresa = Empresa.objects.get(id=empresa_id)
 
-    chaves_lote = [str(lid) for lid in ids]
-    faturamentos = FaturamentoMedico.objects.filter(lote__in=chaves_lote).order_by('data', 'guia', 'nome')
+def _lote_convenio_lote(lote: Lote) -> str:
+    extrato = lote.linhas_extrato_pagamento.first()
+    if extrato and (extrato.lote or '').strip():
+        return extrato.lote.strip()
+    return ''
+
+
+def _montar_secao_lote(lote: Lote, *, layout: str):
+    chave = str(lote.id)
+    faturamentos = FaturamentoMedico.objects.filter(lote=chave).order_by('data', 'guia', 'nome')
     items = (
         ItemServico.objects.filter(faturamento__in=faturamentos)
         .select_related('faturamento')
         .order_by('faturamento__data', 'faturamento__nome', 'faturamento__guia', 'id')
     )
-
     periodo_inicio = faturamentos.aggregate(min_data=Min('data'))['min_data']
     periodo_fim = faturamentos.aggregate(max_data=Max('data'))['max_data']
     total_geral = Decimal('0')
     resumo_publico = None
-    mes_referencia = _mes_referencia_label(periodo_fim or lote.data_lote)
 
     if layout == 'publico':
         linhas = []
@@ -216,25 +226,65 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote
             total_geral += valor_item
         resumo_publico = _montar_resumo_publico(linhas)
         grouped_rows = linhas
+        grouped_items = OrderedDict()
     else:
         grouped_items = OrderedDict()
         for item in items:
             beneficiario = item.faturamento.nome or 'Sem Nome'
             grouped_items.setdefault(beneficiario, []).append(item)
             total_geral += item.total or Decimal('0')
-        grouped_rows = grouped_items
+        grouped_rows = []
+        linhas = []
 
     return {
         'lote': lote,
+        'protocolo': _protocolo_lote(lote),
+        'lote_convenio': _lote_convenio_lote(lote),
+        'periodo_inicio': periodo_inicio,
+        'periodo_fim': periodo_fim,
+        'mes_referencia': _mes_referencia_label(periodo_fim or lote.data_lote),
+        'grouped_items': grouped_items,
+        'linhas': grouped_rows if layout == 'publico' else linhas,
+        'resumo_publico': resumo_publico,
+        'total_geral': total_geral,
+    }
+
+
+def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote_ids=None):
+    from .lote_utils import parse_lote_ids
+
+    ids = parse_lote_ids(lote_ids) if lote_ids else parse_lote_ids(lote_id)
+    if not ids:
+        raise Lote.DoesNotExist
+    lotes = _validar_acesso_lotes(ids, empresa_id)
+    lote = lotes[0]
+    empresa = Empresa.objects.get(id=empresa_id)
+
+    secoes = [_montar_secao_lote(lt, layout=layout) for lt in lotes]
+    primeira = secoes[0]
+    total_geral = sum((s['total_geral'] for s in secoes), Decimal('0'))
+    periodo_inicio = min(
+        (s['periodo_inicio'] for s in secoes if s['periodo_inicio']),
+        default=None,
+    )
+    periodo_fim = max(
+        (s['periodo_fim'] for s in secoes if s['periodo_fim']),
+        default=None,
+    )
+
+    return {
+        'lote': lote,
+        'secoes': secoes,
         'empresa': empresa,
         'convenio_nome': lote.convenio or '',
         'local_relatorio': _local_empresa(empresa),
         'periodo_inicio': periodo_inicio,
         'periodo_fim': periodo_fim,
-        'mes_referencia': mes_referencia,
-        'grouped_items': grouped_rows if layout == 'publico' else grouped_items,
-        'linhas': grouped_rows if layout == 'publico' else [],
-        'resumo_publico': resumo_publico,
+        'mes_referencia': _mes_referencia_label(periodo_fim or lote.data_lote),
+        'protocolo': primeira['protocolo'],
+        'grouped_items': primeira['grouped_items'],
+        'linhas': primeira['linhas'],
+        'resumo_publico': primeira['resumo_publico'],
         'total_geral': total_geral,
         'data_emissao_relatorio': timezone.now().date(),
         'layout': layout,

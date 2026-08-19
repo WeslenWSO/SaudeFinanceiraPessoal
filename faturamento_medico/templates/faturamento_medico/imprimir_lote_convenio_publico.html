@@ -166,112 +166,126 @@
             font-size: 10px;
             color: #333;
         }
+        .secao-lote + .secao-lote {
+            page-break-before: always;
+            margin-top: 24px;
+        }
         @media print {
             body { margin: 0; }
             .no-print { display: none; }
+            .secao-lote + .secao-lote {
+                page-break-before: always;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="top-banner">{{ empresa.razao }}</div>
+    {% for secao in secoes %}
+    <section class="secao-lote">
+        <div class="top-banner">{{ empresa.razao }}</div>
 
-    <div class="titulo-relatorio">
-        <h1>Controle de Exames — {{ convenio_nome|default:"Convênio" }}</h1>
-        <h2>Mês de referência: {{ mes_referencia|default:"—" }}</h2>
-    </div>
-    <p class="meta-lote">
-        Lote {{ lote.id }}
-        {% if periodo_inicio and periodo_fim %}
-            · Período {{ periodo_inicio|date:"d/m/Y" }} a {{ periodo_fim|date:"d/m/Y" }}
-        {% endif %}
-        · Emissão {{ data_emissao_relatorio|date:"d/m/Y" }}
-    </p>
+        <div class="titulo-relatorio">
+            <h1>Controle de Exames — {{ convenio_nome|default:"Convênio" }}</h1>
+            <h2>Mês de referência: {{ secao.mes_referencia|default:"—" }}</h2>
+        </div>
+        <p class="meta-lote">
+            Lote {{ secao.lote.id }}
+            · Protocolo {{ secao.protocolo|default:"—" }}
+            {% if secao.periodo_inicio and secao.periodo_fim %}
+                · Período {{ secao.periodo_inicio|date:"d/m/Y" }} a {{ secao.periodo_fim|date:"d/m/Y" }}
+            {% endif %}
+            · Emissão {{ data_emissao_relatorio|date:"d/m/Y" }}
+        </p>
 
-    <table class="dados">
-        <thead>
-            <tr>
-                <th class="col-data">Data</th>
-                <th>Paciente</th>
-                {% if coluna_terceira_guia %}
-                <th>Número da Guia</th>
-                {% else %}
-                <th>Nome Associado</th>
+        <table class="dados">
+            <thead>
+                <tr>
+                    <th class="col-data">Data</th>
+                    <th>Paciente</th>
+                    {% if coluna_terceira_guia %}
+                    <th>Número da Guia</th>
+                    {% else %}
+                    <th>Nome Associado</th>
+                    {% endif %}
+                    <th>Procedimento</th>
+                    <th class="col-modalidade">Modalidade</th>
+                    <th class="col-contraste">Contraste</th>
+                    <th class="col-valor">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in secao.linhas %}
+                <tr>
+                    <td class="col-data">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                    <td>{{ linha.paciente }}</td>
+                    {% if coluna_terceira_guia %}
+                    <td>{{ linha.numero_guia }}</td>
+                    {% else %}
+                    <td>{{ linha.nome_associado }}</td>
+                    {% endif %}
+                    <td>{{ linha.procedimento }}</td>
+                    <td class="col-modalidade">{{ linha.modalidade }}</td>
+                    <td class="col-contraste">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                    <td class="col-valor">R$ {{ linha.valor|moeda_br }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="col-data">Nenhum procedimento encontrado neste lote.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if secao.resumo_publico %}
+        <div class="secao-resumo">
+            <div class="rodape-grid">
+                <div class="rodape-resumo">
+                    <table class="resumo">
+                        <thead>
+                            <tr>
+                                <th colspan="2">Resumo — Lote {{ secao.lote.id }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in secao.resumo_publico.modalidades %}
+                            <tr>
+                                <td class="label">{{ item.label }}</td>
+                                <td class="qtd">{{ item.quantidade }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="total-qtd">
+                                <td class="label">Quantidade total</td>
+                                <td class="qtd">{{ secao.resumo_publico.quantidade_total }}</td>
+                            </tr>
+                            <tr class="total-valor">
+                                <td class="label">Valor total</td>
+                                <td class="valor">R$ {{ secao.resumo_publico.valor_total|moeda_br }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% if forloop.last %}
+                <div class="rodape-assinatura">
+                    <div class="campo-assinatura">
+                        <span class="label-campo">Data</span>
+                        <span class="linha-campo">{{ data_emissao_relatorio|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="campo-assinatura">
+                        <span class="label-campo">Local</span>
+                        <span class="linha-campo">{% if local_relatorio %}{{ local_relatorio }}{% else %}&nbsp;{% endif %}</span>
+                    </div>
+                    <div class="campo-assinatura">
+                        <span class="label-campo">Responsável para assinatura</span>
+                        <span class="linha-assinatura">&nbsp;</span>
+                    </div>
+                    <p class="empresa-rodape">{{ empresa.razao }} · CNPJ {{ empresa.cnpj }}</p>
+                </div>
                 {% endif %}
-                <th>Procedimento</th>
-                <th class="col-modalidade">Modalidade</th>
-                <th class="col-contraste">Contraste</th>
-                <th class="col-valor">Valor</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for linha in linhas %}
-            <tr>
-                <td class="col-data">{% if linha.data %}{{ linha.data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
-                <td>{{ linha.paciente }}</td>
-                {% if coluna_terceira_guia %}
-                <td>{{ linha.numero_guia }}</td>
-                {% else %}
-                <td>{{ linha.nome_associado }}</td>
-                {% endif %}
-                <td>{{ linha.procedimento }}</td>
-                <td class="col-modalidade">{{ linha.modalidade }}</td>
-                <td class="col-contraste">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                <td class="col-valor">R$ {{ linha.valor|moeda_br }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="col-data">Nenhum procedimento encontrado neste lote.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    {% if resumo_publico %}
-    <div class="secao-resumo">
-        <div class="rodape-grid">
-            <div class="rodape-resumo">
-                <table class="resumo">
-                    <thead>
-                        <tr>
-                            <th colspan="2">Resumo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in resumo_publico.modalidades %}
-                        <tr>
-                            <td class="label">{{ item.label }}</td>
-                            <td class="qtd">{{ item.quantidade }}</td>
-                        </tr>
-                        {% endfor %}
-                        <tr class="total-qtd">
-                            <td class="label">Quantidade total</td>
-                            <td class="qtd">{{ resumo_publico.quantidade_total }}</td>
-                        </tr>
-                        <tr class="total-valor">
-                            <td class="label">Valor total</td>
-                            <td class="valor">R$ {{ resumo_publico.valor_total|moeda_br }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="rodape-assinatura">
-                <div class="campo-assinatura">
-                    <span class="label-campo">Data</span>
-                    <span class="linha-campo">{{ data_emissao_relatorio|date:"d/m/Y" }}</span>
-                </div>
-                <div class="campo-assinatura">
-                    <span class="label-campo">Local</span>
-                    <span class="linha-campo">{% if local_relatorio %}{{ local_relatorio }}{% else %}&nbsp;{% endif %}</span>
-                </div>
-                <div class="campo-assinatura">
-                    <span class="label-campo">Responsável para assinatura</span>
-                    <span class="linha-assinatura">&nbsp;</span>
-                </div>
-                <p class="empresa-rodape">{{ empresa.razao }} · CNPJ {{ empresa.cnpj }}</p>
             </div>
         </div>
-    </div>
-    {% endif %}
+        {% endif %}
+    </section>
+    {% endfor %}
 
     <div class="no-print" style="text-align: center; margin-top: 24px;">
         <button type="button" onclick="window.print()">Imprimir</button>
