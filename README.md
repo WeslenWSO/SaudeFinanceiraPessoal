@@ -89,7 +89,7 @@ Faça backup antes. Script PowerShell: `scripts/importar_para_postgres.ps1`.
 | Recurso | Comportamento |
 |---------|----------------|
 | PostgreSQL | Persiste |
-| Arquivos em `media/` (uploads) | **Não persistem** após redeploy — use Render Disk ou S3 |
+| Arquivos em `media/` (uploads) | Com **Render Disk** em `/var/data/media` persistem — ver [`RENDER_DISCO_MEDIA.md`](RENDER_DISCO_MEDIA.md) |
 | `static/media/` (logo, fundos login) | Versionados no Git — persistem via `collectstatic` |
 | Plano free | Instância dorme (~50s cold start) |
 | OCR/PDF pesado | Pode exigir mais memória |
@@ -101,4 +101,5 @@ Faça backup antes. Script PowerShell: `scripts/importar_para_postgres.ps1`.
 - [ ] Logs do build: `collectstatic` e `migrate` sem erro
 - [ ] `/login/` abre com CSS (WhiteNoise + `DEBUG=false`)
 - [ ] Login com usuário criado no Shell
-- [ ] `DATABASE_URL` aponta para Postgres (Internal), não SQLite
+- [ ] Disco `/var/data` ativo e log `[startup] MEDIA_ROOT=/var/data/media exists=True writable=True`
+- [ ] `python manage.py verificar_anexos_media` no Shell (anexos faltando = reenviar)
