@@ -98,6 +98,16 @@ _RE_NOME_BENEFICIARIO = re.compile(
     r'10\s*[-–]?\s*Nome\s*(.+?)(?=\s+\d+\s*[-–]?\s|\n\d+\b|\n\n|\Z)',
     re.IGNORECASE | re.DOTALL,
 )
+_RE_NOME_BENEFICIARIO_LABEL = re.compile(
+    r'(?:10\s*[-–.]?\s*Nome|Nome\s+do\s+Benefici[aá]rio|Benefici[aá]rio)\s*[:\-]?\s*'
+    r'(.+?)'
+    r'(?=\s*(?:\d+\s*[-–.]|\n\s*\d+\s|Matr[ií]cula|CPF|Cart|N[ºo°]|Sexo|Data\s+de|\Z))',
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_NOME_PACIENTE = re.compile(
+    r'Paciente\s*[:\-]?\s*(.+?)(?=\n|Conv[eê]nio|Proced|$)',
+    re.IGNORECASE,
+)
 _RE_NOME_BENEFICIARIO_OCR = re.compile(
     r'[1lI][0oO]\s*[-–]?\s*Nome\s*(.+?)(?=\s+\d+\s*[-–]?\s|\n\d+\b|\n\n|\Z)',
     re.IGNORECASE | re.DOTALL,
@@ -291,6 +301,55 @@ def _extrair_convenio_tiss(texto: str, convenio_padrao: str = '') -> str:
     return padrao or 'GEAP'
 
 
+def _extrair_metadados_nome_arquivo(nome_arquivo: str) -> tuple[str, str]:
+    """Convênio e data a partir do nome do PDF (ex.: CASSI 25-07 paciente.pdf)."""
+    base = os.path.splitext(nome_arquivo or '')[0]
+    convenio = ''
+    for label, patterns in _TISS_CONVENIOS:
+        if label in base.upper() or any(p.upper() in base.upper() for p in patterns):
+            convenio = label
+            break
+    data = ''
+    m = re.search(r'(?:^|[\s_\-])(\d{2})[-/](\d{2})(?:[-/](\d{2,4}))?(?:[\s_\-]|$)', base)
+    if m:
+        dia, mes = m.group(1), m.group(2)
+        ano = m.group(3) or str(datetime.now().year)
+        if len(ano) == 2:
+            ano = f'20{ano}'
+        data = _data_valida(f'{int(dia):02d}/{int(mes):02d}/{int(ano):04d}')
+    return data, convenio
+
+
+def _extrair_nome_tiss_linhas(texto_norm: str) -> str:
+    linhas = texto_norm.split('\n')
+    for i, linha in enumerate(linhas):
+        for regex in (_RE_NOME_BENEFICIARIO_LABEL, _RE_NOME_BENEFICIARIO, _RE_NOME_BENEFICIARIO_OCR):
+            m = regex.search(linha)
+            if m:
+                candidato = _limpar_nome_beneficiario(m.group(1))
+                if _nome_parece_pessoa(candidato):
+                    return candidato
+        if re.search(r'10\s*[-–.]?\s*Nome', linha, re.IGNORECASE):
+            parte = re.split(r'10\s*[-–.]?\s*Nome', linha, maxsplit=1, flags=re.IGNORECASE)
+            if len(parte) > 1 and parte[1].strip():
+                candidato = _limpar_nome_beneficiario(parte[1])
+                if _nome_parece_pessoa(candidato):
+                    return candidato
+            for j in range(i + 1, min(i + 4, len(linhas))):
+                linha_c = linhas[j].strip()
+                if not linha_c or re.search(r'^\d+\s*[-–.]', linha_c):
+                    continue
+                candidato = _limpar_nome_beneficiario(linha_c)
+                if _nome_parece_pessoa(candidato):
+                    return candidato
+        m_pac = _RE_NOME_PACIENTE.search(linha)
+        if m_pac:
+            candidato = _limpar_nome_beneficiario(m_pac.group(1))
+            if _nome_parece_pessoa(candidato):
+                return candidato
+    return ''
+
+
 def extrair_campos_tiss(texto: str) -> tuple[str, str]:
     """Retorna (data_autorizacao, nome_beneficiario) da guia TISS SP/SADT."""
     if not texto or len(texto.strip()) < 20:
@@ -304,20 +363,16 @@ def extrair_campos_tiss(texto: str) -> tuple[str, str]:
         if m:
             data = _normalizar_data(m.group(1))
             break
+    if not data:
+        data = _extrair_data_emissao(texto_norm)
 
-    nome = ''
-    for regex in (_RE_NOME_BENEFICIARIO, _RE_NOME_BENEFICIARIO_OCR):
-        m_nome = regex.search(texto_norm)
-        if m_nome:
-            nome = _limpar_nome_beneficiario(m_nome.group(1))
-            break
+    nome = _extrair_nome_tiss_linhas(texto_norm)
     if not nome:
-        for linha in texto_norm.split('\n'):
-            if re.search(r'10\s*[-–]?\s*Nome', linha, re.IGNORECASE):
-                parte = re.split(r'10\s*[-–]?\s*Nome', linha, maxsplit=1, flags=re.IGNORECASE)
-                if len(parte) > 1 and parte[1].strip():
-                    nome = _limpar_nome_beneficiario(parte[1])
-                    break
+        m_pac = _RE_NOME_PACIENTE.search(texto_norm)
+        if m_pac:
+            candidato = _limpar_nome_beneficiario(m_pac.group(1))
+            if _nome_parece_pessoa(candidato):
+                nome = candidato
 
     return data, nome
 
@@ -604,9 +659,13 @@ def _ler_texto_pdf_ocr(pdf_bytes: bytes) -> str:
                 if not isinstance(pil_image, Image.Image):
                     pil_image = Image.frombytes(pil_image.mode, pil_image.size, pil_image.tobytes())
                 try:
-                    textos.append(pytesseract.image_to_string(pil_image, lang='por+eng'))
+                    textos.append(
+                        pytesseract.image_to_string(pil_image, lang='por+eng', config='--psm 6')
+                    )
                 except Exception:
-                    textos.append(pytesseract.image_to_string(pil_image, lang='por'))
+                    textos.append(
+                        pytesseract.image_to_string(pil_image, lang='por', config='--psm 6')
+                    )
             return '\n'.join(textos)
     except Exception as exc:
         logger.warning('Falha OCR: %s', exc)
@@ -648,6 +707,7 @@ def processar_arquivo(
 ) -> ResultadoRenomearGuiaGeap:
     resultado = ResultadoRenomearGuiaGeap(arquivo_original=arquivo_nome)
     gemini_erro = ''
+    data_arq, conv_arq = _extrair_metadados_nome_arquivo(arquivo_nome)
 
     texto = _ler_texto_pdf(pdf_bytes)
     texto_ocr = ''
@@ -700,6 +760,10 @@ def processar_arquivo(
 
     if not convenio and convenio_padrao:
         convenio = convenio_padrao.strip().upper()
+    if not convenio:
+        convenio = conv_arq
+    if not data:
+        data = data_arq
 
     data = _normalizar_data(data)
     nome = _limpar_nome_beneficiario(nome)
@@ -709,13 +773,18 @@ def processar_arquivo(
             msg = 'Data não encontrada ou inválida.'
         elif not nome:
             msg = 'Nome do beneficiário não encontrado.'
+            if 'TABELA DE INSUMO' in (arquivo_nome or '').upper() or 'FALTA TABELA' in (texto or '').upper():
+                msg += ' Este PDF parece ser relatório de insumo, não guia TISS com paciente.'
         else:
             msg = 'Convênio não identificado.'
         if ocr_usado:
             msg += ' OCR não localizou;'
-        msg += ' tentativa via Gemini também falhou.'
         if gemini_erro:
-            msg += f' ({gemini_erro})'
+            msg += f' Gemini: {gemini_erro}'
+        elif not GEMINI_AVAILABLE:
+            msg += ' Configure GEMINI_API_KEY no Render para PDFs escaneados.'
+        else:
+            msg += ' Confira se o PDF é guia TISS (campo 10 - Nome) ou preencha Convênio padrão.'
         resultado.erro = msg
         return resultado
 

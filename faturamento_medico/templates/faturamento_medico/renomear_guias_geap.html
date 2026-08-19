@@ -1624,27 +1624,89 @@
 
         }
 
-        if (typeof fileHandle.move !== 'function') {
+        const file = await fileHandle.getFile();
 
-            throw new Error('Renomear no disco não suportado neste navegador.');
+        const bytes = await file.arrayBuffer();
 
-        }
 
-        try {
 
-            await fileHandle.move(nomeNovo);
+        if (typeof fileHandle.move === 'function') {
 
-            const atualizado = await fileHandle.getFile();
+            try {
 
-            if (normalizarNomeArquivo(atualizado.name) !== normalizarNomeArquivo(nomeNovo)) {
+                await fileHandle.move(nomeNovo);
 
-                throw new Error('O sistema de arquivos não confirmou o novo nome.');
+                const atualizado = await fileHandle.getFile();
+
+                if (normalizarNomeArquivo(atualizado.name) === normalizarNomeArquivo(nomeNovo)) {
+
+                    return;
+
+                }
+
+            } catch (moveErr) {
+
+                /* fallback: grava cópia com novo nome na pasta escolhida */
 
             }
 
-        } catch (err) {
+        }
 
-            throw err;
+
+
+        let dir = dirHandleRenomeFallback;
+
+        if (!dir) {
+
+            try {
+
+                dir = await escolherPastaDestino(false);
+
+            } catch (pickErr) {
+
+                throw new Error(
+
+                    'Não foi possível renomear no disco. Use Baixar selecionados ou Salvar selecionados na pasta.'
+
+                );
+
+            }
+
+        }
+
+        if (!dir) {
+
+            throw new Error(
+
+                'Não foi possível renomear no disco. Use Baixar selecionados ou Salvar selecionados na pasta.'
+
+            );
+
+        }
+
+
+
+        const newHandle = await dir.getFileHandle(nomeNovo, { create: true });
+
+        const writable = await newHandle.createWritable();
+
+        await writable.write(bytes);
+
+        await writable.close();
+
+
+
+        if (normalizarNomeArquivo(nomeOriginal) !== normalizarNomeArquivo(nomeNovo)) {
+
+            try {
+
+                await dir.removeEntry(nomeOriginal);
+
+            } catch (removeErr) {
+
+                /* original pode permanecer; cópia com novo nome já foi gravada */
+
+            }
 
         }
 
@@ -2622,7 +2684,7 @@
 
 
 
-            if (falhas.length) {
+            if (falhas.length && totalOk > 0) {
 
                 console.warn('Falhas ao renomear no disco:', falhas);
 
