@@ -64,6 +64,34 @@ def _lote_protocolo_faturamento_grid(faturamento, ids_internos):
         'protocolo': (faturamento.guia_lancada or '').strip(),
     }
 
+
+def _nota_lote_linha_grid(faturamento, ids_internos):
+    """Destaque na listagem: NF vinculada e/ou lote interno."""
+    nota = (faturamento.nota_fiscal or '').strip()
+    lote_val = (faturamento.lote or '').strip()
+    lote_interno_id = lote_val if lote_val in ids_internos else ''
+    lote_convenio = '' if lote_val in ids_internos else lote_val
+    tem_nota = bool(nota)
+    tem_lote_interno = bool(lote_interno_id)
+    destacar = tem_nota or tem_lote_interno
+    lote_rotulo = ''
+    lote_url = ''
+    if lote_interno_id:
+        lote_rotulo = lote_interno_id
+        try:
+            lote_url = reverse('faturamento_medico:imprimir_lote', args=[int(lote_interno_id)])
+        except (TypeError, ValueError):
+            lote_url = ''
+    elif tem_nota and lote_convenio:
+        lote_rotulo = lote_convenio
+    return {
+        'tem_nota_fiscal': tem_nota,
+        'nota_fiscal_numero': nota,
+        'destacar_linha_nota_lote': destacar,
+        'lote_rotulo': lote_rotulo,
+        'lote_url': lote_url,
+    }
+
 # Status de agendamento fora da lista principal de faturamento
 STATUS_AGENDAMENTO_CANCELADOS = (
     'Cancelado',
@@ -2018,6 +2046,7 @@ def listar_faturamentos(request):
                     faturamento, ids_internos=ids_lotes_int
                 ),
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
+                **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
             })
             continue
@@ -2050,6 +2079,7 @@ def listar_faturamentos(request):
                     faturamento, ids_internos=ids_lotes_int
                 ),
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
+                **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
             })
 

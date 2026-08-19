@@ -30,6 +30,15 @@
     padding: 0.12em 0.35em;
     line-height: 1;
 }
+.fm-lote-link {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.grid-ris tbody tr.row-com-nota-lote td {
+    background-color: #dee2e6 !important;
+}
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -247,9 +256,10 @@
                                 </thead>
                                 <tbody>
                                     {% for linha in grid_linhas %}
-                                    <tr class="{% if linha.conferido %}table-success{% elif linha.status_conferencia == 'FALTA TABELA DE CONTRASTE' %}row-status-contraste{% endif %}"
+                                    <tr class="{% if linha.destacar_linha_nota_lote %}row-com-nota-lote{% elif linha.conferido %}table-success{% elif linha.status_conferencia == 'FALTA TABELA DE CONTRASTE' %}row-status-contraste{% endif %}"
                                         data-status="{{ linha.status_conferencia }}"
-                                        data-status-css="{{ linha.status_conferencia_css }}">
+                                        data-status-css="{{ linha.status_conferencia_css }}"
+                                        data-destacar-nota-lote="{% if linha.destacar_linha_nota_lote %}1{% else %}0{% endif %}">
                                         <td>
                                             {% if linha.mostrar_selecao_lote and linha.elegivel_lote %}
                                                 <input type="checkbox"
@@ -304,6 +314,22 @@
                                         <td>{{ linha.faturamento.convenio|default:"-" }}</td>
                                         <td class="text-nowrap">
                                             <div class="fm-row-actions-inline">
+                                                {% if linha.lote_rotulo %}
+                                                {% if linha.lote_url %}
+                                                <a href="{{ linha.lote_url }}?empresa_id={{ request.session.empresa_id }}"
+                                                   class="fm-lote-link btn btn-sm btn-outline-secondary"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   title="{% if linha.tem_nota_fiscal %}NF {{ linha.nota_fiscal_numero }} · {% endif %}Imprimir lote {{ linha.lote_rotulo }}">
+                                                    Lote {{ linha.lote_rotulo }}
+                                                </a>
+                                                {% else %}
+                                                <span class="fm-lote-link badge bg-secondary"
+                                                      title="{% if linha.tem_nota_fiscal %}NF {{ linha.nota_fiscal_numero }}{% endif %}">
+                                                    Lote {{ linha.lote_rotulo }}
+                                                </span>
+                                                {% endif %}
+                                                {% endif %}
                                                 {% if linha.qtd_anexos %}
                                                 <button type="button"
                                                         class="btn btn-sm btn-outline-success btn-anexo-info"
@@ -1092,11 +1118,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function aplicarStatusNaLinha(row, data) {
         const checkbox = row.querySelector('.conferencia-checkbox');
         const select = row.querySelector('.status-conferencia-select');
+        const destacar = row.dataset.destacarNotaLote === '1';
         if (checkbox) checkbox.checked = !!data.conferido;
-        row.classList.toggle('table-success', !!data.conferido);
+        row.classList.toggle('table-success', !!data.conferido && !destacar);
         row.classList.toggle(
             'row-status-contraste',
-            data.status === 'FALTA TABELA DE CONTRASTE' && !data.conferido
+            data.status === 'FALTA TABELA DE CONTRASTE' && !data.conferido && !destacar
         );
         if (data.status) {
             row.dataset.status = data.status;
