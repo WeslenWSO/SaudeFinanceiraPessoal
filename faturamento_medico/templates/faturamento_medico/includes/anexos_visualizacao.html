@@ -1,0 +1,312 @@
+{% if faturamento.pk %}
+<style>
+#modalAlbumDocumentos .modal-dialog.modal-album-90 {
+    width: 90vw;
+    max-width: 90vw;
+    height: 90vh;
+    max-height: 90vh;
+    margin: 5vh auto;
+}
+#modalAlbumDocumentos .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#modalAlbumDocumentos .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+#modalAlbumDocumentos .album-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+}
+#modalAlbumDocumentos .album-pdf-wrap {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+#modalAlbumDocumentos .album-pdf-frame,
+#documentoContainer .album-pdf-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: calc(90vh - 260px);
+    border: 0;
+}
+#documentoContainer .album-pdf-frame {
+    min-height: 600px;
+}
+#modalAlbumDocumentos .album-content img {
+    max-height: calc(90vh - 260px);
+    max-width: 100%;
+    object-fit: contain;
+}
+</style>
+
+<table id="fatAnexosTable" class="d-none">
+    <tbody>
+        {% for documento in faturamento.documentos_anexados.all %}
+        <tr data-doc-url="{% url 'faturamento_medico:download_documento' documento.pk %}"
+            data-doc-ext="{{ documento.get_file_extension|lower|cut:'.' }}"
+            data-doc-nome="{{ documento.nome|default:documento.arquivo.name }}">
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="modal fade" id="modalVisualizarDocumento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title">Visualizar anexo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body text-center p-2">
+                <div id="documentoContainer"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-dismiss="modal">Fechar</button>
+                <a id="btnDownloadDocumento" href="#" class="btn btn-success btn-sm" target="_blank">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAlbumDocumentos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-album-90 modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title">
+                    <i class="fas fa-images"></i> Anexos
+                    <span class="badge bg-info ms-2" id="contadorAlbum">0/0</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <div class="d-flex justify-content-between align-items-center p-2 bg-light">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnAnterior" disabled>
+                        <i class="fas fa-chevron-left"></i> Anterior
+                    </button>
+                    <div>
+                        <span id="nomeDocumentoAtual">-</span>
+                        <small class="text-muted ms-2" id="tipoDocumentoAtual">-</small>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnProximo" disabled>
+                        Próximo <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div id="albumContainer" class="album-content"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-dismiss="modal">Fechar</button>
+                <a id="btnDownloadAlbum" href="#" class="btn btn-success btn-sm" target="_blank">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function initAnexosVisualizacao() {
+    var documentosAlbum = [];
+    var indiceAtual = 0;
+    var pdfBlobUrlAtual = null;
+
+    function revogarPdfBlob() {
+        if (pdfBlobUrlAtual) {
+            URL.revokeObjectURL(pdfBlobUrlAtual);
+            pdfBlobUrlAtual = null;
+        }
+    }
+
+    function urlPdfInline(url) {
+        return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'inline=1';
+    }
+
+    function escapeHtml(texto) {
+        return String(texto || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function abrirModal(el) {
+        if (!el) return;
+        if (window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(el).show();
+        } else if (typeof $ !== 'undefined' && $.fn.modal) {
+            $(el).modal('show');
+        }
+    }
+
+    function fecharModal(el) {
+        if (!el) return;
+        revogarPdfBlob();
+        if (window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(el).hide();
+        } else if (typeof $ !== 'undefined' && $.fn.modal) {
+            $(el).modal('hide');
+        }
+    }
+
+    async function renderizarPdfNoContainer(container, url, nomeArquivo) {
+        revogarPdfBlob();
+        var urlInline = urlPdfInline(url);
+        container.innerHTML = '<div class="text-muted py-5"><i class="fas fa-spinner fa-spin"></i> Carregando PDF...</div>';
+        try {
+            var resp = await fetch(urlInline, { credentials: 'same-origin' });
+            if (!resp.ok) {
+                throw new Error(resp.status === 404
+                    ? 'Arquivo não encontrado no servidor.'
+                    : 'Erro ao carregar PDF (HTTP ' + resp.status + ').');
+            }
+            var contentType = (resp.headers.get('content-type') || '').toLowerCase();
+            var blob = await resp.blob();
+            if (!blob.size) throw new Error('Arquivo vazio.');
+            if (contentType.indexOf('text/html') >= 0) {
+                throw new Error('Faça login novamente e tente de novo.');
+            }
+            pdfBlobUrlAtual = URL.createObjectURL(blob);
+            container.innerHTML =
+                '<div class="album-pdf-wrap">' +
+                '<embed src="' + pdfBlobUrlAtual + '#toolbar=1" type="application/pdf" class="album-pdf-frame">' +
+                '<div class="text-center py-2">' +
+                '<a href="' + escapeHtml(urlInline) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">' +
+                '<i class="fas fa-external-link-alt"></i> Abrir em nova aba</a></div></div>';
+        } catch (err) {
+            container.innerHTML =
+                '<div class="alert alert-warning m-3 text-start">' +
+                escapeHtml(err.message || 'Erro ao exibir PDF.') +
+                '<div class="mt-2">' +
+                '<a href="' + escapeHtml(urlInline) + '" target="_blank" class="btn btn-sm btn-outline-primary me-2">Nova aba</a>' +
+                '<a href="' + escapeHtml(url) + '" class="btn btn-sm btn-success">Baixar</a></div></div>';
+        }
+    }
+
+    async function visualizarDocumento(url, extensao, nome) {
+        var container = document.getElementById('documentoContainer');
+        var downloadBtn = document.getElementById('btnDownloadDocumento');
+        if (!container) return;
+        downloadBtn.href = url;
+        downloadBtn.setAttribute('download', nome);
+        if (extensao === 'pdf') {
+            await renderizarPdfNoContainer(container, url, nome);
+        } else if (['jpg', 'jpeg', 'png', 'gif'].indexOf(extensao) >= 0) {
+            container.innerHTML = '<img src="' + escapeHtml(url) + '" alt="' + escapeHtml(nome) + '" class="img-fluid">';
+        } else {
+            container.innerHTML = '<div class="alert alert-info">Tipo não visualizável. Use Download.</div>';
+        }
+        abrirModal(document.getElementById('modalVisualizarDocumento'));
+    }
+
+    function coletarDocumentosAlbum() {
+        documentosAlbum = [];
+        var linhas = document.querySelectorAll('#fatAnexosTable tbody tr[data-doc-url]');
+        var suportadas = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
+        linhas.forEach(function(linha, index) {
+            var url = linha.getAttribute('data-doc-url');
+            var extensao = (linha.getAttribute('data-doc-ext') || '').toLowerCase().replace(/^\./, '');
+            var nome = (linha.getAttribute('data-doc-nome') || '').trim() || ('Documento ' + (index + 1));
+            if (!url || suportadas.indexOf(extensao) < 0) return;
+            documentosAlbum.push({ url: url, extensao: extensao, nome: nome, downloadUrl: url });
+        });
+        return documentosAlbum.length;
+    }
+
+    async function mostrarDocumentoAlbum(indice) {
+        if (indice < 0 || indice >= documentosAlbum.length) return;
+        var documento = documentosAlbum[indice];
+        var container = document.getElementById('albumContainer');
+        document.getElementById('nomeDocumentoAtual').textContent = documento.nome;
+        document.getElementById('tipoDocumentoAtual').textContent = documento.extensao.toUpperCase();
+        document.getElementById('btnDownloadAlbum').href = documento.downloadUrl;
+        revogarPdfBlob();
+        if (documento.extensao === 'pdf') {
+            await renderizarPdfNoContainer(container, documento.url, documento.nome);
+        } else if (['jpg', 'jpeg', 'png', 'gif'].indexOf(documento.extensao) >= 0) {
+            container.innerHTML = '<img src="' + escapeHtml(documento.url) + '" alt="' + escapeHtml(documento.nome) + '" class="img-fluid">';
+        }
+    }
+
+    function atualizarControlesAlbum() {
+        document.getElementById('contadorAlbum').textContent = (indiceAtual + 1) + '/' + documentosAlbum.length;
+        document.getElementById('btnAnterior').disabled = indiceAtual === 0;
+        document.getElementById('btnProximo').disabled = indiceAtual >= documentosAlbum.length - 1;
+    }
+
+    function abrirAlbumDocumentos(indiceInicial) {
+        if (coletarDocumentosAlbum() === 0) {
+            alert('Nenhum anexo visualizável (PDF ou imagem).');
+            return;
+        }
+        indiceAtual = Math.min(indiceInicial || 0, documentosAlbum.length - 1);
+        mostrarDocumentoAlbum(indiceAtual);
+        atualizarControlesAlbum();
+        abrirModal(document.getElementById('modalAlbumDocumentos'));
+    }
+
+    window.abrirAlbumAnexosFaturamento = abrirAlbumDocumentos;
+    window.visualizarAnexoFaturamento = visualizarDocumento;
+
+    document.addEventListener('click', function(e) {
+        var btnAlbum = e.target.closest('.js-abrir-album-anexos');
+        if (btnAlbum) {
+            e.preventDefault();
+            abrirAlbumDocumentos(0);
+            return;
+        }
+        var btnVer = e.target.closest('.js-ver-anexo');
+        if (btnVer) {
+            e.preventDefault();
+            visualizarDocumento(
+                btnVer.getAttribute('data-url'),
+                (btnVer.getAttribute('data-ext') || '').toLowerCase(),
+                btnVer.getAttribute('data-nome') || 'Anexo'
+            );
+        }
+    });
+
+    var btnAnterior = document.getElementById('btnAnterior');
+    var btnProximo = document.getElementById('btnProximo');
+    if (btnAnterior) {
+        btnAnterior.addEventListener('click', function() {
+            if (indiceAtual > 0) {
+                indiceAtual -= 1;
+                mostrarDocumentoAlbum(indiceAtual);
+                atualizarControlesAlbum();
+            }
+        });
+    }
+    if (btnProximo) {
+        btnProximo.addEventListener('click', function() {
+            if (indiceAtual < documentosAlbum.length - 1) {
+                indiceAtual += 1;
+                mostrarDocumentoAlbum(indiceAtual);
+                atualizarControlesAlbum();
+            }
+        });
+    }
+
+    ['modalVisualizarDocumento', 'modalAlbumDocumentos'].forEach(function(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        modal.addEventListener('hidden.bs.modal', revogarPdfBlob);
+        if (typeof $ !== 'undefined') {
+            $(modal).on('hidden.bs.modal hidden.modal', revogarPdfBlob);
+        }
+    });
+})();
+</script>
+{% endif %}

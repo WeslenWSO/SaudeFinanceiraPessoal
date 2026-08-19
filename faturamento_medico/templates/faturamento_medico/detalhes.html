@@ -141,6 +141,12 @@
     border: 0;
 }
 
+#documentoContainer .album-pdf-frame {
+    width: 100%;
+    min-height: 600px;
+    border: 0;
+}
+
 #modalAlbumDocumentos .album-content img {
     max-height: calc(90vh - 260px);
     max-width: 100%;
@@ -606,28 +612,78 @@
 // Array global para armazenar os documentos do álbum
 let documentosAlbum = [];
 let indiceAtual = 0;
+let pdfBlobUrlAtual = null;
+
+function revogarPdfBlob() {
+    if (pdfBlobUrlAtual) {
+        URL.revokeObjectURL(pdfBlobUrlAtual);
+        pdfBlobUrlAtual = null;
+    }
+}
+
+function urlPdfInline(url) {
+    return url + (url.includes('?') ? '&' : '?') + 'inline=1';
+}
+
+function escapeHtml(texto) {
+    return String(texto || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function renderizarPdfNoContainer(container, url, nomeArquivo) {
+    revogarPdfBlob();
+    const urlInline = urlPdfInline(url);
+    container.innerHTML = '<div class="text-muted py-5"><i class="fas fa-spinner fa-spin"></i> Carregando PDF...</div>';
+
+    try {
+        const resp = await fetch(urlInline, { credentials: 'same-origin' });
+        if (!resp.ok) {
+            var msgErro = resp.status === 404
+                ? 'Arquivo não encontrado no servidor (pode ter sido perdido após atualização do sistema).'
+                : 'Erro ao carregar o PDF (HTTP ' + resp.status + ').';
+            throw new Error(msgErro);
+        }
+        const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+        const blob = await resp.blob();
+        if (!blob.size) {
+            throw new Error('O arquivo PDF está vazio.');
+        }
+        if (contentType.includes('text/html')) {
+            throw new Error('Não foi possível abrir o PDF. Faça login novamente e tente de novo.');
+        }
+        pdfBlobUrlAtual = URL.createObjectURL(blob);
+        container.innerHTML =
+            '<div class="album-pdf-wrap">' +
+            '<embed src="' + pdfBlobUrlAtual + '#toolbar=1" type="application/pdf" class="album-pdf-frame" title="' + escapeHtml(nomeArquivo) + '">' +
+            '<div class="text-center py-2">' +
+            '<a href="' + escapeHtml(urlInline) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">' +
+            '<i class="fas fa-external-link-alt"></i> Abrir PDF em nova aba</a>' +
+            '</div></div>';
+    } catch (err) {
+        container.innerHTML =
+            '<div class="alert alert-warning m-3 text-start">' +
+            '<i class="fas fa-exclamation-triangle"></i> ' + escapeHtml(err.message || 'Erro ao exibir PDF.') +
+            '<div class="mt-2">' +
+            '<a href="' + escapeHtml(urlInline) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary me-2">Abrir em nova aba</a>' +
+            '<a href="' + escapeHtml(url) + '" class="btn btn-sm btn-success" download>Baixar PDF</a>' +
+            '</div></div>';
+    }
+}
 
 // Função para visualizar documento individual
-function visualizarDocumento(url, extensao, nome) {
+async function visualizarDocumento(url, extensao, nome) {
     const container = document.getElementById('documentoContainer');
     const downloadBtn = document.getElementById('btnDownloadDocumento');
 
-    // Limpar conteúdo anterior
     container.innerHTML = '';
-
-    // Configurar botão de download
     downloadBtn.href = url;
     downloadBtn.setAttribute('download', nome);
 
     if (extensao === 'pdf') {
-        // Para PDFs, usar iframe com parâmetro inline
-        const urlInline = url + (url.includes('?') ? '&' : '?') + 'inline=true';
-        container.innerHTML = `
-            <iframe src="${urlInline}" width="100%" height="600px" style="border: none;">
-                Seu navegador não suporta visualização de PDF.
-                <a href="${url}" target="_blank">Clique aqui para baixar o arquivo</a>
-            </iframe>
-        `;
+        await renderizarPdfNoContainer(container, url, nome);
     } else if (['jpg', 'jpeg', 'png', 'gif'].includes(extensao)) {
         // Para imagens, usar tag img
         container.innerHTML = `
@@ -743,7 +799,7 @@ function abrirAlbumDocumentos(indiceInicial = 0) {
 }
 
 // Função para mostrar documento no álbum
-function mostrarDocumentoAlbum(indice) {
+async function mostrarDocumentoAlbum(indice) {
     if (indice < 0 || indice >= documentosAlbum.length) return;
 
     const documento = documentosAlbum[indice];
@@ -752,28 +808,16 @@ function mostrarDocumentoAlbum(indice) {
     const tipoElement = document.getElementById('tipoDocumentoAtual');
     const downloadBtn = document.getElementById('btnDownloadAlbum');
 
-    // Limpar conteúdo anterior
+    revogarPdfBlob();
     container.innerHTML = '';
 
-    // Atualizar informações
     nomeElement.textContent = documento.nome;
     tipoElement.textContent = documento.extensao.toUpperCase();
     downloadBtn.href = documento.downloadUrl;
     downloadBtn.setAttribute('download', documento.nome);
 
-    // Renderizar documento
     if (documento.extensao === 'pdf') {
-        const urlInline = documento.url + (documento.url.includes('?') ? '&' : '?') + 'inline=true';
-        container.innerHTML = `
-            <div class="album-pdf-wrap">
-                <iframe src="${urlInline}" class="album-pdf-frame" title="${documento.nome}"></iframe>
-                <div class="text-center py-2">
-                    <a href="${urlInline}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-external-link-alt"></i> Abrir PDF em nova aba
-                    </a>
-                </div>
-            </div>
-        `;
+        await renderizarPdfNoContainer(container, documento.url, documento.nome);
     } else if (['jpg', 'jpeg', 'png', 'gif'].includes(documento.extensao)) {
         container.innerHTML = `
             <img src="${documento.url}" alt="${documento.nome}" class="img-fluid">
@@ -874,6 +918,7 @@ function gerarMiniaturas() {
 
 // Função para fechar modal do álbum
 function fecharModalAlbum() {
+    revogarPdfBlob();
     const modal = document.getElementById('modalAlbumDocumentos');
     if (modal) {
         // Tentar com jQuery primeiro
@@ -921,6 +966,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnXVisualizar = document.querySelector('#modalVisualizarDocumento .close');
 
     function fecharModalVisualizar() {
+        revogarPdfBlob();
         const modal = document.getElementById('modalVisualizarDocumento');
         if (modal) {
             if (typeof $ !== 'undefined' && $.fn.modal) {

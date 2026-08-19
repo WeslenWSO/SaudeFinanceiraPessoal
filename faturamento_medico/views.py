@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.utils.formats import number_format
+from django.utils.http import content_disposition_header
 from django.http import HttpResponse, Http404, JsonResponse, FileResponse
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -3434,7 +3435,10 @@ def criar_faturamento(request):
 
 def editar_faturamento(request, pk):
     """Edita um faturamento médico existente"""
-    faturamento = get_object_or_404(FaturamentoMedico, pk=pk)
+    faturamento = get_object_or_404(
+        FaturamentoMedico.objects.prefetch_related('documentos_anexados'),
+        pk=pk,
+    )
     empresa_id = request.session.get('empresa_id')
 
     if request.method == 'POST':
@@ -3461,7 +3465,10 @@ def editar_documentacao_faturamento(request, pk):
     qs = FaturamentoMedico.objects.all()
     if empresa_id:
         qs = qs.filter(empresa_id=empresa_id)
-    faturamento = get_object_or_404(qs, pk=pk)
+    faturamento = get_object_or_404(
+        qs.prefetch_related('documentos_anexados'),
+        pk=pk,
+    )
 
     voltar = (request.GET.get('next') or request.POST.get('voltar') or '').strip()
     if not voltar:
@@ -3886,6 +3893,8 @@ def download_documento(request, pk):
         filename = os.path.basename(documento.arquivo.name)
     if not filename:
         filename = f'documento-{pk}'
+    if extensao and not filename.lower().endswith(f'.{extensao}'):
+        filename = f'{filename}.{extensao}'
 
     try:
         file_obj = documento.arquivo.open('rb')
@@ -3895,9 +3904,14 @@ def download_documento(request, pk):
         logger.warning('Erro ao abrir documento anexado #%s: %s', pk, exc)
         raise Http404('Arquivo não encontrado') from exc
 
+    inline = (request.GET.get('inline') or '').lower() in ('1', 'true', 'yes')
     response = FileResponse(file_obj, content_type=content_type)
-    disposition = 'inline' if request.GET.get('inline') == 'true' else 'attachment'
-    response['Content-Disposition'] = f'{disposition}; filename="{filename}"'
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=not inline,
+        filename=filename,
+    )
+    if inline:
+        response['Cache-Control'] = 'private, max-age=300'
     return response
 
 
