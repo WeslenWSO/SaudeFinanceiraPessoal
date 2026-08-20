@@ -39,6 +39,16 @@
 .grid-ris tbody tr.row-com-nota-lote td {
     background-color: #dee2e6 !important;
 }
+.fm-celula-nf .badge { font-size: 0.72rem; }
+.fm-celula-nf { min-width: 9rem; max-width: 14rem; font-size: 0.78rem; }
+.fm-nota-candidata {
+    cursor: pointer;
+    border: 1px solid #e9ecef;
+    border-radius: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    margin-bottom: 0.35rem;
+}
+.fm-nota-candidata:hover { background: #eef4ff; border-color: #cfe2ff; }
 </style>
 <div class="container-fluid">
     <div class="row">
@@ -254,6 +264,7 @@
                                         <th class="grid-ris-th-conf">CONFERENCIA</th>
                                         <th class="grid-ris-th">STATUS CONFERENCIA</th>
                                         <th class="grid-ris-th">CONVÊNIO</th>
+                                        <th class="grid-ris-th">NF / PAGAMENTO</th>
                                         <th class="grid-ris-th">AÇÕES</th>
                                     </tr>
                                 </thead>
@@ -315,6 +326,12 @@
                                             {% endif %}
                                         </td>
                                         <td>{{ linha.faturamento.convenio|default:"-" }}</td>
+                                        <td class="fm-celula-nf"
+                                            data-faturamento-id="{{ linha.faturamento.id }}"
+                                            data-paciente="{{ linha.paciente }}"
+                                            data-data="{{ linha.data_iso }}">
+                                            {% include 'faturamento_medico/partials/celula_nf_pagamento.html' %}
+                                        </td>
                                         <td class="text-nowrap">
                                             <div class="fm-row-actions-inline">
                                                 {% if linha.lote_rotulo %}
@@ -1420,4 +1437,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+{% if grid_total %}
+{% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
+{% endif %}
 {% endblock %}

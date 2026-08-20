@@ -1,0 +1,58 @@
+{% if linha.exibir_nf_pagamento %}
+    {% if linha.mostrar_nf_celula %}
+        {% if linha.qtd_notas == 0 %}
+        <div class="d-flex flex-column gap-1">
+            <span class="badge bg-warning text-dark align-self-start">Sem NF</span>
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm py-0 px-2 js-vincular-nf"
+                    data-faturamento-id="{{ linha.faturamento.id }}"
+                    data-paciente="{{ linha.paciente }}"
+                    data-data="{{ linha.data_iso }}">
+                Vincular NF
+            </button>
+        </div>
+        {% elif linha.qtd_notas == 1 %}
+        {% with nota=linha.notas_vinculadas.0 %}
+        <div>
+            <a href="{{ nota.url }}" target="_blank" rel="noopener"
+               title="NF {{ nota.numero }} — {{ nota.data_emissao_fmt }}">
+                NF {{ nota.numero }}
+            </a>
+            <span class="text-muted">· R$ {{ nota.valor_fmt }}</span>
+            {% if nota.manual %}
+            <span class="badge bg-secondary">Manual</span>
+            {% endif %}
+            {% if nota.forma_pagamento != '-' %}
+            <div class="mt-1">
+                <span class="badge bg-info text-dark">{{ nota.forma_pagamento }}</span>
+            </div>
+            {% endif %}
+            <div class="mt-1 d-flex gap-1 flex-wrap">
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm py-0 px-2 js-vincular-nf"
+                        data-faturamento-id="{{ linha.faturamento.id }}"
+                        data-paciente="{{ linha.paciente }}"
+                        data-data="{{ linha.data_iso }}">
+                    Alterar NF
+                </button>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm py-0 px-2 js-desvincular-nf"
+                        data-faturamento-id="{{ linha.faturamento.id }}"
+                        data-paciente="{{ linha.paciente }}"
+                        data-data="{{ linha.data_iso }}">
+                    Desvincular
+                </button>
+            </div>
+        </div>
+        {% endwith %}
+        {% else %}
+        <button type="button"
+                class="btn btn-link btn-sm p-0 js-ver-notas-multi"
+                data-notas="{{ linha.notas_json|escape }}">
+            {{ linha.qtd_notas }} notas — ver detalhes
+        </button>
+        {% endif %}
+    {% endif %}
+{% else %}
+    <span class="text-muted">-</span>
+{% endif %}

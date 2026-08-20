@@ -1936,6 +1936,47 @@ def _anexos_grid_faturamento(faturamento):
     }
 
 
+def _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id):
+    from .convenio_nf_utils import convenio_mostra_nf_pagamento
+    from .services.vincular_nota_solicitante import (
+        notas_linha_para_json,
+        resolver_notas_linha,
+    )
+
+    data_iso = faturamento.data.isoformat() if faturamento.data else ''
+    if not convenio_mostra_nf_pagamento(faturamento.convenio):
+        return {
+            'exibir_nf_pagamento': False,
+            'notas_vinculadas': [],
+            'qtd_notas': 0,
+            'notas_json': '',
+            'data_iso': data_iso,
+        }
+    notas = resolver_notas_linha(
+        notas_por_data,
+        empresa_id,
+        faturamento.nome or '',
+        faturamento.data,
+        faturamento.nota_fiscal,
+    )
+    return {
+        'exibir_nf_pagamento': True,
+        'notas_vinculadas': notas,
+        'qtd_notas': len(notas),
+        'notas_json': notas_linha_para_json(notas) if len(notas) > 1 else '',
+        'data_iso': data_iso,
+    }
+
+
+def _nf_pagamento_linha_grid(faturamento, notas_por_data, empresa_id, nf_cache, *, mostrar_celula):
+    fat_id = faturamento.pk
+    if fat_id not in nf_cache:
+        nf_cache[fat_id] = _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id)
+    dados = dict(nf_cache[fat_id])
+    dados['mostrar_nf_celula'] = bool(dados.get('exibir_nf_pagamento') and mostrar_celula)
+    return dados
+
+
 def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
     if request.GET.get('limpar'):
@@ -2029,6 +2070,15 @@ def listar_faturamentos(request):
     faturamentos = faturamentos.prefetch_related('itens_servico', 'documentos_anexados')
     grid_linhas = []
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
+    nf_cache: dict[int, dict] = {}
+    notas_por_data = {}
+    if empresa_id:
+        from .services.vincular_nota_solicitante import carregar_notas_por_data
+
+        di_nf = _parse_data_filtro(data_inicio)
+        df_nf = _parse_data_filtro(data_fim)
+        if di_nf and df_nf:
+            notas_por_data = carregar_notas_por_data(empresa_id, di_nf, df_nf)
 
     # Cache de preços da tabela por empresa/convênio (código e descrição)
     precos_por_codigo = set()
@@ -2104,6 +2154,9 @@ def listar_faturamentos(request):
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
+                **_nf_pagamento_linha_grid(
+                    faturamento, notas_por_data, empresa_id, nf_cache, mostrar_celula=True,
+                ),
             })
             continue
         itens_filtrados = []
@@ -2139,6 +2192,9 @@ def listar_faturamentos(request):
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
+                **_nf_pagamento_linha_grid(
+                    faturamento, notas_por_data, empresa_id, nf_cache, mostrar_celula=(idx == 0),
+                ),
             })
 
     # Resumo por modalidade (conforme filtros / grid de procedimentos)
