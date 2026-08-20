@@ -60,14 +60,6 @@
     text-align: left;
     line-height: 1.2;
 }
-.badge-lote-ok {
-    background-color: #cfe2ff !important;
-    color: #084298 !important;
-}
-.badge-contraste {
-    background-color: #e2d9f3 !important;
-    color: #432874 !important;
-}
 .dash-exames-link {
     text-decoration: none;
     color: inherit;
@@ -88,7 +80,7 @@
         <div>
             <h3 class="mb-1">Dashboard dos Exames</h3>
             <p class="text-muted mb-0 small">
-                Totalizações por convênio e status de conferência · {{ mes_label }}
+                Totalizações por convênio e status · {{ mes_label }}
                 {% if filtros.convenios %}
                     · {{ filtros.convenios|length }} convênio(s) selecionado(s)
                 {% endif %}
@@ -142,7 +134,7 @@
                         <table class="table dash-exames-tabela mb-0">
                             <thead>
                                 <tr>
-                                    <th>Status conferência</th>
+                                    <th>Status</th>
                                     <th class="text-end" style="width: 6rem;">Qtd.</th>
                                     <th class="text-end" style="width: 9rem;">Valor</th>
                                 </tr>
@@ -152,7 +144,7 @@
                                 <tr>
                                     <td>
                                         <a href="{{ linha.url_listagem }}" class="dash-exames-link">
-                                            <span class="badge badge-status-conf bg-{{ linha.css }}{% if linha.css == 'lote-ok' %} badge-lote-ok{% elif linha.css == 'contraste' %} badge-contraste{% endif %}">
+                                            <span class="badge badge-status-conf bg-{{ linha.css }}">
                                                 {{ linha.status }}
                                             </span>
                                         </a>
@@ -199,7 +191,7 @@
                                 <tr>
                                     <td>
                                         <a href="{{ linha.url_listagem }}" class="dash-exames-link">
-                                            <span class="badge badge-status-conf bg-{{ linha.css }}{% if linha.css == 'lote-ok' %} badge-lote-ok{% elif linha.css == 'contraste' %} badge-contraste{% endif %}">
+                                            <span class="badge badge-status-conf bg-{{ linha.css }}">
                                                 {{ linha.status }}
                                             </span>
                                         </a>
