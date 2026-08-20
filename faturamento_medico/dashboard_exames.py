@@ -63,7 +63,7 @@ def _status_linha(faturamento, item=None, ids_internos=None):
     return 'PENDENTE', ItemServico.STATUS_CONFERENCIA_CSS['PENDENTE']
 
 
-def _link_listagem(data_inicio, data_fim, convenio='', status=''):
+def _link_listagem(data_inicio, data_fim, convenio='', status='', nome=''):
     params = [
         ('data_inicio', data_inicio),
         ('data_fim', data_fim),
@@ -72,14 +72,23 @@ def _link_listagem(data_inicio, data_fim, convenio='', status=''):
         params.append(('status_conferencia', status))
     if convenio and convenio != 'Não informado':
         params.append(('convenio', convenio))
+    if nome:
+        params.append(('nome', nome))
     return f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params)}"
 
 
-def _acumular(stats, totais_gerais, convenio, status_label, valor):
+def _chave_cliente(faturamento) -> str:
+    nome = (faturamento.nome or '').strip()
+    return nome.upper() if nome else '-'
+
+
+def _acumular(stats, totais_gerais, convenio, status_label, valor, cliente_chave):
     stats[convenio][status_label]['quantidade'] += 1
     stats[convenio][status_label]['valor'] += valor
+    stats[convenio][status_label]['clientes'].add(cliente_chave)
     totais_gerais[status_label]['quantidade'] += 1
     totais_gerais[status_label]['valor'] += valor
+    totais_gerais[status_label]['clientes'].add(cliente_chave)
 
 
 def _q_convenio_filtro(nome: str) -> Q:
@@ -109,23 +118,26 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         qs = qs.filter(q_conv)
 
     ids_internos = ids_lotes_internos(empresa_id)
-    stats = defaultdict(lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')}))
-    totais_gerais = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
+    stats = defaultdict(
+        lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()}),
+    )
+    totais_gerais = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()})
 
     for fat in qs:
         conv = (fat.convenio or '').strip() or 'Não informado'
+        cliente_chave = _chave_cliente(fat)
         itens = list(fat.itens_servico.all())
         if not itens:
             status_label, _ = _status_linha(fat, ids_internos=ids_internos)
             valor = Decimal(str(fat.total or 0))
-            _acumular(stats, totais_gerais, conv, status_label, valor)
+            _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
             continue
         for item in itens:
             status_label, _ = _status_linha(fat, item, ids_internos=ids_internos)
             valor = item.total if item.total is not None else (item.valor or Decimal('0'))
             if not isinstance(valor, Decimal):
                 valor = Decimal(str(valor))
-            _acumular(stats, totais_gerais, conv, status_label, valor)
+            _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
 
     ordem_status = [c[0] for c in ItemServico.STATUS_CONFERENCIA_CHOICES]
 
@@ -133,33 +145,37 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         linhas = []
         total_q = 0
         total_v = Decimal('0')
+        clientes_bloco: set[str] = set()
         for st in ordem_status:
             d = bloco.get(st)
             if not d or d['quantidade'] == 0:
                 continue
+            clientes_bloco |= d['clientes']
             linhas.append({
                 'status': st,
                 'css': ItemServico.STATUS_CONFERENCIA_CSS.get(st, 'secondary'),
                 'quantidade': d['quantidade'],
+                'quantidade_clientes': len(d['clientes']),
                 'valor': d['valor'],
                 'url_listagem': _link_listagem(data_inicio, data_fim, convenio, st),
             })
             total_q += d['quantidade']
             total_v += d['valor']
-        return linhas, total_q, total_v
+        return linhas, total_q, total_v, len(clientes_bloco)
 
     cards = []
     for conv in sorted(stats.keys(), key=lambda x: x.lower()):
-        linhas, total_q, total_v = _montar_linhas(stats[conv], convenio=conv)
+        linhas, total_q, total_v, total_clientes = _montar_linhas(stats[conv], convenio=conv)
         cards.append({
             'convenio': conv,
             'status_linhas': linhas,
             'total_quantidade': total_q,
+            'total_clientes': total_clientes,
             'total_valor': total_v,
             'url_listagem': _link_listagem(data_inicio, data_fim, conv, ''),
         })
 
-    geral_linhas, geral_q, geral_v = _montar_linhas(totais_gerais)
+    geral_linhas, geral_q, geral_v, geral_clientes = _montar_linhas(totais_gerais)
 
     return {
         'data_inicio': data_inicio,
@@ -170,6 +186,7 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         'totais_gerais': {
             'status_linhas': geral_linhas,
             'total_quantidade': geral_q,
+            'total_clientes': geral_clientes,
             'total_valor': geral_v,
         },
     }

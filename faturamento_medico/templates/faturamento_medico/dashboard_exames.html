@@ -143,7 +143,8 @@
                             <thead>
                                 <tr>
                                     <th>Status conferência</th>
-                                    <th class="text-end" style="width: 6rem;">Qtd.</th>
+                                    <th class="text-end" style="width: 5rem;">Qtd.</th>
+                                    <th class="text-end" style="width: 5rem;">Qt. clientes</th>
                                     <th class="text-end" style="width: 9rem;">Valor</th>
                                 </tr>
                             </thead>
@@ -158,12 +159,14 @@
                                         </a>
                                     </td>
                                     <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">{{ linha.quantidade_clientes }}</td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
                                 </tr>
                                 {% endfor %}
                                 <tr class="dash-exames-total-row">
                                     <td>Total</td>
                                     <td class="text-end">{{ totais_gerais.total_quantidade }}</td>
+                                    <td class="text-end">{{ totais_gerais.total_clientes }}</td>
                                     <td class="text-end">R$ {{ totais_gerais.total_valor_fmt }}</td>
                                 </tr>
                             </tbody>
@@ -182,7 +185,8 @@
             <div class="card dash-exames-card">
                 <div class="card-header d-flex justify-content-between align-items-start gap-2">
                     <a href="{{ card.url_listagem }}" class="dash-exames-link text-dark">{{ card.convenio }}</a>
-                    <span class="badge bg-secondary">{{ card.total_quantidade }}</span>
+                    <span class="badge bg-secondary" title="Procedimentos">{{ card.total_quantidade }} ex.</span>
+                    <span class="badge bg-light text-dark border" title="Pacientes distintos">{{ card.total_clientes }} cli.</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -191,6 +195,7 @@
                                 <tr>
                                     <th>Status conferência</th>
                                     <th class="text-end" style="width: 4rem;">Qtd.</th>
+                                    <th class="text-end" style="width: 4rem;">Qt. clientes</th>
                                     <th class="text-end" style="width: 8rem;">Valor</th>
                                 </tr>
                             </thead>
@@ -205,12 +210,14 @@
                                         </a>
                                     </td>
                                     <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">{{ linha.quantidade_clientes }}</td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
                                 </tr>
                                 {% endfor %}
                                 <tr class="dash-exames-total-row">
                                     <td>Total</td>
                                     <td class="text-end">{{ card.total_quantidade }}</td>
+                                    <td class="text-end">{{ card.total_clientes }}</td>
                                     <td class="text-end">R$ {{ card.total_valor_fmt }}</td>
                                 </tr>
                             </tbody>
