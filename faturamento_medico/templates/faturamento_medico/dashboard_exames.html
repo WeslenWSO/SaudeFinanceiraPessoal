@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block nav_%}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.dash-exames-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    height: 100%;
+    transition: box-shadow 0.15s ease;
+}
+.dash-exames-card:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+}
+.dash-exames-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #eef2f7 100%);
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #dee2e6;
+}
+.dash-exames-resumo {
+    border: 2px solid #0d6efd;
+    background: #f8fbff;
+}
+.dash-exames-resumo .card-header {
+    background: #0d6efd;
+    color: #fff;
+    border-bottom: 0;
+}
+.dash-exames-tabela {
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+.dash-exames-tabela th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #6c757d;
+    font-weight: 600;
+    border-top: 0;
+}
+.dash-exames-tabela td {
+    vertical-align: middle;
+}
+.dash-exames-tabela tr:last-child td {
+    border-bottom: 0;
+}
+.dash-exames-total-row td {
+    font-weight: 700;
+    background: #f8f9fa;
+    border-top: 2px solid #dee2e6;
+}
+.badge-status-conf {
+    font-size: 0.68rem;
+    font-weight: 600;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.2;
+}
+.badge-lote-ok {
+    background-color: #cfe2ff !important;
+    color: #084298 !important;
+}
+.badge-contraste {
+    background-color: #e2d9f3 !important;
+    color: #432874 !important;
+}
+.dash-exames-link {
+    text-decoration: none;
+    color: inherit;
+}
+.dash-exames-link:hover {
+    text-decoration: underline;
+}
+.dash-exames-vazio {
+    color: #6c757d;
+    font-size: 0.9rem;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+</style>
+
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h3 class="mb-1">Dashboard dos Exames</h3>
+            <p class="text-muted mb-0 small">
+                Totalizações por convênio e status de conferência · {{ mes_label }}
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Voltar à listagem
+            </a>
+            <a href="{{ url_listagem_mes }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-list"></i> Ver exames do mês
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label for="mes" class="form-label small fw-semibold mb-1">Mês de referência</label>
+                    <input type="month" id="mes" name="mes" class="form-control form-control-sm" value="{{ mes_filtro }}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if totais_gerais.total_quantidade %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card dash-exames-card dash-exames-resumo">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span><i class="fas fa-layer-group me-1"></i> Total geral — todos os convênios</span>
+                    <span class="small fw-normal opacity-75">{{ mes_label }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table dash-exames-tabela mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Status conferência</th>
+                                    <th class="text-end" style="width: 6rem;">Qtd.</th>
+                                    <th class="text-end" style="width: 9rem;">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in totais_gerais.status_linhas %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ linha.url_listagem }}" class="dash-exames-link">
+                                            <span class="badge badge-status-conf bg-{{ linha.css }}{% if linha.css == 'lote-ok' %} badge-lote-ok{% elif linha.css == 'contraste' %} badge-contraste{% endif %}">
+                                                {{ linha.status }}
+                                            </span>
+                                        </a>
+                                    </td>
+                                    <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="dash-exames-total-row">
+                                    <td>Total</td>
+                                    <td class="text-end">{{ totais_gerais.total_quantidade }}</td>
+                                    <td class="text-end">R$ {{ totais_gerais.total_valor_fmt }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if cards_convenio %}
+    <div class="row g-3">
+        {% for card in cards_convenio %}
+        <div class="col-md-6 col-xl-4">
+            <div class="card dash-exames-card">
+                <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                    <a href="{{ card.url_listagem }}" class="dash-exames-link text-dark">{{ card.convenio }}</a>
+                    <span class="badge bg-secondary">{{ card.total_quantidade }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table dash-exames-tabela mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th class="text-end" style="width: 4rem;">Qtd.</th>
+                                    <th class="text-end" style="width: 8rem;">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in card.status_linhas %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ linha.url_listagem }}" class="dash-exames-link">
+                                            <span class="badge badge-status-conf bg-{{ linha.css }}{% if linha.css == 'lote-ok' %} badge-lote-ok{% elif linha.css == 'contraste' %} badge-contraste{% endif %}">
+                                                {{ linha.status }}
+                                            </span>
+                                        </a>
+                                    </td>
+                                    <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="dash-exames-total-row">
+                                    <td>Total</td>
+                                    <td class="text-end">{{ card.total_quantidade }}</td>
+                                    <td class="text-end">R$ {{ card.total_valor_fmt }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body dash-exames-vazio">
+            <i class="fas fa-inbox fa-2x mb-2 d-block opacity-50"></i>
+            Nenhum exame encontrado em {{ mes_label }}.
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

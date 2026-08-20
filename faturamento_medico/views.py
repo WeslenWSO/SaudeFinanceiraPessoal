@@ -2892,6 +2892,61 @@ def listar_exames_por_solicitante(request):
     return render(request, 'faturamento_medico/listar_exames_por_solicitante.html', context)
 
 
+def dashboard_exames(request):
+    """Dashboard de exames por convênio, totalizado por status de conferência."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+
+    hoje = date.today()
+    mes_param = (request.GET.get('mes') or '').strip()
+    ano, mes = hoje.year, hoje.month
+    if mes_param:
+        try:
+            partes = mes_param.split('-')
+            if len(partes) == 2:
+                ano = int(partes[0])
+                mes = int(partes[1])
+                if mes < 1 or mes > 12:
+                    raise ValueError('mês inválido')
+        except (TypeError, ValueError):
+            messages.warning(request, 'Mês inválido; usando o mês atual.')
+
+    from .dashboard_exames import montar_dashboard_exames
+
+    dados = montar_dashboard_exames(empresa_id, ano, mes)
+
+    def _fmt_card(card):
+        card = dict(card)
+        card['total_valor_fmt'] = _moeda_br(card['total_valor'])
+        card['status_linhas'] = [
+            {**linha, 'valor_fmt': _moeda_br(linha['valor'])}
+            for linha in card['status_linhas']
+        ]
+        return card
+
+    totais = dict(dados['totais_gerais'])
+    totais['total_valor_fmt'] = _moeda_br(totais['total_valor'])
+    totais['status_linhas'] = [
+        {**linha, 'valor_fmt': _moeda_br(linha['valor'])}
+        for linha in totais['status_linhas']
+    ]
+
+    context = {
+        'mes_filtro': f'{ano:04d}-{mes:02d}',
+        'mes_label': dados['mes_label'],
+        'data_inicio': dados['data_inicio'],
+        'data_fim': dados['data_fim'],
+        'cards_convenio': [_fmt_card(c) for c in dados['cards']],
+        'totais_gerais': totais,
+        'url_listagem_mes': (
+            f"{reverse('faturamento_medico:ftlistar')}"
+            f"?{urlencode({'data_inicio': dados['data_inicio'], 'data_fim': dados['data_fim']})}"
+        ),
+    }
+    return render(request, 'faturamento_medico/dashboard_exames.html', context)
+
+
 @require_GET
 def buscar_notas_vinculo_solicitante(request):
     """AJAX: candidatas à vinculação manual de NFSe na lista por solicitante."""

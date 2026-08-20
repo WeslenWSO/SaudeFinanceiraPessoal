@@ -7,6 +7,7 @@ urlpatterns = [
     path('', views.listar_faturamentos, name='ftlistar'),
     path('cancelados/', views.listar_cancelados, name='listar_cancelados'),
     path('exames-por-solicitante/', views.listar_exames_por_solicitante, name='listar_exames_por_solicitante'),
+    path('dashboard-exames/', views.dashboard_exames, name='dashboard_exames'),
     path(
         'exames-por-solicitante/buscar-notas-vinculo/',
         views.buscar_notas_vinculo_solicitante,
