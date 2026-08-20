@@ -164,7 +164,7 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         return linhas, total_q, total_v, len(clientes_bloco)
 
     cards = []
-    for conv in sorted(stats.keys(), key=lambda x: x.lower()):
+    for conv in stats.keys():
         linhas, total_q, total_v, total_clientes = _montar_linhas(stats[conv], convenio=conv)
         cards.append({
             'convenio': conv,
@@ -174,6 +174,7 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
             'total_valor': total_v,
             'url_listagem': _link_listagem(data_inicio, data_fim, conv, ''),
         })
+    cards.sort(key=lambda c: (-c['total_quantidade'], c['convenio'].lower()))
 
     geral_linhas, geral_q, geral_v, geral_clientes = _montar_linhas(totais_gerais)
 
