@@ -1,4 +1,4 @@
-"""Agregação para o dashboard de exames por convênio e status de faturamento."""
+"""Agregação para o dashboard de exames por convênio e status de conferência."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from django.db.models import Q
 from django.urls import reverse
 from urllib.parse import urlencode
 
-from .models import FaturamentoMedico
+from .lote_utils import faturamento_tem_lote_interno, ids_lotes_internos
+from .models import FaturamentoMedico, ItemServico
 
 STATUS_AGENDAMENTO_CANCELADOS = (
     'Cancelado',
@@ -38,18 +39,6 @@ MESES_PT = (
     'Dezembro',
 )
 
-STATUS_DASHBOARD = FaturamentoMedico.FATURAMENTO_STATUS_CHOICES
-
-STATUS_DASHBOARD_CSS = {
-    'pendente': 'secondary',
-    'aguardando_pagamento': 'warning',
-    'enviado': 'info',
-    'finalizado': 'success',
-}
-
-STATUS_DASHBOARD_LABEL = dict(STATUS_DASHBOARD)
-STATUS_DASHBOARD_KEYS = {k for k, _ in STATUS_DASHBOARD}
-
 
 def _q_cancelados():
     q = Q()
@@ -58,30 +47,39 @@ def _q_cancelados():
     return q
 
 
-def _status_faturamento(faturamento):
-    key = (faturamento.status or 'pendente').strip() or 'pendente'
-    if key not in STATUS_DASHBOARD_KEYS:
-        key = 'pendente'
-    return key, STATUS_DASHBOARD_LABEL[key]
+def _status_linha(faturamento, item=None, ids_internos=None):
+    tem_lote = faturamento_tem_lote_interno(faturamento, ids_internos=ids_internos)
+    if item is not None:
+        status_label, status_css = item.status_conferencia_badge()
+        if tem_lote and (status_label in ('CONFERIDO', 'LOTE OK') or item.conferido):
+            return 'LOTE OK', ItemServico.STATUS_CONFERENCIA_CSS['LOTE OK']
+        return status_label, status_css
+    if not (faturamento.guia or '').strip():
+        return 'FALTA DE GUIA', ItemServico.STATUS_CONFERENCIA_CSS.get('FALTA DE GUIA', 'warning')
+    if not faturamento.total:
+        return 'FALTA DE VALOR NA TABELA', ItemServico.STATUS_CONFERENCIA_CSS.get(
+            'FALTA DE VALOR NA TABELA', 'danger'
+        )
+    return 'PENDENTE', ItemServico.STATUS_CONFERENCIA_CSS['PENDENTE']
 
 
-def _link_listagem(data_inicio, data_fim, convenio='', status_key=''):
+def _link_listagem(data_inicio, data_fim, convenio='', status=''):
     params = [
         ('data_inicio', data_inicio),
         ('data_fim', data_fim),
     ]
-    if status_key:
-        params.append(('status', status_key))
+    if status:
+        params.append(('status_conferencia', status))
     if convenio and convenio != 'Não informado':
         params.append(('convenio', convenio))
     return f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params)}"
 
 
-def _acumular(stats, totais_gerais, convenio, status_key, valor):
-    stats[convenio][status_key]['quantidade'] += 1
-    stats[convenio][status_key]['valor'] += valor
-    totais_gerais[status_key]['quantidade'] += 1
-    totais_gerais[status_key]['valor'] += valor
+def _acumular(stats, totais_gerais, convenio, status_label, valor):
+    stats[convenio][status_label]['quantidade'] += 1
+    stats[convenio][status_label]['valor'] += valor
+    totais_gerais[status_label]['quantidade'] += 1
+    totais_gerais[status_label]['valor'] += valor
 
 
 def _q_convenio_filtro(nome: str) -> Q:
@@ -110,40 +108,41 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
             q_conv |= _q_convenio_filtro(conv)
         qs = qs.filter(q_conv)
 
+    ids_internos = ids_lotes_internos(empresa_id)
     stats = defaultdict(lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')}))
     totais_gerais = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
 
     for fat in qs:
         conv = (fat.convenio or '').strip() or 'Não informado'
-        status_key, _ = _status_faturamento(fat)
         itens = list(fat.itens_servico.all())
         if not itens:
+            status_label, _ = _status_linha(fat, ids_internos=ids_internos)
             valor = Decimal(str(fat.total or 0))
-            _acumular(stats, totais_gerais, conv, status_key, valor)
+            _acumular(stats, totais_gerais, conv, status_label, valor)
             continue
         for item in itens:
+            status_label, _ = _status_linha(fat, item, ids_internos=ids_internos)
             valor = item.total if item.total is not None else (item.valor or Decimal('0'))
             if not isinstance(valor, Decimal):
                 valor = Decimal(str(valor))
-            _acumular(stats, totais_gerais, conv, status_key, valor)
+            _acumular(stats, totais_gerais, conv, status_label, valor)
 
-    ordem_status = [k for k, _ in STATUS_DASHBOARD]
+    ordem_status = [c[0] for c in ItemServico.STATUS_CONFERENCIA_CHOICES]
 
     def _montar_linhas(bloco, convenio=None):
         linhas = []
         total_q = 0
         total_v = Decimal('0')
-        for st_key in ordem_status:
-            d = bloco.get(st_key)
+        for st in ordem_status:
+            d = bloco.get(st)
             if not d or d['quantidade'] == 0:
                 continue
             linhas.append({
-                'status': STATUS_DASHBOARD_LABEL[st_key],
-                'status_key': st_key,
-                'css': STATUS_DASHBOARD_CSS.get(st_key, 'secondary'),
+                'status': st,
+                'css': ItemServico.STATUS_CONFERENCIA_CSS.get(st, 'secondary'),
                 'quantidade': d['quantidade'],
                 'valor': d['valor'],
-                'url_listagem': _link_listagem(data_inicio, data_fim, convenio, st_key),
+                'url_listagem': _link_listagem(data_inicio, data_fim, convenio, st),
             })
             total_q += d['quantidade']
             total_v += d['valor']

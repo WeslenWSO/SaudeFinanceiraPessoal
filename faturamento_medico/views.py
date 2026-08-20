@@ -2949,7 +2949,7 @@ def listar_exames_por_solicitante(request):
 
 
 def dashboard_exames(request):
-    """Dashboard de exames por convênio, totalizado por status de faturamento."""
+    """Dashboard de exames por convênio, totalizado por status de conferência."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return HttpResponse('Sessão expirada. Faça login novamente.')
