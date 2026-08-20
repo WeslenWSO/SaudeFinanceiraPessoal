@@ -82,11 +82,19 @@ def _acumular(stats, totais_gerais, convenio, status_label, valor):
     totais_gerais[status_label]['valor'] += valor
 
 
-def montar_dashboard_exames(empresa_id, ano, mes):
+def _q_convenio_filtro(nome: str) -> Q:
+    conv = (nome or '').strip()
+    if not conv:
+        return Q()
+    return Q(convenio__iexact=conv)
+
+
+def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
     inicio = date(ano, mes, 1)
     fim = date(ano, mes, monthrange(ano, mes)[1])
     data_inicio = inicio.isoformat()
     data_fim = fim.isoformat()
+    convenios_sel = [c.strip() for c in (convenios or []) if c and str(c).strip()]
 
     qs = (
         FaturamentoMedico.objects
@@ -94,6 +102,11 @@ def montar_dashboard_exames(empresa_id, ano, mes):
         .exclude(_q_cancelados())
         .prefetch_related('itens_servico')
     )
+    if convenios_sel:
+        q_conv = Q()
+        for conv in convenios_sel:
+            q_conv |= _q_convenio_filtro(conv)
+        qs = qs.filter(q_conv)
     ids_internos = ids_lotes_internos(empresa_id)
 
     stats = defaultdict(lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')}))
@@ -152,6 +165,7 @@ def montar_dashboard_exames(empresa_id, ano, mes):
         'data_inicio': data_inicio,
         'data_fim': data_fim,
         'mes_label': f'{MESES_PT[mes]} / {ano}',
+        'convenios_selecionados': convenios_sel,
         'cards': cards,
         'totais_gerais': {
             'status_linhas': geral_linhas,

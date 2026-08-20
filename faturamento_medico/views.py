@@ -2912,9 +2912,23 @@ def dashboard_exames(request):
         except (TypeError, ValueError):
             messages.warning(request, 'Mês inválido; usando o mês atual.')
 
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
+
     from .dashboard_exames import montar_dashboard_exames
 
-    dados = montar_dashboard_exames(empresa_id, ano, mes)
+    dados = montar_dashboard_exames(empresa_id, ano, mes, convenios=convenios_sel)
+
+    convenios_disponiveis = []
+    from servicos_medicos.models import Convenio
+    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
+    if not convenios_disponiveis:
+        convenios_disponiveis = [
+            type('Conv', (), {'nome': n})()
+            for n in (
+                'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
+                'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
+            )
+        ]
 
     def _fmt_card(card):
         card = dict(card)
@@ -2932,17 +2946,23 @@ def dashboard_exames(request):
         for linha in totais['status_linhas']
     ]
 
+    params_listagem = [
+        ('data_inicio', dados['data_inicio']),
+        ('data_fim', dados['data_fim']),
+    ]
+    for conv in convenios_sel:
+        params_listagem.append(('convenio', conv))
+
     context = {
         'mes_filtro': f'{ano:04d}-{mes:02d}',
         'mes_label': dados['mes_label'],
         'data_inicio': dados['data_inicio'],
         'data_fim': dados['data_fim'],
+        'convenios_disponiveis': convenios_disponiveis,
+        'filtros': {'convenios': convenios_sel},
         'cards_convenio': [_fmt_card(c) for c in dados['cards']],
         'totais_gerais': totais,
-        'url_listagem_mes': (
-            f"{reverse('faturamento_medico:ftlistar')}"
-            f"?{urlencode({'data_inicio': dados['data_inicio'], 'data_fim': dados['data_fim']})}"
-        ),
+        'url_listagem_mes': f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params_listagem)}",
     }
     return render(request, 'faturamento_medico/dashboard_exames.html', context)
 
