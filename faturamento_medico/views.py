@@ -37,6 +37,7 @@ from .forms import (
     DocumentoAnexadoForm,
     ItemServicoForm,
     ItemServicoFormSet,
+    LancamentoAnestesistaForm,
     ServicoDisponivelForm,
 )
 from .models import (
@@ -45,6 +46,7 @@ from .models import (
     ExtratoPagamentoConvenio,
     FaturamentoMedico,
     ItemServico,
+    LancamentoAnestesistaExame,
     Lote,
     MetaModalidadeSolicitante,
     ServicoDisponivel,
@@ -232,6 +234,16 @@ def _query_export_faturamento(filtros):
         params.append(('status_conferencia', st))
     for conv in filtros.get('convenios') or []:
         params.append(('convenio', conv))
+    return urlencode(params)
+
+
+def _query_relatorio_sedacao(filtros):
+    """Query string do relatório de sedação (data início/fim e anestesista)."""
+    params = []
+    for key in ('data_inicio', 'data_fim', 'anestesista'):
+        val = filtros.get(key)
+        if val:
+            params.append((key, val))
     return urlencode(params)
 
 
@@ -2380,6 +2392,7 @@ def listar_faturamentos(request):
             'per_page': str(per_page),
         },
         'export_query_string': _query_export_faturamento(filtros),
+        'relatorio_sedacao_query_string': _query_relatorio_sedacao(filtros),
         'listagem_query_string': _query_listagem_faturamento(filtros, per_page=per_page),
     }
 
@@ -3750,7 +3763,11 @@ def criar_faturamento(request):
 def editar_faturamento(request, pk):
     """Edita um faturamento médico existente"""
     faturamento = get_object_or_404(
-        FaturamentoMedico.objects.prefetch_related('documentos_anexados'),
+        FaturamentoMedico.objects.prefetch_related(
+            'documentos_anexados',
+            'itens_servico',
+            'lancamentos_anestesista',
+        ),
         pk=pk,
     )
     empresa_id = request.session.get('empresa_id')
@@ -3764,10 +3781,16 @@ def editar_faturamento(request, pk):
     else:
         form = FaturamentoMedicoForm(instance=faturamento, empresa_id=empresa_id)
 
+    from django.db.models import Sum
+    total_anestesista = (
+        faturamento.lancamentos_anestesista.aggregate(t=Sum('valor'))['t'] or 0
+    )
+
     context = {
         'form': form,
         'faturamento': faturamento,
-        'titulo': 'Editar Faturamento Médico'
+        'titulo': 'Editar Faturamento Médico',
+        'total_anestesista': total_anestesista,
     }
 
     return render(request, 'faturamento_medico/form.html', context)
@@ -4362,6 +4385,160 @@ def excluir_item_servico(request, pk):
     }
 
     return render(request, 'faturamento_medico/confirmar_exclusao_item.html', context)
+
+
+def adicionar_lancamento_anestesista(request, pk):
+    """Adiciona lançamento de anestesista (exame com sedação)."""
+    faturamento = get_object_or_404(FaturamentoMedico, pk=pk)
+
+    if request.method == 'POST':
+        form = LancamentoAnestesistaForm(request.POST, faturamento=faturamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Lançamento de anestesista registrado com sucesso!')
+            return redirect('faturamento_medico:editar', pk=faturamento.pk)
+    else:
+        form = LancamentoAnestesistaForm(faturamento=faturamento)
+
+    itens_exame = {
+        str(item.pk): (item.servico or '')
+        for item in faturamento.itens_servico.all()
+    }
+
+    return render(request, 'faturamento_medico/lancamento_anestesista_form.html', {
+        'form': form,
+        'faturamento': faturamento,
+        'titulo': 'Lançar anestesista',
+        'itens_exame_json': json.dumps(itens_exame, ensure_ascii=False),
+    })
+
+
+def editar_lancamento_anestesista(request, pk):
+    """Edita lançamento de anestesista."""
+    lancamento = get_object_or_404(LancamentoAnestesistaExame.objects.select_related('faturamento'), pk=pk)
+    faturamento = lancamento.faturamento
+
+    if request.method == 'POST':
+        form = LancamentoAnestesistaForm(request.POST, instance=lancamento, faturamento=faturamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Lançamento de anestesista atualizado!')
+            return redirect('faturamento_medico:editar', pk=faturamento.pk)
+    else:
+        form = LancamentoAnestesistaForm(instance=lancamento, faturamento=faturamento)
+
+    itens_exame = {
+        str(item.pk): (item.servico or '')
+        for item in faturamento.itens_servico.all()
+    }
+
+    return render(request, 'faturamento_medico/lancamento_anestesista_form.html', {
+        'form': form,
+        'faturamento': faturamento,
+        'titulo': 'Editar lançamento anestesista',
+        'itens_exame_json': json.dumps(itens_exame, ensure_ascii=False),
+    })
+
+
+def excluir_lancamento_anestesista(request, pk):
+    """Exclui lançamento de anestesista."""
+    lancamento = get_object_or_404(LancamentoAnestesistaExame, pk=pk)
+    faturamento_pk = lancamento.faturamento_id
+
+    if request.method == 'POST':
+        lancamento.delete()
+        messages.success(request, 'Lançamento de anestesista excluído!')
+        return redirect('faturamento_medico:editar', pk=faturamento_pk)
+
+    return render(request, 'faturamento_medico/confirmar_exclusao_lancamento_anestesista.html', {
+        'lancamento': lancamento,
+    })
+
+
+def relatorio_sedacao_anestesista(request):
+    """Relatório de sedação anestesista por período (data do faturamento)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    data_inicio = _parse_data_filtro(request.GET.get('data_inicio'))
+    data_fim = _parse_data_filtro(request.GET.get('data_fim'))
+    if not data_inicio or not data_fim:
+        data_inicio, data_fim = _periodo_filtro_padrao()
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+
+    anestesista = (request.GET.get('anestesista') or '').strip()
+
+    from .relatorio_sedacao_anestesista import montar_relatorio_sedacao_anestesista
+
+    dados = montar_relatorio_sedacao_anestesista(
+        empresa_id,
+        data_inicio,
+        data_fim,
+        anestesista=anestesista,
+    )
+
+    if request.GET.get('formato') == 'excel':
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Sedacao Anestesista'
+        headers = [
+            'Data', 'Paciente', 'Exame', 'Médico anestesista', 'Valor sedação', 'Médico',
+        ]
+        for col, titulo in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=titulo)
+            cell.font = Font(bold=True)
+        for row_idx, linha in enumerate(dados['linhas'], 2):
+            ws.cell(row=row_idx, column=1, value=linha['data_fmt'])
+            ws.cell(row=row_idx, column=2, value=linha['paciente'])
+            ws.cell(row=row_idx, column=3, value=linha['exame'])
+            ws.cell(row=row_idx, column=4, value=linha['medico_anestesista'])
+            ws.cell(row=row_idx, column=5, value=float(linha['valor_sedacao']))
+            ws.cell(row=row_idx, column=6, value=linha['medico'])
+        tot_row = len(dados['linhas']) + 2
+        ws.cell(row=tot_row, column=4, value='TOTAL').font = Font(bold=True)
+        ws.cell(row=tot_row, column=5, value=float(dados['total_valor'])).font = Font(bold=True)
+
+        from io import BytesIO
+        from django.http import HttpResponse
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        nome_arquivo = f'relatorio_sedacao_{data_inicio:%Y%m%d}_{data_fim:%Y%m%d}.xlsx'
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+        return response
+
+    try:
+        empresa = Empresa.objects.get(id=empresa_id)
+    except Empresa.DoesNotExist:
+        empresa = None
+
+    params_voltar = _query_relatorio_sedacao({
+        'data_inicio': data_inicio.isoformat(),
+        'data_fim': data_fim.isoformat(),
+        'anestesista': anestesista,
+    })
+
+    context = {
+        'empresa': empresa,
+        'linhas': [
+            {**l, 'valor_fmt': _moeda_br(l['valor_sedacao'])}
+            for l in dados['linhas']
+        ],
+        'total_valor_fmt': _moeda_br(dados['total_valor']),
+        'quantidade': dados['quantidade'],
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'anestesista': anestesista,
+        'excel_url': f"{reverse('faturamento_medico:relatorio_sedacao_anestesista')}?{params_voltar}&formato=excel",
+    }
+    return render(request, 'faturamento_medico/relatorio_sedacao_anestesista.html', context)
 
 
 def fechamento_repasse(request):

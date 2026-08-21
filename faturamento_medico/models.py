@@ -352,6 +352,11 @@ class ItemServico(models.Model):
         verbose_name='Com Contraste',
         default=False
     )
+    com_sedacao = models.BooleanField(
+        verbose_name='Com Sedação',
+        default=False,
+        help_text='Exame realizado com sedação/anestesia',
+    )
     conferido = models.BooleanField(
         verbose_name='Conferência',
         default=False
@@ -455,6 +460,51 @@ class ItemServico(models.Model):
         self.conferido = status in ('CONFERIDO', 'LOTE OK')
         self.save(update_fields=['status_conferencia', 'conferido'])
         return self.status_conferencia_badge()
+
+
+class LancamentoAnestesistaExame(models.Model):
+    """Repasse/lançamento de anestesista por exame com sedação (relatórios futuros)."""
+
+    faturamento = models.ForeignKey(
+        FaturamentoMedico,
+        on_delete=models.CASCADE,
+        related_name='lancamentos_anestesista',
+        verbose_name='Faturamento',
+    )
+    item_servico = models.ForeignKey(
+        ItemServico,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lancamentos_anestesista',
+        verbose_name='Item do exame',
+    )
+    medico = models.CharField(
+        verbose_name='Médico (anestesista)',
+        max_length=200,
+    )
+    exame = models.CharField(
+        verbose_name='Exame',
+        max_length=200,
+    )
+    valor = models.DecimalField(
+        verbose_name='Valor',
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    data_criacao = models.DateTimeField(
+        verbose_name='Data de criação',
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = 'Lançamento anestesista'
+        verbose_name_plural = 'Lançamentos anestesista'
+        ordering = ['data_criacao', 'id']
+
+    def __str__(self):
+        return f'{self.medico} — {self.exame} — R$ {self.valor}'
 
 
 class LogStatusConferenciaItem(models.Model):

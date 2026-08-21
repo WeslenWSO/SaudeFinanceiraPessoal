@@ -31,6 +31,7 @@ urlpatterns = [
     path('<int:pk>/excluir/', views.excluir_faturamento, name='excluir'),
     path('<int:pk>/detalhes/', views.detalhes_faturamento, name='detalhes'),
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
+    path('relatorio-sedacao-anestesista/', views.relatorio_sedacao_anestesista, name='relatorio_sedacao_anestesista'),
     path('gerar-lote/', views.gerar_lote, name='gerar_lote'),
     path('vincular-lote-protocolo/', views.vincular_lote_protocolo, name='vincular_lote_protocolo'),
     # URLs para documentos anexados
@@ -42,6 +43,9 @@ urlpatterns = [
     path('<int:pk>/adicionar-item/', views.adicionar_item_servico, name='adicionar_item_servico'),
     path('item/<int:pk>/editar/', views.editar_item_servico, name='editar_item_servico'),
     path('item/<int:pk>/excluir/', views.excluir_item_servico, name='excluir_item_servico'),
+    path('<int:pk>/lancamento-anestesista/adicionar/', views.adicionar_lancamento_anestesista, name='adicionar_lancamento_anestesista'),
+    path('lancamento-anestesista/<int:pk>/editar/', views.editar_lancamento_anestesista, name='editar_lancamento_anestesista'),
+    path('lancamento-anestesista/<int:pk>/excluir/', views.excluir_lancamento_anestesista, name='excluir_lancamento_anestesista'),
 
     # URL para fechamento de repasse
     path('fechamento-repasse/', views.fechamento_repasse, name='fechamento_repasse'),

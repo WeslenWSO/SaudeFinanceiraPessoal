@@ -1,6 +1,6 @@
 from django import forms
 from django.utils import timezone
-from .models import FaturamentoMedico, DocumentoAnexado, ItemServico, ServicoDisponivel
+from .models import FaturamentoMedico, DocumentoAnexado, ItemServico, LancamentoAnestesistaExame, ServicoDisponivel
 from servicos_medicos.models import TabelaPreco, Convenio
 from empresa.models import Empresa
 
@@ -264,7 +264,7 @@ class ItemServicoForm(forms.ModelForm):
 
     class Meta:
         model = ItemServico
-        fields = ['codigo_servico', 'servico', 'porte', 'modalidade', 'com_contraste', 'qt', 'valor', 'percentual']
+        fields = ['codigo_servico', 'servico', 'porte', 'modalidade', 'com_contraste', 'com_sedacao', 'qt', 'valor', 'percentual']
         widgets = {
             'codigo_servico': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -283,6 +283,9 @@ class ItemServicoForm(forms.ModelForm):
                 'placeholder': 'MR, CT, US...'
             }),
             'com_contraste': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'com_sedacao': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
             'qt': forms.NumberInput(attrs={
@@ -397,3 +400,60 @@ class ServicoDisponivelForm(forms.ModelForm):
                 'class': 'form-check-input'
             }),
         }
+
+
+class LancamentoAnestesistaForm(forms.ModelForm):
+    """Lançamento de anestesista vinculado a exame com sedação."""
+
+    class Meta:
+        model = LancamentoAnestesistaExame
+        fields = ['item_servico', 'medico', 'exame', 'valor']
+        widgets = {
+            'item_servico': forms.Select(attrs={'class': 'form-select', 'id': 'item_servico_select'}),
+            'medico': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do anestesista',
+            }),
+            'exame': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Descrição do exame',
+            }),
+            'valor': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0.00',
+            }),
+        }
+        labels = {
+            'item_servico': 'Exame (item)',
+            'medico': 'Médico (anestesista)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.faturamento = kwargs.pop('faturamento', None)
+        super().__init__(*args, **kwargs)
+        self.fields['item_servico'].required = False
+        self.fields['item_servico'].empty_label = 'Selecione o exame (opcional)'
+        if self.faturamento:
+            itens_sedacao = self.faturamento.itens_servico.filter(com_sedacao=True)
+            if itens_sedacao.exists():
+                self.fields['item_servico'].queryset = itens_sedacao
+            else:
+                self.fields['item_servico'].queryset = self.faturamento.itens_servico.all()
+            if not self.instance.pk:
+                if self.faturamento.anestesista:
+                    self.initial.setdefault('medico', self.faturamento.anestesista)
+        else:
+            self.fields['item_servico'].queryset = ItemServico.objects.none()
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.faturamento:
+            instance.faturamento = self.faturamento
+        item = self.cleaned_data.get('item_servico')
+        if item and not (instance.exame or '').strip():
+            instance.exame = (item.servico or '').strip() or f'Item #{item.pk}'
+        if commit:
+            instance.save()
+        return instance

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block nav_%}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title mb-0">Excluir lançamento anestesista</h3>
+        </div>
+        <div class="card-body">
+            <p>Confirma a exclusão do lançamento abaixo?</p>
+            <ul>
+                <li><strong>Médico:</strong> {{ lancamento.medico }}</li>
+                <li><strong>Exame:</strong> {{ lancamento.exame }}</li>
+                <li><strong>Valor:</strong> R$ {{ lancamento.valor|floatformat:2 }}</li>
+            </ul>
+            <form method="POST">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Excluir</button>
+                <a href="{% url 'faturamento_medico:editar' lancamento.faturamento_id %}" class="btn btn-secondary">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -118,6 +118,7 @@
                                                 <th>Exame / Serviço</th>
                                                 <th>Modalidade</th>
                                                 <th>Contraste</th>
+                                                <th>Sedação</th>
                                                 <th class="text-end">Valor</th>
                                                 <th class="text-center">Ações</th>
                                             </tr>
@@ -129,6 +130,7 @@
                                                 <td>{{ item.servico|default:"Serviço não informado" }}</td>
                                                 <td>{{ item.modalidade|default:"-" }}</td>
                                                 <td>{% if item.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                                                <td>{% if item.com_sedacao %}<span class="badge bg-info text-dark">Sim</span>{% else %}Não{% endif %}</td>
                                                 <td class="text-end">R$ {{ item.total|floatformat:2 }}</td>
                                                 <td class="text-center text-nowrap">
                                                     <a href="{% url 'faturamento_medico:editar_item_servico' item.pk %}"
@@ -146,7 +148,7 @@
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-light">
-                                                <th colspan="4">Total dos exames</th>
+                                                <th colspan="5">Total dos exames</th>
                                                 <th class="text-end">R$ {{ form.instance.total|floatformat:2 }}</th>
                                                 <th></th>
                                             </tr>
@@ -160,6 +162,74 @@
                                     <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
                                        class="btn btn-primary btn-sm">
                                         <i class="fas fa-plus"></i> Adicionar primeiro exame
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </section>
+
+                        <section class="fat-section fat-section-anestesista mb-0">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fat-section-title mb-0 border-0 pb-0">
+                                    <i class="fas fa-syringe"></i> Anestesista — exames com sedação
+                                    {% if faturamento.lancamentos_anestesista.exists %}
+                                        <span class="badge bg-secondary">{{ faturamento.lancamentos_anestesista.count }}</span>
+                                    {% endif %}
+                                </h6>
+                                <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' faturamento.pk %}"
+                                   class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-plus"></i> Lançar anestesista
+                                </a>
+                            </div>
+                            <p class="text-muted small mb-2">
+                                Marque <strong>Sedação = Sim</strong> no exame e registre aqui: <strong>Médico · Exame · Valor</strong> (para relatórios futuros).
+                            </p>
+                            {% if faturamento.lancamentos_anestesista.exists %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Médico (anestesista)</th>
+                                                <th>Exame</th>
+                                                <th class="text-end">Valor</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for lan in faturamento.lancamentos_anestesista.all %}
+                                            <tr>
+                                                <td>{{ lan.medico }}</td>
+                                                <td>{{ lan.exame }}</td>
+                                                <td class="text-end">R$ {{ lan.valor|floatformat:2 }}</td>
+                                                <td class="text-center text-nowrap">
+                                                    <a href="{% url 'faturamento_medico:editar_lancamento_anestesista' lan.pk %}"
+                                                       class="btn btn-sm btn-warning" title="Editar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="{% url 'faturamento_medico:excluir_lancamento_anestesista' lan.pk %}"
+                                                       class="btn btn-sm btn-danger" title="Excluir"
+                                                       onclick="return confirm('Excluir este lançamento de anestesista?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-light">
+                                                <th colspan="2">Total anestesista</th>
+                                                <th class="text-end">R$ {{ total_anestesista|floatformat:2 }}</th>
+                                                <th></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="text-center text-muted py-3 border rounded bg-light">
+                                    <i class="fas fa-syringe fa-2x mb-2 opacity-50"></i>
+                                    <p class="mb-2 small">Nenhum lançamento de anestesista ainda.</p>
+                                    <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' faturamento.pk %}"
+                                       class="btn btn-success btn-sm">
+                                        <i class="fas fa-plus"></i> Lançar anestesista
                                     </a>
                                 </div>
                             {% endif %}
