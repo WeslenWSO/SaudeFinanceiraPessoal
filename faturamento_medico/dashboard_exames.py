@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 from urllib.parse import urlencode
 
 from .lote_utils import faturamento_tem_lote_interno, ids_lotes_internos
@@ -193,155 +194,135 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
     }
 
 
-def _ultimo_usuario_por_item(item_ids):
-    """Mapa item_id -> último usuário que alterou status de conferência."""
-    if not item_ids:
-        return {}
-    logs = (
-        LogStatusConferenciaItem.objects
-        .filter(item_servico_id__in=item_ids)
-        .order_by('item_servico_id', '-data_hora', '-id')
-        .values_list('item_servico_id', 'usuario_nome')
-    )
-    resultado = {}
-    for item_id, nome in logs:
-        if item_id not in resultado:
-            resultado[item_id] = (nome or '').strip() or 'Sistema'
-    return resultado
-
-
-def _iterar_exames_dia(fat, usuarios_item):
-    """Gera (convenio, usuario, cliente_chave) por exame/procedimento do faturamento."""
-    conv = (fat.convenio or '').strip() or 'Não informado'
-    cliente_chave = _chave_cliente(fat)
-    itens = list(fat.itens_servico.all())
-    if not itens:
-        yield conv, 'Sem conferência', cliente_chave
-        return
-    for item in itens:
-        usuario = usuarios_item.get(item.pk, 'Sem conferência')
-        yield conv, usuario, cliente_chave
-
-
-def _acumular_dia(stats, convenio, usuario, cliente_chave):
-    stats[(convenio, usuario)]['quantidade'] += 1
-    stats[(convenio, usuario)]['clientes'].add(cliente_chave)
-
-
-def montar_resumo_regua_mes(empresa_id, ano, mes, convenios=None):
-    """Totais de exames e clientes por dia do mês (para a régua temporal)."""
+def _logs_conferencia_mes_qs(empresa_id, ano, mes, convenios=None):
+    """Logs de alteração de status de conferência no mês (filtro por data do log)."""
     inicio = date(ano, mes, 1)
-    ultimo_dia = monthrange(ano, mes)[1]
-    fim = date(ano, mes, ultimo_dia)
+    fim = date(ano, mes, monthrange(ano, mes)[1])
     convenios_sel = [c.strip() for c in (convenios or []) if c and str(c).strip()]
 
     qs = (
-        FaturamentoMedico.objects
-        .filter(empresa_id=empresa_id, data__gte=inicio, data__lte=fim)
-        .exclude(_q_cancelados())
-        .prefetch_related('itens_servico')
+        LogStatusConferenciaItem.objects
+        .filter(
+            item_servico__faturamento__empresa_id=empresa_id,
+            data_hora__date__gte=inicio,
+            data_hora__date__lte=fim,
+        )
+        .select_related('item_servico__faturamento')
+        .order_by('data_hora', 'id')
     )
     if convenios_sel:
         q_conv = Q()
         for conv in convenios_sel:
-            q_conv |= _q_convenio_filtro(conv)
+            q_conv |= Q(item_servico__faturamento__convenio__iexact=conv)
         qs = qs.filter(q_conv)
+    return qs
 
-    por_dia = defaultdict(lambda: {'quantidade': 0, 'clientes': set()})
-    for fat in qs:
-        dia = fat.data
-        if not dia:
-            continue
-        cliente_chave = _chave_cliente(fat)
-        itens = list(fat.itens_servico.all())
-        if not itens:
-            por_dia[dia]['quantidade'] += 1
-            por_dia[dia]['clientes'].add(cliente_chave)
-            continue
-        for _item in itens:
-            por_dia[dia]['quantidade'] += 1
-            por_dia[dia]['clientes'].add(cliente_chave)
+
+def _acumular_producao_log(stats, convenio, usuario, item_id, cliente_chave):
+    chave = (convenio, usuario)
+    stats[chave]['alteracoes'] += 1
+    stats[chave]['itens'].add(item_id)
+    stats[chave]['clientes'].add(cliente_chave)
+
+
+def montar_resumo_regua_mes(empresa_id, ano, mes, convenios=None):
+    """Totais de alterações de conferência por dia do mês (data do log)."""
+    ultimo_dia = monthrange(ano, mes)[1]
+    por_dia = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+
+    for log in _logs_conferencia_mes_qs(empresa_id, ano, mes, convenios):
+        dia = timezone.localtime(log.data_hora).date()
+        fat = log.item_servico.faturamento
+        por_dia[dia]['alteracoes'] += 1
+        por_dia[dia]['itens'].add(log.item_servico_id)
+        por_dia[dia]['clientes'].add(_chave_cliente(fat))
 
     dias = []
     for d in range(1, ultimo_dia + 1):
         ref = date(ano, mes, d)
-        info = por_dia.get(ref, {'quantidade': 0, 'clientes': set()})
+        info = por_dia.get(ref, {'alteracoes': 0, 'itens': set(), 'clientes': set()})
         dias.append({
             'dia': d,
             'data_iso': ref.isoformat(),
-            'quantidade': info['quantidade'],
+            'quantidade': info['alteracoes'],
+            'quantidade_itens': len(info['itens']),
             'quantidade_clientes': len(info['clientes']),
         })
     return dias
 
 
 def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
-    """Detalhe de um dia: exames e clientes por convênio e usuário (última conferência)."""
+    """Produção diária por data do log: alterações de conferência por convênio e usuário."""
     ultimo_dia = monthrange(ano, mes)[1]
     dia = max(1, min(int(dia or 1), ultimo_dia))
     dia_ref = date(ano, mes, dia)
     convenios_sel = [c.strip() for c in (convenios or []) if c and str(c).strip()]
 
-    qs = (
-        FaturamentoMedico.objects
-        .filter(empresa_id=empresa_id, data=dia_ref)
-        .exclude(_q_cancelados())
-        .prefetch_related('itens_servico')
-    )
-    if convenios_sel:
-        q_conv = Q()
-        for conv in convenios_sel:
-            q_conv |= _q_convenio_filtro(conv)
-        qs = qs.filter(q_conv)
-
-    faturamentos = list(qs)
-    item_ids = [
-        item.pk
-        for fat in faturamentos
-        for item in fat.itens_servico.all()
+    logs_dia = [
+        log for log in _logs_conferencia_mes_qs(empresa_id, ano, mes, convenios)
+        if timezone.localtime(log.data_hora).date() == dia_ref
     ]
-    usuarios_item = _ultimo_usuario_por_item(item_ids)
 
-    stats = defaultdict(lambda: {'quantidade': 0, 'clientes': set()})
-    for fat in faturamentos:
-        for conv, usuario, cliente in _iterar_exames_dia(fat, usuarios_item):
-            _acumular_dia(stats, conv, usuario, cliente)
+    stats = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+    eventos = []
+    for log in logs_dia:
+        fat = log.item_servico.faturamento
+        conv = (fat.convenio or '').strip() or 'Não informado'
+        usuario = (log.usuario_nome or '').strip() or 'Sistema'
+        cliente = _chave_cliente(fat)
+        _acumular_producao_log(stats, conv, usuario, log.item_servico_id, cliente)
+        dt = timezone.localtime(log.data_hora)
+        eventos.append({
+            'hora': dt.strftime('%H:%M'),
+            'usuario': usuario,
+            'convenio': conv,
+            'status_conferencia': log.status_conferencia,
+            'cliente': (fat.nome or '').strip() or '-',
+            'procedimento': (log.item_servico.servico or '').strip() or '-',
+        })
 
     linhas = []
-    totais_conv = defaultdict(lambda: {'quantidade': 0, 'clientes': set()})
-    totais_usuario = defaultdict(lambda: {'quantidade': 0, 'clientes': set()})
-    total_q = 0
+    totais_conv = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+    totais_usuario = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+    total_alteracoes = 0
+    total_itens: set[int] = set()
     total_clientes: set[str] = set()
 
     for (conv, usuario), dados in sorted(stats.items(), key=lambda x: (x[0][0].lower(), x[0][1].lower())):
         linhas.append({
             'convenio': conv,
             'usuario': usuario,
-            'quantidade': dados['quantidade'],
+            'quantidade': dados['alteracoes'],
+            'quantidade_itens': len(dados['itens']),
             'quantidade_clientes': len(dados['clientes']),
         })
-        totais_conv[conv]['quantidade'] += dados['quantidade']
+        totais_conv[conv]['alteracoes'] += dados['alteracoes']
+        totais_conv[conv]['itens'] |= dados['itens']
         totais_conv[conv]['clientes'] |= dados['clientes']
-        totais_usuario[usuario]['quantidade'] += dados['quantidade']
+        totais_usuario[usuario]['alteracoes'] += dados['alteracoes']
+        totais_usuario[usuario]['itens'] |= dados['itens']
         totais_usuario[usuario]['clientes'] |= dados['clientes']
-        total_q += dados['quantidade']
+        total_alteracoes += dados['alteracoes']
+        total_itens |= dados['itens']
         total_clientes |= dados['clientes']
 
     resumo_convenios = [
         {
             'convenio': conv,
-            'quantidade': d['quantidade'],
+            'quantidade': d['alteracoes'],
+            'quantidade_itens': len(d['itens']),
             'quantidade_clientes': len(d['clientes']),
         }
-        for conv, d in sorted(totais_conv.items(), key=lambda x: (-x[1]['quantidade'], x[0].lower()))
+        for conv, d in sorted(totais_conv.items(), key=lambda x: (-x[1]['alteracoes'], x[0].lower()))
     ]
     resumo_usuarios = [
         {
             'usuario': usuario,
-            'quantidade': d['quantidade'],
+            'quantidade': d['alteracoes'],
+            'quantidade_itens': len(d['itens']),
             'quantidade_clientes': len(d['clientes']),
         }
-        for usuario, d in sorted(totais_usuario.items(), key=lambda x: (-x[1]['quantidade'], x[0].lower()))
+        for usuario, d in sorted(totais_usuario.items(), key=lambda x: (-x[1]['alteracoes'], x[0].lower()))
     ]
 
     regua = montar_resumo_regua_mes(empresa_id, ano, mes, convenios=convenios_sel)
@@ -356,7 +337,9 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
         'linhas': linhas,
         'resumo_convenios': resumo_convenios,
         'resumo_usuarios': resumo_usuarios,
-        'total_quantidade': total_q,
+        'eventos': list(reversed(eventos)),
+        'total_quantidade': total_alteracoes,
+        'total_itens': len(total_itens),
         'total_clientes': len(total_clientes),
         'regua_dias': regua,
         'regua_max_quantidade': max_q,

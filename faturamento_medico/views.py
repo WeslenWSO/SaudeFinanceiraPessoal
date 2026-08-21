@@ -3033,7 +3033,7 @@ def dashboard_exames(request):
 
 
 def dashboard_exames_diario(request):
-    """Visão diária: exames e clientes por convênio e usuário, com régua do mês."""
+    """Visão diária: produção de conferência por data do log, convênio e usuário."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return HttpResponse('Sessão expirada. Faça login novamente.')
@@ -3101,7 +3101,9 @@ def dashboard_exames_diario(request):
         'linhas': dados['linhas'],
         'resumo_convenios': dados['resumo_convenios'],
         'resumo_usuarios': dados['resumo_usuarios'],
+        'eventos': dados['eventos'],
         'total_quantidade': dados['total_quantidade'],
+        'total_itens': dados['total_itens'],
         'total_clientes': dados['total_clientes'],
         'regua_dias': [
             {**d, 'url': _url_dia(d['dia']), 'ativo': d['dia'] == dados['dia']}

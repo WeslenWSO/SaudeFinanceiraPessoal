@@ -26,7 +26,6 @@
     padding: 0.35rem 0.15rem 0.25rem;
     background: #fff;
     transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
-    position: relative;
 }
 .dash-diario-dia:hover {
     border-color: #0d6efd;
@@ -90,6 +89,13 @@
     font-weight: 600;
     font-size: 0.9rem;
 }
+.dash-diario-card-producao {
+    border: 2px solid #198754;
+}
+.dash-diario-card-producao .card-header {
+    background: #198754;
+    color: #fff;
+}
 .dash-diario-vazio {
     color: #6c757d;
     text-align: center;
@@ -100,9 +106,9 @@
 <div class="container-fluid py-3">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-            <h3 class="mb-1">Visão diária — Dashboard dos Exames</h3>
+            <h3 class="mb-1">Produção diária — Conferência</h3>
             <p class="text-muted mb-0 small">
-                Exames e clientes por convênio e usuário · {{ dia_label }} · {{ mes_label }}
+                Alterações de status por data do log · {{ dia_label }} · {{ mes_label }}
                 {% if filtros.convenios %}
                     · {{ filtros.convenios|length }} convênio(s)
                 {% endif %}
@@ -143,14 +149,14 @@
             </form>
 
             <label class="form-label small fw-semibold mb-2 d-block">
-                <i class="fas fa-ruler-horizontal me-1"></i> Régua do mês — clique no dia
+                <i class="fas fa-ruler-horizontal me-1"></i> Régua do mês — clique no dia (data do log)
             </label>
             <div class="dash-diario-regua-wrap">
                 <div class="dash-diario-regua">
                     {% for d in regua_dias %}
                     <a href="{{ d.url }}"
                        class="dash-diario-dia{% if d.ativo %} ativo{% endif %}"
-                       title="Dia {{ d.dia }} — {{ d.quantidade }} exame(s), {{ d.quantidade_clientes }} cliente(s)">
+                       title="Dia {{ d.dia }} — {{ d.quantidade }} alteração(ões), {{ d.quantidade_itens }} item(ns), {{ d.quantidade_clientes }} cliente(s)">
                         <div class="dash-diario-dia-num">{{ d.dia|stringformat:"02d" }}</div>
                         <div class="dash-diario-dia-bar" aria-hidden="true">
                             {% if regua_max_quantidade %}
@@ -165,37 +171,42 @@
                 </div>
             </div>
             <p class="text-muted small mb-0 mt-2">
-                Número abaixo de cada dia = quantidade de exames naquele dia. Usuário = última conferência registrada no item.
+                Número abaixo de cada dia = <strong>alterações de status</strong> registradas naquele dia (ex.: marcar conferido e voltar para pendente = 2).
             </p>
         </div>
     </div>
 
     {% if total_quantidade %}
     <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="card dash-diario-card-resumo">
-                <div class="card-header">Resumo do dia {{ dia_label }} — por convênio</div>
+        <div class="col-12">
+            <div class="card dash-diario-card-resumo dash-diario-card-producao">
+                <div class="card-header">
+                    <i class="fas fa-user-check me-1"></i> Produção do usuário · {{ dia_label }}
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm dash-diario-tabela mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Convênio</th>
-                                    <th class="text-end">Exames</th>
+                                    <th>Usuário</th>
+                                    <th class="text-end">Alterações</th>
+                                    <th class="text-end">Itens</th>
                                     <th class="text-end">Clientes</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for row in resumo_convenios %}
+                                {% for row in resumo_usuarios %}
                                 <tr>
-                                    <td>{{ row.convenio }}</td>
+                                    <td class="fw-semibold">{{ row.usuario }}</td>
                                     <td class="text-end">{{ row.quantidade }}</td>
+                                    <td class="text-end">{{ row.quantidade_itens }}</td>
                                     <td class="text-end">{{ row.quantidade_clientes }}</td>
                                 </tr>
                                 {% endfor %}
                                 <tr class="table-light fw-bold">
-                                    <td>Total</td>
+                                    <td>Total do dia</td>
                                     <td class="text-end">{{ total_quantidade }}</td>
+                                    <td class="text-end">{{ total_itens }}</td>
                                     <td class="text-end">{{ total_clientes }}</td>
                                 </tr>
                             </tbody>
@@ -204,32 +215,61 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="row g-3 mb-3">
         <div class="col-md-6">
             <div class="card dash-diario-card-resumo">
-                <div class="card-header">Resumo do dia {{ dia_label }} — por usuário</div>
+                <div class="card-header">Por convênio · {{ dia_label }}</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm dash-diario-tabela mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Usuário</th>
-                                    <th class="text-end">Exames</th>
+                                    <th>Convênio</th>
+                                    <th class="text-end">Alterações</th>
+                                    <th class="text-end">Itens</th>
                                     <th class="text-end">Clientes</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for row in resumo_usuarios %}
+                                {% for row in resumo_convenios %}
                                 <tr>
-                                    <td>{{ row.usuario }}</td>
+                                    <td>{{ row.convenio }}</td>
                                     <td class="text-end">{{ row.quantidade }}</td>
+                                    <td class="text-end">{{ row.quantidade_itens }}</td>
                                     <td class="text-end">{{ row.quantidade_clientes }}</td>
                                 </tr>
                                 {% endfor %}
-                                <tr class="table-light fw-bold">
-                                    <td>Total</td>
-                                    <td class="text-end">{{ total_quantidade }}</td>
-                                    <td class="text-end">{{ total_clientes }}</td>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card dash-diario-card-resumo">
+                <div class="card-header">Convênio × usuário · {{ dia_label }}</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm dash-diario-tabela mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Convênio</th>
+                                    <th>Usuário</th>
+                                    <th class="text-end">Alt.</th>
+                                    <th class="text-end">Itens</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in linhas %}
+                                <tr>
+                                    <td>{{ linha.convenio }}</td>
+                                    <td>{{ linha.usuario }}</td>
+                                    <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">{{ linha.quantidade_itens }}</td>
+                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -240,26 +280,30 @@
 
     <div class="card">
         <div class="card-header fw-semibold">
-            Detalhe — convênio × usuário · {{ dia_label }}
+            <i class="fas fa-list me-1"></i> Log do dia — {{ dia_label }}
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover dash-diario-tabela mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Convênio</th>
+                            <th>Hora</th>
                             <th>Usuário</th>
-                            <th class="text-end">Exames</th>
-                            <th class="text-end">Clientes</th>
+                            <th>Convênio</th>
+                            <th>Status</th>
+                            <th>Cliente</th>
+                            <th>Procedimento</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for linha in linhas %}
+                        {% for ev in eventos %}
                         <tr>
-                            <td>{{ linha.convenio }}</td>
-                            <td>{{ linha.usuario }}</td>
-                            <td class="text-end">{{ linha.quantidade }}</td>
-                            <td class="text-end">{{ linha.quantidade_clientes }}</td>
+                            <td class="text-nowrap">{{ ev.hora }}</td>
+                            <td>{{ ev.usuario }}</td>
+                            <td>{{ ev.convenio }}</td>
+                            <td><span class="badge bg-secondary">{{ ev.status_conferencia }}</span></td>
+                            <td>{{ ev.cliente }}</td>
+                            <td class="small text-muted">{{ ev.procedimento }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -271,7 +315,7 @@
     <div class="card">
         <div class="card-body dash-diario-vazio">
             <i class="fas fa-calendar-times fa-2x mb-2 d-block opacity-50"></i>
-            Nenhum exame em {{ dia_label }}.
+            Nenhuma alteração de conferência em {{ dia_label }}.
         </div>
     </div>
     {% endif %}
