@@ -3013,6 +3013,10 @@ def dashboard_exames(request):
     for conv in convenios_sel:
         params_listagem.append(('convenio', conv))
 
+    params_diario = [('mes', f'{ano:04d}-{mes:02d}')]
+    for conv in convenios_sel:
+        params_diario.append(('convenio', conv))
+
     context = {
         'mes_filtro': f'{ano:04d}-{mes:02d}',
         'mes_label': dados['mes_label'],
@@ -3023,8 +3027,90 @@ def dashboard_exames(request):
         'cards_convenio': [_fmt_card(c) for c in dados['cards']],
         'totais_gerais': totais,
         'url_listagem_mes': f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params_listagem)}",
+        'url_diario': f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(params_diario)}",
     }
     return render(request, 'faturamento_medico/dashboard_exames.html', context)
+
+
+def dashboard_exames_diario(request):
+    """Visão diária: exames e clientes por convênio e usuário, com régua do mês."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+
+    hoje = date.today()
+    mes_param = (request.GET.get('mes') or '').strip()
+    ano, mes = hoje.year, hoje.month
+    if mes_param:
+        try:
+            partes = mes_param.split('-')
+            if len(partes) == 2:
+                ano = int(partes[0])
+                mes = int(partes[1])
+                if mes < 1 or mes > 12:
+                    raise ValueError('mês inválido')
+        except (TypeError, ValueError):
+            messages.warning(request, 'Mês inválido; usando o mês atual.')
+
+    dia_param = request.GET.get('dia')
+    try:
+        dia = int(dia_param) if dia_param else None
+    except (TypeError, ValueError):
+        dia = None
+    if dia is None:
+        from calendar import monthrange
+        ultimo = monthrange(ano, mes)[1]
+        if ano == hoje.year and mes == hoje.month:
+            dia = min(hoje.day, ultimo)
+        else:
+            dia = 1
+
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
+
+    from .dashboard_exames import montar_dashboard_exames_diario
+
+    dados = montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=convenios_sel)
+
+    convenios_disponiveis = []
+    from servicos_medicos.models import Convenio
+    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
+    if not convenios_disponiveis:
+        convenios_disponiveis = [
+            type('Conv', (), {'nome': n})()
+            for n in (
+                'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
+                'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
+            )
+        ]
+
+    params_base = [('mes', f'{ano:04d}-{mes:02d}')]
+    for conv in convenios_sel:
+        params_base.append(('convenio', conv))
+
+    def _url_dia(d):
+        p = list(params_base) + [('dia', str(d))]
+        return f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(p)}"
+
+    context = {
+        'mes_filtro': f'{ano:04d}-{mes:02d}',
+        'mes_label': dados['mes_label'],
+        'dia_selecionado': dados['dia'],
+        'dia_label': dados['dia_label'],
+        'convenios_disponiveis': convenios_disponiveis,
+        'filtros': {'convenios': convenios_sel},
+        'linhas': dados['linhas'],
+        'resumo_convenios': dados['resumo_convenios'],
+        'resumo_usuarios': dados['resumo_usuarios'],
+        'total_quantidade': dados['total_quantidade'],
+        'total_clientes': dados['total_clientes'],
+        'regua_dias': [
+            {**d, 'url': _url_dia(d['dia']), 'ativo': d['dia'] == dados['dia']}
+            for d in dados['regua_dias']
+        ],
+        'regua_max_quantidade': dados['regua_max_quantidade'],
+        'url_dashboard_mes': f"{reverse('faturamento_medico:dashboard_exames')}?{urlencode(params_base)}",
+    }
+    return render(request, 'faturamento_medico/dashboard_exames_diario.html', context)
 
 
 @require_GET
