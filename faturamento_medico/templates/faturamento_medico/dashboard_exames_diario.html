@@ -89,12 +89,20 @@
     font-weight: 600;
     font-size: 0.9rem;
 }
-.dash-diario-card-producao {
-    border: 2px solid #198754;
+.dash-diario-card-usuario {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    height: 100%;
 }
-.dash-diario-card-producao .card-header {
-    background: #198754;
-    color: #fff;
+.dash-diario-card-usuario .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #eef2f7 100%);
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #dee2e6;
+}
+.dash-diario-card-usuario .card-header .badge-total {
+    font-size: 0.72rem;
+    font-weight: 600;
 }
 .dash-diario-vazio {
     color: #6c757d;
@@ -178,102 +186,53 @@
 
     {% if total_quantidade %}
     <div class="row g-3 mb-3">
-        <div class="col-12">
-            <div class="card dash-diario-card-resumo dash-diario-card-producao">
-                <div class="card-header">
-                    <i class="fas fa-user-check me-1"></i> Produção do usuário · {{ dia_label }}
+        {% for card in cards_por_usuario %}
+        <div class="col-md-6 col-xl-4">
+            <div class="card dash-diario-card-usuario">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span><i class="fas fa-user me-1"></i> {{ card.usuario }}</span>
+                    <span class="d-flex flex-wrap gap-1">
+                        <span class="badge bg-primary badge-total" title="Alterações">{{ card.quantidade }} alt.</span>
+                        <span class="badge bg-secondary badge-total" title="Itens">{{ card.quantidade_itens }} it.</span>
+                        <span class="badge bg-light text-dark border badge-total" title="Clientes">{{ card.quantidade_clientes }} cli.</span>
+                    </span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm dash-diario-tabela mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Usuário</th>
-                                    <th class="text-end">Alterações</th>
-                                    <th class="text-end">Itens</th>
-                                    <th class="text-end">Clientes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in resumo_usuarios %}
-                                <tr>
-                                    <td class="fw-semibold">{{ row.usuario }}</td>
-                                    <td class="text-end">{{ row.quantidade }}</td>
-                                    <td class="text-end">{{ row.quantidade_itens }}</td>
-                                    <td class="text-end">{{ row.quantidade_clientes }}</td>
-                                </tr>
-                                {% endfor %}
-                                <tr class="table-light fw-bold">
-                                    <td>Total do dia</td>
-                                    <td class="text-end">{{ total_quantidade }}</td>
-                                    <td class="text-end">{{ total_itens }}</td>
-                                    <td class="text-end">{{ total_clientes }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="card dash-diario-card-resumo">
-                <div class="card-header">Por convênio · {{ dia_label }}</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm dash-diario-tabela mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Convênio</th>
-                                    <th class="text-end">Alterações</th>
-                                    <th class="text-end">Itens</th>
-                                    <th class="text-end">Clientes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in resumo_convenios %}
-                                <tr>
-                                    <td>{{ row.convenio }}</td>
-                                    <td class="text-end">{{ row.quantidade }}</td>
-                                    <td class="text-end">{{ row.quantidade_itens }}</td>
-                                    <td class="text-end">{{ row.quantidade_clientes }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card dash-diario-card-resumo">
-                <div class="card-header">Convênio × usuário · {{ dia_label }}</div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm dash-diario-tabela mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Convênio</th>
-                                    <th>Usuário</th>
                                     <th class="text-end">Alt.</th>
                                     <th class="text-end">Itens</th>
+                                    <th class="text-end">Clientes</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for linha in linhas %}
+                                {% for conv in card.convenios %}
                                 <tr>
-                                    <td>{{ linha.convenio }}</td>
-                                    <td>{{ linha.usuario }}</td>
-                                    <td class="text-end">{{ linha.quantidade }}</td>
-                                    <td class="text-end">{{ linha.quantidade_itens }}</td>
+                                    <td>{{ conv.convenio }}</td>
+                                    <td class="text-end">{{ conv.quantidade }}</td>
+                                    <td class="text-end">{{ conv.quantidade_itens }}</td>
+                                    <td class="text-end">{{ conv.quantidade_clientes }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex flex-wrap gap-3 small fw-semibold text-muted">
+                <span>Total do dia {{ dia_label }}:</span>
+                <span>{{ total_quantidade }} alterações</span>
+                <span>{{ total_itens }} itens</span>
+                <span>{{ total_clientes }} clientes</span>
             </div>
         </div>
     </div>

@@ -281,48 +281,40 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
             'procedimento': (log.item_servico.servico or '').strip() or '-',
         })
 
-    linhas = []
-    totais_conv = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
-    totais_usuario = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+    cards_por_usuario_map = defaultdict(
+        lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set(), 'convenios': []},
+    )
     total_alteracoes = 0
     total_itens: set[int] = set()
     total_clientes: set[str] = set()
 
-    for (conv, usuario), dados in sorted(stats.items(), key=lambda x: (x[0][0].lower(), x[0][1].lower())):
-        linhas.append({
+    for (conv, usuario), dados in sorted(stats.items(), key=lambda x: (x[0][1].lower(), x[0][0].lower())):
+        bloco = cards_por_usuario_map[usuario]
+        bloco['alteracoes'] += dados['alteracoes']
+        bloco['itens'] |= dados['itens']
+        bloco['clientes'] |= dados['clientes']
+        bloco['convenios'].append({
             'convenio': conv,
-            'usuario': usuario,
             'quantidade': dados['alteracoes'],
             'quantidade_itens': len(dados['itens']),
             'quantidade_clientes': len(dados['clientes']),
         })
-        totais_conv[conv]['alteracoes'] += dados['alteracoes']
-        totais_conv[conv]['itens'] |= dados['itens']
-        totais_conv[conv]['clientes'] |= dados['clientes']
-        totais_usuario[usuario]['alteracoes'] += dados['alteracoes']
-        totais_usuario[usuario]['itens'] |= dados['itens']
-        totais_usuario[usuario]['clientes'] |= dados['clientes']
         total_alteracoes += dados['alteracoes']
         total_itens |= dados['itens']
         total_clientes |= dados['clientes']
 
-    resumo_convenios = [
-        {
-            'convenio': conv,
-            'quantidade': d['alteracoes'],
-            'quantidade_itens': len(d['itens']),
-            'quantidade_clientes': len(d['clientes']),
-        }
-        for conv, d in sorted(totais_conv.items(), key=lambda x: (-x[1]['alteracoes'], x[0].lower()))
-    ]
-    resumo_usuarios = [
+    cards_por_usuario = [
         {
             'usuario': usuario,
             'quantidade': d['alteracoes'],
             'quantidade_itens': len(d['itens']),
             'quantidade_clientes': len(d['clientes']),
+            'convenios': sorted(d['convenios'], key=lambda x: (-x['quantidade'], x['convenio'].lower())),
         }
-        for usuario, d in sorted(totais_usuario.items(), key=lambda x: (-x[1]['alteracoes'], x[0].lower()))
+        for usuario, d in sorted(
+            cards_por_usuario_map.items(),
+            key=lambda x: (-x[1]['alteracoes'], x[0].lower()),
+        )
     ]
 
     regua = montar_resumo_regua_mes(empresa_id, ano, mes, convenios=convenios_sel)
@@ -334,9 +326,7 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
         'dia_label': f'{dia:02d}/{mes:02d}/{ano}',
         'mes_label': f'{MESES_PT[mes]} / {ano}',
         'convenios_selecionados': convenios_sel,
-        'linhas': linhas,
-        'resumo_convenios': resumo_convenios,
-        'resumo_usuarios': resumo_usuarios,
+        'cards_por_usuario': cards_por_usuario,
         'eventos': list(reversed(eventos)),
         'total_quantidade': total_alteracoes,
         'total_itens': len(total_itens),
