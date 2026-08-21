@@ -218,11 +218,24 @@ def _logs_conferencia_mes_qs(empresa_id, ano, mes, convenios=None):
     return qs
 
 
-def _acumular_producao_log(stats, convenio, usuario, item_id, cliente_chave):
+def _acumular_producao_log(stats, convenio, usuario, item_id, cliente_chave, status):
     chave = (convenio, usuario)
     stats[chave]['alteracoes'] += 1
     stats[chave]['itens'].add(item_id)
     stats[chave]['clientes'].add(cliente_chave)
+    st = (status or '').strip() or 'PENDENTE'
+    stats[chave]['por_status'][st] += 1
+
+
+STATUS_CONFERENCIA_ABREV = {
+    'PENDENTE': 'Pend.',
+    'CONFERIDO': 'Conf.',
+    'LOTE OK': 'Lote',
+    'FALTA DE GUIA': 'Guia',
+    'FALTA DE VALOR NA TABELA': 'Valor',
+    'FALTA TABELA DE CONTRASTE': 'Contr.',
+    'OUTROS': 'Outros',
+}
 
 
 def montar_resumo_regua_mes(empresa_id, ano, mes, convenios=None):
@@ -263,14 +276,19 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
         if timezone.localtime(log.data_hora).date() == dia_ref
     ]
 
-    stats = defaultdict(lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set()})
+    stats = defaultdict(
+        lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set(), 'por_status': defaultdict(int)},
+    )
+    statuses_vistos: set[str] = set()
     eventos = []
     for log in logs_dia:
         fat = log.item_servico.faturamento
         conv = (fat.convenio or '').strip() or 'Não informado'
         usuario = (log.usuario_nome or '').strip() or 'Sistema'
         cliente = _chave_cliente(fat)
-        _acumular_producao_log(stats, conv, usuario, log.item_servico_id, cliente)
+        status = (log.status_conferencia or '').strip() or 'PENDENTE'
+        statuses_vistos.add(status)
+        _acumular_producao_log(stats, conv, usuario, log.item_servico_id, cliente, status)
         dt = timezone.localtime(log.data_hora)
         eventos.append({
             'hora': dt.strftime('%H:%M'),
@@ -280,6 +298,18 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
             'cliente': (fat.nome or '').strip() or '-',
             'procedimento': (log.item_servico.servico or '').strip() or '-',
         })
+
+    ordem_status = [c[0] for c in ItemServico.STATUS_CONFERENCIA_CHOICES]
+    status_colunas = [
+        {
+            'codigo': codigo,
+            'label': codigo,
+            'abrev': STATUS_CONFERENCIA_ABREV.get(codigo, codigo[:6]),
+            'css': ItemServico.STATUS_CONFERENCIA_CSS.get(codigo, 'secondary'),
+        }
+        for codigo in ordem_status
+        if codigo in statuses_vistos
+    ]
 
     cards_por_usuario_map = defaultdict(
         lambda: {'alteracoes': 0, 'itens': set(), 'clientes': set(), 'convenios': []},
@@ -298,6 +328,10 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
             'quantidade': dados['alteracoes'],
             'quantidade_itens': len(dados['itens']),
             'quantidade_clientes': len(dados['clientes']),
+            'status_celulas': [
+                dados['por_status'].get(st['codigo'], 0)
+                for st in status_colunas
+            ],
         })
         total_alteracoes += dados['alteracoes']
         total_itens |= dados['itens']
@@ -327,6 +361,7 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
         'mes_label': f'{MESES_PT[mes]} / {ano}',
         'convenios_selecionados': convenios_sel,
         'cards_por_usuario': cards_por_usuario,
+        'status_colunas': status_colunas,
         'eventos': list(reversed(eventos)),
         'total_quantidade': total_alteracoes,
         'total_itens': len(total_itens),

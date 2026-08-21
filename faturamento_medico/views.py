@@ -3099,6 +3099,7 @@ def dashboard_exames_diario(request):
         'convenios_disponiveis': convenios_disponiveis,
         'filtros': {'convenios': convenios_sel},
         'cards_por_usuario': dados['cards_por_usuario'],
+        'status_colunas': dados['status_colunas'],
         'eventos': dados['eventos'],
         'total_quantidade': dados['total_quantidade'],
         'total_itens': dados['total_itens'],

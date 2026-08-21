@@ -104,6 +104,16 @@
     font-size: 0.72rem;
     font-weight: 600;
 }
+.dash-diario-th-status {
+    font-size: 0.62rem !important;
+    white-space: nowrap;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+}
+.dash-diario-td-status {
+    font-size: 0.8rem;
+    color: #495057;
+}
 .dash-diario-vazio {
     color: #6c757d;
     text-align: center;
@@ -187,7 +197,7 @@
     {% if total_quantidade %}
     <div class="row g-3 mb-3">
         {% for card in cards_por_usuario %}
-        <div class="col-md-6 col-xl-4">
+        <div class="col-md-6 col-xl-{% if status_colunas|length > 2 %}6{% else %}4{% endif %}">
             <div class="card dash-diario-card-usuario">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <span><i class="fas fa-user me-1"></i> {{ card.usuario }}</span>
@@ -203,6 +213,9 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Convênio</th>
+                                    {% for st in status_colunas %}
+                                    <th class="text-end dash-diario-th-status" title="{{ st.label }}">{{ st.abrev }}</th>
+                                    {% endfor %}
                                     <th class="text-end">Alt.</th>
                                     <th class="text-end">Itens</th>
                                     <th class="text-end">Clientes</th>
@@ -212,6 +225,11 @@
                                 {% for conv in card.convenios %}
                                 <tr>
                                     <td>{{ conv.convenio }}</td>
+                                    {% for qtd in conv.status_celulas %}
+                                    <td class="text-end dash-diario-td-status">
+                                        {% if qtd %}{{ qtd }}{% else %}<span class="text-muted">-</span>{% endif %}
+                                    </td>
+                                    {% endfor %}
                                     <td class="text-end">{{ conv.quantidade }}</td>
                                     <td class="text-end">{{ conv.quantidade_itens }}</td>
                                     <td class="text-end">{{ conv.quantidade_clientes }}</td>
