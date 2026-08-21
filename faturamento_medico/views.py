@@ -49,6 +49,10 @@ from .models import (
     MetaModalidadeSolicitante,
     ServicoDisponivel,
 )
+from .log_status_conferencia import (
+    registrar_log_status_conferencia_item,
+    serializar_logs_status_conferencia,
+)
 from .utils import processar_arquivos_com_gemini, processar_arquivos_com_ocr
 
 logger = logging.getLogger(__name__)
@@ -6348,6 +6352,8 @@ def toggle_conferencia_item(request, pk):
     if empresa_id is not None and item.faturamento.empresa_id != empresa_id:
         return JsonResponse({'ok': False, 'erro': 'Sem permissão'}, status=403)
 
+    status_anterior = (item.status_conferencia or '').strip() or 'PENDENTE'
+
     # Aceita estado explícito do checkbox; senão faz toggle
     conferido_param = request.POST.get('conferido')
     if conferido_param is not None:
@@ -6364,6 +6370,9 @@ def toggle_conferencia_item(request, pk):
         item.status_conferencia = 'PENDENTE'
 
     item.save(update_fields=['conferido', 'status_conferencia', 'total'])
+    status_novo = (item.status_conferencia or '').strip() or 'PENDENTE'
+    if status_novo != status_anterior:
+        registrar_log_status_conferencia_item(request, item, status_novo)
     status_label, status_css = item.status_conferencia_badge()
     return JsonResponse({
         'ok': True,
@@ -6388,13 +6397,36 @@ def alterar_status_conferencia_item(request, pk):
     if empresa_id is not None and item.faturamento.empresa_id != empresa_id:
         return JsonResponse({'ok': False, 'erro': 'Sem permissão'}, status=403)
 
+    status_anterior = (item.status_conferencia or '').strip() or 'PENDENTE'
     status = request.POST.get('status') or ''
     status_label, status_css = item.aplicar_status_conferencia(status)
+    status_novo = (item.status_conferencia or '').strip() or 'PENDENTE'
+    if status_novo != status_anterior:
+        registrar_log_status_conferencia_item(request, item, status_novo)
     return JsonResponse({
         'ok': True,
         'conferido': item.conferido,
         'status': status_label,
         'status_css': status_css,
+    })
+
+
+def log_status_conferencia_item(request, pk):
+    """Retorna o histórico de alterações do status de conferência (AJAX GET)."""
+    empresa_id = request.session.get('empresa_id')
+    try:
+        empresa_id = int(empresa_id) if empresa_id is not None else None
+    except (TypeError, ValueError):
+        empresa_id = None
+
+    item = get_object_or_404(ItemServico.objects.select_related('faturamento'), pk=pk)
+    if empresa_id is not None and item.faturamento.empresa_id != empresa_id:
+        return JsonResponse({'ok': False, 'erro': 'Sem permissão'}, status=403)
+
+    logs = item.logs_status_conferencia.all()[:100]
+    return JsonResponse({
+        'ok': True,
+        'logs': serializar_logs_status_conferencia(logs),
     })
 
 

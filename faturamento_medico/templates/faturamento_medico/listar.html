@@ -312,13 +312,21 @@
                                         </td>
                                         <td class="text-center">
                                             {% if linha.item %}
-                                            <select class="form-select form-select-sm status-conferencia-select status-{{ linha.status_conferencia_css }}"
-                                                    data-url="{% url 'faturamento_medico:alterar_status_conferencia' linha.item.id %}"
-                                                    title="Alterar status de conferência">
-                                                {% for value, label in status_conferencia_choices %}
-                                                <option value="{{ value }}" {% if linha.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
-                                                {% endfor %}
-                                            </select>
+                                            <div class="d-flex align-items-center gap-1 justify-content-center fm-status-conferencia-cell">
+                                                <select class="form-select form-select-sm status-conferencia-select status-{{ linha.status_conferencia_css }}"
+                                                        data-url="{% url 'faturamento_medico:alterar_status_conferencia' linha.item.id %}"
+                                                        title="Alterar status de conferência">
+                                                    {% for value, label in status_conferencia_choices %}
+                                                    <option value="{{ value }}" {% if linha.status_conferencia == value %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary btn-log-status-conferencia flex-shrink-0"
+                                                        data-url="{% url 'faturamento_medico:log_status_conferencia' linha.item.id %}"
+                                                        title="Histórico status conferência">
+                                                    <i class="fas fa-history"></i>
+                                                </button>
+                                            </div>
                                             {% else %}
                                             <span class="badge status-conf badge-{{ linha.status_conferencia_css }}">
                                                 {{ linha.status_conferencia }}
@@ -624,6 +632,42 @@
                         </div>
                     </div>
 
+                    <div class="modal fade" id="modalLogStatusConferencia" tabindex="-1" aria-labelledby="modalLogStatusConferenciaLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalLogStatusConferenciaLabel">
+                                        <i class="fas fa-history me-1"></i> Log — Status Conferência
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body p-0">
+                                    <div id="modal-log-status-loading" class="text-center text-muted py-4 d-none">
+                                        <i class="fas fa-spinner fa-spin me-1"></i> Carregando...
+                                    </div>
+                                    <div id="modal-log-status-vazio" class="text-center text-muted py-4 d-none">
+                                        Nenhuma alteração registrada.
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped mb-0 d-none" id="modal-log-status-tabela">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Usuário</th>
+                                                    <th>Status Conferência</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="modal-log-status-corpo"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="modal fade" id="modalConvenioDetalhe" tabindex="-1" aria-labelledby="modalConvenioDetalheLabel" aria-hidden="true">
                         <div class="modal-dialog modal-xl modal-dialog-centered">
                             <div class="modal-content">
@@ -808,6 +852,10 @@
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
+}
+.grid-ris .fm-status-conferencia-cell .status-conferencia-select {
+    min-width: 130px;
+    max-width: 180px;
 }
 .grid-ris .status-conferencia-select.status-success {
     background-color: #d1e7dd;
@@ -1349,6 +1397,60 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         select.dataset.previous = select.value;
+    });
+
+    const modalLogStatusEl = document.getElementById('modalLogStatusConferencia');
+    const modalLogLoading = document.getElementById('modal-log-status-loading');
+    const modalLogVazio = document.getElementById('modal-log-status-vazio');
+    const modalLogTabela = document.getElementById('modal-log-status-tabela');
+    const modalLogCorpo = document.getElementById('modal-log-status-corpo');
+
+    function abrirModalLogStatusConferencia(btn) {
+        if (!modalLogStatusEl || !window.bootstrap) return;
+        const url = btn.dataset.url;
+        modalLogLoading.classList.remove('d-none');
+        modalLogVazio.classList.add('d-none');
+        modalLogTabela.classList.add('d-none');
+        modalLogCorpo.innerHTML = '';
+        bootstrap.Modal.getOrCreateInstance(modalLogStatusEl).show();
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        })
+        .then(async r => {
+            const data = await r.json().catch(() => ({ ok: false }));
+            modalLogLoading.classList.add('d-none');
+            if (!r.ok || !data.ok) {
+                modalLogVazio.textContent = 'Não foi possível carregar o histórico.';
+                modalLogVazio.classList.remove('d-none');
+                return;
+            }
+            const logs = data.logs || [];
+            if (!logs.length) {
+                modalLogVazio.textContent = 'Nenhuma alteração registrada.';
+                modalLogVazio.classList.remove('d-none');
+                return;
+            }
+            modalLogCorpo.innerHTML = logs.map(log => (
+                '<tr>'
+                + '<td class="text-nowrap">' + (log.data || '-') + '</td>'
+                + '<td>' + (log.usuario || '-') + '</td>'
+                + '<td>' + (log.status_conferencia || '-') + '</td>'
+                + '</tr>'
+            )).join('');
+            modalLogTabela.classList.remove('d-none');
+        })
+        .catch(() => {
+            modalLogLoading.classList.add('d-none');
+            modalLogVazio.textContent = 'Não foi possível carregar o histórico.';
+            modalLogVazio.classList.remove('d-none');
+        });
+    }
+
+    document.querySelectorAll('.btn-log-status-conferencia').forEach(btn => {
+        btn.addEventListener('click', function() {
+            abrirModalLogStatusConferencia(this);
+        });
     });
 
     window.abrirModalAnexos = function(btn) {

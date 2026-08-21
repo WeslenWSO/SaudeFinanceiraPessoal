@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     ApelidoSolicitante,
     FaturamentoMedico,
+    LogStatusConferenciaItem,
     MedcloudConfig,
     MedcloudConvenioParceiro,
 )
@@ -122,3 +123,19 @@ class FaturamentoMedicoAdmin(admin.ModelAdmin):
     # Configurações adicionais
     list_per_page = 25
     date_hierarchy = 'data'
+
+
+@admin.register(LogStatusConferenciaItem)
+class LogStatusConferenciaItemAdmin(admin.ModelAdmin):
+    list_display = ('data_hora', 'usuario_nome', 'status_conferencia', 'item_servico')
+    list_filter = ('status_conferencia',)
+    search_fields = ('usuario_nome', 'status_conferencia', 'item_servico__servico')
+    readonly_fields = ('item_servico', 'usuario', 'usuario_nome', 'status_conferencia', 'data_hora')
+    date_hierarchy = 'data_hora'
+    list_per_page = 50
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

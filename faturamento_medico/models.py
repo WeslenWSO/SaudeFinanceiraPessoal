@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from empresa.models import Empresa
@@ -454,6 +455,47 @@ class ItemServico(models.Model):
         self.conferido = status in ('CONFERIDO', 'LOTE OK')
         self.save(update_fields=['status_conferencia', 'conferido'])
         return self.status_conferencia_badge()
+
+
+class LogStatusConferenciaItem(models.Model):
+    """Histórico de alterações manuais do status de conferência de um item."""
+
+    item_servico = models.ForeignKey(
+        ItemServico,
+        on_delete=models.CASCADE,
+        related_name='logs_status_conferencia',
+        verbose_name='Item de serviço',
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='logs_status_conferencia_faturamento',
+        verbose_name='Usuário',
+    )
+    usuario_nome = models.CharField(
+        verbose_name='Usuário (nome)',
+        max_length=150,
+        blank=True,
+        default='',
+    )
+    status_conferencia = models.CharField(
+        verbose_name='Status Conferência',
+        max_length=40,
+    )
+    data_hora = models.DateTimeField(
+        verbose_name='Data',
+        auto_now_add=True,
+    )
+
+    class Meta:
+        verbose_name = 'Log status conferência'
+        verbose_name_plural = 'Logs status conferência'
+        ordering = ['-data_hora', '-id']
+
+    def __str__(self):
+        return f'{self.data_hora:%d/%m/%Y %H:%M} — {self.usuario_nome} — {self.status_conferencia}'
 
 
 class Lote(models.Model):

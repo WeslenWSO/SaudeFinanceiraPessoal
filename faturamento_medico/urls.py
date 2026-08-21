@@ -88,4 +88,5 @@ urlpatterns = [
     path('item/<int:pk>/lancar-glosa/', views.lancar_glosa_item, name='lancar_glosa_item'),
     path('item/<int:pk>/conferencia/', views.toggle_conferencia_item, name='toggle_conferencia'),
     path('item/<int:pk>/status-conferencia/', views.alterar_status_conferencia_item, name='alterar_status_conferencia'),
+    path('item/<int:pk>/log-status-conferencia/', views.log_status_conferencia_item, name='log_status_conferencia'),
 ]
