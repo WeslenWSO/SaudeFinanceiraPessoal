@@ -34,17 +34,6 @@
                     {% endif %}
                 </div>
                 <div class="card-body">
-                    <div class="row mb-4 small">
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Paciente:</strong> {{ faturamento.nome|default:"—" }}</p>
-                            <p class="mb-1"><strong>Convênio:</strong> {{ faturamento.convenio|default:"—" }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Guia:</strong> {{ faturamento.guia|default:"—" }}</p>
-                            <p class="mb-0"><strong>Data:</strong> {{ faturamento.data|date:"d/m/Y" }}</p>
-                        </div>
-                    </div>
-
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="voltar" value="{{ voltar }}">
@@ -52,6 +41,28 @@
                         {% if form.non_field_errors %}
                         <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                         {% endif %}
+
+                        <div class="row mb-4 small align-items-end">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Paciente:</strong> {{ faturamento.nome|default:"—" }}</p>
+                                <p class="mb-0"><strong>Convênio:</strong> {{ faturamento.convenio|default:"—" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row g-2">
+                                    <div class="col-auto">
+                                        <label class="form-label mb-1" for="{{ form.guia.id_for_label }}">{{ form.guia.label }}</label>
+                                        {{ form.guia }}
+                                        {% if form.guia.errors %}<div class="text-danger small">{{ form.guia.errors }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="form-label mb-1" for="{{ form.senha.id_for_label }}">{{ form.senha.label }}</label>
+                                        {{ form.senha }}
+                                        {% if form.senha.errors %}<div class="text-danger small">{{ form.senha.errors }}</div>{% endif %}
+                                    </div>
+                                </div>
+                                <p class="mb-0 mt-2"><strong>Data:</strong> {{ faturamento.data|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
 
                         <div class="row g-3">
                             <div class="col-auto">

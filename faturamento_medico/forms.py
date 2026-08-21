@@ -186,16 +186,24 @@ class FaturamentoMedicoForm(forms.ModelForm):
 
 
 class FaturamentoDocumentacaoForm(forms.ModelForm):
-    """Formulário parcial: protocolo, lote, guia lançada e nota fiscal."""
+    """Formulário parcial: guia, senha, protocolo, lote, guia lançada e nota fiscal."""
 
     class Meta:
         model = FaturamentoMedico
-        fields = ['guia_lancada', 'lote', 'numero_guia_lancada', 'nota_fiscal']
+        fields = ['guia', 'senha', 'guia_lancada', 'lote', 'numero_guia_lancada', 'nota_fiscal']
         labels = {
             'guia_lancada': 'Protocolo',
             'numero_guia_lancada': 'Número da Guia Lançada',
         }
         widgets = {
+            'guia': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número da guia',
+            }),
+            'senha': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Senha',
+            }),
             'guia_lancada': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Número do protocolo',
