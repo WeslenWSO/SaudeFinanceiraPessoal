@@ -493,6 +493,11 @@ class LancamentoAnestesistaExame(models.Model):
         decimal_places=2,
         default=0,
     )
+    pago = models.BooleanField(
+        verbose_name='Pago',
+        default=False,
+        help_text='Repasse da sedação já pago ao anestesista.',
+    )
     data_criacao = models.DateTimeField(
         verbose_name='Data de criação',
         auto_now_add=True,

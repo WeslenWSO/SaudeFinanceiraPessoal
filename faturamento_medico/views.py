@@ -4473,6 +4473,37 @@ def excluir_lancamento_anestesista(request, pk):
     })
 
 
+@require_POST
+def marcar_lancamento_anestesista_pago(request, pk):
+    """Marca ou desmarca repasse de sedação como pago (relatório anestesista)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Empresa não encontrada na sessão.')
+        return redirect('faturamento_medico:ftlistar')
+
+    lancamento = get_object_or_404(
+        LancamentoAnestesistaExame.objects.select_related('faturamento'),
+        pk=pk,
+    )
+    if lancamento.faturamento.empresa_id != int(empresa_id):
+        messages.error(request, 'Sem permissão para alterar este lançamento.')
+        return redirect('faturamento_medico:ftlistar')
+
+    acao = (request.POST.get('acao') or 'marcar').strip().lower()
+    lancamento.pago = acao != 'desmarcar'
+    lancamento.save(update_fields=['pago'])
+
+    if lancamento.pago:
+        messages.success(request, f'Lançamento marcado como pago: {lancamento.exame}.')
+    else:
+        messages.info(request, f'Marcação de pago removida: {lancamento.exame}.')
+
+    next_url = (request.POST.get('next') or '').strip()
+    if next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('faturamento_medico:relatorio_sedacao_anestesista')
+
+
 def relatorio_sedacao_anestesista(request):
     """Relatório de sedação anestesista por período (data do faturamento)."""
     empresa_id = request.session.get('empresa_id')
@@ -4503,7 +4534,7 @@ def relatorio_sedacao_anestesista(request):
         ws = wb.active
         ws.title = 'Sedacao Anestesista'
         headers = [
-            'Data', 'Paciente', 'Exame', 'Médico anestesista', 'Valor sedação', 'Médico',
+            'Data', 'Paciente', 'Exame', 'Médico anestesista', 'Valor sedação', 'Médico', 'Pago',
         ]
         for col, titulo in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=titulo)
@@ -4515,6 +4546,7 @@ def relatorio_sedacao_anestesista(request):
             ws.cell(row=row_idx, column=4, value=linha['medico_anestesista'])
             ws.cell(row=row_idx, column=5, value=float(linha['valor_sedacao']))
             ws.cell(row=row_idx, column=6, value=linha['medico'])
+            ws.cell(row=row_idx, column=7, value='Sim' if linha.get('pago') else 'Não')
         tot_row = len(dados['linhas']) + 2
         ws.cell(row=tot_row, column=4, value='TOTAL').font = Font(bold=True)
         ws.cell(row=tot_row, column=5, value=float(dados['total_valor'])).font = Font(bold=True)
@@ -4555,6 +4587,7 @@ def relatorio_sedacao_anestesista(request):
         'data_fim': data_fim,
         'anestesista': anestesista,
         'excel_url': f"{reverse('faturamento_medico:relatorio_sedacao_anestesista')}?{params_voltar}&formato=excel",
+        'relatorio_url': request.get_full_path,
     }
     return render(request, 'faturamento_medico/relatorio_sedacao_anestesista.html', context)
 

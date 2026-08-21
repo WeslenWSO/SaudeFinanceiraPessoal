@@ -20,6 +20,12 @@
     text-transform: uppercase;
     white-space: nowrap;
 }
+.relatorio-sedacao-table tr.linha-paga td {
+    background-color: #f0fdf4;
+}
+.relatorio-sedacao-acao {
+    white-space: nowrap;
+}
 </style>
 
 <div class="container-fluid">
@@ -67,17 +73,43 @@
                             <th>Médico anestesista</th>
                             <th class="text-end">Valor sedação</th>
                             <th>Médico</th>
+                            <th class="no-print text-center">Pago</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for linha in linhas %}
-                        <tr>
+                        <tr{% if linha.pago %} class="linha-paga"{% endif %}>
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
                             <td>{{ linha.paciente }}</td>
                             <td>{{ linha.exame }}</td>
                             <td>{{ linha.medico_anestesista }}</td>
                             <td class="text-end">R$ {{ linha.valor_fmt }}</td>
                             <td>{{ linha.medico }}</td>
+                            <td class="no-print text-center relatorio-sedacao-acao">
+                                {% if linha.pago %}
+                                    <span class="badge bg-success"><i class="fas fa-check"></i> Pago</span>
+                                    <form method="post"
+                                          action="{% url 'faturamento_medico:marcar_lancamento_anestesista_pago' linha.id %}"
+                                          class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ relatorio_url }}">
+                                        <input type="hidden" name="acao" value="desmarcar">
+                                        <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Desfazer pagamento">
+                                            Desfazer
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form method="post"
+                                          action="{% url 'faturamento_medico:marcar_lancamento_anestesista_pago' linha.id %}"
+                                          class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ relatorio_url }}">
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            <i class="fas fa-dollar-sign"></i> Marcar pago
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -86,6 +118,7 @@
                             <td colspan="4" class="text-end">Total</td>
                             <td class="text-end">R$ {{ total_valor_fmt }}</td>
                             <td></td>
+                            <td class="no-print"></td>
                         </tr>
                     </tfoot>
                 </table>

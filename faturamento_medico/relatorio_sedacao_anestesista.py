@@ -28,6 +28,8 @@ def montar_relatorio_sedacao_anestesista(empresa_id, data_inicio, data_fim, *, a
     for lan in qs:
         fat = lan.faturamento
         linhas.append({
+            'id': lan.id,
+            'pago': lan.pago,
             'data': fat.data,
             'data_fmt': fat.data.strftime('%d/%m/%Y') if fat.data else '-',
             'paciente': (fat.nome or '').strip() or '-',

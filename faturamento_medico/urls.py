@@ -32,6 +32,11 @@ urlpatterns = [
     path('<int:pk>/detalhes/', views.detalhes_faturamento, name='detalhes'),
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('relatorio-sedacao-anestesista/', views.relatorio_sedacao_anestesista, name='relatorio_sedacao_anestesista'),
+    path(
+        'lancamento-anestesista/<int:pk>/marcar-pago/',
+        views.marcar_lancamento_anestesista_pago,
+        name='marcar_lancamento_anestesista_pago',
+    ),
     path('gerar-lote/', views.gerar_lote, name='gerar_lote'),
     path('vincular-lote-protocolo/', views.vincular_lote_protocolo, name='vincular_lote_protocolo'),
     # URLs para documentos anexados
