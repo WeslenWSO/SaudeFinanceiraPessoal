@@ -1421,6 +1421,22 @@ def _horario_slot(faturamento):
     return ini, fim
 
 
+def _ordenar_grid_cancelados(grid_linhas: list) -> list:
+    """Data decrescente; no mesmo dia, horário da manhã para a tarde."""
+
+    def _chave(linha):
+        fat = linha.get('faturamento')
+        data = getattr(fat, 'data', None) or date.min
+        ini, _ = _horario_slot(fat) if fat is not None else (None, None)
+        horario_ord = ini if ini is not None else 24 * 60
+        paciente = (getattr(fat, 'nome', None) or '').strip().lower()
+        procedimento = (linha.get('procedimento') or '').strip().lower()
+        return (-data.toordinal(), horario_ord, paciente, procedimento)
+
+    grid_linhas.sort(key=_chave)
+    return grid_linhas
+
+
 def _duracao_slot_minutos(ini, fim):
     if ini is None or fim is None:
         return 0
@@ -2563,6 +2579,8 @@ def listar_cancelados(request):
             linha['slot_unico'] = True
             linha['minutos_slot'] = minutos_novos
             linha['minutos_slot_fmt'] = _fmt_minutos_hhmm(minutos_novos)
+
+    grid_linhas = _ordenar_grid_cancelados(grid_linhas)
 
     convenios_disponiveis = []
     if empresa_id:

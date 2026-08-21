@@ -57,15 +57,15 @@
                                     <label class="form-label" for="{{ form.agendado_via.id_for_label }}">Agendado Via</label>
                                     {{ form.agendado_via }}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-2 fat-field-wide">
                                     <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
                                     {{ form.nome }}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-2 fat-field-wide">
                                     <label class="form-label" for="{{ form.nome_associado.id_for_label }}">Nome do Associado</label>
                                     {{ form.nome_associado }}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-2 fat-field-wide">
                                     <label class="form-label" for="{{ form.convenio.id_for_label }}">Convênio (Viabilidade)</label>
                                     {{ form.convenio }}
                                 </div>
@@ -492,6 +492,10 @@
 .fat-form-page .col-md-2 .form-control,
 .fat-form-page .col-md-2 .form-select {
     width: var(--fat-input-width-lg);
+}
+.fat-form-page .fat-field-wide .form-control,
+.fat-form-page .fat-field-wide .form-select {
+    width: calc(var(--fat-input-width-lg) * 2);
 }
 .fat-fields-compact .form-control,
 .fat-fields-compact .form-select,
