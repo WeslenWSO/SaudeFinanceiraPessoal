@@ -4534,7 +4534,7 @@ def relatorio_sedacao_anestesista(request):
         ws = wb.active
         ws.title = 'Sedacao Anestesista'
         headers = [
-            'Data', 'Paciente', 'Exame', 'Médico anestesista', 'Valor sedação', 'Médico', 'Pago',
+            'Data', 'Paciente', 'Procedimento', 'Exame', 'Médico anestesista', 'Valor sedação', 'Médico', 'Pago',
         ]
         for col, titulo in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=titulo)
@@ -4542,14 +4542,15 @@ def relatorio_sedacao_anestesista(request):
         for row_idx, linha in enumerate(dados['linhas'], 2):
             ws.cell(row=row_idx, column=1, value=linha['data_fmt'])
             ws.cell(row=row_idx, column=2, value=linha['paciente'])
-            ws.cell(row=row_idx, column=3, value=linha['exame'])
-            ws.cell(row=row_idx, column=4, value=linha['medico_anestesista'])
-            ws.cell(row=row_idx, column=5, value=float(linha['valor_sedacao']))
-            ws.cell(row=row_idx, column=6, value=linha['medico'])
-            ws.cell(row=row_idx, column=7, value='Sim' if linha.get('pago') else 'Não')
+            ws.cell(row=row_idx, column=3, value=linha['procedimento'])
+            ws.cell(row=row_idx, column=4, value=linha['exame'])
+            ws.cell(row=row_idx, column=5, value=linha['medico_anestesista'])
+            ws.cell(row=row_idx, column=6, value=float(linha['valor_sedacao']))
+            ws.cell(row=row_idx, column=7, value=linha['medico'])
+            ws.cell(row=row_idx, column=8, value='Sim' if linha.get('pago') else 'Não')
         tot_row = len(dados['linhas']) + 2
-        ws.cell(row=tot_row, column=4, value='TOTAL').font = Font(bold=True)
-        ws.cell(row=tot_row, column=5, value=float(dados['total_valor'])).font = Font(bold=True)
+        ws.cell(row=tot_row, column=5, value='TOTAL').font = Font(bold=True)
+        ws.cell(row=tot_row, column=6, value=float(dados['total_valor'])).font = Font(bold=True)
 
         from io import BytesIO
         from django.http import HttpResponse

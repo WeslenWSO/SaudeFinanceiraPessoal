@@ -108,6 +108,7 @@
                         <tr>
                             <th>Data</th>
                             <th>Paciente</th>
+                            <th>Procedimento</th>
                             <th>Exame</th>
                             <th>Médico anestesista</th>
                             <th class="text-end">Valor sedação</th>
@@ -120,6 +121,7 @@
                         <tr{% if linha.pago %} class="linha-paga"{% endif %}>
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
                             <td>{{ linha.paciente }}</td>
+                            <td>{{ linha.procedimento }}</td>
                             <td>{{ linha.exame }}</td>
                             <td>{{ linha.medico_anestesista }}</td>
                             <td class="text-end">R$ {{ linha.valor_fmt }}</td>
@@ -154,7 +156,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-light fw-bold">
-                            <td colspan="4" class="text-end">Total</td>
+                            <td colspan="5" class="text-end">Total</td>
                             <td class="text-end">R$ {{ total_valor_fmt }}</td>
                             <td></td>
                             <td class="no-print"></td>
