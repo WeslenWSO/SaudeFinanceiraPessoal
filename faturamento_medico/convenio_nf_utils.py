@@ -26,9 +26,17 @@ def _normalizar_convenio(nome: str) -> str:
     return ' '.join(n.split())
 
 
+def _convenio_na_lista_sem_nf(chave: str) -> bool:
+    """True se o convênio normalizado corresponde a algum da lista (nome completo ou prefixo)."""
+    for excluido in CONVENIOS_SEM_NF_PAGAMENTO:
+        if chave == excluido or chave.startswith(excluido + ' '):
+            return True
+    return False
+
+
 def convenio_mostra_nf_pagamento(convenio: str | None) -> bool:
     """True para convênios que devem exibir NF / forma de pagamento (fora da lista pública)."""
     chave = _normalizar_convenio(convenio or '')
     if not chave:
         return True
-    return chave not in CONVENIOS_SEM_NF_PAGAMENTO
+    return not _convenio_na_lista_sem_nf(chave)
