@@ -3052,24 +3052,29 @@ def dashboard_exames_diario(request):
         except (TypeError, ValueError):
             messages.warning(request, 'Mês inválido; usando o mês atual.')
 
-    dia_param = request.GET.get('dia')
-    try:
-        dia = int(dia_param) if dia_param else None
-    except (TypeError, ValueError):
-        dia = None
-    if dia is None:
-        from calendar import monthrange
-        ultimo = monthrange(ano, mes)[1]
+    from calendar import monthrange
+
+    ultimo_mes = monthrange(ano, mes)[1]
+    dias_sel = []
+    for raw in request.GET.getlist('dia'):
+        try:
+            d = int(raw)
+            if 1 <= d <= ultimo_mes:
+                dias_sel.append(d)
+        except (TypeError, ValueError):
+            continue
+    dias_sel = sorted(set(dias_sel))
+    if not dias_sel:
         if ano == hoje.year and mes == hoje.month:
-            dia = min(hoje.day, ultimo)
+            dias_sel = [min(hoje.day, ultimo_mes)]
         else:
-            dia = 1
+            dias_sel = [1]
 
     convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
 
     from .dashboard_exames import montar_dashboard_exames_diario
 
-    dados = montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=convenios_sel)
+    dados = montar_dashboard_exames_diario(empresa_id, ano, mes, dias=dias_sel, convenios=convenios_sel)
 
     convenios_disponiveis = []
     from servicos_medicos.models import Convenio
@@ -3087,14 +3092,10 @@ def dashboard_exames_diario(request):
     for conv in convenios_sel:
         params_base.append(('convenio', conv))
 
-    def _url_dia(d):
-        p = list(params_base) + [('dia', str(d))]
-        return f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(p)}"
-
     context = {
         'mes_filtro': f'{ano:04d}-{mes:02d}',
         'mes_label': dados['mes_label'],
-        'dia_selecionado': dados['dia'],
+        'dias_selecionados': dados['dias_selecionados'],
         'dia_label': dados['dia_label'],
         'convenios_disponiveis': convenios_disponiveis,
         'filtros': {'convenios': convenios_sel},
@@ -3105,7 +3106,7 @@ def dashboard_exames_diario(request):
         'total_itens': dados['total_itens'],
         'total_clientes': dados['total_clientes'],
         'regua_dias': [
-            {**d, 'url': _url_dia(d['dia']), 'ativo': d['dia'] == dados['dia']}
+            {**d, 'ativo': d['dia'] in dados['dias_selecionados']}
             for d in dados['regua_dias']
         ],
         'regua_max_quantidade': dados['regua_max_quantidade'],

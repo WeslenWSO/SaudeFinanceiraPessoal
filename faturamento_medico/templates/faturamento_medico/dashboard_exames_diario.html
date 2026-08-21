@@ -17,20 +17,31 @@
     padding: 0.25rem 0;
 }
 .dash-diario-dia {
-    flex: 0 0 2.6rem;
+    flex: 0 0 2.85rem;
     text-align: center;
     text-decoration: none;
     color: inherit;
     border: 1px solid #dee2e6;
     border-radius: 0.35rem;
-    padding: 0.35rem 0.15rem 0.25rem;
+    padding: 0.2rem 0.12rem 0.22rem;
     background: #fff;
     transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+    cursor: pointer;
 }
 .dash-diario-dia:hover {
     border-color: #0d6efd;
     box-shadow: 0 0.125rem 0.35rem rgba(13, 110, 253, 0.15);
-    color: inherit;
+}
+.dash-diario-dia-semana {
+    font-size: 0.56rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 0.1rem;
+}
+.dash-diario-dia.ativo .dash-diario-dia-semana {
+    color: #0d6efd;
+    font-weight: 600;
 }
 .dash-diario-dia.ativo {
     border-color: #0d6efd;
@@ -144,7 +155,8 @@
 
     <div class="card mb-3">
         <div class="card-body py-3">
-            <form method="get" class="row g-2 align-items-end mb-3">
+            <form method="get" id="form-diario-filtros" class="mb-3">
+                <div class="row g-2 align-items-end mb-3">
                 <div class="col-auto">
                     <label for="mes" class="form-label small fw-semibold mb-1">Mês de referência</label>
                     <input type="month" id="mes" name="mes" class="form-control form-control-sm" value="{{ mes_filtro }}">
@@ -158,23 +170,30 @@
                         {% endfor %}
                     </select>
                 </div>
-                <input type="hidden" name="dia" value="{{ dia_selecionado }}">
                 <div class="col-auto">
                     <button type="submit" class="btn btn-primary btn-sm">
                         <i class="fas fa-filter"></i> Filtrar
                     </button>
                 </div>
-            </form>
+                </div>
+
+                <div id="dias-selecionados-inputs">
+                    {% for d in dias_selecionados %}
+                    <input type="hidden" name="dia" value="{{ d }}">
+                    {% endfor %}
+                </div>
 
             <label class="form-label small fw-semibold mb-2 d-block">
-                <i class="fas fa-ruler-horizontal me-1"></i> Régua do mês — clique no dia (data do log)
+                <i class="fas fa-ruler-horizontal me-1"></i> Régua do mês — clique para marcar vários dias (data do log)
             </label>
             <div class="dash-diario-regua-wrap">
-                <div class="dash-diario-regua">
+                <div class="dash-diario-regua" id="regua-dias">
                     {% for d in regua_dias %}
-                    <a href="{{ d.url }}"
+                    <button type="button"
                        class="dash-diario-dia{% if d.ativo %} ativo{% endif %}"
-                       title="Dia {{ d.dia }} — {{ d.quantidade }} alteração(ões), {{ d.quantidade_itens }} item(ns), {{ d.quantidade_clientes }} cliente(s)">
+                       data-dia="{{ d.dia }}"
+                       title="{{ d.dia_semana }}, dia {{ d.dia }} — {{ d.quantidade }} alteração(ões)">
+                        <div class="dash-diario-dia-semana">{{ d.dia_semana }}</div>
                         <div class="dash-diario-dia-num">{{ d.dia|stringformat:"02d" }}</div>
                         <div class="dash-diario-dia-bar" aria-hidden="true">
                             {% if regua_max_quantidade %}
@@ -184,13 +203,15 @@
                             {% endif %}
                         </div>
                         <div class="dash-diario-dia-qtd">{{ d.quantidade }}</div>
-                    </a>
+                    </button>
                     {% endfor %}
                 </div>
             </div>
             <p class="text-muted small mb-0 mt-2">
-                Número abaixo de cada dia = <strong>alterações de status</strong> registradas naquele dia (ex.: marcar conferido e voltar para pendente = 2).
+                Número abaixo de cada dia = <strong>alterações de status</strong> registradas naquele dia.
+                Clique em vários dias para somar a produção. <strong>Ctrl+clique</strong> também alterna a seleção.
             </p>
+            </form>
         </div>
     </div>
 
@@ -247,7 +268,7 @@
     <div class="card mb-3">
         <div class="card-body py-2 px-3">
             <div class="d-flex flex-wrap gap-3 small fw-semibold text-muted">
-                <span>Total do dia {{ dia_label }}:</span>
+                <span>Total — {{ dia_label }}:</span>
                 <span>{{ total_quantidade }} alterações</span>
                 <span>{{ total_itens }} itens</span>
                 <span>{{ total_clientes }} clientes</span>
@@ -257,13 +278,14 @@
 
     <div class="card">
         <div class="card-header fw-semibold">
-            <i class="fas fa-list me-1"></i> Log do dia — {{ dia_label }}
+            <i class="fas fa-list me-1"></i> Log — {{ dia_label }}
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover dash-diario-tabela mb-0">
                     <thead class="table-light">
                         <tr>
+                            {% if dias_selecionados|length > 1 %}<th>Data</th>{% endif %}
                             <th>Hora</th>
                             <th>Usuário</th>
                             <th>Convênio</th>
@@ -275,6 +297,7 @@
                     <tbody>
                         {% for ev in eventos %}
                         <tr>
+                            {% if dias_selecionados|length > 1 %}<td class="text-nowrap">{{ ev.data }}</td>{% endif %}
                             <td class="text-nowrap">{{ ev.hora }}</td>
                             <td>{{ ev.usuario }}</td>
                             <td>{{ ev.convenio }}</td>
@@ -299,7 +322,50 @@
 </div>
 <script>
 (function() {
-    const ativo = document.querySelector('.dash-diario-dia.ativo');
+    const form = document.getElementById('form-diario-filtros');
+    const inputsWrap = document.getElementById('dias-selecionados-inputs');
+    const regua = document.getElementById('regua-dias');
+    if (!form || !inputsWrap || !regua) return;
+
+    function diasSelecionados() {
+        return new Set(
+            Array.from(inputsWrap.querySelectorAll('input[name="dia"]')).map(i => i.value)
+        );
+    }
+
+    function sincronizarInputs(selecionados) {
+        inputsWrap.innerHTML = '';
+        [...selecionados].sort((a, b) => Number(a) - Number(b)).forEach(d => {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'dia';
+            inp.value = d;
+            inputsWrap.appendChild(inp);
+        });
+    }
+
+    function marcarBotoes(selecionados) {
+        regua.querySelectorAll('.dash-diario-dia').forEach(btn => {
+            btn.classList.toggle('ativo', selecionados.has(btn.dataset.dia));
+        });
+    }
+
+    regua.addEventListener('click', function(e) {
+        const btn = e.target.closest('.dash-diario-dia');
+        if (!btn) return;
+        const dia = btn.dataset.dia;
+        const sel = diasSelecionados();
+        if (sel.has(dia)) {
+            if (sel.size > 1) sel.delete(dia);
+        } else {
+            sel.add(dia);
+        }
+        sincronizarInputs(sel);
+        marcarBotoes(sel);
+        form.submit();
+    });
+
+    const ativo = regua.querySelector('.dash-diario-dia.ativo');
     if (ativo) {
         ativo.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'instant' });
     }

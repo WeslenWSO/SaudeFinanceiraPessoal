@@ -40,6 +40,8 @@ MESES_PT = (
     'Dezembro',
 )
 
+DIAS_SEMANA_ABREV = ('Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom')
+
 
 def _q_cancelados():
     q = Q()
@@ -257,6 +259,7 @@ def montar_resumo_regua_mes(empresa_id, ano, mes, convenios=None):
         dias.append({
             'dia': d,
             'data_iso': ref.isoformat(),
+            'dia_semana': DIAS_SEMANA_ABREV[ref.weekday()],
             'quantidade': info['alteracoes'],
             'quantidade_itens': len(info['itens']),
             'quantidade_clientes': len(info['clientes']),
@@ -264,16 +267,37 @@ def montar_resumo_regua_mes(empresa_id, ano, mes, convenios=None):
     return dias
 
 
-def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
-    """Produção diária por data do log: alterações de conferência por convênio e usuário."""
+def _normalizar_dias_mes(dias, ano, mes):
     ultimo_dia = monthrange(ano, mes)[1]
-    dia = max(1, min(int(dia or 1), ultimo_dia))
-    dia_ref = date(ano, mes, dia)
+    normalizados = []
+    for d in dias or []:
+        try:
+            normalizados.append(max(1, min(int(d), ultimo_dia)))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(normalizados))
+
+
+def _label_periodo(dias_refs, mes, ano):
+    if len(dias_refs) == 1:
+        d = dias_refs[0]
+        return f'{d.day:02d}/{mes:02d}/{ano}'
+    nums = [d.day for d in dias_refs]
+    return f'{len(nums)} dias ({nums[0]:02d}–{nums[-1]:02d}/{mes:02d}/{ano})'
+
+
+def montar_dashboard_exames_diario(empresa_id, ano, mes, dias=None, convenios=None):
+    """Produção diária por data do log: alterações de conferência por convênio e usuário."""
+    dias_norm = _normalizar_dias_mes(dias, ano, mes)
+    if not dias_norm:
+        dias_norm = [1]
+    dias_refs_set = {date(ano, mes, d) for d in dias_norm}
+    dias_refs = sorted(dias_refs_set)
     convenios_sel = [c.strip() for c in (convenios or []) if c and str(c).strip()]
 
     logs_dia = [
         log for log in _logs_conferencia_mes_qs(empresa_id, ano, mes, convenios)
-        if timezone.localtime(log.data_hora).date() == dia_ref
+        if timezone.localtime(log.data_hora).date() in dias_refs_set
     ]
 
     stats = defaultdict(
@@ -291,6 +315,7 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
         _acumular_producao_log(stats, conv, usuario, log.item_servico_id, cliente, status)
         dt = timezone.localtime(log.data_hora)
         eventos.append({
+            'data': dt.strftime('%d/%m'),
             'hora': dt.strftime('%H:%M'),
             'usuario': usuario,
             'convenio': conv,
@@ -355,9 +380,8 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dia, convenios=None):
     max_q = max((d['quantidade'] for d in regua), default=0)
 
     return {
-        'dia': dia,
-        'dia_ref': dia_ref.isoformat(),
-        'dia_label': f'{dia:02d}/{mes:02d}/{ano}',
+        'dias_selecionados': dias_norm,
+        'dia_label': _label_periodo(dias_refs, mes, ano),
         'mes_label': f'{MESES_PT[mes]} / {ano}',
         'convenios_selecionados': convenios_sel,
         'cards_por_usuario': cards_por_usuario,
