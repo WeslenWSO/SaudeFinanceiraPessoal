@@ -471,9 +471,13 @@ class NotaFiscalServico(models.Model):
                 return
         self.gerar_contas_a_receber()
         if self.pk:
-            from contasareceber.socio_sync import propagar_forma_pagamento_nota_para_contas_receber
+            from contasareceber.socio_sync import (
+                propagar_autorizacao_nota_para_contas_receber,
+                propagar_forma_pagamento_nota_para_contas_receber,
+            )
 
             propagar_forma_pagamento_nota_para_contas_receber(self)
+            propagar_autorizacao_nota_para_contas_receber(self)
 
 
 class LogNotaFiscal(models.Model):

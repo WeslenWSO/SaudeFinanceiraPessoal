@@ -813,6 +813,8 @@ def extrair_aut_todos(discriminacao: str) -> List[str]:
         r"\bAUT([A-Za-z0-9\-/\.]+)",
         r"\bSTONE\s*ID[:\s]*([0-9]+)",
         r"\bSTONEID[:\s]*([0-9]+)",
+        r"\bSTONED[:\s]*([0-9]+)",  # typo comum: STONED em vez de STONE
+        r"\bSTONE\s*:\s*([0-9]+)",  # STONE: 12345 (não confunde com STONECODE)
         r"autorizacao[:\s]*([A-Za-z0-9\-/\.]+)",
     ]
     auts = []
