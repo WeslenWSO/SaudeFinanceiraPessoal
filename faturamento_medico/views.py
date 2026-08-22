@@ -7020,7 +7020,10 @@ def baixar_extrato_pagamento(request, pk):
             extrato.data_recebimento = date.fromisoformat(data_receb)
             extrato.valor_recebido = _dec(valor_raw)
             extrato.banco = banco
-            extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+            extrato.aplicar_status_recebimento(data_recebimento_default=extrato.data_recebimento)
+            extrato.save(update_fields=[
+                'data_recebimento', 'valor_recebido', 'banco', 'status_recebimento', 'data_atualizacao',
+            ])
             extrato.sincronizar_baixado_lote()
             n_final = FaturamentoMedico.objects.filter(
                 empresa_id=empresa_id,
@@ -7061,7 +7064,14 @@ def estornar_baixa_extrato_pagamento(request, pk):
     extrato.data_recebimento = None
     extrato.valor_recebido = Decimal('0')
     extrato.banco = ''
-    extrato.save(update_fields=['data_recebimento', 'valor_recebido', 'banco', 'data_atualizacao'])
+    extrato.status_recebimento = (
+        ExtratoPagamentoConvenio.STATUS_RECEBIMENTO_PENDENTE_COM_NOTA
+        if (extrato.nota or '').strip()
+        else ExtratoPagamentoConvenio.STATUS_RECEBIMENTO_PENDENTE
+    )
+    extrato.save(update_fields=[
+        'data_recebimento', 'valor_recebido', 'banco', 'status_recebimento', 'data_atualizacao',
+    ])
     extrato.sincronizar_baixado_lote()
     messages.success(request, 'Baixa estornada. Faturamentos do lote voltaram para Aguardando pagamento.')
     return redirect('faturamento_medico:listar_extrato_pagamento')
@@ -7084,8 +7094,9 @@ def _redirect_listar_extrato_pagamento(request):
 
 
 def editar_extrato_pagamento(request, pk):
-    """Edita protocolo, nota fiscal e valores complementares do extrato."""
+    """Edita protocolo, nota fiscal, previsão, recebimento e valores complementares do extrato."""
     from emprestimos.sicoob_pdf import _dec
+    from extrato.models import Banco
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
@@ -7117,16 +7128,41 @@ def editar_extrato_pagamento(request, pk):
         else:
             extrato.data_previsao = None
 
-        extrato.save(update_fields=[
-            'protocolo', 'nota', 'valor_nota', 'retencoes', 'liquido',
-            'data_previsao', 'data_atualizacao',
-        ])
+        extrato.banco = (request.POST.get('banco') or '').strip()
+        valor_recebido_raw = (request.POST.get('valor_recebido') or '').strip()
+        if valor_recebido_raw:
+            extrato.valor_recebido = _dec(valor_recebido_raw)
+        else:
+            extrato.valor_recebido = Decimal('0')
+
+        data_receb_raw = (request.POST.get('data_recebimento') or '').strip()
+        if data_receb_raw:
+            try:
+                extrato.data_recebimento = date.fromisoformat(data_receb_raw)
+            except ValueError:
+                messages.error(request, 'Data de recebimento inválida.')
+                return redirect('faturamento_medico:editar_extrato_pagamento', pk=pk)
+        else:
+            extrato.data_recebimento = None
+
+        status_form = (request.POST.get('status_recebimento') or '').strip()
+        extrato.aplicar_status_recebimento(
+            status_form,
+            data_recebimento_default=timezone.now().date(),
+        )
+
+        extrato.save()
+        extrato.sincronizar_baixado_lote()
         messages.success(request, 'Extrato atualizado com sucesso.')
         return _redirect_listar_extrato_pagamento(request)
 
+    sugestao_valor = extrato.valor_esperado_recebimento()
     context = {
         'titulo': 'Editar Extrato de Pagamento — Convênio',
         'extrato': extrato,
+        'bancos': Banco.objects.order_by('nome'),
+        'sugestao_valor': sugestao_valor,
+        'status_recebimento_choices': ExtratoPagamentoConvenio.STATUS_RECEBIMENTO_CHOICES,
         'filtros': {
             'competencia': (request.GET.get('competencia') or '').strip(),
             'convenio': (request.GET.get('convenio') or '').strip(),

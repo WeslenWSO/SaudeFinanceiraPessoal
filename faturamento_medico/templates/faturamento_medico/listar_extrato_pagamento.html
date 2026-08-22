@@ -85,8 +85,19 @@
                                     <td class="text-end">{{ linha.retencoes|moeda_br }}</td>
                                     <td class="text-end">{{ linha.liquido|moeda_br }}</td>
                                     <td>{% if linha.data_previsao %}{{ linha.data_previsao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
-                                    <td>{% if linha.data_recebimento %}{{ linha.data_recebimento|date:"d/m/Y" }}{% else %}<span class="text-muted">Pendente</span>{% endif %}</td>
-                                    <td class="text-end">{% if linha.baixado %}{{ linha.valor_recebido|moeda_br }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td>
+                                        {% if linha.status_recebimento == 'finalizado' %}
+                                            <span class="badge bg-success">{{ linha.get_status_recebimento_display }}</span>
+                                        {% elif linha.status_recebimento == 'pendente_com_nota' %}
+                                            <span class="badge bg-info text-dark">{{ linha.get_status_recebimento_display }}</span>
+                                        {% else %}
+                                            <span class="text-muted">{{ linha.get_status_recebimento_display }}</span>
+                                        {% endif %}
+                                        {% if linha.data_recebimento %}
+                                            <small class="d-block text-muted">{{ linha.data_recebimento|date:"d/m/Y" }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{% if linha.status_recebimento == 'finalizado' %}{{ linha.valor_recebido|moeda_br }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td>{% if linha.banco %}{{ linha.banco }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td class="text-nowrap">
                                         <a href="{% url 'faturamento_medico:editar_extrato_pagamento' linha.pk %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}"

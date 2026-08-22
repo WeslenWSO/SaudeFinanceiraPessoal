@@ -715,6 +715,15 @@ class Lote(models.Model):
 class ExtratoPagamentoConvenio(models.Model):
     """Linha importada do Demonstrativo de Pagamento TISS (convênio)."""
 
+    STATUS_RECEBIMENTO_PENDENTE = 'pendente'
+    STATUS_RECEBIMENTO_PENDENTE_COM_NOTA = 'pendente_com_nota'
+    STATUS_RECEBIMENTO_FINALIZADO = 'finalizado'
+    STATUS_RECEBIMENTO_CHOICES = [
+        (STATUS_RECEBIMENTO_PENDENTE, 'Pendente'),
+        (STATUS_RECEBIMENTO_PENDENTE_COM_NOTA, 'Pendente com Nota'),
+        (STATUS_RECEBIMENTO_FINALIZADO, 'Finalizado'),
+    ]
+
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, verbose_name='Empresa')
     lote_faturamento = models.ForeignKey(
         Lote,
@@ -747,6 +756,12 @@ class ExtratoPagamentoConvenio(models.Model):
     data_recebimento = models.DateField(verbose_name='Data de Recebimento', null=True, blank=True)
     valor_recebido = models.DecimalField(verbose_name='Valor Recebido', max_digits=12, decimal_places=2, default=0)
     banco = models.CharField(verbose_name='Banco', max_length=100, blank=True, default='')
+    status_recebimento = models.CharField(
+        verbose_name='Status recebimento',
+        max_length=20,
+        choices=STATUS_RECEBIMENTO_CHOICES,
+        default=STATUS_RECEBIMENTO_PENDENTE,
+    )
     numero_demonstrativo = models.CharField(
         verbose_name='Nº Demonstrativo', max_length=50, blank=True, default=''
     )
@@ -779,7 +794,45 @@ class ExtratoPagamentoConvenio(models.Model):
 
     @property
     def baixado(self) -> bool:
-        return self.data_recebimento is not None and (self.valor_recebido or 0) > 0
+        return self.status_recebimento == self.STATUS_RECEBIMENTO_FINALIZADO
+
+    def valor_esperado_recebimento(self) -> Decimal:
+        if (self.liquido or 0) > 0:
+            return self.liquido
+        if (self.valor_liberado or 0) > 0:
+            return self.valor_liberado
+        return self.valor or Decimal('0')
+
+    def recebimento_confere_valor(self) -> bool:
+        recebido = self.valor_recebido or Decimal('0')
+        if recebido <= 0:
+            return False
+        esperado = self.valor_esperado_recebimento()
+        return abs(recebido - esperado) <= Decimal('0.02')
+
+    def calcular_status_recebimento(self) -> str:
+        if (self.banco or '').strip() and self.recebimento_confere_valor():
+            return self.STATUS_RECEBIMENTO_FINALIZADO
+        if (self.nota or '').strip():
+            return self.STATUS_RECEBIMENTO_PENDENTE_COM_NOTA
+        return self.STATUS_RECEBIMENTO_PENDENTE
+
+    def resolver_status_recebimento(self, status_form: str | None = None) -> str:
+        """Finalizado é automático; demais status podem ser escolhidos na edição."""
+        if self.calcular_status_recebimento() == self.STATUS_RECEBIMENTO_FINALIZADO:
+            return self.STATUS_RECEBIMENTO_FINALIZADO
+        if status_form in (
+            self.STATUS_RECEBIMENTO_PENDENTE,
+            self.STATUS_RECEBIMENTO_PENDENTE_COM_NOTA,
+        ):
+            return status_form
+        return self.calcular_status_recebimento()
+
+    def aplicar_status_recebimento(self, status_form: str | None = None, *, data_recebimento_default=None):
+        self.status_recebimento = self.resolver_status_recebimento(status_form)
+        if self.status_recebimento == self.STATUS_RECEBIMENTO_FINALIZADO:
+            if not self.data_recebimento and data_recebimento_default:
+                self.data_recebimento = data_recebimento_default
 
     def sincronizar_baixado_lote(self):
         """Marca lote e faturamentos conforme recebimento baixado no extrato."""

@@ -144,6 +144,82 @@
 
                             </div>
 
+                            <div class="col-12"><hr class="my-2"><h6 class="text-muted mb-0">Recebimento</h6></div>
+
+                            <div class="col-md-4">
+
+                                <label for="status_recebimento" class="form-label">Status recebimento</label>
+
+                                <select class="form-select" id="status_recebimento" name="status_recebimento">
+
+                                    {% for value, label in status_recebimento_choices %}
+
+                                    <option value="{{ value }}" {% if extrato.status_recebimento == value %}selected{% endif %}>
+
+                                        {{ label }}
+
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                                <div class="form-text">Finalizado automático ao informar banco e valor recebido = líquido.</div>
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="valor_recebido" class="form-label">Valor recebido</label>
+
+                                <input type="text" class="form-control" id="valor_recebido" name="valor_recebido"
+
+                                       value="{% if extrato.valor_recebido %}{{ extrato.valor_recebido|moeda_br }}{% elif sugestao_valor %}{{ sugestao_valor|moeda_br }}{% endif %}"
+
+                                       placeholder="0,00">
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label for="data_recebimento" class="form-label">Data recebimento</label>
+
+                                <input type="date" class="form-control" id="data_recebimento" name="data_recebimento"
+
+                                       value="{% if extrato.data_recebimento %}{{ extrato.data_recebimento|date:'Y-m-d' }}{% endif %}">
+
+                            </div>
+
+                            <div class="col-md-6">
+
+                                <label for="banco" class="form-label">Banco</label>
+
+                                <select class="form-select" id="banco" name="banco">
+
+                                    <option value="">Selecione...</option>
+
+                                    {% for b in bancos %}
+
+                                    <option value="{{ b.nome }}" {% if extrato.banco == b.nome %}selected{% endif %}>{{ b.nome }}</option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                            </div>
+
+                            <div class="col-md-6 d-flex align-items-end">
+
+                                <p class="mb-2 text-muted small">
+
+                                    Valor esperado: <strong>R$ {{ sugestao_valor|moeda_br }}</strong>
+
+                                    (líquido → liberado → valor)
+
+                                </p>
+
+                            </div>
+
                         </div>
 
 
