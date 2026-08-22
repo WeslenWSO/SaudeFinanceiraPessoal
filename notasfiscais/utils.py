@@ -1606,6 +1606,34 @@ def _extrair_valores_nfse_scope(scope) -> tuple[Decimal, Decimal]:
     return bruto, liquido
 
 
+def _compnfse_tem_cancelamento(comp_elem) -> bool:
+    """True se o CompNfse ABRASF inclui bloco NfseCancelamento (nota cancelada na prefeitura)."""
+    return any(_local(child.tag) == 'nfsecancelamento' for child in comp_elem)
+
+
+def _iter_infnfse_lote_abrasf(root):
+    """
+    Itera pares (InfNfse, cancelada) de um lote ConsultarNfseLote / ListaNfse.
+    Cancelamento é por CompNfse — não pelo arquivo inteiro (lotes misturam ativas e canceladas).
+    """
+    for comp in root.iter():
+        if _local(comp.tag) != 'compnfse':
+            continue
+        cancelada = _compnfse_tem_cancelamento(comp)
+        infnfse = None
+        for child in comp:
+            if _local(child.tag) != 'nfse':
+                continue
+            for sub in child.iter():
+                if _local(sub.tag) == 'infnfse':
+                    infnfse = sub
+                    break
+            if infnfse is not None:
+                break
+        if infnfse is not None:
+            yield infnfse, cancelada
+
+
 def _xml_ficheiro_vem_de_pasta_cancelada(nome: str) -> bool:
     """True se o caminho/nome lógico indica subpasta ``Cancelada/`` (importação inbox ou cópias)."""
     if not nome:
@@ -1652,10 +1680,14 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
                 xml_nfse_portal_indica_cancelada,
             )
 
+            root_local = _local(root.tag)
+            is_lote_abrasf = root_local in ("consultarnfselote", "listanfse", "lotenotafiscal")
+
             # Heurística de cancelamento: SPED (portal nacional) ou ABRASF explícito — nunca por palavra solta «nfse»
+            # Lotes ABRASF (Rio Branco) podem conter NfseCancelamento só em alguns CompNfse — não marcar o arquivo inteiro.
             if _is_nfse_sped(root):
                 importar_canceladas = bool(importar_canceladas) or xml_nfse_portal_indica_cancelada(xml_bytes)
-            else:
+            elif not is_lote_abrasf:
                 importar_canceladas = bool(importar_canceladas) or abrasf_xml_indica_cancelada(xml_bytes)
         except OSError as os_err:
             # Trata especificamente erros de sistema de arquivos (como [Errno 22] Invalid argument)
@@ -1888,81 +1920,68 @@ def import_lote_nfse(root, user, empresa, importar_canceladas: bool = False):
     notas_ignoradas = []
     
     try:
-        # Procura por InfNfse diretamente
-        for elem in root.iter():
+        for infnfse, cancelada in _iter_infnfse_lote_abrasf(root):
+            importar_nota = importar_canceladas or cancelada
             try:
-                tag_local = _local(elem.tag)
-                print(f"Processando tag: {elem.tag} -> {tag_local}")
-                
-                if tag_local == 'infnfse':
-                    safe_print(f"[OK] Encontrado InfNfse: {elem.tag}")
-                    
-                    # Verificar se já processamos este elemento
-                    elem_id = id(elem)
-                    if elem_id in notas_processadas:
-                        safe_print(f"[AVISO] Elemento já processado, pulando...")
-                        continue
-                    
-                    notas_processadas.add(elem_id)
-                    nfse_count += 1
-                    print(f"Encontrado elemento InfNfse #{nfse_count}")
-                    print(f"Tag completa: {elem.tag}")
-                    
-                    try:
-                        resultado = import_nfse_individual(
-                            elem,
-                            user,
-                            empresa,
-                            cobrancas=cobrancas,
-                            importar_canceladas=importar_canceladas,
-                        )
-                        nfses_retorno = resultado if isinstance(resultado, list) else [resultado] if resultado else []
-                        for nfse in nfses_retorno:
-                            if not nfse:
-                                continue
-                            nota_existente = NotaFiscalServico.objects.filter(
-                                empresa=empresa,
-                                numero_nota=nfse.numero_nota,
-                                serie=nfse.serie
-                            ).first()
+                elem_id = id(infnfse)
+                if elem_id in notas_processadas:
+                    safe_print("[AVISO] Elemento já processado, pulando...")
+                    continue
+                notas_processadas.add(elem_id)
+                nfse_count += 1
+                safe_print(f"[OK] InfNfse #{nfse_count} (cancelada={cancelada})")
 
-                            if nota_existente:
-                                safe_print(f"[AVISO] NFSe {nfse.numero_nota} já existe no banco, ignorando...")
-                                notas_ignoradas.append({
-                                    'numero_nota': nfse.numero_nota,
-                                    'cliente': nfse.cliente,
-                                    'motivo': 'Nota já existe no banco'
-                                })
-                            else:
-                                numero_existente = any(n.numero_nota == nfse.numero_nota and n.serie == nfse.serie for n in nfses)
-                                if not numero_existente:
-                                    nfses.append(nfse)
-                                    notas_importadas.append({
-                                        'numero_nota': nfse.numero_nota,
-                                        'cliente': nfse.cliente,
-                                        'valor_liquido': float(nfse.valor_liquido)
-                                    })
-                                    safe_print(f"[OK] NFSe {nfse.numero_nota} adicionada ao lote")
-                                else:
-                                    safe_print(f"[AVISO] NFSe {nfse.numero_nota} já foi processada no lote, pulando...")
-                                    notas_ignoradas.append({
-                                        'numero_nota': nfse.numero_nota,
-                                        'cliente': nfse.cliente,
-                                        'motivo': 'Duplicata no XML'
-                                    })
-                        if not nfses_retorno:
-                            safe_print(f"[ERRO] NFSe não foi criada para InfNfse #{nfse_count}")
-                    except Exception as e:
-                        safe_print(f"[ERRO] ERRO ao importar NFSe do InfNfse #{nfse_count}: {str(e)}")
-                        safe_traceback_print_exc()
-                        notas_ignoradas.append({
-                            'numero_nota': f'InfNfse #{nfse_count}',
-                            'cliente': 'Erro na importação',
-                            'motivo': str(e)
-                        })
+                resultado = import_nfse_individual(
+                    infnfse,
+                    user,
+                    empresa,
+                    cobrancas=cobrancas,
+                    importar_canceladas=importar_nota,
+                )
+                nfses_retorno = resultado if isinstance(resultado, list) else [resultado] if resultado else []
+                for nfse in nfses_retorno:
+                    if not nfse:
                         continue
+                    nota_existente = NotaFiscalServico.objects.filter(
+                        empresa=empresa,
+                        numero_nota=nfse.numero_nota,
+                        serie=nfse.serie
+                    ).first()
+
+                    if nota_existente:
+                        safe_print(f"[AVISO] NFSe {nfse.numero_nota} já existe no banco, ignorando...")
+                        notas_ignoradas.append({
+                            'numero_nota': nfse.numero_nota,
+                            'cliente': nfse.cliente,
+                            'motivo': 'Nota já existe no banco'
+                        })
+                    else:
+                        numero_existente = any(n.numero_nota == nfse.numero_nota and n.serie == nfse.serie for n in nfses)
+                        if not numero_existente:
+                            nfses.append(nfse)
+                            notas_importadas.append({
+                                'numero_nota': nfse.numero_nota,
+                                'cliente': nfse.cliente,
+                                'valor_liquido': float(nfse.valor_liquido)
+                            })
+                            safe_print(f"[OK] NFSe {nfse.numero_nota} adicionada ao lote")
+                        else:
+                            safe_print(f"[AVISO] NFSe {nfse.numero_nota} já foi processada no lote, pulando...")
+                            notas_ignoradas.append({
+                                'numero_nota': nfse.numero_nota,
+                                'cliente': nfse.cliente,
+                                'motivo': 'Duplicata no XML'
+                            })
+                if not nfses_retorno:
+                    safe_print(f"[ERRO] NFSe não foi criada para InfNfse #{nfse_count}")
             except Exception as e:
-                safe_print(f"[AVISO] Erro ao processar elemento: {str(e)}")
+                safe_print(f"[ERRO] ERRO ao importar NFSe do InfNfse #{nfse_count}: {str(e)}")
+                safe_traceback_print_exc()
+                notas_ignoradas.append({
+                    'numero_nota': f'InfNfse #{nfse_count}',
+                    'cliente': 'Erro na importação',
+                    'motivo': str(e)
+                })
                 continue
         
         print(f"Total de InfNfse encontrados: {len(notas_processadas)}")
@@ -2039,6 +2058,9 @@ def import_nfse_individual(
     
     try:
         # Se vier CompNfse/Nfse, desce até InfNfse para ter o escopo correto
+        if _local(root.tag) == 'compnfse':
+            importar_canceladas = bool(importar_canceladas) or _compnfse_tem_cancelamento(root)
+
         scope = root
         infnfse_found = False
         
@@ -2741,46 +2763,25 @@ def extract_lote_preview(root, empresa):
     
     # Buscar especificamente por elementos InfNfse
     try:
-        # Procura por InfNfse diretamente
-        for elem in root.iter():
-            try:
-                tag_local = _local(elem.tag)
-                print(f"Processando tag: {elem.tag} -> {tag_local}")
-                
-                if tag_local == 'infnfse':
-                    safe_print(f"[OK] Encontrado InfNfse: {elem.tag}")
+        for infnfse, cancelada in _iter_infnfse_lote_abrasf(root):
+            elem_id = id(infnfse)
+            if elem_id in notas_processadas:
+                continue
+            notas_processadas.add(elem_id)
 
-                    # Verificar se já processamos este elemento
-                    elem_id = id(elem)
-                    if elem_id in notas_processadas:
-                        safe_print(f"[AVISO] Elemento já processado, pulando...")
-                        continue
-                    
-                    notas_processadas.add(elem_id)
-                    
-                    try:
-                        nota = extract_nota_individual_preview(elem, empresa)
-                        print(f"DEBUG: Resultado da extração: {nota}")
-                        if nota and nota.get('numero_nota'):
-                            # Verificar se já temos uma nota com este número e série
-                            numero_existente = any(n.get('numero_nota') == nota['numero_nota'] and n.get('serie') == nota['serie'] for n in notas_preview)
-                            if not numero_existente:
-                                notas_preview.append(nota)
-                                safe_print(f"[OK] Preview extraído para InfNfse: {nota.get('numero_nota', 'N/A')}")
-                            else:
-                                safe_print(f"[AVISO] NFSe {nota.get('numero_nota')} já foi processada, pulando...")
-                        else:
-                            safe_print(f"[ERRO] Preview não foi extraído para InfNfse")
-                            print(f"DEBUG: nota = {nota}")
-                            if nota:
-                                print(f"DEBUG: numero_nota = {nota.get('numero_nota')}")
-                    except Exception as e:
-                        print(f"Erro ao extrair preview da NFSe InfNfse: {str(e)}")
-                        import traceback
-                        traceback.print_exc()
-                        continue
+            try:
+                nota = extract_nota_individual_preview(infnfse, empresa, importar_canceladas=cancelada)
+                if nota and nota.get('numero_nota'):
+                    numero_existente = any(
+                        n.get('numero_nota') == nota['numero_nota'] and n.get('serie') == nota['serie']
+                        for n in notas_preview
+                    )
+                    if not numero_existente:
+                        notas_preview.append(nota)
             except Exception as e:
-                safe_print(f"[AVISO] Erro ao processar elemento para preview: {str(e)}")
+                print(f"Erro ao extrair preview da NFSe InfNfse: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         print(f"Total de InfNfse encontrados: {len(notas_processadas)}")
@@ -2793,7 +2794,7 @@ def extract_lote_preview(root, empresa):
         safe_traceback_print_exc()
         return []
 
-def extract_nota_individual_preview(root, empresa):
+def extract_nota_individual_preview(root, empresa, importar_canceladas: bool = False):
     """
     Extrai preview de uma NFSe individual para exibição
     """
@@ -2966,6 +2967,10 @@ def extract_nota_individual_preview(root, empresa):
     if not valor_bruto and valor_liquido:
         valor_bruto = valor_liquido
 
+    if importar_canceladas:
+        valor_bruto = 0
+        valor_liquido = 0
+
     # Retornar dados para preview (status usado no template para Válida/Inválida)
     return {
         'numero_nota': numero_nota,
@@ -2978,7 +2983,8 @@ def extract_nota_individual_preview(root, empresa):
         'discriminacao': discriminacao or '',
         'cnpj_prestador': cnpj_prestador,
         'cnpj_valido': cnpj_valido,
-        'status': 'valido' if cnpj_valido else 'invalido',
+        'status': 'cancelada' if importar_canceladas else ('valido' if cnpj_valido else 'invalido'),
+        'importar_cancelada': importar_canceladas,
     }
 
 

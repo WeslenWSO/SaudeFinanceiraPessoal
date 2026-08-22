@@ -15,6 +15,7 @@ from django.db import transaction
 from empresa.models import Empresa
 from notasfiscais.models import NotaFiscalServico
 from notasfiscais.utils import (
+    _iter_infnfse_lote_abrasf,
     _local,
     _parse_xml_root,
     aplicar_nfse_importada_em_existente,
@@ -62,7 +63,9 @@ class Command(BaseCommand):
             'erros': 0,
         }
 
-        elementos = [e for e in root.iter() if _local(e.tag) == 'infnfse']
+        elementos = list(_iter_infnfse_lote_abrasf(root))
+        if not elementos:
+            elementos = [(e, False) for e in root.iter() if _local(e.tag) == 'infnfse']
 
         if options.get('dry_run'):
             self.stdout.write(f'InfNfse no arquivo: {len(elementos)}')
@@ -71,10 +74,10 @@ class Command(BaseCommand):
             return
 
         with transaction.atomic():
-            for elem in elementos:
+            for elem, cancelada in elementos:
                 try:
                     parsed = import_nfse_individual(
-                        elem, user, empresa, importar_canceladas=False,
+                        elem, user, empresa, importar_canceladas=cancelada,
                     )
                 except Exception as exc:
                     stats['erros'] += 1
