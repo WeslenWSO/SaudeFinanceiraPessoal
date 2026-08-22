@@ -7123,6 +7123,9 @@ def editar_extrato_pagamento(request, pk):
 
         extrato.retencoes = _dec(request.POST.get('retencoes'))
         extrato.liquido = _dec(request.POST.get('liquido'))
+        extrato.valor_glosado = _dec(request.POST.get('valor_glosado'))
+        if (extrato.valor or 0) > 0:
+            extrato.valor_liberado = max(extrato.valor - extrato.valor_glosado, Decimal('0'))
 
         data_previsao_raw = (request.POST.get('data_previsao') or '').strip()
         if data_previsao_raw:

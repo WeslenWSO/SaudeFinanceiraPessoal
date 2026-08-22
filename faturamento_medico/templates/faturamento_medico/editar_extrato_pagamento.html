@@ -102,7 +102,7 @@
 
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
 
                                 <label for="valor_nota" class="form-label">Valor da nota</label>
 
@@ -114,7 +114,17 @@
 
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+
+                                <label for="valor_glosado" class="form-label">Glosado</label>
+
+                                <input type="text" class="form-control" id="valor_glosado" name="valor_glosado"
+
+                                       value="{{ extrato.valor_glosado|moeda_br }}" placeholder="0,00">
+
+                            </div>
+
+                            <div class="col-md-3">
 
                                 <label for="retencoes" class="form-label">Retenções</label>
 
@@ -124,7 +134,7 @@
 
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
 
                                 <label for="liquido" class="form-label">Líquido</label>
 

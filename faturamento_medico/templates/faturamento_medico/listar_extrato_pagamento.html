@@ -63,9 +63,9 @@
                                     <th>Previsão</th>
                                     <th>Recebimento</th>
                                     <th class="text-end">Recebido</th>
-                                    <th class="text-end">Diferença</th>
                                     <th>Banco</th>
                                     <th>Ações</th>
+                                    <th class="text-end">Diferença</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -99,7 +99,6 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">{{ linha.valor_recebido_efetivo|moeda_br }}</td>
-                                    <td class="text-end">{{ linha.diferenca_liquido_recebido|moeda_br }}</td>
                                     <td>{% if linha.banco %}{{ linha.banco }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td class="text-nowrap">
                                         <a href="{% url 'faturamento_medico:editar_extrato_pagamento' linha.pk %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}"
@@ -121,6 +120,7 @@
                                         </a>
                                         {% endif %}
                                     </td>
+                                    <td class="text-end">{{ linha.diferenca_liquido_recebido|moeda_br }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -143,8 +143,8 @@
                                     <td class="text-end">{{ totais.total_liquido|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
                                     <td class="text-end">{{ totais.total_recebido|default:0|moeda_br }}</td>
-                                    <td class="text-end">{{ totais.total_diferenca|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
+                                    <td class="text-end">{{ totais.total_diferenca|default:0|moeda_br }}</td>
                                 </tr>
                             </tfoot>
                             {% endif %}
