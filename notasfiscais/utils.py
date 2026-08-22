@@ -221,6 +221,133 @@ def _dec(root, path: str, ns: str = NS_SPED) -> "Decimal":
         return Decimal("0")
 
 
+def _dec_primeiro(root, paths, ns: str = NS_SPED) -> Decimal:
+    for path in paths:
+        val = _dec(root, path, ns)
+        if val > 0:
+            return val
+    return Decimal("0")
+
+
+def _t_primeiro(root, paths, ns: str = NS_SPED) -> str:
+    for path in paths:
+        val = _t(root, path, ns)
+        if val:
+            return val
+    return ""
+
+
+def _ler_conteudo_xml(xml_file) -> bytes:
+    if isinstance(xml_file, (bytes, bytearray)):
+        return bytes(xml_file)
+    if hasattr(xml_file, "read"):
+        if hasattr(xml_file, "seek"):
+            xml_file.seek(0)
+        data = xml_file.read() or b""
+        if hasattr(xml_file, "seek"):
+            xml_file.seek(0)
+        return data
+    return b""
+
+
+def _parse_xml_root(xml_file):
+    """Lê bytes do arquivo, valida conteúdo e retorna elemento raiz."""
+    data = _ler_conteudo_xml(xml_file)
+    if not data or not data.strip():
+        raise ValueError(
+            "Arquivo XML vazio ou inválido. Selecione um arquivo NFSe (.xml) com conteúdo."
+        )
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    texto = data.decode("utf-8", errors="replace").strip()
+    if not texto:
+        raise ValueError("Arquivo XML vazio ou inválido.")
+    if not texto.lstrip().startswith("<"):
+        raise ValueError('Arquivo não parece ser XML válido (conteúdo não inicia com "<").')
+    try:
+        return ET.fromstring(data)
+    except ET.ParseError as exc:
+        raise ValueError(f"Erro ao processar XML: {exc}") from exc
+
+
+def _extrair_ibscbs_sped(infnfse_elem) -> dict:
+    """Extrai IBS/CBS do layout NFSe nacional (reforma tributária / RTC)."""
+    base_ibs_cbs = _dec_primeiro(infnfse_elem, [
+        "IBSCBS/vBC",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBS/vBC",
+        "DPS/infDPS/IBSCBS/valores/vBC",
+    ])
+    valor_ibs = _dec_primeiro(infnfse_elem, [
+        "IBSCBS/totCIBS/vIBSTot",
+        "IBSCBS/vIBS",
+        "IBSCBS/gIBSCBS/vIBS",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBS/vIBS",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBSAjuste/vIBS",
+        "IBSCBS/totCIBS/gTribSN/vIBSSN",
+    ])
+    if valor_ibs <= 0:
+        v_ibs_uf = _dec(infnfse_elem, "IBSCBS/gIBSCBS/gIBSUF/vIBSUF", NS_SPED)
+        v_ibs_mun = _dec(infnfse_elem, "IBSCBS/gIBSCBS/gIBSMun/vIBSMun", NS_SPED)
+        if v_ibs_uf > 0 or v_ibs_mun > 0:
+            valor_ibs = v_ibs_uf + v_ibs_mun
+    valor_cbs = _dec_primeiro(infnfse_elem, [
+        "IBSCBS/totCIBS/vCBSTot",
+        "IBSCBS/vCBS",
+        "IBSCBS/gIBSCBS/gCBS/vCBS",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBS/gCBS/vCBS",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBSAjuste/vCBS",
+        "IBSCBS/totCIBS/gTribSN/vCBSSN",
+    ])
+    aliquota_ibs = _dec_primeiro(infnfse_elem, [
+        "IBSCBS/totCIBS/pAliqIBS",
+        "IBSCBS/gIBSCBS/gIBSUF/pIBSUF",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBS/gIBSUF/pIBSUF",
+    ])
+    aliquota_cbs = _dec_primeiro(infnfse_elem, [
+        "IBSCBS/totCIBS/pAliqCBS",
+        "IBSCBS/gIBSCBS/gCBS/pCBS",
+        "DPS/infDPS/IBSCBS/valores/trib/gIBSCBS/gCBS/pCBS",
+    ])
+    return {
+        "base_ibs_cbs": base_ibs_cbs,
+        "valor_ibs": valor_ibs,
+        "valor_cbs": valor_cbs,
+        "aliquota_ibs": aliquota_ibs,
+        "aliquota_cbs": aliquota_cbs,
+    }
+
+
+def _kwargs_ibscbs_nfse(ibscbs: dict, *, zerar: bool = False) -> dict:
+    zero = Decimal("0")
+    if zerar:
+        return {
+            "base_ibs_cbs": zero,
+            "valor_ibs": zero,
+            "valor_cbs": zero,
+            "aliquota_ibs": zero,
+            "aliquota_cbs": zero,
+        }
+    return {
+        "base_ibs_cbs": ibscbs.get("base_ibs_cbs") or zero,
+        "valor_ibs": ibscbs.get("valor_ibs") or zero,
+        "valor_cbs": ibscbs.get("valor_cbs") or zero,
+        "aliquota_ibs": ibscbs.get("aliquota_ibs") or zero,
+        "aliquota_cbs": ibscbs.get("aliquota_cbs") or zero,
+    }
+
+
+def _ibscbs_proporcional(ibscbs_kwargs: dict, proporcao: Decimal) -> dict:
+    zero = Decimal("0")
+    prop = proporcao if proporcao else Decimal("1")
+    return {
+        "base_ibs_cbs": (ibscbs_kwargs.get("base_ibs_cbs") or zero) * prop,
+        "valor_ibs": (ibscbs_kwargs.get("valor_ibs") or zero) * prop,
+        "valor_cbs": (ibscbs_kwargs.get("valor_cbs") or zero) * prop,
+        "aliquota_ibs": ibscbs_kwargs.get("aliquota_ibs") or zero,
+        "aliquota_cbs": ibscbs_kwargs.get("aliquota_cbs") or zero,
+    }
+
+
 def _is_nfse_sped(root) -> bool:
     """Verifica se o root é NFSe do Portal Nacional (SPED)."""
     if root is None:
@@ -951,13 +1078,35 @@ def import_nfse_sped(
     serie = _t(infnfse_elem, "DPS/infDPS/serie", NS_SPED) or "1"
     numero_dps_raw = _extrair_numero_dps_sped(infnfse_elem)
     numero_dps_val = (numero_dps_raw or "").strip()[:20] or None
-    data_emissao = _d(infnfse_elem, "dhProc", NS_SPED) or _d(infnfse_elem, "dhEmi", NS_SPED)
+    data_emissao = (
+        _d(infnfse_elem, "dhProc", NS_SPED)
+        or _d(infnfse_elem, "dhEmi", NS_SPED)
+        or _d(infnfse_elem, "DPS/infDPS/dhEmi", NS_SPED)
+    )
     if not data_emissao:
         data_emissao = date.today()
 
-    cliente = _t(infnfse_elem, "DPS/infDPS/toma/xNome", NS_SPED) or "Cliente não identificado"
-    cnpj_cpf = _t(infnfse_elem, "DPS/infDPS/toma/CNPJ", NS_SPED) or _t(infnfse_elem, "DPS/infDPS/toma/CPF", NS_SPED) or ""
-    discriminacao = _t(infnfse_elem, "serv/cServ/xDescServ", NS_SPED) or ""
+    cliente = (
+        _t_primeiro(infnfse_elem, [
+            "DPS/infDPS/toma/xNome",
+            "toma/xNome",
+        ])
+        or "Cliente não identificado"
+    )
+    cnpj_cpf = (
+        _t_primeiro(infnfse_elem, [
+            "DPS/infDPS/toma/CNPJ",
+            "DPS/infDPS/toma/CPF",
+            "toma/CNPJ",
+            "toma/CPF",
+        ])
+        or ""
+    )
+    discriminacao = _t_primeiro(infnfse_elem, [
+        "serv/cServ/xDescServ",
+        "DPS/infDPS/serv/cServ/xDescServ",
+        "DPS/infDPS/serv/xDescServ",
+    ])
     _nfs_import_debug_log(
         "info",
         "[NFS_IMPORT_DEBUG] SPED discriminacao extraída: len=%s, primeiros_200=%s",
@@ -966,15 +1115,21 @@ def import_nfse_sped(
     )
 
     # Valores principais: valor bruto da tag vBC, valor líquido da tag vLiq
-    valor_bruto = _dec(infnfse_elem, "valores/vBC", NS_SPED)
-    if not valor_bruto or valor_bruto <= 0:
-        valor_bruto = _dec(infnfse_elem, "valores/vServPrest/vServ", NS_SPED)
-    valor_liq = _dec(infnfse_elem, "valores/vLiq", NS_SPED)
+    valor_bruto = _dec_primeiro(infnfse_elem, [
+        "valores/vBC",
+        "valores/vServPrest/vServ",
+        "DPS/infDPS/valores/vServPrest/vServ",
+        "DPS/infDPS/valores/vServ",
+    ])
+    valor_liq = _dec_primeiro(infnfse_elem, [
+        "valores/vLiq",
+        "DPS/infDPS/valores/vLiq",
+    ])
     valor_liquido = valor_liq if valor_liq > 0 else valor_bruto
     if not valor_bruto or valor_bruto <= 0:
         valor_bruto = valor_liquido
 
-    # Campos de retenção no layout SPED
+    ibscbs = _extrair_ibscbs_sped(infnfse_elem)
     v_total_ret = _dec(infnfse_elem, "valores/vTotalRet", NS_SPED)
     v_iss_xml = _dec(infnfse_elem, "valores/vISSQN", NS_SPED)
 
@@ -1060,8 +1215,11 @@ def import_nfse_sped(
         valor_iss_retido_xml = _D("0")
         outras_retencoes_xml = _D("0")
         aliquota_iss_xml = _D("0")
+        ibscbs_kwargs = _kwargs_ibscbs_nfse(ibscbs, zerar=True)
 
     zero = Decimal("0")
+    if not importar_canceladas:
+        ibscbs_kwargs = _kwargs_ibscbs_nfse(ibscbs)
     cob, motivo, segmentos = detectar_forma_pagamento_e_vincular(
         discriminacao or "", cobrancas,
         valor_total_nfse=valor_bruto,
@@ -1098,6 +1256,7 @@ def import_nfse_sped(
                 aliquota=aliquota_iss_xml,
                 status_conciliacao='nao_conciliado',
                 forma_pagamento=cob_seg,
+                **_ibscbs_proporcional(ibscbs_kwargs, proporcao),
             )
             if nsu_seg is not None:
                 nfse_seg.nsu = nsu_seg
@@ -1135,6 +1294,7 @@ def import_nfse_sped(
         aliquota=aliquota_iss_xml,
         status_conciliacao="nao_conciliado",
         data_cancelamento=data_emissao if importar_canceladas else None,
+        **ibscbs_kwargs,
     )
     nfse.forma_pagamento = cob if cob else None
     forma_unica = extrair_forma_pagamento(discriminacao or "") if discriminacao else None
@@ -1360,8 +1520,7 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
         # Parse do XML com tratamento específico para erros de arquivo
         print("Fazendo parse do XML...")
         try:
-            tree = ET.parse(xml_file.file)
-            root = tree.getroot()
+            root = _parse_xml_root(xml_file)
             print(f"Root tag: {root.tag}")
             from notasfiscais.nfse_xml_copia import (
                 tentar_salvar_copia_xml_importacao,
@@ -1383,6 +1542,8 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
             safe_print(f"[ERRO] Erro de parsing XML: {str(parse_err)}")
             safe_print(f"[ERRO] Arquivo pode estar corrompido ou ter formato inválido")
             raise ValueError(f"Erro ao processar XML: {str(parse_err)}")
+        except ValueError:
+            raise
 
         from notasfiscais.nfse_evento_cancelamento import (
             import_evento_cancelamento_nfse,
@@ -2280,8 +2441,7 @@ def extract_xml_data_preview(xml_file, empresa):
     """
     try:
         try:
-            tree = ET.parse(xml_file.file)
-            root = tree.getroot()
+            root = _parse_xml_root(xml_file)
         except OSError as os_err:
             # Trata especificamente erros de sistema de arquivos (como [Errno 22] Invalid argument)
             safe_print(f"[ERRO] Erro de sistema de arquivos ao abrir XML para preview: {str(os_err)}")
@@ -2296,6 +2456,8 @@ def extract_xml_data_preview(xml_file, empresa):
             safe_print(f"[ERRO] Erro de parsing XML para preview: {str(parse_err)}")
             safe_print(f"[ERRO] Arquivo pode estar corrompido ou ter formato inválido")
             raise ValueError(f"Erro ao processar XML: {str(parse_err)}")
+        except ValueError:
+            raise
 
         from notasfiscais.nfse_evento_cancelamento import (
             extract_evento_cancelamento_preview,
@@ -2336,18 +2498,30 @@ def extract_sped_preview(root, empresa):
             if not numero_nota:
                 continue
             serie = _t(infnfse, "DPS/infDPS/serie", ns) or "1"
-            data_emissao = _d(infnfse, "dhProc", ns) or _d(infnfse, "dhEmi", ns)
+            data_emissao = (
+                _d(infnfse, "dhProc", ns)
+                or _d(infnfse, "dhEmi", ns)
+                or _d(infnfse, "DPS/infDPS/dhEmi", ns)
+            )
             data_str = data_emissao.strftime("%Y-%m-%d") if data_emissao else ""
-            valor_bruto = _dec(infnfse, "valores/vBC", ns)
-            if not valor_bruto or valor_bruto <= 0:
-                valor_bruto = _dec(infnfse, "valores/vServPrest/vServ", ns)
-            valor_liq = _dec(infnfse, "valores/vLiq", ns)
+            valor_bruto = _dec_primeiro(infnfse, [
+                "valores/vBC",
+                "valores/vServPrest/vServ",
+                "DPS/infDPS/valores/vServPrest/vServ",
+            ], ns=ns)
+            valor_liq = _dec_primeiro(infnfse, ["valores/vLiq", "DPS/infDPS/valores/vLiq"], ns=ns)
             valor_liquido = valor_liq if valor_liq > 0 else valor_bruto
             if not valor_bruto or valor_bruto <= 0:
                 valor_bruto = valor_liquido
-            cliente = _t(infnfse, "DPS/infDPS/toma/xNome", ns) or "Cliente não identificado"
-            cnpj_cpf = _t(infnfse, "DPS/infDPS/toma/CNPJ", ns) or _t(infnfse, "DPS/infDPS/toma/CPF", ns) or ""
-            discriminacao = _t(infnfse, "serv/cServ/xDescServ", ns) or ""
+            cliente = _t_primeiro(infnfse, ["DPS/infDPS/toma/xNome", "toma/xNome"], ns=ns) or "Cliente não identificado"
+            cnpj_cpf = _t_primeiro(infnfse, [
+                "DPS/infDPS/toma/CNPJ", "DPS/infDPS/toma/CPF", "toma/CNPJ", "toma/CPF",
+            ], ns=ns) or ""
+            discriminacao = _t_primeiro(infnfse, [
+                "serv/cServ/xDescServ",
+                "DPS/infDPS/serv/cServ/xDescServ",
+            ], ns=ns) or ""
+            ibscbs = _extrair_ibscbs_sped(infnfse)
             # Preview simples de base de serviço (usar NORMAL por padrão no preview;
             # o cálculo definitivo é feito em determinar_base_servico() ao salvar a NFSe)
             base_servico_preview = "Normal"
@@ -2361,6 +2535,9 @@ def extract_sped_preview(root, empresa):
                 "cnpj_cpf": cnpj_cpf,
                 "discriminacao": discriminacao,
                 "base_servico": base_servico_preview,
+                "base_ibs_cbs": str(ibscbs.get("base_ibs_cbs") or 0),
+                "valor_ibs": str(ibscbs.get("valor_ibs") or 0),
+                "valor_cbs": str(ibscbs.get("valor_cbs") or 0),
                 "cnpj_prestador": None,
                 "cnpj_valido": True,
                 "status": "valido",

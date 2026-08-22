@@ -213,6 +213,39 @@ class NotaFiscalServico(models.Model):
         blank=True,
         null=True,
     )
+    base_ibs_cbs = models.DecimalField(
+        verbose_name='Base IBS/CBS',
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        help_text='Base de cálculo IBS/CBS (reforma tributária), tag vBC do XML.',
+    )
+    valor_ibs = models.DecimalField(
+        verbose_name='Valor IBS',
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        help_text='Valor do IBS destacado no XML nacional (vIBS / vIBSTot).',
+    )
+    valor_cbs = models.DecimalField(
+        verbose_name='Valor CBS',
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        help_text='Valor da CBS destacada no XML nacional (vCBS / vCBSTot).',
+    )
+    aliquota_ibs = models.DecimalField(
+        verbose_name='Alíquota IBS (%)',
+        max_digits=7,
+        decimal_places=4,
+        default=0,
+    )
+    aliquota_cbs = models.DecimalField(
+        verbose_name='Alíquota CBS (%)',
+        max_digits=7,
+        decimal_places=4,
+        default=0,
+    )
 
     class Meta:
         verbose_name = 'Nota Fiscal de Serviço'
