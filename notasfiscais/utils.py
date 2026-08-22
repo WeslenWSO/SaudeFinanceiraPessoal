@@ -1647,11 +1647,16 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
             root = _parse_xml_root(xml_file)
             print(f"Root tag: {root.tag}")
             from notasfiscais.nfse_xml_copia import (
+                abrasf_xml_indica_cancelada,
                 tentar_salvar_copia_xml_importacao,
                 xml_nfse_portal_indica_cancelada,
             )
 
-            importar_canceladas = bool(importar_canceladas) or xml_nfse_portal_indica_cancelada(xml_bytes)
+            # Heurística de cancelamento: SPED (portal nacional) ou ABRASF explícito — nunca por palavra solta «nfse»
+            if _is_nfse_sped(root):
+                importar_canceladas = bool(importar_canceladas) or xml_nfse_portal_indica_cancelada(xml_bytes)
+            else:
+                importar_canceladas = bool(importar_canceladas) or abrasf_xml_indica_cancelada(xml_bytes)
         except OSError as os_err:
             # Trata especificamente erros de sistema de arquivos (como [Errno 22] Invalid argument)
             safe_print(f"[ERRO] Erro de sistema de arquivos ao abrir XML: {str(os_err)}")

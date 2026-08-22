@@ -34,13 +34,27 @@ logger = logging.getLogger(__name__)
 # Padrões no XML nacional (SPED / eventos) que indicam cancelamento da NFS-e.
 _RE_CSITNFE_CANCEL = re.compile(r"<[^>]*cSitNFe[^>]*>\s*([23])\s*</", re.I)
 _RE_INF_CANC = re.compile(r"<[^>]*infCanc[^>]*>", re.I)
+_RE_ABRASF_LAYOUT = re.compile(
+    r"abrasf\.org\.br|ginfes\.com\.br|<[^>]*compnfse|<[^>]*listanfse|<[^>]*lotenotafiscal",
+    re.I,
+)
+_RE_ABRASF_CANCELAMENTO = re.compile(
+    r"<[^>]*(nfsecancelamento|infpedidocancelamento|confirmacaocancelamento|retcancelamento)[^>]*>",
+    re.I,
+)
 
 
-def xml_nfse_portal_indica_cancelada(xml_bytes: bytes) -> bool:
+def _xml_layout_abrasf_municipal(raw: str) -> bool:
+    """True se o XML é NFS-e municipal (ABRASF/Ginfes), não portal nacional SPED."""
+    if not raw:
+        return False
+    return bool(_RE_ABRASF_LAYOUT.search(raw))
+
+
+def abrasf_xml_indica_cancelada(xml_bytes: bytes) -> bool:
     """
-    Heurística para XML baixado do portal nacional: evento de cancelamento ou situação cancelada.
-
-    Usado para gravar cópias em ``…/Cancelada/`` e para importar com valores zerados sem depender só do checkbox.
+    Cancelamento explícito em XML ABRASF (Rio Branco e similares).
+    Não usa palavras soltas na discriminação — só tags de evento/pedido de cancelamento.
     """
     if not xml_bytes or len(xml_bytes) < 80:
         return False
@@ -48,12 +62,30 @@ def xml_nfse_portal_indica_cancelada(xml_bytes: bytes) -> bool:
         raw = xml_bytes.decode("utf-8", errors="replace")
     except Exception:
         return False
+    return bool(_RE_ABRASF_CANCELAMENTO.search(raw))
+
+
+def xml_nfse_portal_indica_cancelada(xml_bytes: bytes) -> bool:
+    """
+    Heurística para XML baixado do portal nacional: evento de cancelamento ou situação cancelada.
+
+    Usado para gravar cópias em ``…/Cancelada/`` e para importar com valores zerados sem depender só do checkbox.
+    Não se aplica a XML ABRASF municipal (Rio Branco) — use ``abrasf_xml_indica_cancelada``.
+    """
+    if not xml_bytes or len(xml_bytes) < 80:
+        return False
+    try:
+        raw = xml_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        return False
+    if _xml_layout_abrasf_municipal(raw):
+        return abrasf_xml_indica_cancelada(xml_bytes)
     low = raw.lower().replace("\n", " ")
     if _RE_INF_CANC.search(raw):
         return True
     if "pedregevento" in low and "cancel" in low:
         return True
-    if "cancelamento" in low and ("nfse" in low or "nfs-e" in low or "sped" in low):
+    if "cancelamento" in low and ("nfs-e" in low or "sped" in low):
         return True
     m = _RE_CSITNFE_CANCEL.search(raw)
     if m:

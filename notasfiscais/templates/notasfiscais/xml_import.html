@@ -166,6 +166,10 @@
                             <label class="form-check-label" for="{{ form.importar_canceladas.id_for_label }}">
                                 {{ form.importar_canceladas.label }}
                             </label>
+                            <div class="form-text text-warning">
+                                Marque <strong>somente</strong> se os XMLs forem de notas já canceladas na prefeitura.
+                                Se marcar por engano, todas as notas importadas ficarão com status <strong>Cancelada</strong> e valores zerados.
+                            </div>
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
