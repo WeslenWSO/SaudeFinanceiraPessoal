@@ -20,15 +20,17 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3 class="card-title">Contas a Pagar</h3>
-                    <div>
-                        <a href="{% url 'contasapagar:importar_pdf' %}" class="btn btn-info mr-2">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{% url 'contasapagar:importar_pdf' %}" class="btn btn-info">
                             <i class="fas fa-file-pdf"></i> Importar PDF
                         </a>
-                        <a href="{% url 'contasapagar:importar_relatorio_liquidos' %}" class="btn btn-success mr-2">
+                        <a href="{% url 'contasapagar:importar_relatorio_liquidos' %}" class="btn btn-success">
                             <i class="fas fa-file-invoice-dollar"></i> Relatório de Líquidos
                         </a>
+                        <a href="{% url 'contasapagar:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já pagos">
+                            <i class="fas fa-tags"></i> Categorizar baixados
+                        </a>
                         <a href="{% url 'contasapagar:cadastrar' %}" class="btn btn-primary">Cadastrar Conta a Pagar</a>
-                        
                     </div>
                 </div>
                 <div class="card-body">

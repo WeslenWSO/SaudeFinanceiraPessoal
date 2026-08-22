@@ -27,6 +27,9 @@ urlpatterns = [
         name='importar_relatorio_liquidos',
     ),
     path('baixar_selecionadas/', views.baixar_contas_selecionadas, name='baixar_selecionadas'),
+    path('categorizar-baixados/', views.categorizar_pagos_baixados, name='categorizar_baixados'),
+    path('buscar_categorias/', views.buscar_categorias, name='buscar_categorias'),
+    path('aplicar_categoria/', views.aplicar_categoria, name='aplicar_categoria'),
     #path('Pagas/', views.contasapagas, name='listaAPagar'),
 
     ]

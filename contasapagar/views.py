@@ -19,6 +19,7 @@ from django.db import transaction
 
 from contasapagar.models import ContasaPagar
 from categoria.models import Categoria
+from empresa.models import Empresa
 from fornecedor.models import Fornecedor
 from cobranca.models import Cobranca
 from extrato.models import ContaBancaria
@@ -960,6 +961,95 @@ def desconciliar_contas_pagar(request):
         return redirect('contasapagar:listaAPagar')
 
 
+def extrair_filtros_categorizar_baixados(request):
+    """Filtros da tela de categorização de contas já pagas."""
+    return {
+        'search': (request.GET.get('search') or '').strip(),
+        'forma_pagamento': request.GET.getlist('forma_pagamento'),
+        'data_inicio': (request.GET.get('data_inicio') or '').strip(),
+        'data_fim': (request.GET.get('data_fim') or '').strip(),
+        'per_page': (request.GET.get('per_page') or '50').strip(),
+    }
+
+
+@login_required
+def categorizar_pagos_baixados(request):
+    """Lista contas já baixadas (pago) para aplicar categoria em lote."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    filtros = extrair_filtros_categorizar_baixados(request)
+    per_page = filtros['per_page']
+    try:
+        per_page = int(per_page)
+        if per_page not in [25, 50, 100, 150, 500, 900]:
+            per_page = 50
+    except ValueError:
+        per_page = 50
+
+    hoje = timezone.now().date()
+    data_inicio = filtros['data_inicio'] or (hoje - timedelta(days=365)).strftime('%Y-%m-%d')
+    data_fim = filtros['data_fim'] or hoje.strftime('%Y-%m-%d')
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+
+    contas = (
+        ContasaPagar.objects.filter(empresa_id=empresa_id, status='pago')
+        .filter(dtPag__isnull=False)
+        .filter(dtPag__gte=data_inicio, dtPag__lte=data_fim)
+        .select_related('categoria', 'cobranca', 'fornecedor')
+        .order_by('-dtPag', '-id')
+    )
+
+    if filtros['search']:
+        contas = contas.filter(
+            Q(fornecedor__razao__icontains=filtros['search'])
+            | Q(fornecedor__nome_fantasia__icontains=filtros['search'])
+            | Q(descricao__icontains=filtros['search'])
+            | Q(numdoc__icontains=filtros['search'])
+            | Q(cpf_cnpj__icontains=filtros['search'])
+        )
+
+    fp_ids = []
+    for fp in filtros['forma_pagamento']:
+        if fp and str(fp).strip():
+            try:
+                fp_ids.append(int(fp))
+            except ValueError:
+                continue
+    if fp_ids:
+        contas = contas.filter(cobranca_id__in=fp_ids)
+
+    categorias = Categoria.objects.filter(empresa_id=empresa_id).order_by('classificacao', 'nome')
+    formas_pagamento = Cobranca.objects.all().order_by('descricao')
+
+    paginator = Paginator(contas, per_page)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    q_nav = request.GET.copy()
+    if 'page' in q_nav:
+        del q_nav['page']
+    filtros_query_sem_page = q_nav.urlencode()
+
+    context = {
+        'contas': page_obj,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'categorias': categorias,
+        'formas_pagamento': formas_pagamento,
+        'filtros_query_sem_page': filtros_query_sem_page,
+        'filtros': {
+            'search': filtros['search'],
+            'forma_pagamento': filtros['forma_pagamento'],
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+            'per_page': str(per_page),
+        },
+    }
+    return render(request, 'contasapagar/categorizar_baixados.html', context)
+
+
 @login_required
 def aplicar_categoria(request):
     """Aplicar categoria a múltiplas contas a pagar selecionadas"""
@@ -971,11 +1061,22 @@ def aplicar_categoria(request):
     if request.method != 'POST':
         return redirect('contasapagar:listaAPagar')
 
+    redirect_to = (request.POST.get('redirect_to') or '').strip()
+    filtros_query = request.POST.get('filtros_query') or ''
+
+    def _redirect_apos_categoria():
+        if redirect_to == 'categorizar_baixados':
+            base = reverse('contasapagar:categorizar_baixados')
+            if filtros_query:
+                return redirect(f'{base}?{filtros_query}')
+            return redirect(base)
+        return redirect('contasapagar:listaAPagar')
+
     try:
         empresa = Empresa.objects.get(id=empresa_id)
     except Empresa.DoesNotExist:
         messages.error(request, 'Empresa não encontrada.')
-        return redirect('contasapagar:listaAPagar')
+        return _redirect_apos_categoria()
 
     # Obter dados do formulário
     contas_ids = request.POST.getlist('contas_ids')
@@ -983,18 +1084,18 @@ def aplicar_categoria(request):
 
     if not contas_ids:
         messages.error(request, 'Nenhuma conta selecionada.')
-        return redirect('contasapagar:listaAPagar')
+        return _redirect_apos_categoria()
 
     if not categoria_id:
         messages.error(request, 'Categoria não selecionada.')
-        return redirect('contasapagar:listaAPagar')
+        return _redirect_apos_categoria()
 
     try:
         # Buscar categoria
         categoria = Categoria.objects.get(id=categoria_id, empresa_id=empresa_id)
     except Categoria.DoesNotExist:
         messages.error(request, 'Categoria não encontrada ou não pertence à empresa.')
-        return redirect('contasapagar:listaAPagar')
+        return _redirect_apos_categoria()
 
     # Buscar contas selecionadas
     contas = ContasaPagar.objects.filter(id__in=contas_ids, empresa_id=empresa_id)
@@ -1017,7 +1118,7 @@ def aplicar_categoria(request):
     else:
         messages.warning(request, 'Nenhuma conta foi atualizada.')
 
-    return redirect('contasapagar:listaAPagar')
+    return _redirect_apos_categoria()
 
 
 @login_required
