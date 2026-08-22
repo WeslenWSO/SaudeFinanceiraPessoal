@@ -2113,8 +2113,10 @@ def import_nfse_individual(
                 valor_liquido = text
                 print(f"Valor líquido encontrado: {valor_liquido}")
             elif lname == 'serie':
-                serie = text
-                print(f"Série encontrada: {serie}")
+                ctx_serie = get_element_context(elem, scope)
+                if ctx_serie not in ('identificacaorps', 'rpssubstituido', 'identificacaorps'):
+                    serie = text
+                    print(f"Série encontrada: {serie}")
             elif lname == 'vbc':
                 valor_bruto = text
                 print(f"Valor bruto encontrado (vBC): {valor_bruto}")
@@ -2160,7 +2162,7 @@ def import_nfse_individual(
                 aliquota = text
                 print(f"Alíquota pAliqAplic encontrada: {aliquota}")
             elif lname == 'issretido':
-                iss_retido = text.lower() in ('1', 'true', 'sim', 's')
+                iss_retido = text.strip() in ('1', 'true', 'sim', 's')
                 print(f"ISS Retido encontrado: {iss_retido}")
             elif lname == 'valoriss':
                 valor_iss = text
@@ -2355,12 +2357,20 @@ def import_nfse_individual(
             valor_ir_decimal = Decimal('0')
             valor_csll_decimal = Decimal('0')
 
-        # ISS: se empresa.utiliza_iss_fixo = N e tpRetISSQN = 2 → ISS retido S, valor vISSQN, alíquota pAliqAplic; senão zerar tudo
-        utiliza_iss_fixo = getattr(empresa, "utiliza_iss_fixo", True)
-        if utiliza_iss_fixo or tp_ret_issqn != '2':
-            iss_retido = False
-            valor_iss_retido_decimal = Decimal('0')
-            aliquota_decimal = Decimal('0')
+        # ISS SPED (tpRetISSQN): regra do portal nacional. ABRASF (Rio Branco) mantém Aliquota/ValorIss do XML.
+        if tp_ret_issqn is not None:
+            utiliza_iss_fixo = getattr(empresa, "utiliza_iss_fixo", True)
+            if utiliza_iss_fixo or tp_ret_issqn != '2':
+                iss_retido = False
+                valor_iss_retido_decimal = Decimal('0')
+                aliquota_decimal = Decimal('0')
+        else:
+            if valor_iss_retido_decimal > 0:
+                iss_retido = True
+            elif iss_retido and valor_iss_retido_decimal <= 0 and valor_iss:
+                vi = _parse_valor_xml(valor_iss)
+                if vi > 0:
+                    valor_iss_retido_decimal = vi
         
         # Validar campos obrigatórios
         if not numero_nota:
@@ -2500,7 +2510,7 @@ def import_nfse_individual(
         auts = extrair_aut_todos(discriminacao or "")
         if forma_unica and _eh_forma_cartao(forma_unica):
             if len(auts) == 1:
-                nfse.nsu = auts[0]
+                nfse.nsu = (auts[0] or "").strip().rstrip(".,;")
                 safe_print(f"NSU extraído da discriminação: {nfse.nsu}")
             elif len(auts) > 1:
                 logger.debug("NFSe %s: multi_aut_detectado (não preenchendo nsu)", nfse.numero_nota)
@@ -2519,11 +2529,45 @@ def import_nfse_individual(
         safe_print(f"[OK] NFSe criada com sucesso: {nfse.numero_nota}")
         safe_print(f"Cliente: {nfse.cliente}, CNPJ/CPF: {nfse.cnpj_cpf}")
         return nfse
-        
+
     except Exception as e:
         safe_print(f"ERRO FATAL no import_nfse_individual: {str(e)}")
         safe_traceback_print_exc()
         raise
+
+
+def aplicar_nfse_importada_em_existente(destino: NotaFiscalServico, origem: NotaFiscalServico) -> None:
+    """Atualiza NFSe existente com dados parseados do XML (valores, retenções, status)."""
+    destino.data_cancelamento = None
+    destino.serie = origem.serie or destino.serie or '1'
+    destino.data_emissao = origem.data_emissao or destino.data_emissao
+    destino.valor_bruto = origem.valor_bruto
+    destino.valor_liquido = origem.valor_liquido
+    destino.cliente = origem.cliente or destino.cliente
+    destino.cnpj_cpf = origem.cnpj_cpf or destino.cnpj_cpf
+    destino.discriminacao = origem.discriminacao or destino.discriminacao
+    destino.valor_deducoes = origem.valor_deducoes
+    destino.valor_pis = origem.valor_pis
+    destino.valor_cofins = origem.valor_cofins
+    destino.valor_inss = origem.valor_inss
+    destino.valor_ir = origem.valor_ir
+    destino.valor_csll = origem.valor_csll
+    destino.iss_retido = origem.iss_retido
+    destino.valor_iss_retido = origem.valor_iss_retido
+    destino.outras_retencoes = origem.outras_retencoes
+    destino.aliquota = origem.aliquota
+    if origem.forma_pagamento_id:
+        destino.forma_pagamento = origem.forma_pagamento
+    if origem.nsu:
+        destino.nsu = origem.nsu
+    destino.save()
+    from contasareceber.socio_sync import (
+        propagar_autorizacao_nota_para_contas_receber,
+        propagar_forma_pagamento_nota_para_contas_receber,
+    )
+    propagar_forma_pagamento_nota_para_contas_receber(destino)
+    propagar_autorizacao_nota_para_contas_receber(destino, apenas_vazias=False)
+
 
 def parse_date(date_str):
     """
