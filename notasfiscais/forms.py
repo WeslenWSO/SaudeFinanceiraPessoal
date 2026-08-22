@@ -227,7 +227,8 @@ class PortalExtensaoNfseForm(forms.Form):
 class XMLUploadForm(forms.Form):
     xml_file = forms.FileField(
         label='Arquivo XML',
-        help_text='Selecione um arquivo XML de NFSe válido',
+        help_text='Selecione um ou mais arquivos XML de NFSe válidos',
+        required=False,
         widget=forms.FileInput(attrs={
             'class': 'form-control',
             'accept': '.xml',
@@ -239,29 +240,47 @@ class XMLUploadForm(forms.Form):
         required=False,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'importarCanceladas'})
     )
-    
-    def clean_xml_file(self):
-        xml_file = self.cleaned_data.get('xml_file')
-        
-        if not xml_file:
-            raise ValidationError('Este campo é obrigatório.')
-        
-        # Validações básicas
-        if not xml_file.name.endswith('.xml'):
-            raise ValidationError('O arquivo deve ser um XML válido.')
-        
-        if xml_file.size > 5 * 1024 * 1024:  # 5MB
-            raise ValidationError('O arquivo é muito grande. Tamanho máximo: 5MB.')
-        
-        # Validação básica de XML (sem parse completo para evitar problemas)
-        try:
-            # Apenas verifica se o arquivo pode ser lido
-            xml_file.read(1024)  # Lê apenas os primeiros 1KB
-            xml_file.seek(0)  # Volta ao início do arquivo
-        except Exception as e:
-            raise ValidationError(f'Erro ao ler arquivo: {str(e)}')
-        
-        return xml_file
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.arquivos_vazios = []
+
+    def clean(self):
+        cleaned_data = super().clean()
+        arquivos = self.files.getlist('xml_file') if self.files else []
+
+        if not arquivos:
+            raise ValidationError({'xml_file': 'Selecione pelo menos um arquivo XML.'})
+
+        from .utils import _conteudo_xml_vazio
+
+        validos = []
+        vazios = []
+        for xml_file in arquivos:
+            nome = xml_file.name or 'arquivo.xml'
+            if not nome.lower().endswith('.xml'):
+                raise ValidationError({'xml_file': f'O arquivo "{nome}" deve ser um XML (.xml).'})
+            if xml_file.size > 5 * 1024 * 1024:
+                raise ValidationError({'xml_file': f'O arquivo "{nome}" excede 5MB.'})
+            if xml_file.size == 0 or _conteudo_xml_vazio(xml_file):
+                vazios.append(nome)
+                continue
+            validos.append(xml_file)
+
+        if not validos:
+            if vazios:
+                raise ValidationError({
+                    'xml_file': (
+                        f'Nenhum arquivo com conteúdo. '
+                        f'{len(vazios)} arquivo(s) vazio(s): {", ".join(vazios[:5])}'
+                        + (f' e mais {len(vazios) - 5}' if len(vazios) > 5 else '')
+                    )
+                })
+            raise ValidationError({'xml_file': 'Selecione pelo menos um arquivo XML válido.'})
+
+        self.arquivos_vazios = vazios
+        cleaned_data['xml_files'] = validos
+        return cleaned_data
 
 class NFSeForm(forms.ModelForm):
     class Meta:

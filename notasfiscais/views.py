@@ -82,11 +82,43 @@ def serialize_resultado(resultado):
         'notas_importadas': resultado_serializado.get('notas_importadas', []),
         'notas_ignoradas': resultado_serializado.get('notas_ignoradas', []),
         'notas_canceladas': resultado_serializado.get('notas_canceladas', []),
+        'arquivos_vazios': resultado_serializado.get('arquivos_vazios', []),
         'total_processadas': int(resultado_serializado.get('total_processadas', 0)),
         'total_importadas': int(resultado_serializado.get('total_importadas', 0)),
         'total_canceladas': int(resultado_serializado.get('total_canceladas', 0)),
-        'total_ignoradas': int(resultado_serializado.get('total_ignoradas', 0))
+        'total_ignoradas': int(resultado_serializado.get('total_ignoradas', 0)),
+        'total_arquivos_vazios': int(resultado_serializado.get('total_arquivos_vazios', 0)),
     }
+
+
+def _mensagens_arquivos_vazios(request, arquivos_vazios):
+    """Avisa quantos arquivos XML vazios foram ignorados no lote."""
+    if not arquivos_vazios:
+        return
+    n = len(arquivos_vazios)
+    if n == 1:
+        messages.warning(request, f'1 arquivo ignorado por estar vazio: {arquivos_vazios[0]}')
+        return
+    nomes = ', '.join(arquivos_vazios[:5])
+    if n > 5:
+        nomes += f' e mais {n - 5}'
+    messages.warning(request, f'{n} arquivos ignorados por estarem vazios: {nomes}')
+
+
+def _incorporar_arquivos_vazios_no_resultado(resultado_total, arquivos_vazios):
+    """Registra arquivos vazios ignorados no resultado agregado."""
+    if not arquivos_vazios:
+        return
+    from .utils import resultado_importacao_arquivo_vazio
+    resultado_total.setdefault('arquivos_vazios', [])
+    for nome in arquivos_vazios:
+        if nome in resultado_total['arquivos_vazios']:
+            continue
+        resultado_total['arquivos_vazios'].append(nome)
+        r = resultado_importacao_arquivo_vazio(nome)
+        resultado_total['notas_ignoradas'].extend(r.get('notas_ignoradas', []))
+        resultado_total['total_ignoradas'] += r.get('total_ignoradas', 0)
+    resultado_total['total_arquivos_vazios'] = len(resultado_total['arquivos_vazios'])
 
 # Chave de session para persistir filtros da listagem NFSe (limpa ao sair do módulo via middleware)
 NFS_FILTROS_SESSION_KEY = 'nfs_filtros'
@@ -784,9 +816,15 @@ class XMLImportView(LoginRequiredMixin, FormView):
 
             # Remove cópias antigas e grava novos XMLs em temp para o passo "Confirmar importação"
             _nfse_clear_pending_session(request)
+            from .utils import _conteudo_xml_vazio, preview_arquivo_vazio
+
             pending_paths: list[dict[str, str]] = []
+            arquivos_vazios: list[str] = []
             try:
                 for xml_file in xml_files:
+                    if _conteudo_xml_vazio(xml_file):
+                        arquivos_vazios.append(xml_file.name or 'arquivo.xml')
+                        continue
                     pending_paths.append(_nfse_persist_upload_to_temp(xml_file, request.user.id))
             except Exception as e:
                 for item in pending_paths:
@@ -800,10 +838,17 @@ class XMLImportView(LoginRequiredMixin, FormView):
             notas_preview = []
             file_names = []
             for xml_file in xml_files:
+                nome = xml_file.name or 'arquivo.xml'
+                file_names.append(nome)
                 xml_file.seek(0)
+                if _conteudo_xml_vazio(xml_file):
+                    notas_preview.append(preview_arquivo_vazio(nome))
+                    continue
                 notas_arquivo = self.extract_notas_preview(xml_file, empresa)
                 notas_preview.extend(notas_arquivo)
-                file_names.append(xml_file.name)
+
+            if arquivos_vazios:
+                _mensagens_arquivos_vazios(request, arquivos_vazios)
 
             valid_count = sum(1 for n in notas_preview if n.get('status') == 'valido')
             invalid_count = len(notas_preview) - valid_count
@@ -817,6 +862,8 @@ class XMLImportView(LoginRequiredMixin, FormView):
                 'invalid_count': invalid_count,
                 'show_preview': True,
                 'importar_canceladas': importar_canceladas,
+                'arquivos_vazios': arquivos_vazios,
+                'total_arquivos_vazios': len(arquivos_vazios),
             }
 
             return render(request, 'notasfiscais/xml_import.html', context)
@@ -864,26 +911,34 @@ class XMLImportView(LoginRequiredMixin, FormView):
             'notas_importadas': [],
             'notas_ignoradas': [],
             'notas_canceladas': [],
+            'arquivos_vazios': [],
             'total_processadas': 0,
             'total_importadas': 0,
             'total_canceladas': 0,
             'total_ignoradas': 0,
+            'total_arquivos_vazios': 0,
         }
 
         try:
+            from .utils import _conteudo_xml_vazio, resultado_importacao_arquivo_vazio
+
             for item in pending:
                 path = item.get('path')
                 name = item.get('name') or 'nota.xml'
                 try:
                     with open(path, 'rb') as f:
                         raw = f.read()
-                    uploaded = SimpleUploadedFile(name, raw, content_type='application/xml')
-                    resultado = import_nfse_from_xml(
-                        uploaded,
-                        request.user,
-                        empresa,
-                        importar_canceladas=importar_canceladas,
-                    )
+                    if not raw or not raw.strip() or _conteudo_xml_vazio(raw):
+                        resultado_total.setdefault('arquivos_vazios', []).append(name)
+                        resultado = resultado_importacao_arquivo_vazio(name)
+                    else:
+                        uploaded = SimpleUploadedFile(name, raw, content_type='application/xml')
+                        resultado = import_nfse_from_xml(
+                            uploaded,
+                            request.user,
+                            empresa,
+                            importar_canceladas=importar_canceladas,
+                        )
                     resultado_total['notas_importadas'].extend(resultado.get('notas_importadas', []))
                     resultado_total['notas_ignoradas'].extend(resultado.get('notas_ignoradas', []))
                     resultado_total['notas_canceladas'].extend(resultado.get('notas_canceladas', []))
@@ -893,6 +948,8 @@ class XMLImportView(LoginRequiredMixin, FormView):
                     resultado_total['total_ignoradas'] += resultado.get('total_ignoradas', 0)
                 finally:
                     _nfse_safe_unlink(path)
+
+            resultado_total['total_arquivos_vazios'] = len(resultado_total.get('arquivos_vazios', []))
 
             if resultado_total.get('total_canceladas', 0) > 0:
                 if resultado_total['total_canceladas'] == 1:
@@ -925,8 +982,10 @@ class XMLImportView(LoginRequiredMixin, FormView):
                 else:
                     messages.warning(
                         request,
-                        f'{resultado_total["total_ignoradas"]} NFSe ignoradas (duplicatas ou com erro)',
+                        f'{resultado_total["total_ignoradas"]} NFSe ignoradas (duplicatas, vazias ou com erro)',
                     )
+
+            _mensagens_arquivos_vazios(request, resultado_total.get('arquivos_vazios', []))
 
             if resultado_total['total_importadas'] == 0:
                 if resultado_total['total_ignoradas'] > 0:
@@ -964,10 +1023,11 @@ class XMLImportView(LoginRequiredMixin, FormView):
             return redirect('empresa:lista')
 
         try:
-            xml_files = form.files.getlist('xml_file')
+            xml_files = form.cleaned_data.get('xml_files') or []
+            arquivos_vazios = list(getattr(form, 'arquivos_vazios', []))
             importar_canceladas = form.cleaned_data.get('importar_canceladas', False)
 
-            if not xml_files:
+            if not xml_files and not arquivos_vazios:
                 messages.error(self.request, 'Selecione pelo menos um arquivo XML para importar.')
                 return self.form_invalid(form)
 
@@ -982,11 +1042,15 @@ class XMLImportView(LoginRequiredMixin, FormView):
                 'notas_importadas': [],
                 'notas_ignoradas': [],
                 'notas_canceladas': [],
+                'arquivos_vazios': [],
                 'total_processadas': 0,
                 'total_importadas': 0,
                 'total_canceladas': 0,
-                'total_ignoradas': 0
+                'total_ignoradas': 0,
+                'total_arquivos_vazios': 0,
             }
+
+            _incorporar_arquivos_vazios_no_resultado(resultado_total, arquivos_vazios)
 
             for xml_file in xml_files:
                 resultado = import_nfse_from_xml(
@@ -1029,7 +1093,9 @@ class XMLImportView(LoginRequiredMixin, FormView):
                     motivo = resultado_total['notas_ignoradas'][0]['motivo']
                     messages.warning(self.request, f'1 NFSe ignorada: {motivo}')
                 else:
-                    messages.warning(self.request, f'{resultado_total["total_ignoradas"]} NFSe ignoradas (duplicatas ou com erro)')
+                    messages.warning(self.request, f'{resultado_total["total_ignoradas"]} NFSe ignoradas (duplicatas, vazias ou com erro)')
+
+            _mensagens_arquivos_vazios(self.request, resultado_total.get('arquivos_vazios', []))
             
             # Se não importou nenhuma nota
             if resultado_total['total_importadas'] == 0:

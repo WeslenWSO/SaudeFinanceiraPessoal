@@ -8,6 +8,7 @@ import re
 from dateutil import parser as date_parser
 import traceback
 import logging
+import os
 
 from django.conf import settings as django_settings
 
@@ -248,6 +249,55 @@ def _ler_conteudo_xml(xml_file) -> bytes:
             xml_file.seek(0)
         return data
     return b""
+
+
+def _conteudo_xml_vazio(xml_file) -> bool:
+    """True se o arquivo não tem conteúdo XML utilizável."""
+    data = _ler_conteudo_xml(xml_file)
+    if not data or not data.strip():
+        return True
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    texto = data.decode("utf-8", errors="replace").strip()
+    return not texto
+
+
+def preview_arquivo_vazio(nome_arquivo: str) -> dict:
+    """Entrada de preview para um XML vazio (importação em lote)."""
+    base = os.path.basename(nome_arquivo) or nome_arquivo or "arquivo.xml"
+    return {
+        "numero_nota": base,
+        "serie": "—",
+        "data_emissao": "",
+        "valor_bruto": Decimal("0"),
+        "valor_liquido": Decimal("0"),
+        "cliente": "Arquivo vazio",
+        "cnpj_cpf": "",
+        "discriminacao": "",
+        "cnpj_prestador": "",
+        "cnpj_valido": False,
+        "status": "invalido",
+        "motivo": "Arquivo vazio",
+        "arquivo": nome_arquivo,
+    }
+
+
+def resultado_importacao_arquivo_vazio(nome_arquivo: str) -> dict:
+    """Resultado de importação quando o XML está vazio (não interrompe o lote)."""
+    base = os.path.basename(nome_arquivo) or nome_arquivo or "nota.xml"
+    return {
+        "nfses": [],
+        "notas_importadas": [],
+        "notas_ignoradas": [{
+            "numero_nota": base,
+            "cliente": nome_arquivo,
+            "motivo": f"Arquivo vazio: {nome_arquivo}",
+        }],
+        "total_processadas": 0,
+        "total_importadas": 0,
+        "total_ignoradas": 1,
+        "arquivo_vazio": True,
+    }
 
 
 def _parse_xml_root(xml_file):
@@ -1507,6 +1557,11 @@ def import_nfse_from_xml(xml_file, user, empresa, importar_canceladas: bool = Fa
     safe_print("=== DEBUG import_nfse_from_xml ===")
     safe_print(f"Arquivo: {xml_file.name}, Usuario: {user.username}, Empresa: {empresa.razao}")
 
+    if _conteudo_xml_vazio(xml_file):
+        nome = getattr(xml_file, "name", "") or "nota.xml"
+        safe_print(f"[AVISO] Arquivo vazio ignorado: {nome}")
+        return resultado_importacao_arquivo_vazio(nome)
+
     xml_bytes = b""
     try:
         if hasattr(xml_file, "seek") and hasattr(xml_file, "read"):
@@ -2439,6 +2494,10 @@ def extract_xml_data_preview(xml_file, empresa):
     """
     Extrai dados das notas para preview sem salvar no banco
     """
+    nome = getattr(xml_file, "name", "") or "nota.xml"
+    if _conteudo_xml_vazio(xml_file):
+        return [preview_arquivo_vazio(nome)]
+
     try:
         try:
             root = _parse_xml_root(xml_file)

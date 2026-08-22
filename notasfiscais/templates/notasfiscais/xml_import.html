@@ -201,6 +201,12 @@
                         <strong>Arquivos:</strong> {{ xml_file_name }} |
                         <strong>Empresa:</strong> {{ empresa.razao }}
                     </div>
+                    {% if total_arquivos_vazios %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>{{ total_arquivos_vazios }}</strong> arquivo(s) vazio(s) ignorado(s) e não serão importados.
+                    </div>
+                    {% endif %}
                     
                     <div class="table-responsive">
                         <table class="table table-striped table-hover">
@@ -262,7 +268,8 @@
                                             </span>
                                         {% else %}
                                             <span class="badge bg-danger">
-                                                <i class="fas fa-times"></i> Inválida
+                                                <i class="fas fa-times"></i>
+                                                {% if nota.motivo %}{{ nota.motivo }}{% else %}Inválida{% endif %}
                                             </span>
                                         {% endif %}
                                     </td>
@@ -302,6 +309,11 @@
                                         <li><strong>Inválidas:</strong> 
                                             <span class="text-danger">{{ invalid_count|default:0 }}</span>
                                         </li>
+                                        {% if total_arquivos_vazios %}
+                                        <li><strong>Arquivos vazios:</strong>
+                                            <span class="text-warning">{{ total_arquivos_vazios }}</span>
+                                        </li>
+                                        {% endif %}
                                     </ul>
                                 </div>
                             </div>
@@ -319,9 +331,12 @@
                                         <p class="small text-muted mb-2">
                                             Os arquivos XML foram guardados ao visualizar; não é preciso escolher o arquivo de novo.
                                         </p>
-                                        <button type="submit" class="btn btn-success w-100">
+                                        <button type="submit" class="btn btn-success w-100"{% if valid_count == 0 %} disabled{% endif %}>
                                             <i class="fas fa-upload"></i> Confirmar Importação
                                         </button>
+                                        {% if valid_count == 0 %}
+                                        <p class="small text-danger mt-2 mb-0">Nenhuma nota válida para importar.</p>
+                                        {% endif %}
                                     </form>
                                 </div>
                             </div>
@@ -369,6 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let validFiles = 0;
             let invalidFiles = 0;
+            let emptyFiles = 0;
             let fileNames = [];
 
             for (let file of files) {
@@ -385,6 +401,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     continue;
                 }
 
+                if (file.size === 0) {
+                    emptyFiles++;
+                    fileNames.push(file.name + ' (vazio)');
+                    continue;
+                }
+
                 validFiles++;
                 fileNames.push(file.name);
             }
@@ -398,15 +420,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            if (validFiles === 0 && emptyFiles > 0) {
+                submitBtn.disabled = true;
+                previewBtn.disabled = false;
+                importStatus.innerHTML = `
+                    <div class="text-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${emptyFiles} arquivo(s) vazio(s). Selecione ao menos um XML com conteúdo para importar direto.
+                    </div>
+                `;
+                return;
+            }
+
             // Habilita os botões
             submitBtn.disabled = false;
             previewBtn.disabled = false;
 
             // Atualiza status
+            let statusMsg = `${validFiles} arquivo(s) selecionado(s): ${fileNames.join(', ')}`;
+            if (emptyFiles > 0) {
+                statusMsg += `. ${emptyFiles} vazio(s) será(ão) ignorado(s) na importação.`;
+            }
             importStatus.innerHTML = `
                 <div class="text-success">
                     <i class="fas fa-check-circle me-2"></i>
-                    ${validFiles} arquivo(s) selecionado(s): ${fileNames.join(', ')}
+                    ${statusMsg}
                 </div>
             `;
         } else {
