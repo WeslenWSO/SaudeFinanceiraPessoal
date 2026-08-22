@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
+  <Nfse>
+    <InfNfse>
+      <Numero>17302</Numero>
+      <Serie>A</Serie>
+      <DataEmissao>2025-12-01T10:00:00</DataEmissao>
+      <ValorServicos>300,00</ValorServicos>
+      <ValorLiquidoNfse>300,00</ValorLiquidoNfse>
+      <Discriminacao>Exame</Discriminacao>
+      <PrestadorServico>
+        <IdentificacaoPrestador>
+          <Cnpj>12345678000123</Cnpj>
+        </IdentificacaoPrestador>
+      </PrestadorServico>
+      <TomadorServico>
+        <IdentificacaoTomador>
+          <CpfCnpj>
+            <Cpf>12345678901</Cpf>
+          </CpfCnpj>
+        </IdentificacaoTomador>
+        <RazaoSocial>Maria Teste</RazaoSocial>
+      </TomadorServico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>

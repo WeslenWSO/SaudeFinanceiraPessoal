@@ -1539,6 +1539,73 @@ def get_element_context(elem, scope):
     
     return 'unknown'
 
+
+_TAGS_VALOR_BRUTO_ABRASF = frozenset({
+    'valorservicos', 'valorservico', 'basecalculo', 'vbc', 'valorbruto',
+})
+_TAGS_VALOR_LIQUIDO_ABRASF = frozenset({
+    'valorliquidonfse', 'valorliquido', 'vliq',
+})
+
+
+def _parse_valor_xml(text) -> Decimal:
+    """Converte texto de valor XML (1000.00 ou 300,00 ou 1.234,56) para Decimal."""
+    if text is None:
+        return Decimal('0')
+    if isinstance(text, Decimal):
+        return text
+    s = str(text).strip()
+    if not s:
+        return Decimal('0')
+    parsed = _normalizar_valor_monetario_str(s)
+    if parsed is not None:
+        return parsed
+    try:
+        return Decimal(s.replace(',', '.'))
+    except Exception:
+        return Decimal('0')
+
+
+def _texto_elemento_xml(elem) -> str:
+    """Texto do elemento ou atributo com valor monetário (alguns XMLs antigos)."""
+    text = (elem.text or '').strip()
+    if text:
+        return text
+    for attr in ('valor', 'Value', 'value'):
+        av = elem.get(attr)
+        if av and str(av).strip():
+            return str(av).strip()
+    return ''
+
+
+def _extrair_valores_nfse_scope(scope) -> tuple[Decimal, Decimal]:
+    """
+    Extrai valor bruto e líquido de InfNfse ABRASF (Rio Branco modelo antigo/novo).
+    Aceita vírgula decimal e tags BaseCalculo / ValorServicos / ValorLiquidoNfse.
+    """
+    bruto_vals: list[Decimal] = []
+    liquido_vals: list[Decimal] = []
+    for elem in scope.iter():
+        lname = _local(elem.tag)
+        raw = _texto_elemento_xml(elem)
+        if not raw:
+            continue
+        val = _parse_valor_xml(raw)
+        if val <= 0:
+            continue
+        if lname in _TAGS_VALOR_BRUTO_ABRASF:
+            bruto_vals.append(val)
+        if lname in _TAGS_VALOR_LIQUIDO_ABRASF:
+            liquido_vals.append(val)
+    bruto = max(bruto_vals) if bruto_vals else Decimal('0')
+    liquido = max(liquido_vals) if liquido_vals else Decimal('0')
+    if bruto <= 0 and liquido > 0:
+        bruto = liquido
+    elif liquido <= 0 and bruto > 0:
+        liquido = bruto
+    return bruto, liquido
+
+
 def _xml_ficheiro_vem_de_pasta_cancelada(nome: str) -> bool:
     """True se o caminho/nome lógico indica subpasta ``Cancelada/`` (importação inbox ou cópias)."""
     if not nome:
@@ -2037,7 +2104,7 @@ def import_nfse_individual(
             elif lname == 'vliq':
                 valor_liquido = text
                 print(f"Valor líquido encontrado (vLiq): {valor_liquido}")
-            elif valor_liquido is None and lname in ('valorliquidonfse', 'valorliquido', 'valortotal', 'valor'):
+            elif valor_liquido is None and lname in ('valorliquidonfse', 'valorliquido', 'valortotal'):
                 valor_liquido = text
                 print(f"Valor líquido encontrado: {valor_liquido}")
             elif lname == 'serie':
@@ -2046,7 +2113,11 @@ def import_nfse_individual(
             elif lname == 'vbc':
                 valor_bruto = text
                 print(f"Valor bruto encontrado (vBC): {valor_bruto}")
-            elif valor_bruto is None and lname in ('valorservicos', 'valorservico', 'valortotal', 'valorbruto', 'valor'):
+            elif lname == 'basecalculo':
+                if not valor_bruto:
+                    valor_bruto = text
+                    print(f"Valor bruto encontrado (BaseCalculo): {valor_bruto}")
+            elif valor_bruto is None and lname in ('valorservicos', 'valorservico', 'valortotal', 'valorbruto'):
                 valor_bruto = text
                 print(f"Valor bruto encontrado: {valor_bruto}")
             elif lname == 'discriminacao':
@@ -2100,6 +2171,13 @@ def import_nfse_individual(
                 print(f"Alíquota encontrada: {aliquota}")
         
         print(f"Dados extraídos - Numero: {numero_nota}, Data: {data_emissao}, Valor Bruto: {valor_bruto}, Valor Líquido: {valor_liquido}")
+
+        # Reforço: layout Rio Branco (modelo antigo) — vírgula decimal, BaseCalculo, ValoresNfse
+        bruto_scope, liquido_scope = _extrair_valores_nfse_scope(scope)
+        if bruto_scope > 0:
+            valor_bruto = str(bruto_scope)
+        if liquido_scope > 0:
+            valor_liquido = str(liquido_scope)
         
         print("Buscando dados do tomador...")
         # Tomador: TomadorServico ou Tomador > (IdentificacaoTomador > CpfCnpj > Cnpj/CPF) + RazaoSocial
@@ -2220,8 +2298,9 @@ def import_nfse_individual(
         
         if not data_emissao:
             raise ValueError("Data de emissão não encontrada no XML")
-        
-        if not valor_liquido:
+
+        valor_bruto_decimal, valor_liquido_decimal = _extrair_valores_nfse_scope(scope)
+        if valor_liquido_decimal <= 0 and valor_bruto_decimal <= 0:
             raise ValueError("Valor líquido não encontrado no XML")
         
         print("Criando objeto NFSe...")
@@ -2237,32 +2316,20 @@ def import_nfse_individual(
                 print(f"Erro ao converter data: {str(e)}")
                 data_emissao_parsed = None
         
-        # Converter valores
-        try:
-            valor_bruto_decimal = Decimal(str(valor_bruto or 0))
-            print(f"Valor bruto convertido: {valor_bruto_decimal}")
-        except (ValueError, TypeError) as e:
-            print(f"⚠️ Erro ao converter valor bruto: {str(e)}")
-            valor_bruto_decimal = Decimal('0')
-        
-        try:
-            valor_liquido_decimal = Decimal(str(valor_liquido or 0))
-            print(f"Valor líquido convertido: {valor_liquido_decimal}")
-        except (ValueError, TypeError) as e:
-            print(f"⚠️ Erro ao converter valor líquido: {str(e)}")
-            valor_liquido_decimal = Decimal('0')
+        print(f"Valor bruto convertido: {valor_bruto_decimal}")
+        print(f"Valor líquido convertido: {valor_liquido_decimal}")
         
         # Converter valores de impostos e retenções
         try:
-            valor_deducoes_decimal = Decimal(str(valor_deducoes or 0))
-            valor_pis_decimal = Decimal(str(valor_pis or 0))
-            valor_cofins_decimal = Decimal(str(valor_cofins or 0))
-            valor_inss_decimal = Decimal(str(valor_inss or 0))
-            valor_ir_decimal = Decimal(str(valor_ir or 0))
-            valor_csll_decimal = Decimal(str(valor_csll or 0))
-            valor_iss_retido_decimal = Decimal(str(valor_iss_retido or 0))
-            outras_retencoes_decimal = Decimal(str(outras_retencoes or 0))
-            aliquota_decimal = Decimal(str(aliquota or 0))
+            valor_deducoes_decimal = _parse_valor_xml(valor_deducoes)
+            valor_pis_decimal = _parse_valor_xml(valor_pis)
+            valor_cofins_decimal = _parse_valor_xml(valor_cofins)
+            valor_inss_decimal = _parse_valor_xml(valor_inss)
+            valor_ir_decimal = _parse_valor_xml(valor_ir)
+            valor_csll_decimal = _parse_valor_xml(valor_csll)
+            valor_iss_retido_decimal = _parse_valor_xml(valor_iss_retido)
+            outras_retencoes_decimal = _parse_valor_xml(outras_retencoes)
+            aliquota_decimal = _parse_valor_xml(aliquota)
             print(f"Valores de impostos convertidos com sucesso")
         except (ValueError, TypeError) as e:
             print(f"⚠️ Erro ao converter valores de impostos: {str(e)}")
@@ -2739,7 +2806,7 @@ def extract_nota_individual_preview(root, empresa):
         elif lname == 'vliq':
             valor_liquido = text
             print(f"Valor líquido encontrado (vLiq): {valor_liquido}")
-        elif valor_liquido is None and lname in ('valorliquidonfse', 'valorliquido', 'valortotal', 'valor'):
+        elif valor_liquido is None and lname in ('valorliquidonfse', 'valorliquido', 'valortotal'):
             valor_liquido = text
             print(f"Valor líquido encontrado: {valor_liquido}")
         elif lname == 'serie':
@@ -2748,12 +2815,22 @@ def extract_nota_individual_preview(root, empresa):
         elif lname == 'vbc':
             valor_bruto = text
             print(f"Valor bruto encontrado (vBC): {valor_bruto}")
-        elif valor_bruto is None and lname in ('valorservicos', 'valorservico', 'valortotal', 'valorbruto', 'vserv', 'valor'):
+        elif lname == 'basecalculo':
+            if not valor_bruto:
+                valor_bruto = text
+                print(f"Valor bruto encontrado (BaseCalculo): {valor_bruto}")
+        elif valor_bruto is None and lname in ('valorservicos', 'valorservico', 'valortotal', 'valorbruto', 'vserv'):
             valor_bruto = text
             print(f"Valor bruto encontrado: {valor_bruto}")
         elif lname == 'discriminacao':
             discriminacao = text
             print(f"Discriminação encontrada: {discriminacao}")
+    
+    bruto_preview, liquido_preview = _extrair_valores_nfse_scope(scope)
+    if bruto_preview > 0:
+        valor_bruto = bruto_preview
+    if liquido_preview > 0:
+        valor_liquido = liquido_preview
     
     print(f"Dados extraídos para preview - Numero: {numero_nota}, Data: {data_emissao}, Valor Bruto: {valor_bruto}, Valor Líquido: {valor_liquido}")
     
