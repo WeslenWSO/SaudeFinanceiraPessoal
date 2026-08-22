@@ -63,6 +63,7 @@
                                     <th>Previsão</th>
                                     <th>Recebimento</th>
                                     <th class="text-end">Recebido</th>
+                                    <th class="text-end">Diferença</th>
                                     <th>Banco</th>
                                     <th>Ações</th>
                                 </tr>
@@ -97,7 +98,8 @@
                                             <small class="d-block text-muted">{{ linha.data_recebimento|date:"d/m/Y" }}</small>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">{% if linha.status_recebimento == 'finalizado' %}{{ linha.valor_recebido|moeda_br }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td class="text-end">{{ linha.valor_recebido_efetivo|moeda_br }}</td>
+                                    <td class="text-end">{{ linha.diferenca_liquido_recebido|moeda_br }}</td>
                                     <td>{% if linha.banco %}{{ linha.banco }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                     <td class="text-nowrap">
                                         <a href="{% url 'faturamento_medico:editar_extrato_pagamento' linha.pk %}{% if filtros.competencia or filtros.convenio %}?{% if filtros.competencia %}competencia={{ filtros.competencia|urlencode }}{% endif %}{% if filtros.competencia and filtros.convenio %}&{% endif %}{% if filtros.convenio %}convenio={{ filtros.convenio|urlencode }}{% endif %}{% endif %}"
@@ -122,7 +124,7 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="19" class="text-center text-muted py-4">
+                                    <td colspan="20" class="text-center text-muted py-4">
                                         Nenhum extrato importado.
                                         <a href="{% url 'faturamento_medico:importar_extrato_pagamento_bradesco' %}">Importar PDF Bradesco</a>
                                     </td>
@@ -138,8 +140,10 @@
                                     <td class="text-end">{{ totais.total_liberado|default:0|moeda_br }}</td>
                                     <td colspan="4"></td>
                                     <td class="text-end">{{ totais.total_retencoes|default:0|moeda_br }}</td>
+                                    <td class="text-end">{{ totais.total_liquido|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
                                     <td class="text-end">{{ totais.total_recebido|default:0|moeda_br }}</td>
+                                    <td class="text-end">{{ totais.total_diferenca|default:0|moeda_br }}</td>
                                     <td colspan="2"></td>
                                 </tr>
                             </tfoot>

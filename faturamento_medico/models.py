@@ -834,6 +834,15 @@ class ExtratoPagamentoConvenio(models.Model):
             if not self.data_recebimento and data_recebimento_default:
                 self.data_recebimento = data_recebimento_default
 
+    def valor_recebido_efetivo(self) -> Decimal:
+        if self.status_recebimento == self.STATUS_RECEBIMENTO_FINALIZADO:
+            return self.valor_recebido or Decimal('0')
+        return Decimal('0')
+
+    def diferenca_liquido_recebido(self) -> Decimal:
+        base = self.liquido if (self.liquido or 0) > 0 else self.valor_esperado_recebimento()
+        return base - self.valor_recebido_efetivo()
+
     def sincronizar_baixado_lote(self):
         """Marca lote e faturamentos conforme recebimento baixado no extrato."""
         lote = self.lote_faturamento

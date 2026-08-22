@@ -6855,9 +6855,15 @@ def listar_extrato_pagamento(request):
         .order_by('-competencia')
     )
 
+    linhas_qs = qs.order_by('-data_recebimento', '-competencia', 'lote')
+    linhas = list(linhas_qs)
+    totais['total_recebido'] = sum(l.valor_recebido_efetivo() for l in linhas)
+    totais['total_diferenca'] = sum(l.diferenca_liquido_recebido() for l in linhas)
+    totais['total_liquido'] = sum((l.liquido or 0) for l in linhas)
+
     context = {
         'titulo': 'Extrato de Pagamento — Convênio',
-        'linhas': qs.order_by('-data_recebimento', '-competencia', 'lote'),
+        'linhas': linhas,
         'filtros': {'competencia': competencia, 'convenio': convenio},
         'competencias': competencias,
         'totais': totais,
@@ -7150,6 +7156,9 @@ def editar_extrato_pagamento(request, pk):
             status_form,
             data_recebimento_default=timezone.now().date(),
         )
+        if extrato.status_recebimento != ExtratoPagamentoConvenio.STATUS_RECEBIMENTO_FINALIZADO:
+            extrato.valor_recebido = Decimal('0')
+            extrato.data_recebimento = None
 
         extrato.save()
         extrato.sincronizar_baixado_lote()

@@ -174,7 +174,7 @@
 
                                 <input type="text" class="form-control" id="valor_recebido" name="valor_recebido"
 
-                                       value="{% if extrato.valor_recebido %}{{ extrato.valor_recebido|moeda_br }}{% elif sugestao_valor %}{{ sugestao_valor|moeda_br }}{% endif %}"
+                                       value="{% if extrato.status_recebimento == 'finalizado' and extrato.valor_recebido %}{{ extrato.valor_recebido|moeda_br }}{% else %}0,00{% endif %}"
 
                                        placeholder="0,00">
 
@@ -214,7 +214,7 @@
 
                                     Valor esperado: <strong>R$ {{ sugestao_valor|moeda_br }}</strong>
 
-                                    (líquido → liberado → valor)
+                                    · Diferença (líquido − recebido): <strong>R$ {{ extrato.diferenca_liquido_recebido|moeda_br }}</strong>
 
                                 </p>
 
