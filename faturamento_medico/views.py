@@ -6767,6 +6767,34 @@ def observacao_status_outros_item(request, pk):
     return JsonResponse({'ok': True, 'observacao': observacao})
 
 
+def revelar_cpf_faturamento(request, pk):
+    """Revela CPF completo após confirmação da senha do usuário logado."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'erro': 'Método não permitido'}, status=405)
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'ok': False, 'erro': 'Usuário não autenticado.'}, status=403)
+
+    empresa_id = request.session.get('empresa_id')
+    try:
+        empresa_id = int(empresa_id) if empresa_id is not None else None
+    except (TypeError, ValueError):
+        empresa_id = None
+
+    faturamento = get_object_or_404(FaturamentoMedico, pk=pk)
+    if empresa_id is not None and faturamento.empresa_id != empresa_id:
+        return JsonResponse({'ok': False, 'erro': 'Sem permissão'}, status=403)
+
+    senha = (request.POST.get('senha') or '').strip()
+    if not senha:
+        return JsonResponse({'ok': False, 'erro': 'Informe sua senha.'}, status=400)
+
+    if not request.user.check_password(senha):
+        return JsonResponse({'ok': False, 'erro': 'Senha incorreta.'}, status=403)
+
+    return JsonResponse({'ok': True, 'cpf': faturamento.cpf or ''})
+
+
 def log_status_conferencia_item(request, pk):
     """Retorna o histórico de alterações do status de conferência (AJAX GET)."""
     empresa_id = request.session.get('empresa_id')

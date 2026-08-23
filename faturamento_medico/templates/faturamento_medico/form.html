@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load faturamento_extras %}
 
 {% block title %}{{ titulo }}{% endblock %}
 
@@ -106,7 +107,17 @@
     padding-bottom: 0.35rem;
     border-bottom: 2px solid #d9e2ef;
 }
-.fat-form-footer {
+.fat-cpf-wrap {
+    display: flex;
+    gap: 0.25rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+}
+.fat-cpf-wrap .form-control {
+    flex: 1 1 auto;
+    min-width: 0;
+}
     background: #f7f9fc;
     border-top: 1px solid #e5e9f0;
     display: flex;
@@ -293,7 +304,26 @@
                             </div>
                             <div class="fat-detalhes-item">
                                 <label class="fat-detalhes-label" for="{{ form.cpf.id_for_label }}">CPF</label>
+                                {% if form.instance.pk and form.instance.cpf %}
+                                <div class="fat-cpf-wrap">
+                                    <input type="text"
+                                           class="form-control"
+                                           id="{{ form.cpf.id_for_label }}"
+                                           value="{{ form.instance.cpf|mascara_cpf }}"
+                                           readonly
+                                           data-mascarado="1"
+                                           autocomplete="off">
+                                    <input type="hidden" name="cpf" id="cpf-hidden" value="{{ form.instance.cpf }}">
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                                            id="btn-revelar-cpf"
+                                            title="Ver CPF completo">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                {% else %}
                                 {{ form.cpf }}
+                                {% endif %}
                             </div>
                         </div>
 
@@ -553,6 +583,31 @@
                         {% endif %}
                     </div>
 
+                    <div class="modal fade" id="modalRevelarCpf" tabindex="-1" aria-labelledby="modalRevelarCpfLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalRevelarCpfLabel">
+                                        <i class="fas fa-lock me-1"></i> Ver CPF completo
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="small text-muted mb-2">Informe sua senha de acesso para visualizar o CPF.</p>
+                                    <label class="form-label" for="modal-revelar-cpf-senha">Senha</label>
+                                    <input type="password" class="form-control form-control-sm" id="modal-revelar-cpf-senha" autocomplete="current-password">
+                                    <div id="modal-revelar-cpf-erro" class="alert alert-danger py-2 mt-2 mb-0 d-none"></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-revelar-cpf">
+                                        <i class="fas fa-eye me-1"></i> Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="fat-form-footer">
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-save"></i> Salvar
@@ -636,6 +691,94 @@ window.addEventListener('load', function() {
                 alert('Dados extraídos com sucesso via OCR! Verifique os campos preenchidos.');
             })
             .catch(error => alert('Erro ao extrair dados com OCR: ' + error));
+        });
+    }
+
+    var btnRevelarCpf = document.getElementById('btn-revelar-cpf');
+    var modalRevelarCpfEl = document.getElementById('modalRevelarCpf');
+    var inputSenhaRevelarCpf = document.getElementById('modal-revelar-cpf-senha');
+    var erroRevelarCpf = document.getElementById('modal-revelar-cpf-erro');
+    var btnConfirmarRevelarCpf = document.getElementById('btn-confirmar-revelar-cpf');
+    var cpfCampo = document.getElementById('{{ form.cpf.id_for_label }}');
+    var cpfHidden = document.getElementById('cpf-hidden');
+    var urlRevelarCpf = '{% if form.instance.pk %}{% url "faturamento_medico:revelar_cpf" form.instance.pk %}{% endif %}';
+
+    function getCsrfTokenForm() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    }
+
+    if (btnRevelarCpf && modalRevelarCpfEl && window.bootstrap) {
+        btnRevelarCpf.addEventListener('click', function() {
+            if (inputSenhaRevelarCpf) inputSenhaRevelarCpf.value = '';
+            if (erroRevelarCpf) {
+                erroRevelarCpf.classList.add('d-none');
+                erroRevelarCpf.textContent = '';
+            }
+            bootstrap.Modal.getOrCreateInstance(modalRevelarCpfEl).show();
+            setTimeout(function() { inputSenhaRevelarCpf && inputSenhaRevelarCpf.focus(); }, 300);
+        });
+    }
+
+    if (btnConfirmarRevelarCpf) {
+        btnConfirmarRevelarCpf.addEventListener('click', function() {
+            var senha = (inputSenhaRevelarCpf && inputSenhaRevelarCpf.value || '').trim();
+            if (!senha) {
+                if (erroRevelarCpf) {
+                    erroRevelarCpf.textContent = 'Informe sua senha.';
+                    erroRevelarCpf.classList.remove('d-none');
+                }
+                return;
+            }
+            btnConfirmarRevelarCpf.disabled = true;
+            var formData = new FormData();
+            formData.append('senha', senha);
+            fetch(urlRevelarCpf, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfTokenForm(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            })
+            .then(async function(r) {
+                var data = await r.json().catch(function() { return { ok: false }; });
+                btnConfirmarRevelarCpf.disabled = false;
+                if (!r.ok || !data.ok) {
+                    if (erroRevelarCpf) {
+                        erroRevelarCpf.textContent = data.erro || 'Não foi possível revelar o CPF.';
+                        erroRevelarCpf.classList.remove('d-none');
+                    }
+                    return;
+                }
+                if (cpfCampo) {
+                    cpfCampo.value = data.cpf || '';
+                    cpfCampo.removeAttribute('readonly');
+                    cpfCampo.setAttribute('name', 'cpf');
+                    cpfCampo.removeAttribute('data-mascarado');
+                }
+                if (cpfHidden) cpfHidden.remove();
+                if (btnRevelarCpf) btnRevelarCpf.remove();
+                if (modalRevelarCpfEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalRevelarCpfEl).hide();
+                }
+            })
+            .catch(function() {
+                btnConfirmarRevelarCpf.disabled = false;
+                if (erroRevelarCpf) {
+                    erroRevelarCpf.textContent = 'Não foi possível revelar o CPF.';
+                    erroRevelarCpf.classList.remove('d-none');
+                }
+            });
+        });
+    }
+
+    if (inputSenhaRevelarCpf) {
+        inputSenhaRevelarCpf.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnConfirmarRevelarCpf && btnConfirmarRevelarCpf.click();
+            }
         });
     }
 });

@@ -1,6 +1,7 @@
 from django import template
 from django.templatetags.static import static
 from django.utils.formats import number_format
+import re
 
 register = template.Library()
 
@@ -21,6 +22,17 @@ def moeda_br(value):
         return number_format(value, decimal_pos=2, force_grouping=True, use_l10n=True)
     except (TypeError, ValueError):
         return str(value)
+
+
+@register.filter(name='mascara_cpf')
+def mascara_cpf(valor):
+    """Oculta os 6 dígitos centrais do CPF (ex.: 025.***.***-73)."""
+    if not valor:
+        return ''
+    digits = re.sub(r'\D', '', str(valor))
+    if len(digits) != 11:
+        return str(valor)
+    return f'{digits[:3]}.***.***-{digits[-2:]}'
 
 
 def _codigo_banco(banco):

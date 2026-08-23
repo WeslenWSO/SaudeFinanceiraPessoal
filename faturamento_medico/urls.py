@@ -100,4 +100,5 @@ urlpatterns = [
     path('item/<int:pk>/status-conferencia/', views.alterar_status_conferencia_item, name='alterar_status_conferencia'),
     path('item/<int:pk>/log-status-conferencia/', views.log_status_conferencia_item, name='log_status_conferencia'),
     path('item/<int:pk>/observacao-outros/', views.observacao_status_outros_item, name='observacao_status_outros'),
+    path('<int:pk>/revelar-cpf/', views.revelar_cpf_faturamento, name='revelar_cpf'),
 ]
