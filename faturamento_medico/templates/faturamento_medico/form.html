@@ -8,409 +8,542 @@
 {%endblock%}
 
 {% block conteudo %}
-<div class="container-fluid fat-form-page">
+<style>
+.fat-detalhes-page .card-body {
+    padding: 0.75rem 1rem;
+}
+.fat-detalhes-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.fat-detalhes-header .card-title {
+    font-size: 1.1rem;
+    margin: 0;
+}
+.fat-detalhes-header .btn {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.8rem;
+}
+.fat-detalhes-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem 0.6rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+.fat-detalhes-item {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    min-width: 0;
+}
+.fat-detalhes-label {
+    font-weight: 600;
+    color: #475569;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    margin: 0;
+}
+.fat-detalhes-label::after {
+    content: ':';
+}
+.fat-detalhes-item .form-control,
+.fat-detalhes-item .form-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.82rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+}
+.fat-detalhes-item .form-control:focus,
+.fat-detalhes-item .form-select:focus {
+    border-color: #2b4b7c;
+    box-shadow: 0 0 0 0.15rem rgba(43, 75, 124, 0.15);
+}
+.fat-detalhes-item .form-control[readonly] {
+    background-color: #f1f5f9;
+    color: #475569;
+}
+.fat-detalhes-item--full {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+}
+.fat-detalhes-item--full .form-control {
+    width: 100%;
+}
+.fat-detalhes-item--span2 {
+    grid-column: span 2;
+}
+.fat-detalhes-item--span2 .form-control {
+    width: 100%;
+}
+.fat-detalhes-section {
+    margin-top: 0.75rem;
+}
+.fat-detalhes-section .card-header {
+    padding: 0.45rem 0.75rem;
+}
+.fat-detalhes-section .card-header .card-title {
+    font-size: 0.95rem;
+}
+.fat-detalhes-section .card-body {
+    padding: 0.5rem 0.75rem;
+}
+.fat-detalhes-subtitle {
+    color: #2b4b7c;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.78rem;
+    margin: 0.75rem 0 0.45rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid #d9e2ef;
+}
+.fat-form-footer {
+    background: #f7f9fc;
+    border-top: 1px solid #e5e9f0;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+@media (max-width: 992px) {
+    .fat-detalhes-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .fat-detalhes-item--span2 {
+        grid-column: span 2;
+    }
+}
+@media (max-width: 576px) {
+    .fat-detalhes-grid {
+        grid-template-columns: 1fr;
+    }
+    .fat-detalhes-item--span2 {
+        grid-column: span 1;
+    }
+}
+</style>
+
+<div class="container-fluid fat-detalhes-page">
     <div class="row">
         <div class="col-12">
-            <div class="card fat-form-card">
-                <div class="card-header fat-form-header">
-                    <h3 class="card-title mb-0">{{ titulo }}</h3>
+            <div class="card">
+                <div class="card-header fat-detalhes-header">
+                    <h3 class="card-title">{{ titulo }}</h3>
                     <div class="card-tools d-flex flex-wrap gap-1">
-                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary btn-sm">
+                        {% if form.instance.pk %}
+                        <a href="{% url 'faturamento_medico:editar_documentacao' form.instance.pk %}?next={{ request.get_full_path|urlencode }}"
+                           class="btn btn-outline-primary btn-sm" title="Protocolo, lote, guia, NF">
+                            <i class="fas fa-file-alt"></i> Documentação
+                        </a>
+                        <a href="{% url 'faturamento_medico:detalhes' form.instance.pk %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-eye"></i> Ver detalhes
+                        </a>
+                        {% if form.instance.documentos_anexados.exists %}
+                        <button type="button" class="btn btn-info btn-sm js-abrir-album-anexos">
+                            <i class="fas fa-eye"></i> Anexos ({{ form.instance.documentos_anexados.count }})
+                        </button>
+                        {% endif %}
+                        <a href="{% url 'faturamento_medico:anexar_documento' form.instance.pk %}" class="btn btn-info btn-sm">
+                            <i class="fas fa-paperclip"></i> Anexar
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-arrow-left"></i> Voltar
                         </a>
-                        {% if faturamento.pk %}
-                            {% if faturamento.documentos_anexados.exists %}
-                            <button type="button" class="btn btn-info btn-sm js-abrir-album-anexos">
-                                <i class="fas fa-eye"></i> Visualizar anexos ({{ faturamento.documentos_anexados.count }})
-                            </button>
-                            {% endif %}
-                            <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}" class="btn btn-outline-info btn-sm">
-                                <i class="fas fa-paperclip"></i> Anexar
-                            </a>
-                        {% endif %}
                     </div>
                 </div>
+
                 <form method="POST" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="card-body">
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Identificação</h6>
-                            <div class="row g-3">
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.guia.id_for_label }}">Guia</label>
-                                    {{ form.guia }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.senha.id_for_label }}">Senha</label>
-                                    {{ form.senha }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.carteirinha.id_for_label }}">Carteirinha</label>
-                                    {{ form.carteirinha }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.codigo_relatorio.id_for_label }}">Código Relatório</label>
-                                    {{ form.codigo_relatorio }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.agendado_via.id_for_label }}">Agendado Via</label>
-                                    {{ form.agendado_via }}
-                                </div>
-                                <div class="col-md-2 fat-field-wide">
-                                    <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
-                                    {{ form.nome }}
-                                </div>
-                                <div class="col-md-2 fat-field-wide">
-                                    <label class="form-label" for="{{ form.nome_associado.id_for_label }}">Nome do Associado</label>
-                                    {{ form.nome_associado }}
-                                </div>
-                                <div class="col-md-2 fat-field-wide">
-                                    <label class="form-label" for="{{ form.convenio.id_for_label }}">Convênio (Viabilidade)</label>
-                                    {{ form.convenio }}
-                                </div>
+                        <div class="fat-detalhes-grid">
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.lote.id_for_label }}">Lote</label>
+                                {{ form.lote }}
                             </div>
-                        </section>
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Datas e valores</h6>
-                            <div class="row g-3">
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.data.id_for_label }}">Data</label>
-                                    {{ form.data }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.data_autorizacao.id_for_label }}">Data da Autorização</label>
-                                    {{ form.data_autorizacao }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.total.id_for_label }}">Total</label>
-                                    {{ form.total }}
-                                    <div class="form-text">Calculado automaticamente pelos itens dos exames</div>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.urgencia.id_for_label }}">Urgência</label>
-                                    {{ form.urgencia }}
-                                </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.guia.id_for_label }}">Guia</label>
+                                {{ form.guia }}
                             </div>
-                        </section>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.senha.id_for_label }}">Senha</label>
+                                {{ form.senha }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.carteirinha.id_for_label }}">Carteirinha</label>
+                                {{ form.carteirinha }}
+                            </div>
+
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.guia_lancada.id_for_label }}">Protocolo</label>
+                                {{ form.guia_lancada }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.numero_guia_lancada.id_for_label }}">Nº Guia Lançada</label>
+                                {{ form.numero_guia_lancada }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.nota_fiscal.id_for_label }}">Nota Fiscal</label>
+                                {{ form.nota_fiscal }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.codigo_relatorio.id_for_label }}">Cód. Relatório</label>
+                                {{ form.codigo_relatorio }}
+                            </div>
+
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.codigo_fechamento.id_for_label }}">Cód. Fechamento</label>
+                                {{ form.codigo_fechamento }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.data_autorizacao.id_for_label }}">Data Autorização</label>
+                                {{ form.data_autorizacao }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.data.id_for_label }}">Data</label>
+                                {{ form.data }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.convenio.id_for_label }}">Convênio</label>
+                                {{ form.convenio }}
+                            </div>
+
+                            <div class="fat-detalhes-item fat-detalhes-item--span2">
+                                <label class="fat-detalhes-label" for="{{ form.nome.id_for_label }}">Nome</label>
+                                {{ form.nome }}
+                            </div>
+                            <div class="fat-detalhes-item fat-detalhes-item--span2">
+                                <label class="fat-detalhes-label" for="{{ form.nome_associado.id_for_label }}">Nome Associado</label>
+                                {{ form.nome_associado }}
+                            </div>
+
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">Porte</label>
+                                <input type="text" class="form-control" value="{{ form.instance.porte|default:'' }}" readonly tabindex="-1">
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">QT</label>
+                                <input type="text" class="form-control" value="{{ form.instance.qt|default:0 }}" readonly tabindex="-1">
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">Valor</label>
+                                <input type="text" class="form-control" value="R$ {{ form.instance.valor|default:0|floatformat:2 }}" readonly tabindex="-1">
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.total.id_for_label }}">Total</label>
+                                {{ form.total }}
+                            </div>
+
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.urgencia.id_for_label }}">Urgência</label>
+                                {{ form.urgencia }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.apartamento_enfermaria.id_for_label }}">Apt/Enfermaria</label>
+                                {{ form.apartamento_enfermaria }}
+                            </div>
+
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.local.id_for_label }}">Local</label>
+                                {{ form.local }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.medico.id_for_label }}">Médico</label>
+                                {{ form.medico }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.medico_solicitante.id_for_label }}">Méd. Solicitante</label>
+                                {{ form.medico_solicitante }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.anestesista.id_for_label }}">Anestesista</label>
+                                {{ form.anestesista }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.tecnico.id_for_label }}">Técnico</label>
+                                {{ form.tecnico }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.receber_por.id_for_label }}">Receber Por</label>
+                                {{ form.receber_por }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.checkin_por.id_for_label }}">Check-in Por</label>
+                                {{ form.checkin_por }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.agendado_por.id_for_label }}">Agendado Por</label>
+                                {{ form.agendado_por }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.agendado_via.id_for_label }}">Agendado Via</label>
+                                {{ form.agendado_via }}
+                            </div>
+                        </div>
+
+                        <h6 class="fat-detalhes-subtitle">Complementos do atendimento</h6>
+                        <div class="fat-detalhes-grid">
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
+                                {{ form.prioridade }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.horario_inicio.id_for_label }}">Horário Início</label>
+                                {{ form.horario_inicio }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.horario_fim.id_for_label }}">Horário Fim</label>
+                                {{ form.horario_fim }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.status_agendamento.id_for_label }}">Status Agendamento</label>
+                                {{ form.status_agendamento }}
+                            </div>
+                            <div class="fat-detalhes-item fat-detalhes-item--span2">
+                                <label class="fat-detalhes-label" for="{{ form.motivo_cancelamento.id_for_label }}">Motivo Cancel./Desist.</label>
+                                {{ form.motivo_cancelamento }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.tag.id_for_label }}">Tag</label>
+                                {{ form.tag }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.cpf.id_for_label }}">CPF</label>
+                                {{ form.cpf }}
+                            </div>
+                        </div>
+
+                        <div class="fat-detalhes-grid mt-2">
+                            <div class="fat-detalhes-item fat-detalhes-item--full">
+                                <label class="fat-detalhes-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
+                                {{ form.indicacao_clinica }}
+                            </div>
+                            <div class="fat-detalhes-item fat-detalhes-item--full">
+                                <label class="fat-detalhes-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
+                                {{ form.descricao }}
+                            </div>
+                            <div class="fat-detalhes-item fat-detalhes-item--full">
+                                <label class="fat-detalhes-label" for="{{ form.observacao.id_for_label }}">Observação</label>
+                                {{ form.observacao }}
+                            </div>
+                        </div>
 
                         {% if form.instance.pk %}
-                        <section class="fat-section fat-section-itens mb-0">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="fat-section-title mb-0 border-0 pb-0">
-                                    <i class="fas fa-vial"></i> Itens dos exames
-                                    {% if form.instance.itens_servico.exists %}
-                                        <span class="badge bg-secondary">{{ form.instance.itens_servico.count }}</span>
-                                    {% endif %}
-                                </h6>
-                                <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
-                                   class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-plus"></i> Adicionar exame
-                                </a>
-                            </div>
-                            {% if form.instance.itens_servico.exists %}
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped table-hover mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Código</th>
-                                                <th>Exame / Serviço</th>
-                                                <th>Modalidade</th>
-                                                <th>Contraste</th>
-                                                <th>Sedação</th>
-                                                <th class="text-end">Valor</th>
-                                                <th class="text-center">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for item in form.instance.itens_servico.all %}
-                                            <tr>
-                                                <td>{{ item.codigo_servico|default:"-" }}</td>
-                                                <td>{{ item.servico|default:"Serviço não informado" }}</td>
-                                                <td>{{ item.modalidade|default:"-" }}</td>
-                                                <td>{% if item.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                                                <td>{% if item.com_sedacao %}<span class="badge bg-info text-dark">Sim</span>{% else %}Não{% endif %}</td>
-                                                <td class="text-end">R$ {{ item.total|floatformat:2 }}</td>
-                                                <td class="text-center text-nowrap">
-                                                    <a href="{% url 'faturamento_medico:editar_item_servico' item.pk %}"
-                                                       class="btn btn-sm btn-warning" title="Editar">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="{% url 'faturamento_medico:excluir_item_servico' item.pk %}"
-                                                       class="btn btn-sm btn-danger" title="Excluir"
-                                                       onclick="return confirm('Tem certeza que deseja excluir este item?')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="table-light">
-                                                <th colspan="5">Total dos exames</th>
-                                                <th class="text-end">R$ {{ form.instance.total|floatformat:2 }}</th>
-                                                <th></th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <div class="text-center text-muted py-3">
-                                    <i class="fas fa-vial fa-2x mb-2"></i>
-                                    <p class="mb-2">Nenhum exame cadastrado ainda.</p>
-                                    <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
-                                       class="btn btn-primary btn-sm">
-                                        <i class="fas fa-plus"></i> Adicionar primeiro exame
-                                    </a>
-                                </div>
-                            {% endif %}
-                        </section>
-
-                        <section class="fat-section fat-section-anestesista mb-0">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="fat-section-title mb-0 border-0 pb-0">
-                                    <i class="fas fa-syringe"></i> Anestesista — exames com sedação
-                                    {% if faturamento.lancamentos_anestesista.exists %}
-                                        <span class="badge bg-secondary">{{ faturamento.lancamentos_anestesista.count }}</span>
-                                    {% endif %}
-                                </h6>
-                                <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' faturamento.pk %}"
-                                   class="btn btn-outline-success btn-sm">
-                                    <i class="fas fa-plus"></i> Lançar anestesista
-                                </a>
-                            </div>
-                            <p class="text-muted small mb-2">
-                                Marque <strong>Sedação = Sim</strong> no exame e registre aqui: <strong>Médico · Exame · Valor</strong> (para relatórios futuros).
-                            </p>
-                            {% if faturamento.lancamentos_anestesista.exists %}
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped table-hover mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Médico (anestesista)</th>
-                                                <th>Exame</th>
-                                                <th class="text-end">Valor</th>
-                                                <th class="text-center">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for lan in faturamento.lancamentos_anestesista.all %}
-                                            <tr>
-                                                <td>{{ lan.medico }}</td>
-                                                <td>{{ lan.exame }}</td>
-                                                <td class="text-end">R$ {{ lan.valor|floatformat:2 }}</td>
-                                                <td class="text-center text-nowrap">
-                                                    <a href="{% url 'faturamento_medico:editar_lancamento_anestesista' lan.pk %}"
-                                                       class="btn btn-sm btn-warning" title="Editar">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="{% url 'faturamento_medico:excluir_lancamento_anestesista' lan.pk %}"
-                                                       class="btn btn-sm btn-danger" title="Excluir"
-                                                       onclick="return confirm('Excluir este lançamento de anestesista?')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="table-light">
-                                                <th colspan="2">Total anestesista</th>
-                                                <th class="text-end">R$ {{ total_anestesista|floatformat:2 }}</th>
-                                                <th></th>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <div class="text-center text-muted py-3 border rounded bg-light">
-                                    <i class="fas fa-syringe fa-2x mb-2 opacity-50"></i>
-                                    <p class="mb-2 small">Nenhum lançamento de anestesista ainda.</p>
-                                    <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' faturamento.pk %}"
-                                       class="btn btn-success btn-sm">
-                                        <i class="fas fa-plus"></i> Lançar anestesista
-                                    </a>
-                                </div>
-                            {% endif %}
-                        </section>
-                        {% else %}
-                        <div class="alert alert-info py-2 mb-3">
-                            <i class="fas fa-info-circle"></i>
-                            Salve o faturamento para incluir os itens dos exames (o total será calculado automaticamente).
-                        </div>
-                        {% endif %}
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Atendimento</h6>
-                            <div class="row g-3">
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.local.id_for_label }}">Local</label>
-                                    {{ form.local }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.prioridade.id_for_label }}">Prioridade</label>
-                                    {{ form.prioridade }}
-                                </div>
-                                <div class="col-md-1">
-                                    <label class="form-label" for="{{ form.horario_inicio.id_for_label }}">Horário de Início</label>
-                                    {{ form.horario_inicio }}
-                                </div>
-                                <div class="col-md-1">
-                                    <label class="form-label" for="{{ form.horario_fim.id_for_label }}">Horário de Fim</label>
-                                    {{ form.horario_fim }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.status_agendamento.id_for_label }}">Status do Agendamento</label>
-                                    {{ form.status_agendamento }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.motivo_cancelamento.id_for_label }}">Motivo Cancelamento/Desistência/Deleção</label>
-                                    {{ form.motivo_cancelamento }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.medico.id_for_label }}">Médico</label>
-                                    {{ form.medico }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.medico_solicitante.id_for_label }}">Médico Solicitante</label>
-                                    {{ form.medico_solicitante }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.anestesista.id_for_label }}">Anestesista</label>
-                                    {{ form.anestesista }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.tecnico.id_for_label }}">Técnico</label>
-                                    {{ form.tecnico }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.checkin_por.id_for_label }}">Check-in Por</label>
-                                    {{ form.checkin_por }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.agendado_por.id_for_label }}">Agendado Por</label>
-                                    {{ form.agendado_por }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.tag.id_for_label }}">Tag</label>
-                                    {{ form.tag }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.receber_por.id_for_label }}">Receber Por</label>
-                                    {{ form.receber_por }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.apartamento_enfermaria.id_for_label }}">Apartamento ou Enfermaria</label>
-                                    {{ form.apartamento_enfermaria }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.cpf.id_for_label }}">CPF</label>
-                                    {{ form.cpf }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.indicacao_clinica.id_for_label }}">Indicação Clínica</label>
-                                    {{ form.indicacao_clinica }}
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição</label>
-                                    {{ form.descricao }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
-                                    {{ form.observacao }}
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="fat-section fat-fields-compact">
-                            <h6 class="fat-section-title">Documentação e fechamento</h6>
-                            <div class="row g-3">
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.guia_lancada.id_for_label }}">Protocolo</label>
-                                    {{ form.guia_lancada }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.lote.id_for_label }}">Lote</label>
-                                    {{ form.lote }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.numero_guia_lancada.id_for_label }}">Número da Guia Lançada</label>
-                                    {{ form.numero_guia_lancada }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">Nota Fiscal</label>
-                                    {{ form.nota_fiscal }}
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label" for="{{ form.codigo_fechamento.id_for_label }}">Código do Fechamento</label>
-                                    {{ form.codigo_fechamento }}
-                                    <div class="form-text">Gerado no fechamento de repasse</div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="fat-section">
-                            <h6 class="fat-section-title">Extração de documento</h6>
-                            <div class="row g-3 align-items-end">
-                                <div class="col-md-4">
-                                    <label class="form-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
-                                    {{ form.documento_upload }}
-                                    <div class="form-text">{{ form.documento_upload.help_text }}</div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" id="extrair-dados-btn" class="btn btn-info btn-sm">
-                                            <i class="fas fa-magic"></i> Extrair com IA
-                                        </button>
-                                        <button type="button" id="extrair-dados-ocr-btn" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-search"></i> Extrair com OCR
-                                        </button>
+                        <div class="row fat-detalhes-section">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0">
+                                            <i class="fas fa-list"></i> Itens de Serviço
+                                            {% if form.instance.itens_servico.exists %}
+                                            <span class="badge bg-primary">{{ form.instance.itens_servico.count }}</span>
+                                            {% endif %}
+                                        </h5>
+                                        <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
+                                           class="btn btn-success btn-sm">
+                                            <i class="fas fa-plus"></i> Adicionar Item
+                                        </a>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if form.instance.itens_servico.exists %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Código</th>
+                                                        <th>Exame / Serviço</th>
+                                                        <th>Modalidade</th>
+                                                        <th>Contraste</th>
+                                                        <th>Sedação</th>
+                                                        <th class="text-end">Valor</th>
+                                                        <th class="text-center">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for item in form.instance.itens_servico.all %}
+                                                    <tr>
+                                                        <td>{{ item.codigo_servico|default:"-" }}</td>
+                                                        <td>{{ item.servico|default:"-" }}</td>
+                                                        <td>{{ item.modalidade|default:"-" }}</td>
+                                                        <td>{% if item.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                                                        <td>{% if item.com_sedacao %}<span class="badge bg-info text-dark">Sim</span>{% else %}Não{% endif %}</td>
+                                                        <td class="text-end">R$ {{ item.total|floatformat:2 }}</td>
+                                                        <td class="text-center text-nowrap">
+                                                            <a href="{% url 'faturamento_medico:editar_item_servico' item.pk %}"
+                                                               class="btn btn-sm btn-warning" title="Editar">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <a href="{% url 'faturamento_medico:excluir_item_servico' item.pk %}"
+                                                               class="btn btn-sm btn-danger" title="Excluir"
+                                                               onclick="return confirm('Tem certeza que deseja excluir este item?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="table-light">
+                                                        <th colspan="5">Total dos exames</th>
+                                                        <th class="text-end">R$ {{ form.instance.total|floatformat:2 }}</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                        {% else %}
+                                        <div class="text-center text-muted py-3">
+                                            <p class="mb-2">Nenhum item de serviço cadastrado ainda.</p>
+                                            <a href="{% url 'faturamento_medico:adicionar_item_servico' form.instance.pk %}"
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-plus"></i> Adicionar Item
+                                            </a>
+                                        </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            {% if faturamento.pk %}
-                            <div class="mt-3 pt-3 border-top">
-                                <div class="d-flex flex-wrap align-items-center gap-2">
-                                    <span class="text-muted small fw-semibold">Anexos salvos:</span>
-                                    {% for documento in faturamento.documentos_anexados.all %}
-                                    {% with ext=documento.get_file_extension|lower|cut:'.' %}
-                                    {% if ext == 'pdf' or ext == 'jpg' or ext == 'jpeg' or ext == 'png' or ext == 'gif' %}
-                                    <button type="button"
-                                            class="btn btn-outline-primary btn-sm js-ver-anexo"
-                                            data-url="{% url 'faturamento_medico:download_documento' documento.pk %}"
-                                            data-ext="{{ ext }}"
-                                            data-nome="{{ documento.nome|default:documento.arquivo.name }}">
-                                        <i class="fas fa-eye"></i>
-                                        {{ documento.nome|default:documento.arquivo.name|truncatechars:28 }}
-                                    </button>
-                                    {% else %}
-                                    <a href="{% url 'faturamento_medico:download_documento' documento.pk %}"
-                                       class="btn btn-outline-secondary btn-sm" target="_blank">
-                                        <i class="fas fa-download"></i>
-                                        {{ documento.nome|default:documento.arquivo.name|truncatechars:28 }}
-                                    </a>
-                                    {% endif %}
-                                    {% endwith %}
-                                    {% empty %}
-                                    <span class="text-muted small">Nenhum anexo — use <strong>Anexar</strong> no topo.</span>
-                                    {% endfor %}
-                                    {% if faturamento.documentos_anexados.exists %}
-                                    <button type="button" class="btn btn-info btn-sm js-abrir-album-anexos">
-                                        <i class="fas fa-images"></i> Álbum
-                                    </button>
-                                    {% endif %}
+                        </div>
+
+                        <div class="row fat-detalhes-section">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0">
+                                            <i class="fas fa-syringe"></i> Anestesista — exames com sedação
+                                            {% if form.instance.lancamentos_anestesista.exists %}
+                                            <span class="badge bg-secondary">{{ form.instance.lancamentos_anestesista.count }}</span>
+                                            {% endif %}
+                                        </h5>
+                                        <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' form.instance.pk %}"
+                                           class="btn btn-outline-success btn-sm">
+                                            <i class="fas fa-plus"></i> Lançar anestesista
+                                        </a>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if form.instance.lancamentos_anestesista.exists %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Médico (anestesista)</th>
+                                                        <th>Exame</th>
+                                                        <th class="text-end">Valor</th>
+                                                        <th class="text-center">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for lan in form.instance.lancamentos_anestesista.all %}
+                                                    <tr>
+                                                        <td>{{ lan.medico }}</td>
+                                                        <td>{{ lan.exame }}</td>
+                                                        <td class="text-end">R$ {{ lan.valor|floatformat:2 }}</td>
+                                                        <td class="text-center text-nowrap">
+                                                            <a href="{% url 'faturamento_medico:editar_lancamento_anestesista' lan.pk %}"
+                                                               class="btn btn-sm btn-warning" title="Editar">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <a href="{% url 'faturamento_medico:excluir_lancamento_anestesista' lan.pk %}"
+                                                               class="btn btn-sm btn-danger" title="Excluir"
+                                                               onclick="return confirm('Excluir este lançamento de anestesista?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="table-light">
+                                                        <th colspan="2">Total anestesista</th>
+                                                        <th class="text-end">R$ {{ total_anestesista|default:0|floatformat:2 }}</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                        {% else %}
+                                        <div class="text-center text-muted py-3">
+                                            <p class="mb-2 small">Nenhum lançamento de anestesista ainda.</p>
+                                            <a href="{% url 'faturamento_medico:adicionar_lancamento_anestesista' form.instance.pk %}"
+                                               class="btn btn-success btn-sm">
+                                                <i class="fas fa-plus"></i> Lançar anestesista
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
-                            {% endif %}
-                        </section>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info py-2 mt-3 mb-0">
+                            <i class="fas fa-info-circle"></i>
+                            Salve o faturamento para incluir itens de serviço e lançamentos de anestesista.
+                        </div>
+                        {% endif %}
 
+                        <h6 class="fat-detalhes-subtitle">Extração de documento</h6>
+                        <div class="fat-detalhes-grid">
+                            <div class="fat-detalhes-item fat-detalhes-item--span2">
+                                <label class="fat-detalhes-label" for="{{ form.documento_upload.id_for_label }}">{{ form.documento_upload.label }}</label>
+                                {{ form.documento_upload }}
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">&nbsp;</label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="button" id="extrair-dados-btn" class="btn btn-info btn-sm">
+                                        <i class="fas fa-magic"></i> IA
+                                    </button>
+                                    <button type="button" id="extrair-dados-ocr-btn" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-search"></i> OCR
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% if form.instance.pk and form.instance.documentos_anexados.exists %}
+                        <div class="mt-2 pt-2 border-top">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="text-muted small fw-semibold">Anexos salvos:</span>
+                                {% for documento in form.instance.documentos_anexados.all %}
+                                {% with ext=documento.get_file_extension|lower|cut:'.' %}
+                                {% if ext == 'pdf' or ext == 'jpg' or ext == 'jpeg' or ext == 'png' or ext == 'gif' %}
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm js-ver-anexo"
+                                        data-url="{% url 'faturamento_medico:download_documento' documento.pk %}"
+                                        data-ext="{{ ext }}"
+                                        data-nome="{{ documento.nome|default:documento.arquivo.name }}">
+                                    <i class="fas fa-eye"></i>
+                                    {{ documento.nome|default:documento.arquivo.name|truncatechars:28 }}
+                                </button>
+                                {% else %}
+                                <a href="{% url 'faturamento_medico:download_documento' documento.pk %}"
+                                   class="btn btn-outline-secondary btn-sm" target="_blank">
+                                    <i class="fas fa-download"></i>
+                                    {{ documento.nome|default:documento.arquivo.name|truncatechars:28 }}
+                                </a>
+                                {% endif %}
+                                {% endwith %}
+                                {% endfor %}
+                                <button type="button" class="btn btn-info btn-sm js-abrir-album-anexos">
+                                    <i class="fas fa-images"></i> Álbum
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="card-footer fat-form-footer">
-                        <button type="submit" class="btn btn-primary">
+
+                    <div class="fat-form-footer">
+                        <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-save"></i> Salvar
                         </button>
-                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary">
+                        <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-times"></i> Cancelar
                         </a>
                     </div>
@@ -419,143 +552,6 @@
         </div>
     </div>
 </div>
-
-<style>
-.fat-form-page {
-    --fat-accent: #2b4b7c;
-    --fat-border: #e5e9f0;
-    --fat-muted: #6c757d;
-    --fat-input-width: 5.25rem;
-    --fat-input-width-lg: 8rem;
-    --fat-input-width-xl: 12rem;
-}
-.fat-form-card {
-    border: 1px solid var(--fat-border);
-    box-shadow: 0 2px 10px rgba(43, 75, 124, 0.06);
-}
-.fat-form-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #f7f9fc;
-    border-bottom: 1px solid var(--fat-border);
-}
-.fat-form-header .card-title {
-    color: var(--fat-accent);
-    font-weight: 700;
-}
-.fat-section {
-    margin-bottom: 1.5rem;
-    padding: 1.25rem;
-    border: 1px solid var(--fat-border);
-    border-radius: 0.5rem;
-    background: #fff;
-}
-.fat-section-title {
-    color: var(--fat-accent);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-size: 0.8rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #d9e2ef;
-}
-.fat-form-page .form-label {
-    display: block;
-    font-weight: 600;
-    font-size: 0.8rem;
-    color: #334155;
-    margin-bottom: 0.25rem;
-}
-.fat-form-page .fat-section .row.g-3 > [class*="col-"] {
-    flex: 0 0 auto;
-    width: auto;
-    max-width: 100%;
-}
-.fat-form-page .form-control,
-.fat-form-page .form-select {
-    width: var(--fat-input-width);
-    max-width: 100%;
-    min-height: 2rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 0.375rem;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.875rem;
-    background-color: #fff;
-}
-.fat-form-page .col-md-3 textarea.form-control,
-.fat-form-page .col-md-6 .form-control,
-.fat-form-page .col-md-6 textarea.form-control {
-    width: var(--fat-input-width-xl);
-}
-.fat-form-page .col-md-2 .form-control,
-.fat-form-page .col-md-2 .form-select {
-    width: var(--fat-input-width-lg);
-}
-.fat-form-page .fat-field-wide .form-control,
-.fat-form-page .fat-field-wide .form-select {
-    width: calc(var(--fat-input-width-lg) * 2);
-}
-.fat-fields-compact .form-control,
-.fat-fields-compact .form-select,
-.fat-fields-compact .col-md-2 .form-control,
-.fat-fields-compact .col-md-2 .form-select {
-    width: calc(var(--fat-input-width) * 0.9);
-}
-.fat-fields-compact .form-text {
-    max-width: calc(var(--fat-input-width) * 0.9);
-}
-.fat-form-page .col-md-1 .form-control {
-    width: 3.5rem;
-}
-.fat-form-page .form-control:focus,
-.fat-form-page .form-select:focus {
-    border-color: var(--fat-accent);
-    box-shadow: 0 0 0 0.2rem rgba(43, 75, 124, 0.15);
-}
-.fat-form-page .form-control[readonly] {
-    background-color: #f1f5f9;
-    color: #475569;
-}
-.fat-form-page textarea.form-control {
-    width: var(--fat-input-width-xl);
-    max-width: 100%;
-    min-height: 3rem;
-    resize: vertical;
-}
-.fat-form-page input[type="file"].form-control {
-    width: var(--fat-input-width-xl);
-    max-width: 100%;
-}
-.fat-form-page .form-text {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.78rem;
-    color: var(--fat-muted);
-    max-width: var(--fat-input-width);
-}
-.fat-section-itens {
-    background: #f8fafc;
-    margin-top: -0.75rem;
-    margin-bottom: 1.5rem;
-    border-top: none;
-    border-radius: 0 0 0.5rem 0.5rem;
-}
-.fat-section-itens .table-responsive {
-    width: 100%;
-}
-.fat-section-itens + .fat-section,
-.fat-section + .alert + .fat-section {
-    margin-top: 0;
-}
-.fat-form-footer {
-    background: #f7f9fc;
-    border-top: 1px solid var(--fat-border);
-    display: flex;
-    gap: 0.5rem;
-}
-</style>
 
 <script>
 window.addEventListener('load', function() {
@@ -631,7 +627,9 @@ window.addEventListener('load', function() {
 });
 </script>
 
-{% if faturamento %}
+{% if form.instance.pk %}
+{% with faturamento=form.instance %}
 {% include 'faturamento_medico/includes/anexos_visualizacao.html' %}
+{% endwith %}
 {% endif %}
 {% endblock %}
