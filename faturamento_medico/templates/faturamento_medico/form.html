@@ -229,18 +229,6 @@
                                 <label class="fat-detalhes-label">Porte</label>
                                 <input type="text" class="form-control" value="{{ form.instance.porte|default:'' }}" readonly tabindex="-1">
                             </div>
-                            <div class="fat-detalhes-item">
-                                <label class="fat-detalhes-label">QT</label>
-                                <input type="text" class="form-control" value="{{ form.instance.qt|default:0 }}" readonly tabindex="-1">
-                            </div>
-                            <div class="fat-detalhes-item">
-                                <label class="fat-detalhes-label">Valor</label>
-                                <input type="text" class="form-control" value="R$ {{ form.instance.valor|default:0|floatformat:2 }}" readonly tabindex="-1">
-                            </div>
-                            <div class="fat-detalhes-item">
-                                <label class="fat-detalhes-label" for="{{ form.total.id_for_label }}">Total</label>
-                                {{ form.total }}
-                            </div>
 
                             <div class="fat-detalhes-item">
                                 <label class="fat-detalhes-label" for="{{ form.urgencia.id_for_label }}">Urgência</label>
@@ -333,6 +321,21 @@
                             <div class="fat-detalhes-item fat-detalhes-item--full">
                                 <label class="fat-detalhes-label" for="{{ form.observacao.id_for_label }}">Observação</label>
                                 {{ form.observacao }}
+                            </div>
+                        </div>
+
+                        <div class="fat-detalhes-grid mt-2">
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">QT</label>
+                                <input type="text" class="form-control" value="{{ form.instance.qt|default:0 }}" readonly tabindex="-1">
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label">Valor</label>
+                                <input type="text" class="form-control" value="R$ {{ form.instance.valor|default:0|floatformat:2 }}" readonly tabindex="-1">
+                            </div>
+                            <div class="fat-detalhes-item">
+                                <label class="fat-detalhes-label" for="{{ form.total.id_for_label }}">Total</label>
+                                {{ form.total }}
                             </div>
                         </div>
 
