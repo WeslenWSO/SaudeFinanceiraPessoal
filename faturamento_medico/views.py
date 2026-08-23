@@ -6728,6 +6728,45 @@ def alterar_status_conferencia_item(request, pk):
     })
 
 
+def observacao_status_outros_item(request, pk):
+    """Consulta ou grava observação do faturamento quando status conferência é OUTROS."""
+    empresa_id = request.session.get('empresa_id')
+    try:
+        empresa_id = int(empresa_id) if empresa_id is not None else None
+    except (TypeError, ValueError):
+        empresa_id = None
+
+    item = get_object_or_404(ItemServico.objects.select_related('faturamento'), pk=pk)
+    if empresa_id is not None and item.faturamento.empresa_id != empresa_id:
+        return JsonResponse({'ok': False, 'erro': 'Sem permissão'}, status=403)
+
+    if (item.status_conferencia or '').strip() != 'OUTROS':
+        return JsonResponse(
+            {'ok': False, 'erro': 'Observação disponível apenas com status OUTROS.'},
+            status=400,
+        )
+
+    faturamento = item.faturamento
+
+    if request.method == 'GET':
+        return JsonResponse({
+            'ok': True,
+            'observacao': faturamento.observacao or '',
+            'paciente': faturamento.nome or '',
+        })
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'erro': 'Método não permitido'}, status=405)
+
+    observacao = (request.POST.get('observacao') or '').strip()
+    if not observacao:
+        return JsonResponse({'ok': False, 'erro': 'Informe a observação.'}, status=400)
+
+    faturamento.observacao = observacao
+    faturamento.save(update_fields=['observacao'])
+    return JsonResponse({'ok': True, 'observacao': observacao})
+
+
 def log_status_conferencia_item(request, pk):
     """Retorna o histórico de alterações do status de conferência (AJAX GET)."""
     empresa_id = request.session.get('empresa_id')

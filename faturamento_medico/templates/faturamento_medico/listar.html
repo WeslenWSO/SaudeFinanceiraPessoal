@@ -331,6 +331,13 @@
                                                         title="Histórico status conferência">
                                                     <i class="fas fa-history"></i>
                                                 </button>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-info btn-obs-status-outros flex-shrink-0{% if linha.status_conferencia != 'OUTROS' %} d-none{% endif %}"
+                                                        data-url="{% url 'faturamento_medico:observacao_status_outros' linha.item.id %}"
+                                                        data-paciente="{{ linha.paciente|escape }}"
+                                                        title="Observação (status OUTROS)">
+                                                    <i class="fas fa-comment-dots"></i>
+                                                </button>
                                             </div>
                                             {% else %}
                                             <span class="badge status-conf badge-{{ linha.status_conferencia_css }}">
@@ -632,6 +639,37 @@
                                         <i class="fas fa-external-link-alt"></i> Abrir faturamento
                                     </a>
                                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="modalObsStatusOutros" tabindex="-1" aria-labelledby="modalObsStatusOutrosLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalObsStatusOutrosLabel">
+                                        <i class="fas fa-comment-dots me-1"></i> Observação — OUTROS
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="small text-muted mb-2" id="modal-obs-status-paciente"></p>
+                                    <div id="modal-obs-status-loading" class="text-center text-muted py-3 d-none">
+                                        <i class="fas fa-spinner fa-spin me-1"></i> Carregando...
+                                    </div>
+                                    <div id="modal-obs-status-erro" class="alert alert-danger py-2 d-none mb-0"></div>
+                                    <div id="modal-obs-status-form-wrap">
+                                        <label class="form-label" for="modal-obs-status-texto">Descreva a observação</label>
+                                        <textarea id="modal-obs-status-texto" class="form-control" rows="4" placeholder="Descreva o motivo ou detalhe do status OUTROS..."></textarea>
+                                        <p class="form-text mb-0">Será gravado no campo <strong>Observação</strong> do lançamento (tela de edição).</p>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btn-salvar-obs-status-outros">
+                                        <i class="fas fa-save me-1"></i> Salvar
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1197,6 +1235,12 @@ document.addEventListener('DOMContentLoaded', function() {
             || '{{ csrf_token }}';
     }
 
+    function atualizarBotaoObsStatusOutros(row, status) {
+        const btn = row.querySelector('.btn-obs-status-outros');
+        if (!btn) return;
+        btn.classList.toggle('d-none', status !== 'OUTROS');
+    }
+
     function aplicarStatusNaLinha(row, data) {
         const checkbox = row.querySelector('.conferencia-checkbox');
         const select = row.querySelector('.status-conferencia-select');
@@ -1216,6 +1260,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (select && data.status) {
             select.value = data.status;
             select.className = 'form-select form-select-sm status-conferencia-select status-' + (data.status_css || 'secondary');
+        }
+        if (data.status) {
+            atualizarBotaoObsStatusOutros(row, data.status);
         }
     }
 
@@ -1457,6 +1504,101 @@ document.addEventListener('DOMContentLoaded', function() {
             abrirModalLogStatusConferencia(this);
         });
     });
+
+    const modalObsStatusEl = document.getElementById('modalObsStatusOutros');
+    const modalObsStatusTexto = document.getElementById('modal-obs-status-texto');
+    const modalObsStatusPaciente = document.getElementById('modal-obs-status-paciente');
+    const modalObsStatusLoading = document.getElementById('modal-obs-status-loading');
+    const modalObsStatusErro = document.getElementById('modal-obs-status-erro');
+    const modalObsStatusFormWrap = document.getElementById('modal-obs-status-form-wrap');
+    const btnSalvarObsStatusOutros = document.getElementById('btn-salvar-obs-status-outros');
+    let obsStatusOutrosUrlAtual = '';
+
+    function abrirModalObsStatusOutros(btn) {
+        if (!modalObsStatusEl || !window.bootstrap) return;
+        obsStatusOutrosUrlAtual = btn.dataset.url || '';
+        modalObsStatusTexto.value = '';
+        modalObsStatusErro.classList.add('d-none');
+        modalObsStatusErro.textContent = '';
+        modalObsStatusFormWrap.classList.add('d-none');
+        modalObsStatusLoading.classList.remove('d-none');
+        modalObsStatusPaciente.textContent = btn.dataset.paciente
+            ? 'Paciente: ' + btn.dataset.paciente
+            : '';
+        bootstrap.Modal.getOrCreateInstance(modalObsStatusEl).show();
+        fetch(obsStatusOutrosUrlAtual, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        })
+        .then(async r => {
+            const data = await r.json().catch(() => ({ ok: false }));
+            modalObsStatusLoading.classList.add('d-none');
+            if (!r.ok || !data.ok) {
+                modalObsStatusErro.textContent = data.erro || 'Não foi possível carregar a observação.';
+                modalObsStatusErro.classList.remove('d-none');
+                return;
+            }
+            modalObsStatusFormWrap.classList.remove('d-none');
+            modalObsStatusTexto.value = data.observacao || '';
+            if (data.paciente) {
+                modalObsStatusPaciente.textContent = 'Paciente: ' + data.paciente;
+            }
+            modalObsStatusTexto.focus();
+        })
+        .catch(() => {
+            modalObsStatusLoading.classList.add('d-none');
+            modalObsStatusErro.textContent = 'Não foi possível carregar a observação.';
+            modalObsStatusErro.classList.remove('d-none');
+        });
+    }
+
+    document.querySelectorAll('.btn-obs-status-outros').forEach(btn => {
+        btn.addEventListener('click', function() {
+            abrirModalObsStatusOutros(this);
+        });
+    });
+
+    if (btnSalvarObsStatusOutros) {
+        btnSalvarObsStatusOutros.addEventListener('click', function() {
+            const texto = (modalObsStatusTexto.value || '').trim();
+            if (!texto) {
+                modalObsStatusErro.textContent = 'Informe a observação.';
+                modalObsStatusErro.classList.remove('d-none');
+                modalObsStatusTexto.focus();
+                return;
+            }
+            modalObsStatusErro.classList.add('d-none');
+            btnSalvarObsStatusOutros.disabled = true;
+            const formData = new FormData();
+            formData.append('observacao', texto);
+            fetch(obsStatusOutrosUrlAtual, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            })
+            .then(async r => {
+                const data = await r.json().catch(() => ({ ok: false }));
+                btnSalvarObsStatusOutros.disabled = false;
+                if (!r.ok || !data.ok) {
+                    modalObsStatusErro.textContent = data.erro || 'Não foi possível salvar.';
+                    modalObsStatusErro.classList.remove('d-none');
+                    return;
+                }
+                if (modalObsStatusEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalObsStatusEl).hide();
+                }
+            })
+            .catch(() => {
+                btnSalvarObsStatusOutros.disabled = false;
+                modalObsStatusErro.textContent = 'Não foi possível salvar.';
+                modalObsStatusErro.classList.remove('d-none');
+            });
+        });
+    }
 
     window.abrirModalAnexos = function(btn) {
         const listaEl = document.getElementById('modal-anexos-lista');
