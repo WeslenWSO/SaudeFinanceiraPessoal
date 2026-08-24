@@ -1,0 +1,6 @@
+# Cole aqui UMA linha: External Database URL do financas-db (Render → Connect).
+# Renomeie este arquivo para render_db.url (na raiz do projeto).
+# NUNCA commite render_db.url — já está no .gitignore.
+#
+# Exemplo (substitua SENHA e use a URL real do painel Render):
+# postgresql://financas_db_adei_user:SENHA@dpg-d9hurgo4n6ts73bj8pkg-a.oregon-postgres.render.com:5432/financas_db_adei

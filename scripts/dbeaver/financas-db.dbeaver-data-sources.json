@@ -1,0 +1,38 @@
+{
+  "folders": {},
+  "connections": {
+    "financas-db-render": {
+      "provider": "postgresql",
+      "driver": "postgres-jdbc",
+      "name": "financas-db (Render)",
+      "save-password": false,
+      "configuration": {
+        "host": "dpg-d9hurgo4n6ts73bj8pkg-a.oregon-postgres.render.com",
+        "port": "5432",
+        "database": "financas_db_adei",
+        "url": "jdbc:postgresql://dpg-d9hurgo4n6ts73bj8pkg-a.oregon-postgres.render.com:5432/financas_db_adei",
+        "configurationType": "MANUAL",
+        "type": "dev",
+        "closeIdleConnection": true,
+        "properties": {
+          "connectTimeout": "20",
+          "ssl": "true",
+          "sslmode": "require"
+        },
+        "auth-model": "native",
+        "user": "financas_db_adei_user"
+      }
+    }
+  },
+  "connection-types": {
+    "dev": {
+      "name": "Development",
+      "color": "rgb(48,161,45)",
+      "description": "Regular development database",
+      "auto-commit": true,
+      "confirm-execute": false,
+      "confirm-data-change": false,
+      "smart-commit": false
+    }
+  }
+}
