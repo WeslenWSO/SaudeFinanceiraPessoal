@@ -59,6 +59,7 @@ credentials.json
 
 # Backup de migracao SQLite -> Postgres (nao commitar)
 backup_render.json
+backups/
 fixtures/import_*.json
 render_db.url
 import_log*.txt

@@ -54,6 +54,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('regraimposto', 'Regras do Imposto', 'fa-percent', 'cadastro', url_name='regraimposto:ListaRegra'),
     MenuItemDef('regrarateio', 'Regra do Rateio', 'fa-share-nodes', 'cadastro', url_name='regrarateio:regraList'),
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
+    MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='accounts:backup_banco'),
     MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'cadastro', url_name='faturamento_medico:ftlistar'),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-tasks', 'cadastro', url_name='agendador_tarefas:listar'),
     MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
@@ -166,6 +167,8 @@ def montar_menu_nav(user: User | None) -> dict[str, Any]:
     dropdowns: list[dict[str, Any]] = []
 
     for item in ITENS_MENU:
+        if item.codigo == 'backup_banco' and not (user and user.is_superuser):
+            continue
         if item.secao is None and item.codigo in permitidos:
             links.append(_item_para_template(item))
 
@@ -173,7 +176,9 @@ def montar_menu_nav(user: User | None) -> dict[str, Any]:
         filhos = [
             _item_para_template(item)
             for item in ITENS_MENU
-            if item.secao == secao.codigo and item.codigo in permitidos
+            if item.secao == secao.codigo
+            and item.codigo in permitidos
+            and not (item.codigo == 'backup_banco' and not (user and user.is_superuser))
         ]
         if filhos:
             dropdowns.append({

@@ -76,6 +76,43 @@
 </table>
      </div>
 
+     {% if page_obj.paginator.num_pages > 1 %}
+     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-2 border-top">
+       <small class="text-muted">
+         Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }} convênios
+       </small>
+       <nav aria-label="Paginação convênios">
+         <ul class="pagination pagination-sm mb-0">
+           {% if page_obj.has_previous %}
+           <li class="page-item">
+             <a class="page-link" href="?page=1">Primeira</a>
+           </li>
+           <li class="page-item">
+             <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+           </li>
+           {% else %}
+           <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+           {% endif %}
+
+           <li class="page-item disabled">
+             <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+           </li>
+
+           {% if page_obj.has_next %}
+           <li class="page-item">
+             <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+           </li>
+           <li class="page-item">
+             <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última</a>
+           </li>
+           {% else %}
+           <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+           {% endif %}
+         </ul>
+       </nav>
+     </div>
+     {% endif %}
+
    </div>
 </div>
 </div>

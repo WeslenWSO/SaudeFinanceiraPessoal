@@ -33,32 +33,40 @@ def _on_render() -> bool:
 def _log_database_backend() -> None:
     if not _on_render():
         return
-    import django
-    django.setup()
-    from django.conf import settings
-    from django.contrib.auth.models import User
+    try:
+        import django
+        django.setup()
+        from django.conf import settings
+        from django.contrib.auth.models import User
 
-    db = settings.DATABASES['default']
-    engine = db.get('ENGINE', '')
-    print(f'[startup] DATABASE ENGINE: {engine}', flush=True)
-    if 'sqlite' in engine:
-        print(
-            '[startup] AVISO: SQLite no Render — configure DATABASE_URL no Environment.',
-            flush=True,
-        )
-    else:
-        print(f'[startup] auth_user count: {User.objects.count()}', flush=True)
+        db = settings.DATABASES['default']
+        engine = db.get('ENGINE', '')
+        host = db.get('HOST', '') or '(local)'
+        print(f'[startup] DATABASE ENGINE: {engine}', flush=True)
+        print(f'[startup] DATABASE HOST: {host}', flush=True)
+        if 'sqlite' in engine:
+            print(
+                '[startup] AVISO: SQLite no Render — configure DATABASE_URL no Environment.',
+                flush=True,
+            )
+        else:
+            print(f'[startup] auth_user count: {User.objects.count()}', flush=True)
+    except Exception as exc:
+        print(f'[startup] AVISO: banco indisponível no boot ({exc})', flush=True)
 
 
 def _bootstrap_database_and_static() -> None:
     """Migrate/collectstatic no Render (mesmo sem DATABASE_URL configurado ainda)."""
     if not (_on_render() or os.environ.get('DATABASE_URL', '').strip()):
         return
-    import django
-    django.setup()
-    from django.core.management import call_command
-    call_command('migrate', '--noinput', verbosity=0)
-    call_command('collectstatic', '--noinput', verbosity=0)
+    try:
+        import django
+        django.setup()
+        from django.core.management import call_command
+        call_command('migrate', '--noinput', verbosity=0)
+        call_command('collectstatic', '--noinput', verbosity=0)
+    except Exception as exc:
+        print(f'[startup] AVISO: migrate/collectstatic no boot falhou ({exc})', flush=True)
 
 
 _log_database_backend()

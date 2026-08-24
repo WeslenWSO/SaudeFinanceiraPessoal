@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Backup do banco de dados{% endblock %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-database me-2 text-primary"></i> Backup do banco de dados
+                    </h5>
+                    <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} py-2">{{ message }}</div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <p class="text-muted small">
+                        Somente administradores (<strong>superuser</strong>) podem gerar backup.
+                        O arquivo é salvo na pasta <code>{{ pasta_backups }}</code> deste servidor
+                        e também é enviado para download no seu computador.
+                    </p>
+
+                    <div class="alert alert-light border small mb-3">
+                        <strong>Formato:</strong>
+                        {% if usa_pg_dump %}
+                        PostgreSQL — arquivo <code>.sql.gz</code> (pg_dump) + JSON complementar.
+                        {% else %}
+                        JSON (<code>dumpdata</code>) — compatível com SQLite e PostgreSQL.
+                        {% endif %}
+                    </div>
+
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="gerar">
+                        <div class="mb-3">
+                            <label class="form-label" for="senha">Confirme sua senha de administrador</label>
+                            <input type="password"
+                                   class="form-control"
+                                   id="senha"
+                                   name="senha"
+                                   required
+                                   autocomplete="current-password"
+                                   placeholder="Senha do usuário {{ request.user.username }}">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-download me-1"></i> Gerar backup e baixar
+                        </button>
+                    </form>
+
+                    <h6 class="border-bottom pb-2 mb-3">Backups salvos neste servidor</h6>
+                    {% if backups_locais %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Arquivo</th>
+                                    <th>Data</th>
+                                    <th class="text-end">Tamanho</th>
+                                    <th class="text-end">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in backups_locais %}
+                                <tr>
+                                    <td><code>{{ item.nome }}</code></td>
+                                    <td>{{ item.modificado|date:"d/m/Y H:i" }}</td>
+                                    <td class="text-end">{{ item.tamanho_fmt }}</td>
+                                    <td class="text-end">
+                                        <a href="{% url 'accounts:backup_banco_download' item.nome %}"
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">Nenhum backup salvo ainda.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

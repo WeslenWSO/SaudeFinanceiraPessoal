@@ -236,6 +236,24 @@ if _database_url:
         conn_max_age=600,
         ssl_require=_database_url.startswith('postgres'),
     )
+
+    def _completar_host_postgres_render(db_settings):
+        """
+        Render: URL interna usa host curto (dpg-xxx-a) na rede privada.
+        Se o DNS interno falhar, completa com o sufixo regional público.
+        """
+        host = (db_settings.get('HOST') or '').strip()
+        if not host.startswith('dpg-') or '.' in host:
+            return db_settings
+        suffix = os.environ.get(
+            'RENDER_PG_HOST_SUFFIX',
+            'oregon-postgres.render.com',
+        ).strip().lstrip('.')
+        if suffix:
+            db_settings['HOST'] = f'{host}.{suffix}'
+        return db_settings
+
+    DATABASES['default'] = _completar_host_postgres_render(DATABASES['default'])
 elif os.environ.get('USE_POSTGRES', '').strip().lower() in ('1', 'true', 'yes'):
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.postgresql',
@@ -290,6 +308,11 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 DATE_INPUT_FORMATS = ['%Y-%m-%d', '%d/%m/%Y']
+
+# Backups completos do banco (somente admin / superuser)
+_backup_dir_env = os.environ.get('BACKUP_DATABASE_DIR', '').strip()
+BACKUP_DATABASE_DIR = Path(_backup_dir_env) if _backup_dir_env else BASE_DIR / 'backups'
+BACKUP_DATABASE_TIMEOUT = 600
 
 
 MESSAGE_TAGS = {
