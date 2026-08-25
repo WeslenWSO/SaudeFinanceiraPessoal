@@ -186,14 +186,18 @@ class FaturamentoMedicoForm(forms.ModelForm):
 
 
 class FaturamentoDocumentacaoForm(forms.ModelForm):
-    """Formulário parcial: guia, senha, protocolo, lote, guia lançada e nota fiscal."""
+    """Formulário parcial: guia, senha, protocolo, lote, guia lançada, nota fiscal, código relatório e anestesista."""
 
     class Meta:
         model = FaturamentoMedico
-        fields = ['guia', 'senha', 'guia_lancada', 'lote', 'numero_guia_lancada', 'nota_fiscal']
+        fields = [
+            'guia', 'senha', 'guia_lancada', 'lote', 'numero_guia_lancada', 'nota_fiscal',
+            'codigo_relatorio', 'anestesista',
+        ]
         labels = {
             'guia_lancada': 'Protocolo',
             'numero_guia_lancada': 'Número da Guia Lançada',
+            'codigo_relatorio': 'Cód. Relatório',
         }
         widgets = {
             'guia': forms.TextInput(attrs={
@@ -211,6 +215,14 @@ class FaturamentoDocumentacaoForm(forms.ModelForm):
             'lote': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_guia_lancada': forms.TextInput(attrs={'class': 'form-control'}),
             'nota_fiscal': forms.TextInput(attrs={'class': 'form-control'}),
+            'codigo_relatorio': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Código do relatório',
+            }),
+            'anestesista': forms.TextInput(attrs={
+                'class': 'form-control fat-doc-wide',
+                'placeholder': 'Nome do anestesista',
+            }),
         }
 
 

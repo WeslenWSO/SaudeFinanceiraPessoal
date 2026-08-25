@@ -201,9 +201,15 @@ def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
             col_map['data'] = i
         elif h.startswith('qtde') or h == 'qt' or h.startswith('qtde/via'):
             col_map['qtde'] = i
+        elif 'valor ref' in h:
+            continue
         elif 'valor unit' in h:
             col_map['valor_unit'] = i
-        elif 'valor total' in h or 'valor (r$)' in h or h == 'valor r$':
+        elif h == 'valor (r$)' or (
+            h.startswith('valor') and '(r$)' in h and 'ref' not in h and 'unit' not in h
+        ):
+            col_map['valor_total'] = i
+        elif 'valor total' in h or h == 'valor r$':
             col_map['valor_total'] = i
         elif 'cod.rel' in h or h == 'cod rel' or h.startswith('cod rel'):
             col_map['cod_rel'] = i
@@ -313,7 +319,7 @@ def _adicionar_linha_grupo(
     cod_rel: str = '',
     observacao: str = '',
     porte: str = '',
-    percentual: float = 0,
+    percentual: float = 1,
 ) -> None:
     if not lote or not guia or not cod_servico:
         return
@@ -857,7 +863,7 @@ def persistir_unimed(
                 codigo_servico=servico['codigo'],
                 servico=servico['descricao'],
                 porte=servico.get('porte') or '',
-                percentual=servico.get('percentual') or 0,
+                percentual=servico.get('percentual') or 1,
                 qt=servico.get('qt') or 1,
                 valor=servico.get('valor') or 0,
                 total=servico.get('total') or 0,

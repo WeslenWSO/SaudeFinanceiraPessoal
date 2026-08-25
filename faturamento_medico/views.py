@@ -3815,7 +3815,7 @@ def editar_faturamento(request, pk):
 
 
 def editar_documentacao_faturamento(request, pk):
-    """Altera apenas protocolo, lote, guia lançada e nota fiscal."""
+    """Altera protocolo, lote, guia lançada, nota fiscal, código relatório e anestesista."""
     empresa_id = request.session.get('empresa_id')
     qs = FaturamentoMedico.objects.all()
     if empresa_id:

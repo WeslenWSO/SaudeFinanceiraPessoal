@@ -413,7 +413,10 @@ class ItemServico(models.Model):
     def save(self, *args, **kwargs):
         """Calcula o total automaticamente"""
         from decimal import Decimal
-        self.total = Decimal(self.qt) * Decimal(str(self.valor)) * Decimal(str(self.percentual))
+        pct = Decimal(str(self.percentual or 1))
+        if pct == 0:
+            pct = Decimal('1')
+        self.total = Decimal(self.qt) * Decimal(str(self.valor)) * pct
         if self.conferido and (self.status_conferencia or '').strip() != 'LOTE OK':
             self.status_conferencia = 'CONFERIDO'
             update_fields = kwargs.get('update_fields')

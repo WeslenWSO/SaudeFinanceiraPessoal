@@ -15,6 +15,9 @@
     min-height: 2rem;
     font-size: 0.875rem;
 }
+.fat-doc-form .form-control.fat-doc-wide {
+    width: 11rem;
+}
 .fat-doc-form .row.g-3 > [class*="col-"] {
     flex: 0 0 auto;
     width: auto;
@@ -84,6 +87,16 @@
                                 <label class="form-label" for="{{ form.nota_fiscal.id_for_label }}">{{ form.nota_fiscal.label }}</label>
                                 {{ form.nota_fiscal }}
                                 {% if form.nota_fiscal.errors %}<div class="text-danger small">{{ form.nota_fiscal.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label" for="{{ form.codigo_relatorio.id_for_label }}">{{ form.codigo_relatorio.label }}</label>
+                                {{ form.codigo_relatorio }}
+                                {% if form.codigo_relatorio.errors %}<div class="text-danger small">{{ form.codigo_relatorio.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label" for="{{ form.anestesista.id_for_label }}">{{ form.anestesista.label }}</label>
+                                {{ form.anestesista }}
+                                {% if form.anestesista.errors %}<div class="text-danger small">{{ form.anestesista.errors }}</div>{% endif %}
                             </div>
                         </div>
 
