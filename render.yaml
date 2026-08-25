@@ -33,6 +33,12 @@ services:
         value: /var/data/media
       - key: RENDER
         value: "true"
+      - key: GEMINI_UPLOAD_TIMEOUT
+        value: "12"
+      - key: GEMINI_GENERATE_TIMEOUT
+        value: "15"
+      - key: UNIMED_PDF_TIMEOUT
+        value: "28"
     disk:
       name: media-uploads
       mountPath: /var/data

@@ -25,7 +25,8 @@
                             <p class="mb-0"><strong>PDF</strong> — relatório «Produção» UNIMED (tabela com Lote, Guia, Cod.Serviço, etc.).</p>
                             <p class="small text-muted mt-2 mb-0">
                                 No PDF não são importados: Plano, Tp. Grau, Participação % e Valor Ref.
-                                PDF escaneado: no servidor usa Google Gemini (GEMINI_API_KEY); localmente tenta OCR antes.
+                                PDF escaneado no servidor: tenta Gemini (até ~28s). Se falhar ou der timeout,
+                                exporte o relatório em <strong>.txt</strong> e importe o .txt.
                             </p>
                         </div>
                         <button type="submit" class="btn btn-primary" id="btn-importar-unimed">Importar</button>

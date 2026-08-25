@@ -639,6 +639,41 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
     return grupos, servicos_unicos, avisos
 
 
+def _limite_parse_pdf_segundos() -> float:
+    raw = os.environ.get('UNIMED_PDF_TIMEOUT', '').strip()
+    if raw:
+        try:
+            return max(10.0, float(raw))
+        except ValueError:
+            pass
+    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
+        return 28.0
+    return 0.0
+
+
+def parse_unimed_pdf_com_limite(
+    pdf_bytes: bytes,
+) -> tuple[dict[str, dict], set[tuple[str, str]], list[str]]:
+    """parse_unimed_pdf com teto de tempo (evita 502 Bad Gateway no Render)."""
+    limite = _limite_parse_pdf_segundos()
+    if limite <= 0:
+        return parse_unimed_pdf(pdf_bytes)
+
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(parse_unimed_pdf, pdf_bytes)
+        try:
+            return future.result(timeout=limite)
+        except FuturesTimeoutError as exc:
+            raise ValueError(
+                f'O PDF demorou mais de {int(limite)} segundos no servidor. '
+                'PDF escaneado pode exceder o limite do Render. '
+                'Exporte o relatório UNIMED em .txt (Produção) e importe o .txt, '
+                'ou tente um PDF com texto selecionável.'
+            ) from exc
+
+
 def persistir_unimed(
     grupos: dict[str, dict],
     servicos_unicos: set[tuple[str, str]],

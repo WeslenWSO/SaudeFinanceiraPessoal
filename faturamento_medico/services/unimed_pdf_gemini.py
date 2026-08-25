@@ -38,9 +38,17 @@ def _strip_json_fence(text: str) -> str:
 def _timeout_segundos(nome: str, padrao: float) -> float:
     raw = os.environ.get(nome, '')
     try:
-        return max(10.0, float(raw))
+        return max(5.0, float(raw))
     except ValueError:
         return padrao
+
+
+def _defaults_gemini_timeout() -> tuple[float, float]:
+    """Render: limites baixos para evitar 502 no gateway (~30s)."""
+    on_render = os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
+    if on_render:
+        return 12.0, 15.0
+    return 90.0, 120.0
 
 
 def _executar_com_timeout(fn, timeout_sec: float, descricao: str):
@@ -82,8 +90,9 @@ def extract_unimed_linhas_gemini(pdf_bytes: bytes) -> tuple[list[dict[str, Any]]
 
     tmp_path = None
     uploaded = None
-    upload_timeout = _timeout_segundos('GEMINI_UPLOAD_TIMEOUT', 90.0)
-    generate_timeout = _timeout_segundos('GEMINI_GENERATE_TIMEOUT', 120.0)
+    upload_default, generate_default = _defaults_gemini_timeout()
+    upload_timeout = _timeout_segundos('GEMINI_UPLOAD_TIMEOUT', upload_default)
+    generate_timeout = _timeout_segundos('GEMINI_GENERATE_TIMEOUT', generate_default)
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
             tmp.write(pdf_bytes)

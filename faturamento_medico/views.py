@@ -5778,7 +5778,7 @@ def importar_unimed(request):
         if request.method == 'POST':
             try:
                 from faturamento_medico.services.importar_unimed import (
-                    parse_unimed_pdf,
+                    parse_unimed_pdf_com_limite,
                     parse_unimed_txt,
                     persistir_unimed,
                 )
@@ -5794,7 +5794,7 @@ def importar_unimed(request):
             try:
                 avisos_import: list[str] = []
                 if nome.endswith('.pdf'):
-                    grupos, servicos_unicos, avisos_import = parse_unimed_pdf(arquivo.read())
+                    grupos, servicos_unicos, avisos_import = parse_unimed_pdf_com_limite(arquivo.read())
                 elif nome.endswith('.txt'):
                     raw = arquivo.read()
                     try:
