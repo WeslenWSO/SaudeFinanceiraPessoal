@@ -5778,7 +5778,7 @@ def importar_unimed(request):
         if request.method == 'POST':
             try:
                 from faturamento_medico.services.importar_unimed import (
-                    parse_unimed_pdf_com_limite,
+                    parse_unimed_pdf,
                     parse_unimed_txt,
                     persistir_unimed,
                 )
@@ -5794,7 +5794,7 @@ def importar_unimed(request):
             try:
                 avisos_import: list[str] = []
                 if nome.endswith('.pdf'):
-                    grupos, servicos_unicos, avisos_import = parse_unimed_pdf_com_limite(arquivo.read())
+                    grupos, servicos_unicos, avisos_import = parse_unimed_pdf(arquivo.read())
                 elif nome.endswith('.txt'):
                     raw = arquivo.read()
                     try:
@@ -5833,6 +5833,13 @@ def importar_unimed(request):
                 return _redirect_com_erro(str(e))
             except Exception as e:
                 logger.exception('Falha na importação UNIMED (%s)', nome)
+                from django.db import IntegrityError
+
+                if isinstance(e, IntegrityError):
+                    return _redirect_com_erro(
+                        f'Erro ao gravar faturamento no banco: {e}. '
+                        'Verifique se lote/guia já existem.'
+                    )
                 return _redirect_com_erro(str(e))
 
             return redirect('faturamento_medico:ftlistar')

@@ -240,6 +240,13 @@ def _ocr_habilitado() -> bool:
     return OCR_AVAILABLE and pdfium is not None and _configurar_tesseract()
 
 
+def _gemini_habilitado() -> bool:
+    """Gemini síncrono no Render derruba o worker (502/500); só se UNIMED_GEMINI_RENDER=true."""
+    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
+        return os.environ.get('UNIMED_GEMINI_RENDER', '').strip().lower() in ('true', '1', 'yes')
+    return True
+
+
 def _ocr_pdf_para_texto(pdf_bytes: bytes) -> str:
     """OCR página a página (PDF imagem / scan)."""
     if not OCR_AVAILABLE or pdfium is None or not _configurar_tesseract():
@@ -609,6 +616,17 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
     if not grupos:
         from SaudeFinanceira.gemini_config import get_gemini_api_key
 
+        if not _gemini_habilitado():
+            avisos.append(
+                'PDF escaneado: Gemini desativado no Render (limite de tempo). '
+                'Exporte o relatório UNIMED «Produção» em .txt e importe o .txt.'
+            )
+            detalhe = ' '.join(a for a in avisos if a)
+            raise ValueError(
+                'Não foi possível ler o PDF UNIMED «Produção» (sem texto selecionável). '
+                f'{detalhe}'
+            )
+
         if not get_gemini_api_key():
             avisos.append('GEMINI_API_KEY não configurada no servidor.')
             detalhe = ' '.join(a for a in avisos if a)
@@ -637,41 +655,6 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
         )
 
     return grupos, servicos_unicos, avisos
-
-
-def _limite_parse_pdf_segundos() -> float:
-    raw = os.environ.get('UNIMED_PDF_TIMEOUT', '').strip()
-    if raw:
-        try:
-            return max(10.0, float(raw))
-        except ValueError:
-            pass
-    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
-        return 28.0
-    return 0.0
-
-
-def parse_unimed_pdf_com_limite(
-    pdf_bytes: bytes,
-) -> tuple[dict[str, dict], set[tuple[str, str]], list[str]]:
-    """parse_unimed_pdf com teto de tempo (evita 502 Bad Gateway no Render)."""
-    limite = _limite_parse_pdf_segundos()
-    if limite <= 0:
-        return parse_unimed_pdf(pdf_bytes)
-
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(parse_unimed_pdf, pdf_bytes)
-        try:
-            return future.result(timeout=limite)
-        except FuturesTimeoutError as exc:
-            raise ValueError(
-                f'O PDF demorou mais de {int(limite)} segundos no servidor. '
-                'PDF escaneado pode exceder o limite do Render. '
-                'Exporte o relatório UNIMED em .txt (Produção) e importe o .txt, '
-                'ou tente um PDF com texto selecionável.'
-            ) from exc
 
 
 def persistir_unimed(
