@@ -5728,14 +5728,42 @@ def vincular_lote_protocolo(request):
 
 def importar_unimed(request):
     """View para importar relatório UNIMED (.txt ou .pdf)."""
+    import html
     import logging
 
+    from django.http import HttpResponse
+    from django.urls import reverse
+
     logger = logging.getLogger(__name__)
+
+    def _html_fallback(erro: str = '', aviso: str = '') -> HttpResponse:
+        voltar = reverse('faturamento_medico:ftlistar')
+        partes = ['<h1>Importar Relatório UNIMED</h1>']
+        if erro:
+            partes.append(f'<p style="color:#b00020"><strong>Falha:</strong> {html.escape(erro)}</p>')
+        if aviso:
+            partes.append(f'<p>{html.escape(aviso)}</p>')
+        partes.append(
+            f'<p><a href="{reverse("faturamento_medico:importar_unimed")}">Tentar novamente</a>'
+            f' · <a href="{voltar}">Voltar aos faturamentos</a></p>'
+        )
+        return HttpResponse(
+            '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">'
+            '<title>Importar UNIMED</title></head><body>'
+            + ''.join(partes)
+            + '</body></html>',
+            content_type='text/html; charset=utf-8',
+            status=200,
+        )
 
     def _render_importar(**extra):
         context = {'titulo': 'Importar Relatório UNIMED'}
         context.update(extra)
-        return render(request, 'faturamento_medico/importar_unimed.html', context)
+        try:
+            return render(request, 'faturamento_medico/importar_unimed.html', context)
+        except Exception as exc:
+            logger.exception('Template importar UNIMED indisponível')
+            return _html_fallback(erro=extra.get('erro_importacao') or str(exc))
 
     try:
         empresa_id = request.session.get('empresa_id')
@@ -5744,11 +5772,15 @@ def importar_unimed(request):
             return redirect('faturamento_medico:ftlistar')
 
         if request.method == 'POST':
-            from faturamento_medico.services.importar_unimed import (
-                parse_unimed_pdf,
-                parse_unimed_txt,
-                persistir_unimed,
-            )
+            try:
+                from faturamento_medico.services.importar_unimed import (
+                    parse_unimed_pdf,
+                    parse_unimed_txt,
+                    persistir_unimed,
+                )
+            except Exception as exc:
+                logger.exception('Módulo importar_unimed indisponível')
+                return _html_fallback(erro=f'Módulo de importação indisponível: {exc}')
 
             arquivo = request.FILES.get('arquivo')
             if not arquivo:
@@ -5800,7 +5832,7 @@ def importar_unimed(request):
         return _render_importar()
     except Exception as e:
         logger.exception('Erro inesperado na tela importar UNIMED')
-        return _render_importar(erro_importacao=str(e))
+        return _html_fallback(erro=str(e))
 
 
 def importar_xml(request):

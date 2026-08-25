@@ -47,6 +47,20 @@ except Exception as exc:
     print(f"[startup] anexo_diagnostico erro: {exc}")
 PY
 
+python - <<'PY'
+import os
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
+django.setup()
+try:
+    from faturamento_medico.services.importar_unimed import parse_unimed_pdf
+    from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
+    print("[startup] import UNIMED OK")
+except Exception as exc:
+    print(f"[startup] ERRO import UNIMED: {exc}")
+    raise SystemExit(1)
+PY
+
 exec gunicorn SaudeFinanceira.wsgi:application \
   --bind "0.0.0.0:${PORT:-8000}" \
   --workers "${WEB_CONCURRENCY:-2}" \

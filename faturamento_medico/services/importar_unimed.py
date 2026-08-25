@@ -36,13 +36,6 @@ except ImportError:
 _OCR_ENGINE_OK: bool | None = None
 
 
-def _ocr_habilitado() -> bool:
-    """OCR local (Tesseract) — desligado no Render (timeout/memória); usa Gemini."""
-    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
-        return False
-    return OCR_AVAILABLE and pdfium is not None and _configurar_tesseract()
-
-
 def _fold(s: str) -> str:
     if not s:
         return ''
@@ -240,6 +233,13 @@ def _configurar_tesseract() -> bool:
     return _OCR_ENGINE_OK
 
 
+def _ocr_habilitado() -> bool:
+    """OCR local (Tesseract) — desligado no Render (timeout/memória); usa Gemini."""
+    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
+        return False
+    return OCR_AVAILABLE and pdfium is not None and _configurar_tesseract()
+
+
 def _ocr_pdf_para_texto(pdf_bytes: bytes) -> str:
     """OCR página a página (PDF imagem / scan)."""
     if not OCR_AVAILABLE or pdfium is None or not _configurar_tesseract():
@@ -427,37 +427,40 @@ def _parse_pdf_tabelas(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str
     servicos_unicos: set[tuple[str, str]] = set()
     col_map: dict[str, int | None] | None = None
 
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            for table in _extrair_tabelas_pdf(page):
-                if not table or len(table) < 2:
-                    continue
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                for table in _extrair_tabelas_pdf(page):
+                    if not table or len(table) < 2:
+                        continue
 
-                header_idx = None
-                for i, row in enumerate(table[:5]):
-                    folded = _fold(' '.join(str(c or '') for c in row))
-                    if 'lote' in folded and 'guia' in folded and 'serv' in folded:
-                        header_idx = i
-                        break
+                    header_idx = None
+                    for i, row in enumerate(table[:5]):
+                        folded = _fold(' '.join(str(c or '') for c in row))
+                        if 'lote' in folded and 'guia' in folded and 'serv' in folded:
+                            header_idx = i
+                            break
 
-                if header_idx is None:
-                    continue
+                    if header_idx is None:
+                        continue
 
-                headers = [str(c or '') for c in table[header_idx]]
-                candidate_map = _mapear_colunas_pdf(headers)
-                if candidate_map.get('lote') is None or candidate_map.get('guia') is None:
-                    continue
+                    headers = [str(c or '') for c in table[header_idx]]
+                    candidate_map = _mapear_colunas_pdf(headers)
+                    if candidate_map.get('lote') is None or candidate_map.get('guia') is None:
+                        continue
 
-                if col_map is None:
-                    col_map = candidate_map
+                    if col_map is None:
+                        col_map = candidate_map
 
-                partial_grupos, partial_servicos = _parse_unimed_pdf_table(
-                    table[header_idx + 1 :],
-                    col_map,
-                )
-                grupos, servicos_unicos = _merge_grupos(
-                    grupos, partial_grupos, servicos_unicos, partial_servicos
-                )
+                    partial_grupos, partial_servicos = _parse_unimed_pdf_table(
+                        table[header_idx + 1 :],
+                        col_map,
+                    )
+                    grupos, servicos_unicos = _merge_grupos(
+                        grupos, partial_grupos, servicos_unicos, partial_servicos
+                    )
+    except Exception as exc:
+        logger.warning('Falha ao ler tabelas PDF UNIMED: %s', exc)
 
     return grupos, servicos_unicos
 
@@ -526,31 +529,34 @@ def _parse_unimed_pdf_texto(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tupl
     grupos: dict[str, dict] = {}
     servicos_unicos: set[tuple[str, str]] = set()
 
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            texto = page.extract_text() or ''
-            for linha in texto.splitlines():
-                parsed = _parse_linha_pdf_texto(linha)
-                if not parsed:
-                    continue
-                obs = ''
-                if parsed.get('guia_prest'):
-                    obs = f"Guia prest.: {parsed['guia_prest']}"
-                _adicionar_linha_grupo(
-                    grupos,
-                    servicos_unicos,
-                    lote=parsed['lote'],
-                    guia=parsed['guia'],
-                    cod_usuario=parsed['cod_usuario'],
-                    nome_usuario=parsed['nome_usuario'],
-                    cod_servico=parsed['cod_servico'],
-                    desc_servico=parsed['desc_servico'],
-                    data=parsed['data'],
-                    qtde=parsed['qtde'],
-                    valor_unit=parsed['valor_unit'],
-                    valor_total=parsed['valor_total'],
-                    observacao=obs,
-                )
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                texto = page.extract_text() or ''
+                for linha in texto.splitlines():
+                    parsed = _parse_linha_pdf_texto(linha)
+                    if not parsed:
+                        continue
+                    obs = ''
+                    if parsed.get('guia_prest'):
+                        obs = f"Guia prest.: {parsed['guia_prest']}"
+                    _adicionar_linha_grupo(
+                        grupos,
+                        servicos_unicos,
+                        lote=parsed['lote'],
+                        guia=parsed['guia'],
+                        cod_usuario=parsed['cod_usuario'],
+                        nome_usuario=parsed['nome_usuario'],
+                        cod_servico=parsed['cod_servico'],
+                        desc_servico=parsed['desc_servico'],
+                        data=parsed['data'],
+                        qtde=parsed['qtde'],
+                        valor_unit=parsed['valor_unit'],
+                        valor_total=parsed['valor_total'],
+                        observacao=obs,
+                    )
+    except Exception as exc:
+        logger.warning('Falha ao ler texto PDF UNIMED: %s', exc)
 
     return grupos, servicos_unicos
 
@@ -602,12 +608,16 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
 
     if not grupos:
         avisos.append('Enviando PDF ao Google Gemini…')
-        from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
+        try:
+            from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
 
-        linhas, gemini_avisos = extract_unimed_linhas_gemini(pdf_bytes)
-        avisos.extend(gemini_avisos)
-        if linhas:
-            grupos, servicos_unicos = _grupos_de_linhas_gemini(linhas)
+            linhas, gemini_avisos = extract_unimed_linhas_gemini(pdf_bytes)
+            avisos.extend(gemini_avisos)
+            if linhas:
+                grupos, servicos_unicos = _grupos_de_linhas_gemini(linhas)
+        except Exception as exc:
+            logger.exception('Falha Gemini UNIMED')
+            avisos.append(f'Erro ao chamar Gemini: {exc}')
 
     if not grupos:
         detalhe = ' '.join(a for a in avisos if a)
