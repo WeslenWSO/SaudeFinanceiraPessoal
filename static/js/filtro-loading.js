@@ -23,11 +23,18 @@
     return el;
   }
 
-  function showLoading() {
+  function showLoading(customMessage) {
     var overlay = getOverlay();
     overlay.removeAttribute('hidden');
     document.body.style.cursor = 'wait';
+    var msgEl = overlay.querySelector('.app-filtro-loading-box p');
+    if (msgEl) {
+      msgEl.textContent = customMessage || 'Carregando…';
+    }
   }
+
+  window.showFiltroLoading = showLoading;
+  window.hideFiltroLoading = hideLoading;
 
   function hideLoading() {
     var overlay = document.getElementById(OVERLAY_ID);
@@ -43,6 +50,9 @@
     }
     if (form.hasAttribute('data-no-loading')) {
       return false;
+    }
+    if (form.dataset.loading === 'true' || form.classList.contains('form-com-loading')) {
+      return true;
     }
     var method = (form.getAttribute('method') || 'get').toLowerCase();
     if (method !== 'get') {
@@ -80,8 +90,10 @@
   document.addEventListener(
     'submit',
     function (event) {
-      if (shouldShowForForm(event.target)) {
-        showLoading();
+      var form = event.target;
+      if (shouldShowForForm(form)) {
+        var msg = (form && form.dataset && form.dataset.loadingMessage) || '';
+        showLoading(msg || undefined);
       }
     },
     true

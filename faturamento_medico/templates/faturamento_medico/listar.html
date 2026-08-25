@@ -8,6 +8,9 @@
 {%endblock%}
 
 {% block conteudo %}
+{% if messages %}
+    {% include 'parcial/_messages.html' %}
+{% endif %}
 <style>
 .fm-row-actions-inline {
     display: inline-flex;

@@ -11,12 +11,23 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
+            {% if messages %}
+                {% include 'parcial/_messages.html' %}
+            {% endif %}
+
+            {% if erro_importacao %}
+            <div class="alert alert-danger shadow-sm" role="alert">
+                <strong>Falha na importação:</strong>
+                <div class="mt-1" style="white-space: pre-wrap;">{{ erro_importacao }}</div>
+            </div>
+            {% endif %}
+
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">{{ titulo }}</h3>
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" class="form-com-loading" data-loading="true" data-loading-message="Importando relatório UNIMED…">
                         {% csrf_token %}
                         <div class="form-group mb-3">
                             <label for="arquivo">Selecione o arquivo UNIMED (.txt ou .pdf):</label>
@@ -29,7 +40,7 @@
                                 No PDF não são importados: Plano, Tp. Grau, Participação % e Valor Ref.
                             </p>
                         </div>
-                        <button type="submit" class="btn btn-primary">Importar</button>
+                        <button type="submit" class="btn btn-primary" id="btn-importar-unimed">Importar</button>
                         <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-cancel btn-secondary">Cancelar</a>
                     </form>
                 </div>

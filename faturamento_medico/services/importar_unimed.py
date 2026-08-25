@@ -288,6 +288,103 @@ def _merge_grupos(
     return base, servicos_base
 
 
+def _parse_linha_pdf_texto(line: str) -> dict[str, Any] | None:
+    """Fallback: linha de texto extraída do PDF (relatório Produção)."""
+    line = re.sub(r'\s+', ' ', (line or '').strip())
+    if _linha_ignorada([line]):
+        return None
+
+    m_data = re.search(r'(\d{2}/\d{2}/\d{4})', line)
+    if not m_data:
+        return None
+
+    left = line[: m_data.start()].strip()
+    right = line[m_data.end() :].strip()
+    data_str = m_data.group(1)
+
+    lm = re.match(
+        r'^(\d+)\s+(\d+)\s+(\d+)\s+(.+?)\s+[A-Z]\s+(\d+)\s+(.+?)\s+(\d+)\s+(\w+)\s*$',
+        left,
+    )
+    if not lm:
+        return None
+
+    rm = re.match(
+        r'^(\d+)\s+(\d+)\s+[\d.,]+\s+\S+\s+\S+\s+.+?\s+([\d.,]+)\s+([\d.,]+)\s*$',
+        right,
+    )
+    if not rm:
+        rm = re.match(r'^(\d+)\s+(\d+)\s+.+?\s+([\d.,]+)\s+([\d.,]+)\s*$', right)
+    if not rm:
+        return None
+
+    return {
+        'lote': lm.group(1),
+        'guia': lm.group(2),
+        'cod_usuario': lm.group(3),
+        'nome_usuario': lm.group(4).strip(),
+        'cod_servico': lm.group(5),
+        'desc_servico': lm.group(6).strip(),
+        'guia_prest': lm.group(7),
+        'data': _parse_data(data_str),
+        'qtde': _parse_int(rm.group(1)),
+        'valor_unit': _money_br(rm.group(3)),
+        'valor_total': _money_br(rm.group(4)),
+    }
+
+
+def _parse_unimed_pdf_texto(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+    grupos: dict[str, dict] = {}
+    servicos_unicos: set[tuple[str, str]] = set()
+
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for page in pdf.pages:
+            texto = page.extract_text() or ''
+            for linha in texto.splitlines():
+                parsed = _parse_linha_pdf_texto(linha)
+                if not parsed:
+                    continue
+                obs = ''
+                if parsed.get('guia_prest'):
+                    obs = f"Guia prest.: {parsed['guia_prest']}"
+                _adicionar_linha_grupo(
+                    grupos,
+                    servicos_unicos,
+                    lote=parsed['lote'],
+                    guia=parsed['guia'],
+                    cod_usuario=parsed['cod_usuario'],
+                    nome_usuario=parsed['nome_usuario'],
+                    cod_servico=parsed['cod_servico'],
+                    desc_servico=parsed['desc_servico'],
+                    data=parsed['data'],
+                    qtde=parsed['qtde'],
+                    valor_unit=parsed['valor_unit'],
+                    valor_total=parsed['valor_total'],
+                    observacao=obs,
+                )
+
+    return grupos, servicos_unicos
+
+
+def _extrair_tabelas_pdf(page) -> list[list[list[Any]]]:
+    configs = [
+        {'vertical_strategy': 'lines', 'horizontal_strategy': 'lines', 'intersection_tolerance': 8},
+        {'vertical_strategy': 'text', 'horizontal_strategy': 'text'},
+        {'vertical_strategy': 'lines_strict', 'horizontal_strategy': 'lines_strict'},
+        {},
+    ]
+    seen: list[list[list[Any]]] = []
+    for cfg in configs:
+        try:
+            tables = page.extract_tables(cfg) or []
+        except Exception:
+            tables = []
+        for table in tables:
+            if table and len(table) >= 2:
+                seen.append(table)
+    return seen
+
+
 def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
     """
     Relatório UNIMED «Produção» em PDF.
@@ -297,19 +394,9 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
     servicos_unicos: set[tuple[str, str]] = set()
     col_map: dict[str, int | None] | None = None
 
-    table_settings = {
-        'vertical_strategy': 'lines',
-        'horizontal_strategy': 'lines',
-        'intersection_tolerance': 8,
-    }
-
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
-            tables = page.extract_tables(table_settings) or []
-            if not tables:
-                tables = page.extract_tables() or []
-
-            for table in tables:
+            for table in _extrair_tabelas_pdf(page):
                 if not table or len(table) < 2:
                     continue
 
@@ -340,9 +427,13 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
                 )
 
     if not grupos:
+        grupos, servicos_unicos = _parse_unimed_pdf_texto(pdf_bytes)
+
+    if not grupos:
         raise ValueError(
-            'Não foi possível ler tabelas do PDF. Verifique se é o relatório UNIMED «Produção» '
-            'com texto selecionável (não escaneado).'
+            'Não foi possível ler o PDF UNIMED «Produção». '
+            'Verifique se o arquivo tem texto selecionável (não é scan/foto) '
+            'e se contém as colunas Lote, Guia e Cod.Serviço.'
         )
 
     return grupos, servicos_unicos
