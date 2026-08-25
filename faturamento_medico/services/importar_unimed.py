@@ -234,9 +234,11 @@ def _configurar_tesseract() -> bool:
 
 
 def _ocr_habilitado() -> bool:
-    """OCR local (Tesseract) — desligado no Render (timeout/memória); usa Gemini."""
+    """OCR Tesseract — no Render usa build.sh (tesseract-ocr); desligar com UNIMED_OCR_RENDER=false."""
     if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
-        return False
+        flag = os.environ.get('UNIMED_OCR_RENDER', 'true').strip().lower()
+        if flag in ('false', '0', 'no'):
+            return False
     return OCR_AVAILABLE and pdfium is not None and _configurar_tesseract()
 
 
@@ -251,12 +253,22 @@ def _ocr_pdf_para_texto(pdf_bytes: bytes) -> str:
     """OCR página a página (PDF imagem / scan)."""
     if not OCR_AVAILABLE or pdfium is None or not _configurar_tesseract():
         return ''
+    on_render = os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
+    try:
+        max_pages = int(os.environ.get('UNIMED_OCR_MAX_PAGES', '0') or '0')
+    except ValueError:
+        max_pages = 0
+    if on_render and max_pages <= 0:
+        max_pages = 12
+    scale = 200 / 72 if on_render else 300 / 72
     try:
         with pdfium.PdfDocument(pdf_bytes) as pdf:
             partes: list[str] = []
-            for idx in range(len(pdf)):
+            total = len(pdf)
+            limite = min(total, max_pages) if max_pages > 0 else total
+            for idx in range(limite):
                 page = pdf[idx]
-                bitmap = page.render(scale=300 / 72)
+                bitmap = page.render(scale=scale)
                 pil_image = bitmap.to_pil()
                 if not isinstance(pil_image, Image.Image):
                     pil_image = Image.frombytes(pil_image.mode, pil_image.size, pil_image.tobytes())
@@ -268,6 +280,8 @@ def _ocr_pdf_para_texto(pdf_bytes: bytes) -> str:
                     partes.append(
                         pytesseract.image_to_string(pil_image, lang='por', config='--psm 6')
                     )
+            if max_pages > 0 and total > limite:
+                partes.append(f'[OCR limitado a {limite} de {total} paginas no servidor]')
             return '\n'.join(partes)
     except Exception as exc:
         logger.warning('Falha OCR UNIMED: %s', exc)
@@ -618,8 +632,8 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
 
         if not _gemini_habilitado():
             avisos.append(
-                'PDF escaneado: Gemini desativado no Render (limite de tempo). '
-                'Exporte o relatório UNIMED «Produção» em .txt e importe o .txt.'
+                'PDF escaneado: Gemini desativado no Render (requisição HTTP tem limite ~30s). '
+                'Se o OCR não extraiu linhas, exporte o relatório UNIMED «Produção» em .txt.'
             )
             detalhe = ' '.join(a for a in avisos if a)
             raise ValueError(
