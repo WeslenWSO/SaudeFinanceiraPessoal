@@ -3,24 +3,11 @@
 
 {% block title %}Importar Relatório UNIMED{% endblock %}
 
-{%block nav_%}
-    {% include 'parcial/_nav.html' %}
-{%endblock%}
-
 {% block conteudo %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            {% if messages %}
-                {% include 'parcial/_messages.html' %}
-            {% endif %}
-
-            {% if erro_importacao %}
-            <div class="alert alert-danger shadow-sm" role="alert">
-                <strong>Falha na importação:</strong>
-                <div class="mt-1" style="white-space: pre-wrap;">{{ erro_importacao }}</div>
-            </div>
-            {% endif %}
+            {% include 'parcial/_messages.html' %}
 
             <div class="card">
                 <div class="card-header">
@@ -38,7 +25,7 @@
                             <p class="mb-0"><strong>PDF</strong> — relatório «Produção» UNIMED (tabela com Lote, Guia, Cod.Serviço, etc.).</p>
                             <p class="small text-muted mt-2 mb-0">
                                 No PDF não são importados: Plano, Tp. Grau, Participação % e Valor Ref.
-                                PDF escaneado: tenta OCR local e, se necessário, Google Gemini (GEMINI_API_KEY).
+                                PDF escaneado: no servidor usa Google Gemini (GEMINI_API_KEY); localmente tenta OCR antes.
                             </p>
                         </div>
                         <button type="submit" class="btn btn-primary" id="btn-importar-unimed">Importar</button>
@@ -49,4 +36,11 @@
         </div>
     </div>
 </div>
+<script>
+(function () {
+    if (typeof window.hideFiltroLoading === 'function') {
+        window.hideFiltroLoading();
+    }
+})();
+</script>
 {% endblock %}

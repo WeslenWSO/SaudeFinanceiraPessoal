@@ -110,11 +110,10 @@
     true
   );
 
-  window.addEventListener('pageshow', function (event) {
-    if (event.persisted) {
-      hideLoading();
-    }
+  window.addEventListener('pageshow', function () {
+    hideLoading();
   });
 
+  document.addEventListener('DOMContentLoaded', hideLoading);
   window.addEventListener('load', hideLoading);
 })();

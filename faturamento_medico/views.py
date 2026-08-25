@@ -5756,6 +5756,10 @@ def importar_unimed(request):
             status=200,
         )
 
+    def _redirect_com_erro(msg: str):
+        messages.error(request, msg)
+        return redirect('faturamento_medico:importar_unimed')
+
     def _render_importar(**extra):
         context = {'titulo': 'Importar Relatório UNIMED'}
         context.update(extra)
@@ -5780,12 +5784,11 @@ def importar_unimed(request):
                 )
             except Exception as exc:
                 logger.exception('Módulo importar_unimed indisponível')
-                return _html_fallback(erro=f'Módulo de importação indisponível: {exc}')
+                return _redirect_com_erro(f'Módulo de importação indisponível: {exc}')
 
             arquivo = request.FILES.get('arquivo')
             if not arquivo:
-                messages.error(request, 'Selecione um arquivo para importar.')
-                return _render_importar()
+                return _redirect_com_erro('Selecione um arquivo para importar.')
 
             nome = (arquivo.name or '').lower()
             try:
@@ -5800,15 +5803,17 @@ def importar_unimed(request):
                         content = raw.decode('latin-1')
                     grupos, servicos_unicos = parse_unimed_txt(content)
                 else:
-                    messages.error(request, 'Formato não suportado. Use arquivo .txt ou .pdf.')
-                    return _render_importar()
+                    return _redirect_com_erro('Formato não suportado. Use arquivo .txt ou .pdf.')
 
                 if not grupos:
-                    messages.warning(
-                        request,
-                        'Nenhum registro encontrado no arquivo. Verifique o formato do relatório UNIMED.',
+                    detalhe = '\n'.join(avisos_import) if avisos_import else ''
+                    msg = (
+                        'Nenhum registro encontrado no arquivo. '
+                        'Verifique se é o relatório UNIMED «Produção» (.txt ou .pdf).'
                     )
-                    return _render_importar()
+                    if detalhe:
+                        msg = f'{msg}\n\n{detalhe}'
+                    return _redirect_com_erro(msg)
 
                 servicos_criados, faturamentos_criados, itens_criados = persistir_unimed(
                     grupos, servicos_unicos, empresa_id
@@ -5823,9 +5828,12 @@ def importar_unimed(request):
                     f'{faturamentos_criados} faturamentos criados, {itens_criados} itens de serviço criados.',
                 )
 
+            except ValueError as e:
+                logger.warning('Importação UNIMED rejeitada (%s): %s', nome, e)
+                return _redirect_com_erro(str(e))
             except Exception as e:
                 logger.exception('Falha na importação UNIMED (%s)', nome)
-                return _render_importar(erro_importacao=str(e))
+                return _redirect_com_erro(str(e))
 
             return redirect('faturamento_medico:ftlistar')
 

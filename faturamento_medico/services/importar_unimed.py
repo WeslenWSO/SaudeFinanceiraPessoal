@@ -607,6 +607,16 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
         avisos.append('Texto nativo não encontrado; OCR local indisponível neste servidor.')
 
     if not grupos:
+        from SaudeFinanceira.gemini_config import get_gemini_api_key
+
+        if not get_gemini_api_key():
+            avisos.append('GEMINI_API_KEY não configurada no servidor.')
+            detalhe = ' '.join(a for a in avisos if a)
+            raise ValueError(
+                'Não foi possível importar o PDF UNIMED «Produção». '
+                f'{detalhe} Configure GEMINI_API_KEY no Render ou envie o relatório em .txt.'
+            )
+
         avisos.append('Enviando PDF ao Google Gemini…')
         try:
             from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
