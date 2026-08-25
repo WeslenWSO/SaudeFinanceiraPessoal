@@ -5730,12 +5730,6 @@ def importar_unimed(request):
     """View para importar relatório UNIMED (.txt ou .pdf)."""
     import logging
 
-    from faturamento_medico.services.importar_unimed import (
-        parse_unimed_pdf,
-        parse_unimed_txt,
-        persistir_unimed,
-    )
-
     logger = logging.getLogger(__name__)
 
     def _render_importar(**extra):
@@ -5743,60 +5737,70 @@ def importar_unimed(request):
         context.update(extra)
         return render(request, 'faturamento_medico/importar_unimed.html', context)
 
-    empresa_id = request.session.get('empresa_id')
-    if not empresa_id:
-        messages.error(request, 'Empresa não encontrada na sessão.')
-        return redirect('faturamento_medico:ftlistar')
+    try:
+        empresa_id = request.session.get('empresa_id')
+        if not empresa_id:
+            messages.error(request, 'Empresa não encontrada na sessão.')
+            return redirect('faturamento_medico:ftlistar')
 
-    if request.method == 'POST':
-        arquivo = request.FILES.get('arquivo')
-        if not arquivo:
-            messages.error(request, 'Selecione um arquivo para importar.')
-            return _render_importar()
+        if request.method == 'POST':
+            from faturamento_medico.services.importar_unimed import (
+                parse_unimed_pdf,
+                parse_unimed_txt,
+                persistir_unimed,
+            )
 
-        nome = (arquivo.name or '').lower()
-        try:
-            avisos_import: list[str] = []
-            if nome.endswith('.pdf'):
-                grupos, servicos_unicos, avisos_import = parse_unimed_pdf(arquivo.read())
-            elif nome.endswith('.txt'):
-                raw = arquivo.read()
-                try:
-                    content = raw.decode('utf-8')
-                except UnicodeDecodeError:
-                    content = raw.decode('latin-1')
-                grupos, servicos_unicos = parse_unimed_txt(content)
-            else:
-                messages.error(request, 'Formato não suportado. Use arquivo .txt ou .pdf.')
+            arquivo = request.FILES.get('arquivo')
+            if not arquivo:
+                messages.error(request, 'Selecione um arquivo para importar.')
                 return _render_importar()
 
-            if not grupos:
-                messages.warning(
-                    request,
-                    'Nenhum registro encontrado no arquivo. Verifique o formato do relatório UNIMED.',
+            nome = (arquivo.name or '').lower()
+            try:
+                avisos_import: list[str] = []
+                if nome.endswith('.pdf'):
+                    grupos, servicos_unicos, avisos_import = parse_unimed_pdf(arquivo.read())
+                elif nome.endswith('.txt'):
+                    raw = arquivo.read()
+                    try:
+                        content = raw.decode('utf-8')
+                    except UnicodeDecodeError:
+                        content = raw.decode('latin-1')
+                    grupos, servicos_unicos = parse_unimed_txt(content)
+                else:
+                    messages.error(request, 'Formato não suportado. Use arquivo .txt ou .pdf.')
+                    return _render_importar()
+
+                if not grupos:
+                    messages.warning(
+                        request,
+                        'Nenhum registro encontrado no arquivo. Verifique o formato do relatório UNIMED.',
+                    )
+                    return _render_importar()
+
+                servicos_criados, faturamentos_criados, itens_criados = persistir_unimed(
+                    grupos, servicos_unicos, empresa_id
                 )
-                return _render_importar()
 
-            servicos_criados, faturamentos_criados, itens_criados = persistir_unimed(
-                grupos, servicos_unicos, empresa_id
-            )
+                for aviso in avisos_import:
+                    messages.info(request, aviso)
 
-            for aviso in avisos_import:
-                messages.info(request, aviso)
+                messages.success(
+                    request,
+                    f'Importação concluída! {servicos_criados} serviços criados, '
+                    f'{faturamentos_criados} faturamentos criados, {itens_criados} itens de serviço criados.',
+                )
 
-            messages.success(
-                request,
-                f'Importação concluída! {servicos_criados} serviços criados, '
-                f'{faturamentos_criados} faturamentos criados, {itens_criados} itens de serviço criados.',
-            )
+            except Exception as e:
+                logger.exception('Falha na importação UNIMED (%s)', nome)
+                return _render_importar(erro_importacao=str(e))
 
-        except Exception as e:
-            logger.exception('Falha na importação UNIMED (%s)', nome)
-            return _render_importar(erro_importacao=str(e))
+            return redirect('faturamento_medico:ftlistar')
 
-        return redirect('faturamento_medico:ftlistar')
-
-    return _render_importar()
+        return _render_importar()
+    except Exception as e:
+        logger.exception('Erro inesperado na tela importar UNIMED')
+        return _render_importar(erro_importacao=str(e))
 
 
 def importar_xml(request):

@@ -35,6 +35,14 @@ except ImportError:
 
 _OCR_ENGINE_OK: bool | None = None
 
+
+def _ocr_habilitado() -> bool:
+    """OCR local (Tesseract) — desligado no Render (timeout/memória); usa Gemini."""
+    if os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes'):
+        return False
+    return OCR_AVAILABLE and pdfium is not None and _configurar_tesseract()
+
+
 def _fold(s: str) -> str:
     if not s:
         return ''
@@ -580,7 +588,7 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
         if grupos:
             avisos.append('PDF lido pelo texto embutido (pdfplumber).')
 
-    if not grupos:
+    if not grupos and _ocr_habilitado():
         avisos.append('Texto nativo não encontrado; aplicando OCR (Tesseract)…')
         texto_ocr = _ocr_pdf_para_texto(pdf_bytes)
         if texto_ocr.strip():
@@ -589,9 +597,11 @@ def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, 
                 avisos.append(f'OCR extraiu {len(grupos)} guia(s); revise os dados importados.')
         else:
             avisos.append('OCR local não produziu texto (Tesseract indisponível ou PDF ilegível).')
+    elif not grupos:
+        avisos.append('Texto nativo não encontrado; OCR local indisponível neste servidor.')
 
     if not grupos:
-        avisos.append('OCR insuficiente; enviando PDF ao Google Gemini…')
+        avisos.append('Enviando PDF ao Google Gemini…')
         from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
 
         linhas, gemini_avisos = extract_unimed_linhas_gemini(pdf_bytes)
