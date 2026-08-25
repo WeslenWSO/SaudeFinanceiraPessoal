@@ -177,8 +177,6 @@ def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
         'valor_total': None,
         'cod_rel': None,
         'observacao': None,
-        'tp_grau': None,
-        'percentual': None,
     }
 
     for i, h in enumerate(folded):
@@ -200,8 +198,6 @@ def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
             col_map['data'] = i
         elif h.startswith('qtde') or h == 'qt' or h.startswith('qtde/via'):
             col_map['qtde'] = i
-        elif 'particip' in h or 'percent' in h:
-            col_map['percentual'] = i
         elif 'valor unit' in h:
             col_map['valor_unit'] = i
         elif 'valor total' in h or 'valor (r$)' in h or h == 'valor r$':
@@ -210,8 +206,7 @@ def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
             col_map['cod_rel'] = i
         elif 'observ' in h:
             col_map['observacao'] = i
-        elif 'tp. grau' in h or 'tp grau' in h or h == 'grau':
-            col_map['tp_grau'] = i
+        # Ignorados: Plano, Tp. Grau, Participação %, Valor Ref.
 
     return col_map
 
@@ -279,8 +274,6 @@ def parse_unimed_xlsx(xlsx_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str
                 valor_total=_money_br(_cel(cells, col_map.get('valor_total'))),
                 cod_rel=_cel(cells, col_map.get('cod_rel')),
                 observacao=_cel(cells, col_map.get('observacao')),
-                porte=_cel(cells, col_map.get('tp_grau')),
-                percentual=_money_br(_cel(cells, col_map.get('percentual'))),
             )
     finally:
         wb.close()
@@ -508,14 +501,13 @@ def parse_unimed_txt(content: str) -> tuple[dict[str, dict], set[tuple[str, str]
         nome_usuario = parts[3].strip()
         cod_servico = parts[5].strip()
         desc_servico = parts[6].strip()
-        tp_grau = parts[7].strip()
         data = _parse_data(parts[8].strip())
         qtde_via = parts[9].strip()
-        percentual = _money_br(parts[10].strip())
         valor_unit = _money_br(parts[11].strip())
         valor_total = _money_br(parts[12].strip())
         cod_rel = parts[13].strip() if len(parts) > 13 else ''
         observacao = parts[14].strip() if len(parts) > 14 else ''
+        # Ignorados: parts[4] Plano, parts[7] Tp. Grau, parts[10] Participação %
 
         _adicionar_linha_grupo(
             grupos,
@@ -532,8 +524,6 @@ def parse_unimed_txt(content: str) -> tuple[dict[str, dict], set[tuple[str, str]
             valor_total=valor_total,
             cod_rel=cod_rel,
             observacao=observacao,
-            porte=tp_grau,
-            percentual=percentual,
         )
 
     return grupos, servicos_unicos
