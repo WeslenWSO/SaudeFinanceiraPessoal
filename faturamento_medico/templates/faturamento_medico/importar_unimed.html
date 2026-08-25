@@ -18,12 +18,16 @@
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
-                        <div class="form-group">
-                            <label for="arquivo">Selecione o arquivo UNIMED (.txt):</label>
-                            <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".txt" required>
-                            <small class="form-text text-muted">
-                                O arquivo deve estar no formato separado por ponto e vírgula (;), com cabeçalho na primeira linha.
-                            </small>
+                        <div class="form-group mb-3">
+                            <label for="arquivo">Selecione o arquivo UNIMED (.txt ou .pdf):</label>
+                            <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".txt,.pdf,application/pdf,text/plain" required>
+                        </div>
+                        <div class="mb-3">
+                            <p class="mb-1"><strong>TXT</strong> — separado por ponto e vírgula (;), com cabeçalho na primeira linha.</p>
+                            <p class="mb-0"><strong>PDF</strong> — relatório «Produção» UNIMED (tabela com Lote, Guia, Cod.Serviço, etc.).</p>
+                            <p class="small text-muted mt-2 mb-0">
+                                No PDF não são importados: Plano, Tp. Grau, Participação % e Valor Ref.
+                            </p>
                         </div>
                         <button type="submit" class="btn btn-primary">Importar</button>
                         <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-cancel btn-secondary">Cancelar</a>

@@ -5727,7 +5727,13 @@ def vincular_lote_protocolo(request):
 
 
 def importar_unimed(request):
-    """View para importar relatório UNIMED"""
+    """View para importar relatório UNIMED (.txt ou .pdf)."""
+    from faturamento_medico.services.importar_unimed import (
+        parse_unimed_pdf,
+        parse_unimed_txt,
+        persistir_unimed,
+    )
+
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Empresa não encontrada na sessão.')
@@ -5739,123 +5745,34 @@ def importar_unimed(request):
             messages.error(request, 'Selecione um arquivo para importar.')
             return redirect('faturamento_medico:importar_unimed')
 
+        nome = (arquivo.name or '').lower()
         try:
-            # Ler o arquivo
-            content = arquivo.read().decode('utf-8')
-            lines = content.split('\n')
-
-            # Pular cabeçalho
-            data_lines = lines[1:]
-
-            # Agrupar por lote e guia
-            grupos = {}
-            servicos_unicos = set()
-
-            for line in data_lines:
-                if not line.strip():
-                    continue
-                parts = line.split(';')
-                if len(parts) < 13:
-                    continue
-
-                lote = parts[0].strip()
-                guia = parts[1].strip()
-                cod_usuario = parts[2].strip()
-                nome_usuario = parts[3].strip()
-                plano = parts[4].strip()
-                cod_servico = parts[5].strip()
-                desc_servico = parts[6].strip()
-                tp_grau = parts[7].strip()
-                data_str = parts[8].strip()
-                qtde_via = parts[9].strip()
-                percentual = parts[10].strip().replace(',', '.')
-                valor_unit = parts[11].strip().replace(',', '.')
-                valor_total = parts[12].strip().replace(',', '.')
-                cod_rel = parts[13].strip()
-                observacao = parts[14].strip() if len(parts) > 12 else ''
-
-                # Converter data
+            if nome.endswith('.pdf'):
+                grupos, servicos_unicos = parse_unimed_pdf(arquivo.read())
+            elif nome.endswith('.txt'):
+                raw = arquivo.read()
                 try:
-                    data = datetime.strptime(data_str, '%d/%m/%Y').date()
-                except:
-                    data = timezone.now().date()
+                    content = raw.decode('utf-8')
+                except UnicodeDecodeError:
+                    content = raw.decode('latin-1')
+                grupos, servicos_unicos = parse_unimed_txt(content)
+            else:
+                messages.error(request, 'Formato não suportado. Use arquivo .txt ou .pdf.')
+                return redirect('faturamento_medico:importar_unimed')
 
-                chave = f"{lote}_{guia}"
+            if not grupos:
+                messages.warning(request, 'Nenhum registro encontrado no arquivo.')
+                return redirect('faturamento_medico:importar_unimed')
 
-                if chave not in grupos:
-                    grupos[chave] = {
-                        'lote': lote,
-                        'guia': guia,
-                        'carteirinha': cod_usuario,
-                        'nome': nome_usuario,
-                        'plano': plano,
-                        'data': data,
-                        'cod_rel': cod_rel,
-                        'servicos': []
-                    }
+            servicos_criados, faturamentos_criados, itens_criados = persistir_unimed(
+                grupos, servicos_unicos, empresa_id
+            )
 
-                grupos[chave]['servicos'].append({
-                    'codigo': cod_servico,
-                    'descricao': desc_servico,
-                    'porte': tp_grau,
-                    'qt': int(float(qtde_via)) if qtde_via else 1,
-                    'percentual': float(percentual) if percentual else 0,
-                    'valor': float(valor_unit) if valor_unit else 0,
-                    'total': float(valor_total) if valor_total else 0,
-                    'observacao': observacao
-                })
-
-                servicos_unicos.add((cod_servico, desc_servico))
-
-            # Verificar e criar serviços não cadastrados
-            from servicos_medicos.models import ServicosMedicos
-            servicos_criados = 0
-            for cod, desc in servicos_unicos:
-                if not ServicosMedicos.objects.filter(codigo=cod).exists():
-                    ServicosMedicos.objects.create(
-                        codigo=cod,
-                        servicos=desc,
-                        porte_anestesico=None  # Será definido depois se necessário
-                    )
-                    servicos_criados += 1
-
-            # Criar faturamentos
-            faturamentos_criados = 0
-            itens_criados = 0
-
-            for chave, dados in grupos.items():
-                # Criar faturamento
-                faturamento = FaturamentoMedico.objects.create(
-                    empresa_id=empresa_id,
-                    lote=dados['lote'],
-                    guia=dados['guia'],
-                    carteirinha=dados['carteirinha'],
-                    nome=dados['nome'],
-                    data=dados['data'],
-                    convenio='UNIMED',
-                    codigo_relatorio=dados['cod_rel'],
-                    status='pendente'
-                )
-
-                # Criar itens de serviço
-                for servico in dados['servicos']:
-                    ItemServico.objects.create(
-                        faturamento=faturamento,
-                        codigo_servico=servico['codigo'],
-                        servico=servico['descricao'],
-                        porte=servico['porte'],
-                        percentual = servico['percentual'],
-                        qt=servico['qt'],
-                        valor=servico['valor'],
-                        total=servico['total']
-                    )
-                    itens_criados += 1
-
-                # Atualizar total do faturamento
-                faturamento.atualizar_total()
-                faturamentos_criados += 1
-
-            messages.success(request, f'Importação concluída! {servicos_criados} serviços criados, {faturamentos_criados} faturamentos criados, {itens_criados} itens de serviço criados.')
+            messages.success(
+                request,
+                f'Importação concluída! {servicos_criados} serviços criados, '
+                f'{faturamentos_criados} faturamentos criados, {itens_criados} itens de serviço criados.',
+            )
 
         except Exception as e:
             messages.error(request, f'Erro durante a importação: {str(e)}')
