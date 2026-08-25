@@ -268,6 +268,7 @@
                                         <th class="grid-ris-th" data-col="paciente">PACIENTE</th>
                                         <th class="grid-ris-th" data-col="nome_associado">NOME ASSOCIADO</th>
                                         <th class="grid-ris-th" data-col="guia">NÚMERO DA GUIA</th>
+                                        <th class="grid-ris-th" data-col="codigo_procedimento">CÓDIGO PROCEDIMENTO</th>
                                         <th class="grid-ris-th" data-col="procedimento">PROCEDIMENTO</th>
                                         <th class="grid-ris-th" data-col="modalidade">MODALIDADE</th>
                                         <th class="grid-ris-th" data-col="contraste">CONTRASTE</th>
@@ -301,6 +302,9 @@
                                         <td data-col="paciente">{{ linha.paciente }}</td>
                                         <td data-col="nome_associado">{{ linha.nome_associado }}</td>
                                         <td class="text-center" data-col="guia">{{ linha.faturamento.guia|default:"-" }}</td>
+                                        <td class="text-center" data-col="codigo_procedimento">
+                                            {% if linha.item %}{{ linha.item.codigo_servico|default:"-" }}{% else %}-{% endif %}
+                                        </td>
                                         <td data-col="procedimento">{{ linha.procedimento }}</td>
                                         <td class="text-center" data-col="modalidade">{{ linha.modalidade }}</td>
                                         <td class="text-center" data-col="contraste">
@@ -994,7 +998,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var STORAGE_KEY = 'faturamento_ris_colunas_v1';
         var LOCKED = { sel: true, acoes: true };
         var COLS = [
-            'sel', 'data', 'paciente', 'nome_associado', 'guia', 'procedimento',
+            'sel', 'data', 'paciente', 'nome_associado', 'guia', 'codigo_procedimento', 'procedimento',
             'modalidade', 'contraste', 'valor', 'conferencia', 'status_conferencia',
             'convenio', 'anestesista', 'nf_pagamento', 'acoes'
         ];
@@ -1004,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
             paciente: 'Paciente',
             nome_associado: 'Nome associado',
             guia: 'Número da guia',
+            codigo_procedimento: 'Código procedimento',
             procedimento: 'Procedimento',
             modalidade: 'Modalidade',
             contraste: 'Contraste',

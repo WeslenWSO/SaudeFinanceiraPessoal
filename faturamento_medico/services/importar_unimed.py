@@ -66,8 +66,13 @@ def _fold(s: str) -> str:
     return re.sub(r'\s+', ' ', d).strip().lower()
 
 
-def _money_br(raw: str) -> float:
-    s = (raw or '').strip()
+def _money_br(raw) -> float:
+    """Converte valor BR (texto ou número do Excel) para float."""
+    if raw is None:
+        return 0.0
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    s = str(raw).strip()
     if not s:
         return 0.0
     s = s.replace('R$', '').replace(' ', '')
@@ -77,6 +82,18 @@ def _money_br(raw: str) -> float:
         return float(s)
     except ValueError:
         return 0.0
+
+
+def _normalizar_valores_import(qtde: int, valor_unit: float, valor_total: float) -> tuple[int, float, float]:
+    """Garante qtde >= 1 e preenche valor unitário/total quando a planilha traz só uma coluna."""
+    qtde = max(qtde or 1, 1)
+    valor_unit = float(valor_unit or 0)
+    valor_total = float(valor_total or 0)
+    if valor_unit <= 0 and valor_total > 0:
+        valor_unit = valor_total / qtde
+    elif valor_total <= 0 and valor_unit > 0:
+        valor_total = valor_unit * qtde
+    return qtde, valor_unit, valor_total
 
 
 def _parse_data(raw: str):
@@ -323,6 +340,10 @@ def _adicionar_linha_grupo(
 ) -> None:
     if not lote or not guia or not cod_servico:
         return
+
+    if not percentual:
+        percentual = 1
+    qtde, valor_unit, valor_total = _normalizar_valores_import(qtde, valor_unit, valor_total)
 
     chave = f'{lote}_{guia}'
     if chave not in grupos:
@@ -858,15 +879,28 @@ def persistir_unimed(
         )
 
         for servico in dados['servicos']:
+            from decimal import Decimal
+
+            pct = Decimal(str(servico.get('percentual') or 1))
+            if pct == 0:
+                pct = Decimal('1')
+            qt = int(servico.get('qt') or 1)
+            valor = Decimal(str(servico.get('valor') or 0))
+            total_import = Decimal(str(servico.get('total') or 0))
+            if total_import <= 0 and valor > 0:
+                total_import = Decimal(qt) * valor * pct
+            elif valor <= 0 and total_import > 0 and qt > 0:
+                valor = total_import / Decimal(qt)
+
             ItemServico.objects.create(
                 faturamento=faturamento,
                 codigo_servico=servico['codigo'],
                 servico=servico['descricao'],
                 porte=servico.get('porte') or '',
-                percentual=servico.get('percentual') or 1,
-                qt=servico.get('qt') or 1,
-                valor=servico.get('valor') or 0,
-                total=servico.get('total') or 0,
+                percentual=pct,
+                qt=qt,
+                valor=valor,
+                total=total_import,
             )
             itens_criados += 1
 
