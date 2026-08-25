@@ -5756,8 +5756,9 @@ def importar_unimed(request):
 
         nome = (arquivo.name or '').lower()
         try:
+            avisos_import: list[str] = []
             if nome.endswith('.pdf'):
-                grupos, servicos_unicos = parse_unimed_pdf(arquivo.read())
+                grupos, servicos_unicos, avisos_import = parse_unimed_pdf(arquivo.read())
             elif nome.endswith('.txt'):
                 raw = arquivo.read()
                 try:
@@ -5780,6 +5781,9 @@ def importar_unimed(request):
                 grupos, servicos_unicos, empresa_id
             )
 
+            for aviso in avisos_import:
+                messages.info(request, aviso)
+
             messages.success(
                 request,
                 f'Importação concluída! {servicos_criados} serviços criados, '
@@ -5788,7 +5792,6 @@ def importar_unimed(request):
 
         except Exception as e:
             logger.exception('Falha na importação UNIMED (%s)', nome)
-            messages.error(request, f'Erro durante a importação: {str(e)}')
             return _render_importar(erro_importacao=str(e))
 
         return redirect('faturamento_medico:ftlistar')

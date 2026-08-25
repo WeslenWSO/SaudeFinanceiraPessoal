@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import logging
+import os
 import re
 import unicodedata
 from datetime import datetime
@@ -13,6 +15,25 @@ from django.utils import timezone
 
 from faturamento_medico.models import FaturamentoMedico, ItemServico
 from servicos_medicos.models import ServicosMedicos
+
+logger = logging.getLogger(__name__)
+
+try:
+    import pypdfium2 as pdfium
+except ImportError:
+    pdfium = None
+
+try:
+    import pytesseract
+    from PIL import Image
+
+    OCR_AVAILABLE = True
+except ImportError:
+    pytesseract = None
+    Image = None
+    OCR_AVAILABLE = False
+
+_OCR_ENGINE_OK: bool | None = None
 
 def _fold(s: str) -> str:
     if not s:
@@ -173,6 +194,126 @@ def _adicionar_linha_grupo(
     servicos_unicos.add((cod_servico, desc_servico))
 
 
+def _configurar_tesseract() -> bool:
+    global _OCR_ENGINE_OK
+    if _OCR_ENGINE_OK is not None:
+        return _OCR_ENGINE_OK
+    if not OCR_AVAILABLE or pytesseract is None:
+        _OCR_ENGINE_OK = False
+        return False
+
+    candidatos = []
+    try:
+        from django.conf import settings
+
+        cmd_env = getattr(settings, 'TESSERACT_CMD', None) or os.environ.get('TESSERACT_CMD', '')
+        if cmd_env:
+            candidatos.append(cmd_env.strip())
+    except Exception:
+        cmd_env = os.environ.get('TESSERACT_CMD', '')
+        if cmd_env:
+            candidatos.append(cmd_env.strip())
+
+    candidatos.extend([
+        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+    ])
+    for cmd in candidatos:
+        if cmd and os.path.isfile(cmd):
+            pytesseract.pytesseract.tesseract_cmd = cmd
+            break
+
+    try:
+        pytesseract.get_tesseract_version()
+        _OCR_ENGINE_OK = True
+    except Exception as exc:
+        logger.warning('Tesseract indisponível: %s', exc)
+        _OCR_ENGINE_OK = False
+    return _OCR_ENGINE_OK
+
+
+def _ocr_pdf_para_texto(pdf_bytes: bytes) -> str:
+    """OCR página a página (PDF imagem / scan)."""
+    if not OCR_AVAILABLE or pdfium is None or not _configurar_tesseract():
+        return ''
+    try:
+        with pdfium.PdfDocument(pdf_bytes) as pdf:
+            partes: list[str] = []
+            for idx in range(len(pdf)):
+                page = pdf[idx]
+                bitmap = page.render(scale=300 / 72)
+                pil_image = bitmap.to_pil()
+                if not isinstance(pil_image, Image.Image):
+                    pil_image = Image.frombytes(pil_image.mode, pil_image.size, pil_image.tobytes())
+                try:
+                    partes.append(
+                        pytesseract.image_to_string(pil_image, lang='por+eng', config='--psm 6')
+                    )
+                except Exception:
+                    partes.append(
+                        pytesseract.image_to_string(pil_image, lang='por', config='--psm 6')
+                    )
+            return '\n'.join(partes)
+    except Exception as exc:
+        logger.warning('Falha OCR UNIMED: %s', exc)
+        return ''
+
+
+def _grupos_de_texto(texto: str) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+    grupos: dict[str, dict] = {}
+    servicos_unicos: set[tuple[str, str]] = set()
+    for linha in (texto or '').splitlines():
+        parsed = _parse_linha_pdf_texto(linha)
+        if not parsed:
+            continue
+        obs = f"Guia prest.: {parsed['guia_prest']}" if parsed.get('guia_prest') else ''
+        _adicionar_linha_grupo(
+            grupos,
+            servicos_unicos,
+            lote=parsed['lote'],
+            guia=parsed['guia'],
+            cod_usuario=parsed['cod_usuario'],
+            nome_usuario=parsed['nome_usuario'],
+            cod_servico=parsed['cod_servico'],
+            desc_servico=parsed['desc_servico'],
+            data=parsed['data'],
+            qtde=parsed['qtde'],
+            valor_unit=parsed['valor_unit'],
+            valor_total=parsed['valor_total'],
+            observacao=obs,
+        )
+    return grupos, servicos_unicos
+
+
+def _grupos_de_linhas_gemini(linhas: list[dict[str, Any]]) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+    grupos: dict[str, dict] = {}
+    servicos_unicos: set[tuple[str, str]] = set()
+    for raw in linhas:
+        lote = str(raw.get('lote') or '').strip()
+        guia = str(raw.get('guia') or '').strip()
+        cod_servico = str(raw.get('cod_servico') or '').strip()
+        if not lote or not guia or not cod_servico:
+            continue
+        guia_prest = str(raw.get('guia_prest') or '').strip()
+        obs = f'Guia prest.: {guia_prest}' if guia_prest else ''
+        _adicionar_linha_grupo(
+            grupos,
+            servicos_unicos,
+            lote=lote,
+            guia=guia,
+            cod_usuario=str(raw.get('cod_usuario') or '').strip(),
+            nome_usuario=str(raw.get('nome_usuario') or '').strip(),
+            cod_servico=cod_servico,
+            desc_servico=str(raw.get('desc_servico') or '').strip(),
+            data=_parse_data(str(raw.get('data') or '')),
+            qtde=_parse_int(str(raw.get('qtde') or '1')),
+            valor_unit=_money_br(str(raw.get('valor_unit') or '')),
+            valor_total=_money_br(str(raw.get('valor_total') or '')),
+            observacao=obs,
+        )
+    return grupos, servicos_unicos
+
+
 def parse_unimed_txt(content: str) -> tuple[dict[str, dict], set[tuple[str, str]]]:
     """Arquivo .txt separado por ponto e vírgula (cabeçalho na 1ª linha)."""
     grupos: dict[str, dict] = {}
@@ -269,6 +410,46 @@ def _parse_unimed_pdf_table(table: list[list[Any]], col_map: dict[str, int | Non
             valor_total=valor_total,
             observacao=' | '.join(obs_parts),
         )
+
+    return grupos, servicos_unicos
+
+
+def _parse_pdf_tabelas(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+    grupos: dict[str, dict] = {}
+    servicos_unicos: set[tuple[str, str]] = set()
+    col_map: dict[str, int | None] | None = None
+
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for page in pdf.pages:
+            for table in _extrair_tabelas_pdf(page):
+                if not table or len(table) < 2:
+                    continue
+
+                header_idx = None
+                for i, row in enumerate(table[:5]):
+                    folded = _fold(' '.join(str(c or '') for c in row))
+                    if 'lote' in folded and 'guia' in folded and 'serv' in folded:
+                        header_idx = i
+                        break
+
+                if header_idx is None:
+                    continue
+
+                headers = [str(c or '') for c in table[header_idx]]
+                candidate_map = _mapear_colunas_pdf(headers)
+                if candidate_map.get('lote') is None or candidate_map.get('guia') is None:
+                    continue
+
+                if col_map is None:
+                    col_map = candidate_map
+
+                partial_grupos, partial_servicos = _parse_unimed_pdf_table(
+                    table[header_idx + 1 :],
+                    col_map,
+                )
+                grupos, servicos_unicos = _merge_grupos(
+                    grupos, partial_grupos, servicos_unicos, partial_servicos
+                )
 
     return grupos, servicos_unicos
 
@@ -385,58 +566,47 @@ def _extrair_tabelas_pdf(page) -> list[list[list[Any]]]:
     return seen
 
 
-def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+def parse_unimed_pdf(pdf_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]], list[str]]:
     """
     Relatório UNIMED «Produção» em PDF.
-    Ignora colunas: Plano, Tp. Grau, Participação %, Valor Ref.
+    Ordem: texto/tabela nativa → OCR (Tesseract) → Google Gemini.
+    Ignora: Plano, Tp. Grau, Participação %, Valor Ref.
     """
-    grupos: dict[str, dict] = {}
-    servicos_unicos: set[tuple[str, str]] = set()
-    col_map: dict[str, int | None] | None = None
+    avisos: list[str] = []
 
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            for table in _extrair_tabelas_pdf(page):
-                if not table or len(table) < 2:
-                    continue
-
-                header_idx = None
-                for i, row in enumerate(table[:5]):
-                    folded = _fold(' '.join(str(c or '') for c in row))
-                    if 'lote' in folded and 'guia' in folded and 'serv' in folded:
-                        header_idx = i
-                        break
-
-                if header_idx is None:
-                    continue
-
-                headers = [str(c or '') for c in table[header_idx]]
-                candidate_map = _mapear_colunas_pdf(headers)
-                if candidate_map.get('lote') is None or candidate_map.get('guia') is None:
-                    continue
-
-                if col_map is None:
-                    col_map = candidate_map
-
-                partial_grupos, partial_servicos = _parse_unimed_pdf_table(
-                    table[header_idx + 1 :],
-                    col_map,
-                )
-                grupos, servicos_unicos = _merge_grupos(
-                    grupos, partial_grupos, servicos_unicos, partial_servicos
-                )
-
+    grupos, servicos_unicos = _parse_pdf_tabelas(pdf_bytes)
     if not grupos:
         grupos, servicos_unicos = _parse_unimed_pdf_texto(pdf_bytes)
+        if grupos:
+            avisos.append('PDF lido pelo texto embutido (pdfplumber).')
 
     if not grupos:
+        avisos.append('Texto nativo não encontrado; aplicando OCR (Tesseract)…')
+        texto_ocr = _ocr_pdf_para_texto(pdf_bytes)
+        if texto_ocr.strip():
+            grupos, servicos_unicos = _grupos_de_texto(texto_ocr)
+            if grupos:
+                avisos.append(f'OCR extraiu {len(grupos)} guia(s); revise os dados importados.')
+        else:
+            avisos.append('OCR local não produziu texto (Tesseract indisponível ou PDF ilegível).')
+
+    if not grupos:
+        avisos.append('OCR insuficiente; enviando PDF ao Google Gemini…')
+        from faturamento_medico.services.unimed_pdf_gemini import extract_unimed_linhas_gemini
+
+        linhas, gemini_avisos = extract_unimed_linhas_gemini(pdf_bytes)
+        avisos.extend(gemini_avisos)
+        if linhas:
+            grupos, servicos_unicos = _grupos_de_linhas_gemini(linhas)
+
+    if not grupos:
+        detalhe = ' '.join(a for a in avisos if a)
         raise ValueError(
-            'Não foi possível ler o PDF UNIMED «Produção». '
-            'Verifique se o arquivo tem texto selecionável (não é scan/foto) '
-            'e se contém as colunas Lote, Guia e Cod.Serviço.'
+            'Não foi possível importar o PDF UNIMED «Produção». '
+            f'{detalhe} Configure GEMINI_API_KEY no Render se o Gemini falhou.'
         )
 
-    return grupos, servicos_unicos
+    return grupos, servicos_unicos, avisos
 
 
 def persistir_unimed(
