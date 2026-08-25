@@ -26,6 +26,15 @@
                     <form method="post" enctype="multipart/form-data" class="form-com-loading" data-loading="true" data-loading-message="Importando relatório UNIMED…">
                         {% csrf_token %}
                         <div class="form-group mb-3">
+                            <label for="codigo_relatorio">Código Relatório <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="codigo_relatorio" name="codigo_relatorio"
+                                   maxlength="50" placeholder="Ex.: 143573"
+                                   value="{{ codigo_relatorio|default:'' }}" required>
+                            <small class="form-text text-muted">
+                                Obrigatório para Excel. Será gravado em todos os faturamentos importados.
+                            </small>
+                        </div>
+                        <div class="form-group mb-3">
                             <label for="arquivo">Selecione o arquivo UNIMED:</label>
                             <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".txt,.pdf,.xlsx,.xlsm,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
                         </div>
@@ -35,7 +44,8 @@
                                 <div class="border rounded p-3 h-100 bg-light">
                                     <h6 class="mb-2"><i class="fas fa-file-excel text-success"></i> Excel (.xlsx)</h6>
                                     <p class="small mb-0 text-muted">
-                                        1ª linha com cabeçalho. Colunas Plano, Tp. Grau e Participação % são ignoradas.
+                                        Cabeçalho na <strong>linha 5</strong> (export Produção UNIMED).
+                                        Plano, Tp. Grau e Participação % são ignorados.
                                     </p>
                                 </div>
                             </div>

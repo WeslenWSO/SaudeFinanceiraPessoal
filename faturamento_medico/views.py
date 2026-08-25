@@ -5761,7 +5761,10 @@ def importar_unimed(request):
         return redirect('faturamento_medico:importar_unimed')
 
     def _render_importar(**extra):
-        context = {'titulo': 'Importar Relatório UNIMED'}
+        context = {
+            'titulo': 'Importar Relatório UNIMED',
+            'codigo_relatorio': request.POST.get('codigo_relatorio', '') if request.method == 'POST' else '',
+        }
         context.update(extra)
         try:
             return render(request, 'faturamento_medico/importar_unimed.html', context)
@@ -5792,6 +5795,7 @@ def importar_unimed(request):
                 return _redirect_com_erro('Selecione um arquivo para importar.')
 
             nome = (arquivo.name or '').lower()
+            codigo_relatorio = (request.POST.get('codigo_relatorio') or '').strip()
             try:
                 avisos_import: list[str] = []
                 if nome.endswith('.pdf'):
@@ -5804,22 +5808,28 @@ def importar_unimed(request):
                         content = raw.decode('latin-1')
                     grupos, servicos_unicos = parse_unimed_txt(content)
                 elif nome.endswith(('.xlsx', '.xlsm')):
+                    if not codigo_relatorio:
+                        return _redirect_com_erro('Informe o Código Relatório antes de importar o Excel.')
                     grupos, servicos_unicos = parse_unimed_xlsx(arquivo.read())
                 else:
                     return _redirect_com_erro('Formato não suportado. Use arquivo .txt, .pdf ou .xlsx.')
+
+                if codigo_relatorio:
+                    for dados in grupos.values():
+                        dados['cod_rel'] = codigo_relatorio
 
                 if not grupos:
                     detalhe = '\n'.join(avisos_import) if avisos_import else ''
                     msg = (
                         'Nenhum registro encontrado no arquivo. '
-                        'Verifique se é o relatório UNIMED «Produção» (.txt ou .pdf).'
+                        'Verifique se é o relatório UNIMED «Produção» (.txt, .xlsx ou .pdf).'
                     )
                     if detalhe:
                         msg = f'{msg}\n\n{detalhe}'
                     return _redirect_com_erro(msg)
 
                 servicos_criados, faturamentos_criados, itens_criados = persistir_unimed(
-                    grupos, servicos_unicos, empresa_id
+                    grupos, servicos_unicos, empresa_id, codigo_relatorio=codigo_relatorio
                 )
 
                 for aviso in avisos_import:
@@ -6143,24 +6153,29 @@ def baixar_modelo_ris(request):
 
 def baixar_modelo_unimed(request):
     """Modelo Excel para importação UNIMED (relatório Produção)."""
-    from faturamento_medico.services.importar_unimed import UNIMED_XLSX_HEADERS
+    from faturamento_medico.services.importar_unimed import (
+        UNIMED_XLSX_HEADERS,
+        UNIMED_XLSX_LINHA_CABECALHO,
+    )
 
     wb = Workbook()
     ws = wb.active
     ws.title = 'Producao UNIMED'
+    ws.cell(1, 1, 'Relatório UNIMED — Produção')
+    ws.cell(2, 1, 'Linhas 1–4: cabeçalho do relatório (export UNIMED). Informe o Código Relatório na tela de importação.')
     header_font = Font(bold=True)
+    linha_cab = UNIMED_XLSX_LINHA_CABECALHO
     for i, header in enumerate(UNIMED_XLSX_HEADERS, 1):
-        cell = ws.cell(1, i, header)
+        cell = ws.cell(linha_cab, i, header)
         cell.font = header_font
-    ws.freeze_panes = 'A2'
-    # Linha de exemplo (opcional — ajuda o usuário)
+    ws.freeze_panes = f'A{linha_cab + 1}'
     exemplo = [
         '12345', '67890', '111222333', 'NOME DO BENEFICIARIO', 'PLANO X',
         '401010', 'CONSULTA EM CONSULTORIO', 'A', '01/04/2026', '1',
         '100', '150,00', '150,00', '', '',
     ]
     for i, val in enumerate(exemplo, 1):
-        ws.cell(2, i, val)
+        ws.cell(linha_cab + 1, i, val)
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)

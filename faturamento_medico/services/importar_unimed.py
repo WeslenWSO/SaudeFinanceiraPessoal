@@ -37,6 +37,9 @@ UNIMED_XLSX_HEADERS = [
     'Observacao',
 ]
 
+# Planilha UNIMED Produção: linhas 1–4 são título/filtros; cabeçalho na linha 5
+UNIMED_XLSX_LINHA_CABECALHO = 5
+
 try:
     import pypdfium2 as pdfium
 except ImportError:
@@ -190,7 +193,7 @@ def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
             col_map['cod_usuario'] = i
         elif 'nome' in h and 'usuario' in h:
             col_map['nome_usuario'] = i
-        elif 'cod' in h and 'serv' in h:
+        elif ('cod' in h or 'codigo' in h) and 'serv' in h and 'usuario' not in h:
             col_map['cod_servico'] = i
         elif 'desc' in h and 'serv' in h:
             col_map['desc_servico'] = i
@@ -223,7 +226,7 @@ def _valor_celula_xlsx(raw) -> str:
 
 
 def parse_unimed_xlsx(xlsx_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
-    """Planilha Excel (.xlsx) — relatório UNIMED Produção (1ª linha = cabeçalho)."""
+    """Planilha Excel (.xlsx) — cabeçalho na linha 5 (relatório UNIMED Produção)."""
     from io import BytesIO
 
     from openpyxl import load_workbook
@@ -235,17 +238,23 @@ def parse_unimed_xlsx(xlsx_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str
     try:
         ws = wb.active
         rows_iter = ws.iter_rows(values_only=True)
+        for _ in range(UNIMED_XLSX_LINHA_CABECALHO - 1):
+            next(rows_iter, None)
+
         try:
             header_row = next(rows_iter)
         except StopIteration:
-            return grupos, servicos_unicos
+            raise ValueError(
+                f'Planilha UNIMED inválida: esperado cabeçalho na linha {UNIMED_XLSX_LINHA_CABECALHO}.'
+            )
 
         headers = [_valor_celula_xlsx(c) for c in header_row]
         col_map = _mapear_colunas_unimed_xlsx(headers)
         if col_map.get('lote') is None or col_map.get('guia') is None or col_map.get('cod_servico') is None:
+            cols = ', '.join(h for h in headers if h) or '(vazio)'
             raise ValueError(
-                'Planilha UNIMED inválida: cabeçalho deve conter Lote, Guia e Cod.Servico '
-                '(use o modelo Excel ou exporte do relatório Produção).'
+                f'Cabeçalho na linha {UNIMED_XLSX_LINHA_CABECALHO} deve conter Lote, Guia e Cod.Serviço. '
+                f'Colunas encontradas: {cols}'
             )
 
         for row in rows_iter:
@@ -811,8 +820,11 @@ def persistir_unimed(
     grupos: dict[str, dict],
     servicos_unicos: set[tuple[str, str]],
     empresa_id: int,
+    *,
+    codigo_relatorio: str = '',
 ) -> tuple[int, int, int]:
     """Cria serviços, faturamentos e itens. Retorna (servicos_criados, faturamentos, itens)."""
+    codigo_relatorio = (codigo_relatorio or '').strip()
     servicos_criados = 0
     for cod, desc in servicos_unicos:
         if not ServicosMedicos.objects.filter(codigo=cod).exists():
@@ -835,7 +847,7 @@ def persistir_unimed(
             nome=dados['nome'],
             data=dados['data'],
             convenio='UNIMED',
-            codigo_relatorio=dados.get('cod_rel') or '',
+            codigo_relatorio=dados.get('cod_rel') or codigo_relatorio or '',
             status='pendente',
         )
 
