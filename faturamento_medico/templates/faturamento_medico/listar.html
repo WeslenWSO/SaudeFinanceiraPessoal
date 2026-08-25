@@ -246,6 +246,9 @@
                                             {% endfor %}
                                         </select>
                                     </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm align-self-end" id="btnColunasFaturamento" title="Escolher colunas visíveis na grade">
+                                        <i class="fas fa-columns"></i> Colunas
+                                    </button>
                                     <small class="text-muted pb-1">
                                         Exibindo {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ grid_total }}
                                         procedimentos · valor total filtrado: R$ {{ valor_total_fmt }}
@@ -255,25 +258,26 @@
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover mb-0 grid-ris">
+                            <table class="table table-bordered table-hover mb-0 grid-ris" id="tabelaFaturamentoRis">
                                 <thead>
                                     <tr>
-                                        <th class="grid-ris-th" width="40">
+                                        <th class="grid-ris-th" width="40" data-col="sel">
                                             <input type="checkbox" id="select-all-lote" title="Selecionar todos">
                                         </th>
-                                        <th class="grid-ris-th">DATA</th>
-                                        <th class="grid-ris-th">PACIENTE</th>
-                                        <th class="grid-ris-th">NOME ASSOCIADO</th>
-                                        <th class="grid-ris-th">NÚMERO DA GUIA</th>
-                                        <th class="grid-ris-th">PROCEDIMENTO</th>
-                                        <th class="grid-ris-th">MODALIDADE</th>
-                                        <th class="grid-ris-th">CONTRASTE</th>
-                                        <th class="grid-ris-th">VALOR</th>
-                                        <th class="grid-ris-th-conf">CONFERENCIA</th>
-                                        <th class="grid-ris-th">STATUS CONFERENCIA</th>
-                                        <th class="grid-ris-th">CONVÊNIO</th>
-                                        <th class="grid-ris-th">NF / PAGAMENTO</th>
-                                        <th class="grid-ris-th">AÇÕES</th>
+                                        <th class="grid-ris-th" data-col="data">DATA</th>
+                                        <th class="grid-ris-th" data-col="paciente">PACIENTE</th>
+                                        <th class="grid-ris-th" data-col="nome_associado">NOME ASSOCIADO</th>
+                                        <th class="grid-ris-th" data-col="guia">NÚMERO DA GUIA</th>
+                                        <th class="grid-ris-th" data-col="procedimento">PROCEDIMENTO</th>
+                                        <th class="grid-ris-th" data-col="modalidade">MODALIDADE</th>
+                                        <th class="grid-ris-th" data-col="contraste">CONTRASTE</th>
+                                        <th class="grid-ris-th" data-col="valor">VALOR</th>
+                                        <th class="grid-ris-th-conf" data-col="conferencia">CONFERENCIA</th>
+                                        <th class="grid-ris-th" data-col="status_conferencia">STATUS CONFERENCIA</th>
+                                        <th class="grid-ris-th" data-col="convenio">CONVÊNIO</th>
+                                        <th class="grid-ris-th" data-col="anestesista">ANESTESISTA</th>
+                                        <th class="grid-ris-th" data-col="nf_pagamento">NF / PAGAMENTO</th>
+                                        <th class="grid-ris-th" data-col="acoes">AÇÕES</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -282,7 +286,7 @@
                                         data-status="{{ linha.status_conferencia }}"
                                         data-status-css="{{ linha.status_conferencia_css }}"
                                         data-destacar-nota-lote="{% if linha.destacar_linha_nota_lote %}1{% else %}0{% endif %}">
-                                        <td>
+                                        <td data-col="sel">
                                             {% if linha.mostrar_selecao_lote and linha.elegivel_lote %}
                                                 <input type="checkbox"
                                                        name="faturamentos_selecionados"
@@ -293,21 +297,21 @@
                                                        data-guia="{{ linha.faturamento.guia|default:'' }}">
                                             {% endif %}
                                         </td>
-                                        <td>{{ linha.faturamento.data|date:"d/m/Y" }}</td>
-                                        <td>{{ linha.paciente }}</td>
-                                        <td>{{ linha.nome_associado }}</td>
-                                        <td class="text-center">{{ linha.faturamento.guia|default:"-" }}</td>
-                                        <td>{{ linha.procedimento }}</td>
-                                        <td class="text-center">{{ linha.modalidade }}</td>
-                                        <td class="text-center">
+                                        <td data-col="data">{{ linha.faturamento.data|date:"d/m/Y" }}</td>
+                                        <td data-col="paciente">{{ linha.paciente }}</td>
+                                        <td data-col="nome_associado">{{ linha.nome_associado }}</td>
+                                        <td class="text-center" data-col="guia">{{ linha.faturamento.guia|default:"-" }}</td>
+                                        <td data-col="procedimento">{{ linha.procedimento }}</td>
+                                        <td class="text-center" data-col="modalidade">{{ linha.modalidade }}</td>
+                                        <td class="text-center" data-col="contraste">
                                             {% if linha.com_contraste %}
                                                 <span class="badge bg-info">Sim</span>
                                             {% else %}
                                                 <span class="text-muted">Não</span>
                                             {% endif %}
                                         </td>
-                                        <td class="text-end">R$ {{ linha.valor_fmt }}</td>
-                                        <td class="text-center">
+                                        <td class="text-end" data-col="valor">R$ {{ linha.valor_fmt }}</td>
+                                        <td class="text-center" data-col="conferencia">
                                             {% if linha.item %}
                                             <input type="checkbox"
                                                    class="form-check-input conferencia-checkbox"
@@ -318,7 +322,7 @@
                                             -
                                             {% endif %}
                                         </td>
-                                        <td class="text-center">
+                                        <td class="text-center" data-col="status_conferencia">
                                             {% if linha.item %}
                                             <div class="d-flex align-items-center gap-1 justify-content-center fm-status-conferencia-cell">
                                                 <select class="form-select form-select-sm status-conferencia-select status-{{ linha.status_conferencia_css }}"
@@ -348,14 +352,16 @@
                                             </span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ linha.faturamento.convenio|default:"-" }}</td>
+                                        <td data-col="convenio">{{ linha.faturamento.convenio|default:"-" }}</td>
+                                        <td data-col="anestesista">{{ linha.faturamento.anestesista|default:"-" }}</td>
                                         <td class="fm-celula-nf"
+                                            data-col="nf_pagamento"
                                             data-faturamento-id="{{ linha.faturamento.id }}"
                                             data-paciente="{{ linha.paciente }}"
                                             data-data="{{ linha.data_iso }}">
                                             {% include 'faturamento_medico/partials/celula_nf_pagamento.html' %}
                                         </td>
-                                        <td class="text-nowrap">
+                                        <td class="text-nowrap" data-col="acoes">
                                             <div class="fm-row-actions-inline">
                                                 {% if linha.lote_rotulo %}
                                                 {% if linha.lote_url %}
@@ -984,6 +990,136 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    (function initColunasFaturamento() {
+        var STORAGE_KEY = 'faturamento_ris_colunas_v1';
+        var LOCKED = { sel: true, acoes: true };
+        var COLS = [
+            'sel', 'data', 'paciente', 'nome_associado', 'guia', 'procedimento',
+            'modalidade', 'contraste', 'valor', 'conferencia', 'status_conferencia',
+            'convenio', 'anestesista', 'nf_pagamento', 'acoes'
+        ];
+        var LABELS = {
+            sel: 'Seleção (lote)',
+            data: 'Data',
+            paciente: 'Paciente',
+            nome_associado: 'Nome associado',
+            guia: 'Número da guia',
+            procedimento: 'Procedimento',
+            modalidade: 'Modalidade',
+            contraste: 'Contraste',
+            valor: 'Valor',
+            conferencia: 'Conferência',
+            status_conferencia: 'Status conferência',
+            convenio: 'Convênio',
+            anestesista: 'Anestesista',
+            nf_pagamento: 'NF / Pagamento',
+            acoes: 'Ações'
+        };
+
+        function defaultVisible() {
+            var vis = {};
+            COLS.forEach(function(k) { vis[k] = true; });
+            return vis;
+        }
+
+        function loadPrefs() {
+            try {
+                var raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return defaultVisible();
+                var parsed = JSON.parse(raw);
+                var base = defaultVisible();
+                Object.keys(parsed).forEach(function(k) {
+                    if (COLS.indexOf(k) !== -1) base[k] = !!parsed[k];
+                });
+                base.sel = true;
+                base.acoes = true;
+                return base;
+            } catch (e) {
+                return defaultVisible();
+            }
+        }
+
+        function savePrefs(visible) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
+        }
+
+        function applyToTable(visible) {
+            var table = document.getElementById('tabelaFaturamentoRis');
+            if (!table) return;
+            table.querySelectorAll('[data-col]').forEach(function(cell) {
+                var key = cell.getAttribute('data-col');
+                if (!key) return;
+                if (LOCKED[key]) {
+                    cell.style.display = '';
+                    return;
+                }
+                cell.style.display = visible[key] === false ? 'none' : '';
+            });
+        }
+
+        var prefs = loadPrefs();
+        applyToTable(prefs);
+
+        function renderLista() {
+            var ul = document.getElementById('listaColunasFaturamento');
+            if (!ul) return;
+            ul.innerHTML = '';
+            COLS.forEach(function(key) {
+                if (LOCKED[key]) return;
+                var li = document.createElement('li');
+                li.className = 'd-flex align-items-center gap-2 py-2 border-bottom';
+                var checked = prefs[key] !== false ? 'checked' : '';
+                li.innerHTML =
+                    '<input type="checkbox" class="form-check-input col-vis-fat mt-0" data-key="' + key + '" ' + checked + ' id="colvis_fat_' + key + '">' +
+                    '<label class="form-check-label flex-grow-1 mb-0" for="colvis_fat_' + key + '">' + (LABELS[key] || key) + '</label>';
+                ul.appendChild(li);
+            });
+        }
+
+        var btnOpen = document.getElementById('btnColunasFaturamento');
+        var modal = document.getElementById('modalColunasFaturamento');
+        if (btnOpen && modal) {
+            btnOpen.addEventListener('click', function() {
+                prefs = loadPrefs();
+                renderLista();
+                if (typeof modal.showModal === 'function') modal.showModal();
+            });
+        }
+
+        var listaEl = document.getElementById('listaColunasFaturamento');
+        if (listaEl) {
+            listaEl.addEventListener('change', function(e) {
+                if (!e.target.classList.contains('col-vis-fat')) return;
+                prefs[e.target.dataset.key] = e.target.checked;
+            });
+        }
+
+        var btnAplicar = document.getElementById('btnColunasFatAplicar');
+        if (btnAplicar) {
+            btnAplicar.addEventListener('click', function() {
+                savePrefs(prefs);
+                applyToTable(prefs);
+                if (modal) modal.close();
+            });
+        }
+
+        var btnMostrar = document.getElementById('btnColunasFatMostrarTodas');
+        if (btnMostrar) {
+            btnMostrar.addEventListener('click', function() {
+                COLS.forEach(function(k) { prefs[k] = true; });
+                renderLista();
+            });
+        }
+
+        var btnRest = document.getElementById('btnColunasFatRestaurar');
+        if (btnRest) {
+            btnRest.addEventListener('click', function() {
+                prefs = defaultVisible();
+                renderLista();
+            });
+        }
+    })();
+
     (function setupFiltroRetratil() {
         var wrap = document.querySelector('.filtro-retratil');
         var btn = document.getElementById('btnToggleFiltrosFat');
@@ -1690,6 +1826,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% if grid_total %}
+<dialog id="modalColunasFaturamento" aria-labelledby="modalColunasFaturamentoLabel" style="max-width: 28rem; width: 95vw; border: none; border-radius: 0.5rem; padding: 0;">
+    <div class="p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 id="modalColunasFaturamentoLabel" class="mb-0"><i class="fas fa-columns"></i> Colunas da grade</h5>
+            <button type="button" class="btn-close" onclick="document.getElementById('modalColunasFaturamento').close();" aria-label="Fechar"></button>
+        </div>
+        <p class="small text-muted mb-2">Marque as colunas que deseja exibir. A preferência fica salva neste navegador.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnColunasFatMostrarTodas">Mostrar todas</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnColunasFatRestaurar">Restaurar padrão</button>
+        </div>
+        <ul id="listaColunasFaturamento" class="list-unstyled mb-3" style="max-height: 55vh; overflow: auto;"></ul>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" id="btnColunasFatAplicar">Aplicar</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('modalColunasFaturamento').close();">Fechar</button>
+        </div>
+    </div>
+</dialog>
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 {% endif %}
 {% endblock %}
