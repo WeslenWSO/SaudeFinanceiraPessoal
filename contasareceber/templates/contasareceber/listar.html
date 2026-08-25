@@ -289,7 +289,7 @@
                                     {% for conta in contas %}
                                     <tr class="{% if conta.is_vencida %}table-warning{% endif %}">
                                         <td>
-                                            {% if conta.status == 'pendente' or conta.status == 'cartao' %}
+                                            {% if conta.status == 'pendente' or conta.status == 'cartao' or conta.status == 'vencido' %}
                                             <input type="checkbox" name="contas" value="{{ conta.pk }}" class="conta-checkbox">
                                             {% endif %}
                                         </td>

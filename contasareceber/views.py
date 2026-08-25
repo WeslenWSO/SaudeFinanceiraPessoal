@@ -1392,7 +1392,7 @@ def conciliar_contas_a_receber(request):
             return redirect(construir_url_crlistar_com_filtros(filtros))
 
         contas = ContaAReceber.objects.filter(
-            id__in=contas_ids, empresa_id=empresa_id, status='pendente'
+            id__in=contas_ids, empresa_id=empresa_id, status__in=['pendente', 'vencido']
         ).select_related('nota')
         conciliadas = 0
         erros_conciliacao = []
@@ -2070,7 +2070,9 @@ def lancar_contas_selecionadas(request):
             filtros = extrair_filtros_contas_receber(request)
             return redirect(construir_url_crlistar_com_filtros(filtros))
 
-        contas = ContaAReceber.objects.filter(id__in=contas_ids, empresa_id=empresa_id, status='pendente')
+        contas = ContaAReceber.objects.filter(
+            id__in=contas_ids, empresa_id=empresa_id, status__in=['pendente', 'vencido']
+        )
         lancamentos_criados = 0
 
         for conta in contas:
@@ -2876,7 +2878,9 @@ def baixar_contas_dinheiro(request):
         return redirect(construir_url_crlistar_com_filtros(filtros))
 
     # Buscar contas selecionadas
-    contas = ContaAReceber.objects.filter(id__in=contas_ids, empresa=empresa, status='pendente')
+    contas = ContaAReceber.objects.filter(
+        id__in=contas_ids, empresa=empresa, status__in=['pendente', 'vencido']
+    )
 
     baixas_criadas = 0
     erros = []
@@ -3015,7 +3019,7 @@ def conciliar_cartao_por_autorizacao(request):
         contas = ContaAReceber.objects.filter(
             id__in=contas_ids,
             empresa_id=empresa_id,
-            status__in=['pendente', 'cartao'],
+            status__in=['pendente', 'cartao', 'vencido'],
         )
         conciliadas = 0
         from .cartao_aproximacao import (

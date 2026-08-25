@@ -239,11 +239,14 @@ if _database_url:
 
     def _completar_host_postgres_render(db_settings):
         """
-        Render: URL interna usa host curto (dpg-xxx-a) na rede privada.
-        Se o DNS interno falhar, completa com o sufixo regional público.
+        Desenvolvimento local: URL copiada do Render às vezes traz host curto (dpg-xxx-a).
+        Completa com o sufixo regional público para conectar de fora do Render.
+        No Render (DATABASE_URL interna), o host curto é correto — não alterar.
         """
         host = (db_settings.get('HOST') or '').strip()
         if not host.startswith('dpg-') or '.' in host:
+            return db_settings
+        if _on_render:
             return db_settings
         suffix = os.environ.get(
             'RENDER_PG_HOST_SUFFIX',

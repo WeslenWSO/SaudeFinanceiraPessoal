@@ -160,6 +160,8 @@ class ContaAReceber(models.Model):
         """Verifica se a conta está vencida"""
         if self.data_recebimento or self.status == 'pago':
             return False
+        if not self.data_vencimento:
+            return False
         return timezone.now().date() > self.data_vencimento
 
     @property
