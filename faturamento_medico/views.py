@@ -5780,6 +5780,7 @@ def importar_unimed(request):
                 from faturamento_medico.services.importar_unimed import (
                     parse_unimed_pdf,
                     parse_unimed_txt,
+                    parse_unimed_xlsx,
                     persistir_unimed,
                 )
             except Exception as exc:
@@ -5802,8 +5803,10 @@ def importar_unimed(request):
                     except UnicodeDecodeError:
                         content = raw.decode('latin-1')
                     grupos, servicos_unicos = parse_unimed_txt(content)
+                elif nome.endswith(('.xlsx', '.xlsm')):
+                    grupos, servicos_unicos = parse_unimed_xlsx(arquivo.read())
                 else:
-                    return _redirect_com_erro('Formato não suportado. Use arquivo .txt ou .pdf.')
+                    return _redirect_com_erro('Formato não suportado. Use arquivo .txt, .pdf ou .xlsx.')
 
                 if not grupos:
                     detalhe = '\n'.join(avisos_import) if avisos_import else ''
@@ -6135,6 +6138,37 @@ def baixar_modelo_ris(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="modelo_ris.xlsx"'
+    return response
+
+
+def baixar_modelo_unimed(request):
+    """Modelo Excel para importação UNIMED (relatório Produção)."""
+    from faturamento_medico.services.importar_unimed import UNIMED_XLSX_HEADERS
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Producao UNIMED'
+    header_font = Font(bold=True)
+    for i, header in enumerate(UNIMED_XLSX_HEADERS, 1):
+        cell = ws.cell(1, i, header)
+        cell.font = header_font
+    ws.freeze_panes = 'A2'
+    # Linha de exemplo (opcional — ajuda o usuário)
+    exemplo = [
+        '12345', '67890', '111222333', 'NOME DO BENEFICIARIO', 'PLANO X',
+        '401010', 'CONSULTA EM CONSULTORIO', 'A', '01/04/2026', '1',
+        '100', '150,00', '150,00', '', '',
+    ]
+    for i, val in enumerate(exemplo, 1):
+        ws.cell(2, i, val)
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="modelo_unimed.xlsx"'
     return response
 
 

@@ -9,27 +9,92 @@
         <div class="col-12">
             {% include 'parcial/_messages.html' %}
 
-            <div class="card">
+            <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="card-title">{{ titulo }}</h3>
+                    <h3 class="card-title mb-0">{{ titulo }}</h3>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-file-excel" aria-hidden="true"></i>
+                        <strong>Recomendado no servidor:</strong> importe o relatório UNIMED «Produção» em
+                        <strong>Excel (.xlsx)</strong> ou <strong>TXT</strong>.
+                        <a href="{% url 'faturamento_medico:baixar_modelo_unimed' %}" class="alert-link ms-1">
+                            Baixar modelo Excel UNIMED
+                        </a>
+                    </div>
+
                     <form method="post" enctype="multipart/form-data" class="form-com-loading" data-loading="true" data-loading-message="Importando relatório UNIMED…">
                         {% csrf_token %}
                         <div class="form-group mb-3">
-                            <label for="arquivo">Selecione o arquivo UNIMED (.txt ou .pdf):</label>
-                            <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".txt,.pdf,application/pdf,text/plain" required>
+                            <label for="arquivo">Selecione o arquivo UNIMED:</label>
+                            <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".txt,.pdf,.xlsx,.xlsm,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
                         </div>
-                        <div class="mb-3">
-                            <p class="mb-1"><strong>TXT</strong> — separado por ponto e vírgula (;), com cabeçalho na primeira linha.</p>
-                            <p class="mb-0"><strong>PDF</strong> — relatório «Produção» UNIMED (tabela com Lote, Guia, Cod.Serviço, etc.).</p>
-                            <p class="small text-muted mt-2 mb-0">
-                                No PDF não são importados: Plano, Tp. Grau, Participação % e Valor Ref.
-                                PDF escaneado no servidor: tenta OCR (Tesseract). Se falhar, exporte em
-                                <strong>.txt</strong> (relatório Produção).
-                            </p>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 mb-2">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <h6 class="mb-2"><i class="fas fa-file-excel text-success"></i> Excel (.xlsx)</h6>
+                                    <p class="small mb-0 text-muted">
+                                        1ª linha com cabeçalho (Lote, Guia, Cod.Servico…). Ideal para relatório Produção exportado ou colado no modelo.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <h6 class="mb-2"><i class="fas fa-file-alt text-primary"></i> TXT (.txt)</h6>
+                                    <p class="small mb-0 text-muted">
+                                        Separado por ponto e vírgula (;), cabeçalho na primeira linha — exportação nativa UNIMED.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="border rounded p-3 h-100 bg-light">
+                                    <h6 class="mb-2"><i class="fas fa-file-pdf text-danger"></i> PDF (.pdf)</h6>
+                                    <p class="small mb-0 text-muted">
+                                        Relatório «Produção» com texto selecionável. Scan: tenta OCR no servidor; se falhar, use Excel ou TXT.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-bordered mb-0 small">
+                                <caption class="caption-top">Colunas do modelo Excel / TXT (Plano não é gravado no faturamento)</caption>
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Lote</th>
+                                        <th>Guia</th>
+                                        <th>Cod. Usuario</th>
+                                        <th>Nome Usuario</th>
+                                        <th>Cod.Servico</th>
+                                        <th>Desc.Servico</th>
+                                        <th>Data</th>
+                                        <th>Qtde</th>
+                                        <th>Valor Unit</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="text-muted">
+                                        <td>12345</td>
+                                        <td>67890</td>
+                                        <td>111222333</td>
+                                        <td>Nome do beneficiário</td>
+                                        <td>401010</td>
+                                        <td>Descrição do serviço</td>
+                                        <td>01/04/2026</td>
+                                        <td>1</td>
+                                        <td>150,00</td>
+                                        <td>150,00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
                         <button type="submit" class="btn btn-primary" id="btn-importar-unimed">Importar</button>
+                        <a href="{% url 'faturamento_medico:baixar_modelo_unimed' %}" class="btn btn-outline-success">
+                            <i class="fas fa-download"></i> Baixar modelo Excel
+                        </a>
                         <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-cancel btn-secondary">Cancelar</a>
                     </form>
                 </div>

@@ -18,6 +18,25 @@ from servicos_medicos.models import ServicosMedicos
 
 logger = logging.getLogger(__name__)
 
+# Cabeçalho do modelo Excel UNIMED (mesma ordem lógica do .txt Produção)
+UNIMED_XLSX_HEADERS = [
+    'Lote',
+    'Guia',
+    'Cod. Usuario',
+    'Nome Usuario',
+    'Plano',
+    'Cod.Servico',
+    'Desc.Servico',
+    'Tp. Grau',
+    'Data',
+    'Qtde',
+    'Participacao %',
+    'Valor Unit',
+    'Valor Total',
+    'Cod.Rel',
+    'Observacao',
+]
+
 try:
     import pypdfium2 as pdfium
 except ImportError:
@@ -140,6 +159,133 @@ def _mapear_colunas_pdf(headers: list[str]) -> dict[str, int | None]:
             col_map['valor_total'] = i
 
     return col_map
+
+
+def _mapear_colunas_unimed_xlsx(headers: list[str]) -> dict[str, int | None]:
+    """Mapeia cabeçalho da planilha UNIMED (export .txt / Excel Produção)."""
+    folded = [_fold(h) for h in headers]
+    col_map: dict[str, int | None] = {
+        'lote': None,
+        'guia': None,
+        'cod_usuario': None,
+        'nome_usuario': None,
+        'cod_servico': None,
+        'desc_servico': None,
+        'data': None,
+        'qtde': None,
+        'valor_unit': None,
+        'valor_total': None,
+        'cod_rel': None,
+        'observacao': None,
+        'tp_grau': None,
+        'percentual': None,
+    }
+
+    for i, h in enumerate(folded):
+        if not h:
+            continue
+        if h == 'lote' or h.startswith('lote '):
+            col_map['lote'] = i
+        elif h == 'guia':
+            col_map['guia'] = i
+        elif 'cod' in h and 'usuario' in h:
+            col_map['cod_usuario'] = i
+        elif 'nome' in h and 'usuario' in h:
+            col_map['nome_usuario'] = i
+        elif 'cod' in h and 'serv' in h:
+            col_map['cod_servico'] = i
+        elif 'desc' in h and 'serv' in h:
+            col_map['desc_servico'] = i
+        elif h == 'data':
+            col_map['data'] = i
+        elif h.startswith('qtde') or h == 'qt' or h.startswith('qtde/via'):
+            col_map['qtde'] = i
+        elif 'particip' in h or 'percent' in h:
+            col_map['percentual'] = i
+        elif 'valor unit' in h:
+            col_map['valor_unit'] = i
+        elif 'valor total' in h or 'valor (r$)' in h or h == 'valor r$':
+            col_map['valor_total'] = i
+        elif 'cod.rel' in h or h == 'cod rel' or h.startswith('cod rel'):
+            col_map['cod_rel'] = i
+        elif 'observ' in h:
+            col_map['observacao'] = i
+        elif 'tp. grau' in h or 'tp grau' in h or h == 'grau':
+            col_map['tp_grau'] = i
+
+    return col_map
+
+
+def _valor_celula_xlsx(raw) -> str:
+    if raw is None:
+        return ''
+    if hasattr(raw, 'strftime'):
+        try:
+            return raw.strftime('%d/%m/%Y')
+        except Exception:
+            pass
+    return str(raw).strip()
+
+
+def parse_unimed_xlsx(xlsx_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str, str]]]:
+    """Planilha Excel (.xlsx) — relatório UNIMED Produção (1ª linha = cabeçalho)."""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    grupos: dict[str, dict] = {}
+    servicos_unicos: set[tuple[str, str]] = set()
+
+    wb = load_workbook(filename=BytesIO(xlsx_bytes), data_only=True, read_only=True)
+    try:
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        try:
+            header_row = next(rows_iter)
+        except StopIteration:
+            return grupos, servicos_unicos
+
+        headers = [_valor_celula_xlsx(c) for c in header_row]
+        col_map = _mapear_colunas_unimed_xlsx(headers)
+        if col_map.get('lote') is None or col_map.get('guia') is None or col_map.get('cod_servico') is None:
+            raise ValueError(
+                'Planilha UNIMED inválida: cabeçalho deve conter Lote, Guia e Cod.Servico '
+                '(use o modelo Excel ou exporte do relatório Produção).'
+            )
+
+        for row in rows_iter:
+            cells = [_valor_celula_xlsx(c) for c in row]
+            if _linha_ignorada(cells):
+                continue
+
+            lote = _cel(cells, col_map.get('lote'))
+            guia = _cel(cells, col_map.get('guia'))
+            cod_servico = _cel(cells, col_map.get('cod_servico'))
+            if not lote or not guia or not cod_servico:
+                continue
+
+            _adicionar_linha_grupo(
+                grupos,
+                servicos_unicos,
+                lote=lote,
+                guia=guia,
+                cod_usuario=_cel(cells, col_map.get('cod_usuario')),
+                nome_usuario=_cel(cells, col_map.get('nome_usuario')),
+                cod_servico=cod_servico,
+                desc_servico=_cel(cells, col_map.get('desc_servico')),
+                data=_parse_data(_cel(cells, col_map.get('data'))),
+                qtde=_parse_int(_cel(cells, col_map.get('qtde'))),
+                valor_unit=_money_br(_cel(cells, col_map.get('valor_unit'))),
+                valor_total=_money_br(_cel(cells, col_map.get('valor_total'))),
+                cod_rel=_cel(cells, col_map.get('cod_rel')),
+                observacao=_cel(cells, col_map.get('observacao')),
+                porte=_cel(cells, col_map.get('tp_grau')),
+                percentual=_money_br(_cel(cells, col_map.get('percentual'))),
+            )
+    finally:
+        wb.close()
+
+    return grupos, servicos_unicos
 
 
 def _cel(cells: list[str], idx: int | None) -> str:

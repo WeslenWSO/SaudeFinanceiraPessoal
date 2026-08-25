@@ -83,6 +83,7 @@ urlpatterns = [
 
     # Import
     path('importar-unimed/', views.importar_unimed, name='importar_unimed'),
+    path('modelo-unimed/', views.baixar_modelo_unimed, name='baixar_modelo_unimed'),
     path('importar-xml/', views.importar_xml, name='importar_xml'),
     path('importar-ris/', views.importar_ris, name='importar_ris'),
     path('renomear-guias-geap/', views.renomear_guias_geap, name='renomear_guias_geap'),
