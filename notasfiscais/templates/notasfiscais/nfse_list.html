@@ -70,7 +70,7 @@
             <a href="{% url 'notasfiscais:import' %}" class="btn btn-secondary"><i class="fas fa-upload"></i> Importar XML</a>
             <a href="{% url 'notasfiscais:portal_extensao_import' %}{% if data_inicio or data_fim %}?{% if data_inicio %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% endif %}" class="btn btn-secondary" title="Portal nacional: Selenium e importação da pasta do mês"><i class="fas fa-puzzle-piece"></i> Portal (extensão)</a>
             <a href="{% url 'notasfiscais:logs_notas_fiscais' %}" class="btn btn-muted"><i class="fas fa-history"></i> Logs NFSe</a>
-            <a href="{% url 'notasfiscais:export_excel' %}?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}" class="btn btn-muted"><i class="fas fa-file-excel"></i> Exportar Excel</a>
+            <a href="{% url 'notasfiscais:export_excel' %}?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if conta_receber_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter %}&{% endif %}conta_receber={{ conta_receber_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}" class="btn btn-muted"><i class="fas fa-file-excel"></i> Exportar Excel</a>
         </div>
     </div>
 
@@ -149,6 +149,14 @@
                         </select>
                     </div>
                     <div>
+                        <label for="conta_receber">Contas a Receber</label>
+                        <select id="conta_receber" name="conta_receber">
+                            <option value="" {% if not conta_receber_filter %}selected{% endif %}>Todos</option>
+                            <option value="sim" {% if conta_receber_filter == 'sim' %}selected{% endif %}>Gerado (sim)</option>
+                            <option value="nao" {% if conta_receber_filter == 'nao' %}selected{% endif %}>Não gerado</option>
+                        </select>
+                    </div>
+                    <div>
                         <label for="data_inicio">Data Início</label>
                         <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}" required>
                     </div>
@@ -175,7 +183,7 @@
             </form>
             
             <!-- Indicadores de Filtros Ativos -->
-            {% if search or valor_filter or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or data_inicio or data_fim %}
+            {% if search or valor_filter or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio or data_fim %}
             <div class="toolbar" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--muted-border-color);">
                 <div class="toolbar-left">
                     <small style="color: var(--muted-color); margin-right: 0.5rem;"><i class="fas fa-info-circle"></i> Filtros ativos:</small>
@@ -204,6 +212,11 @@
                         {% if socio_filter %}
                         <span class="badge badge-secondary">
                             <i class="fas fa-user me-1"></i>{% if socio_filter == 'sem' %}Sem sócio definido{% else %}{% for s in socios %}{% if s.id|stringformat:"s" == socio_filter %}{{ s }}{% endif %}{% endfor %}{% endif %}
+                        </span>
+                        {% endif %}
+                        {% if conta_receber_filter %}
+                        <span class="badge badge-info">
+                            <i class="fas fa-file-invoice-dollar me-1"></i>{% if conta_receber_filter == 'sim' %}CAR gerado{% else %}CAR não gerado{% endif %}
                         </span>
                         {% endif %}
                         {% if data_inicio_display %}

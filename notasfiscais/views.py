@@ -13,7 +13,7 @@ from django.views.generic.edit import UpdateView, CreateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum, Count, F, IntegerField, Max
+from django.db.models import Q, Sum, Count, F, IntegerField, Max, Exists, OuterRef
 from django.db.models.functions import Cast
 from django.views import View
 from django.views.generic import FormView
@@ -192,6 +192,25 @@ def _apply_filtro_socio_nfse(queryset, socio_val):
     return queryset
 
 
+def _apply_filtro_conta_receber_nfse(queryset, empresa_id, conta_receber_val):
+    """Filtra NFSe com ou sem conta a receber vinculada (sim / nao / todos)."""
+    val = (conta_receber_val or '').strip().lower()
+    if not val or val == 'todos':
+        return queryset
+
+    from contasareceber.models import ContaAReceber
+
+    car_exists = ContaAReceber.objects.filter(
+        empresa_id=empresa_id,
+        nota_id=OuterRef('pk'),
+    )
+    if val == 'sim':
+        return queryset.filter(Exists(car_exists))
+    if val == 'nao':
+        return queryset.filter(~Exists(car_exists))
+    return queryset
+
+
 def _parse_valor_filtro(valor_str):
     """Converte texto de valor (pt-BR ou US) em Decimal, ou None se inválido."""
     if valor_str is None:
@@ -280,6 +299,7 @@ def _normalize_filters(raw_dict, default_paginate_by=20):
     status_nota = get('status_nota')
     socio = get('socio')
     forma_pagamento = get('forma_pagamento')
+    conta_receber = get('conta_receber')
     data_inicio_str = get('data_inicio')
     data_fim_str = get('data_fim')
     paginate_by_str = get('paginate_by')
@@ -312,6 +332,7 @@ def _normalize_filters(raw_dict, default_paginate_by=20):
         'status_nota': status_nota,
         'socio': socio,
         'forma_pagamento': forma_pagamento,
+        'conta_receber': conta_receber,
         'data_inicio': d_ini.isoformat(),
         'data_fim': d_fim.isoformat(),
         'paginate_by': paginate_by,
@@ -334,6 +355,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
             'status_nota': g.get('status_nota', ''),
             'socio': g.get('socio', ''),
             'forma_pagamento': g.get('forma_pagamento', ''),
+            'conta_receber': g.get('conta_receber', ''),
             'data_inicio': g.get('data_inicio', ''),
             'data_fim': g.get('data_fim', ''),
             'paginate_by': g.get('paginate_by', ''),
@@ -345,6 +367,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
             raw.get('search') or raw.get('valor') or raw.get('status') or raw.get('status_nota')
             or raw.get('socio')
             or raw.get('forma_pagamento')
+            or raw.get('conta_receber')
             or raw.get('data_inicio') or raw.get('data_fim') or raw.get('paginate_by')
         )
 
@@ -369,6 +392,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
                 'status_nota': '',
                 'socio': '',
                 'forma_pagamento': '',
+                'conta_receber': '',
                 'data_inicio': d_ini.isoformat(),
                 'data_fim': d_fim.isoformat(),
                 'paginate_by': self.paginate_by,
@@ -424,6 +448,10 @@ class NFSeListView(LoginRequiredMixin, ListView):
 
         queryset = _apply_filtro_socio_nfse(queryset, filters.get('socio'))
 
+        queryset = _apply_filtro_conta_receber_nfse(
+            queryset, empresa_id, filters.get('conta_receber')
+        )
+
         d_ini = _parse_date(filters.get('data_inicio'))
         d_fim = _parse_date(filters.get('data_fim'))
         if not d_ini or not d_fim:
@@ -446,6 +474,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
         status_nota_filter = filters.get('status_nota', '')
         socio_filter = filters.get('socio', '')
         forma_pagamento_filter = filters.get('forma_pagamento', '')
+        conta_receber_filter = filters.get('conta_receber', '')
         data_inicio = filters.get('data_inicio', '')
         data_fim = filters.get('data_fim', '')
         paginate_by = str(filters.get('paginate_by', self.paginate_by))
@@ -501,6 +530,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
             'status_nota_filter': status_nota_filter,
             'socio_filter': socio_filter,
             'forma_pagamento_filter': forma_pagamento_filter,
+            'conta_receber_filter': conta_receber_filter,
             'data_inicio': data_inicio,
             'data_fim': data_fim,
             'data_inicio_display': data_inicio_display,
@@ -2748,6 +2778,7 @@ def get_filtered_ids(request):
     status = request.GET.get('status', '')
     status_nota = request.GET.get('status_nota', '')
     forma_pagamento = request.GET.get('forma_pagamento', '')
+    conta_receber = request.GET.get('conta_receber', '')
     socio = (request.GET.get('socio') or '').strip()
     data_inicio = request.GET.get('data_inicio', '')
     data_fim = request.GET.get('data_fim', '')
@@ -2785,6 +2816,8 @@ def get_filtered_ids(request):
                 pass
 
     queryset = _apply_filtro_socio_nfse(queryset, socio)
+
+    queryset = _apply_filtro_conta_receber_nfse(queryset, empresa_id, conta_receber)
 
     # Sempre aplicar filtro de data
     queryset = queryset.filter(data_emissao__gte=data_inicio)
@@ -2813,6 +2846,7 @@ def export_excel(request):
     status = request.GET.get('status', '')
     status_nota = request.GET.get('status_nota', '')
     forma_pagamento = request.GET.get('forma_pagamento', '')
+    conta_receber = request.GET.get('conta_receber', '')
     socio = (request.GET.get('socio') or '').strip()
     data_inicio = request.GET.get('data_inicio', '')
     data_fim = request.GET.get('data_fim', '')
@@ -2849,6 +2883,8 @@ def export_excel(request):
                 pass
 
     queryset = _apply_filtro_socio_nfse(queryset, socio)
+
+    queryset = _apply_filtro_conta_receber_nfse(queryset, empresa_id, conta_receber)
 
     # Sempre aplicar filtro de data
     queryset = queryset.filter(data_emissao__gte=data_inicio)
