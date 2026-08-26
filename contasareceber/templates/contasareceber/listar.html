@@ -83,6 +83,10 @@
 .table-car-list th.car-th-sortable:hover {
     background: rgba(0, 0, 0, 0.04);
 }
+.filtros-form select.car-select-cobranca {
+    min-height: 7.5rem;
+    height: auto;
+}
 .table-car-list th.car-th-sortable::after {
     content: ' ⇅';
     font-size: 0.7em;
@@ -165,12 +169,13 @@
                                     </div>
                                     <div>
                                         <label for="forma_pagamento">Cobrança</label>
-                                        <select id="forma_pagamento" name="forma_pagamento">
-                                            <option value="">Todas as Cobranças</option>
+                                        <select id="forma_pagamento" name="forma_pagamento" multiple class="form-select car-select-cobranca" size="5"
+                                                title="Ctrl+clique para várias opções; deixe sem seleção para todas">
                                             {% for forma in formas_pagamento %}
                                             <option value="{{ forma.id }}" {% if forma.id|stringformat:"s" in filtros.forma_pagamento %}selected{% endif %}>{{ forma.descricao }}</option>
                                             {% endfor %}
                                         </select>
+                                        <small class="text-muted d-block mt-1">Ctrl+clique para várias. Vazio = todas.</small>
                                     </div>
                                     <div>
                                         <label for="filtro_socio">Sócio</label>
@@ -395,10 +400,10 @@
                             <ul class="pagination pagination-sm mb-0">
                                 {% if page_obj.has_previous %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">&laquo;</a>
+                                    <a class="page-link" href="?page=1{% if filtros_query_sem_page %}&{{ filtros_query_sem_page }}{% endif %}">&laquo;</a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filtros_query_sem_page %}&{{ filtros_query_sem_page }}{% endif %}">Anterior</a>
                                 </li>
                                 {% endif %}
 
@@ -409,17 +414,17 @@
                                 </li>
                                 {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}{% if filtros_query_sem_page %}&{{ filtros_query_sem_page }}{% endif %}">{{ num }}</a>
                                 </li>
                                 {% endif %}
                                 {% endfor %}
 
                                 {% if page_obj.has_next %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Próximo</a>
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filtros_query_sem_page %}&{{ filtros_query_sem_page }}{% endif %}">Próximo</a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">&raquo;</a>
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if filtros_query_sem_page %}&{{ filtros_query_sem_page }}{% endif %}">&raquo;</a>
                                 </li>
                                 {% endif %}
                             </ul>

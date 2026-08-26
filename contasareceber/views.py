@@ -644,6 +644,11 @@ def listar_contas_a_receber(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    q_nav = request.GET.copy()
+    if 'page' in q_nav:
+        del q_nav['page']
+    filtros_query_sem_page = q_nav.urlencode()
+
     context = {
         'contas': page_obj,
         'page_obj': page_obj,
@@ -661,6 +666,7 @@ def listar_contas_a_receber(request):
         'data_fim': data_fim,
         'per_page': per_page,
         'filtros': filtros,
+        'filtros_query_sem_page': filtros_query_sem_page,
         'socios': Socio.objects.filter(empresa_id=empresa_id).order_by('socio', 'lastname'),
         'resumo_val_receber': (request.GET.get('resumo_val_receber') or '').strip() == '1',
         'sort_col': sort_col,
@@ -3098,14 +3104,14 @@ def conciliar_cartao_por_autorizacao(request):
 
     return render(request, 'contasareceber/conciliar.html', context)
 
-def _excluir_conta_a_receber_obj(conta, empresa_id):
+def _excluir_conta_a_receber_obj(conta, empresa_id, *, permitir_pago=False, permitir_cartao=False):
     """
     Remove vínculos e exclui a conta.
-    Retorna (ok: bool, mensagem: str). Não permite pago/cartão.
+    Retorna (ok: bool, mensagem: str).
     """
-    if conta.status == 'pago':
+    if conta.status == 'pago' and not permitir_pago:
         return False, f'Conta #{conta.pk} ({conta.cliente}): está paga — estorne antes de excluir.'
-    if conta.status == 'cartao':
+    if conta.status == 'cartao' and not permitir_cartao:
         return False, f'Conta #{conta.pk} ({conta.cliente}): conciliada com cartão — desconciliar antes de excluir.'
 
     from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
