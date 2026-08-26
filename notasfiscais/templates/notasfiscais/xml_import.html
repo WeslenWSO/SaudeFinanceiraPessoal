@@ -37,7 +37,9 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" id="xmlUploadForm">
+                    <form method="post" enctype="multipart/form-data" id="xmlUploadForm"
+                          class="form-com-loading" data-loading="true"
+                          data-loading-message="Importando XML de NFSe…">
                         {% csrf_token %}
                         
                         {% if messages %}
@@ -326,7 +328,9 @@
                             <div class="card">
                                 <div class="card-body">
                                     <h6 class="card-title">Ações</h6>
-                                    <form method="post" enctype="multipart/form-data" id="importForm">
+                                    <form method="post" enctype="multipart/form-data" id="importForm"
+                                          class="form-com-loading" data-loading="true"
+                                          data-loading-message="Confirmando importação de NFSe…">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="confirm_import">
                                         {% if importar_canceladas %}
@@ -463,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Form submit - validação final
+    // Form submit - validação final (ampulheta via filtro-loading.js no formulário)
     document.getElementById('xmlUploadForm').addEventListener('submit', function(e) {
         const files = fileInput.files;
 
@@ -472,18 +476,14 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Por favor, selecione um ou mais arquivos XML antes de continuar.');
             return false;
         }
-
-        // Atualiza status
-        importStatus.innerHTML = `
-            <div class="text-center">
-                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                    <span class="visually-hidden">Processando...</span>
-                </div>
-                <span class="text-primary">Processando ${files.length} arquivo(s) XML...</span>
-            </div>
-        `;
     });
 });
+
+(function () {
+    if (typeof window.hideFiltroLoading === 'function') {
+        window.hideFiltroLoading();
+    }
+})();
 </script>
 {% endblock %}
 

@@ -85,15 +85,19 @@ def _money_br(raw) -> float:
 
 
 def _normalizar_valores_import(qtde: int, valor_unit: float, valor_total: float) -> tuple[int, float, float]:
-    """Garante qtde >= 1 e preenche valor unitário/total quando a planilha traz só uma coluna."""
+    """
+    UNIMED Produção: coluna «Valor (R$)» é o total da linha (não necessariamente qt × unit).
+    Ajusta valor unitário efetivo para qt × valor = total da planilha.
+    """
     qtde = max(qtde or 1, 1)
     valor_unit = float(valor_unit or 0)
     valor_total = float(valor_total or 0)
-    if valor_unit <= 0 and valor_total > 0:
-        valor_unit = valor_total / qtde
-    elif valor_total <= 0 and valor_unit > 0:
-        valor_total = valor_unit * qtde
-    return qtde, valor_unit, valor_total
+
+    if valor_total > 0:
+        return qtde, valor_total / qtde, valor_total
+    if valor_unit > 0:
+        return qtde, valor_unit, valor_unit * qtde
+    return qtde, 0.0, 0.0
 
 
 def _parse_data(raw: str):
@@ -311,6 +315,114 @@ def parse_unimed_xlsx(xlsx_bytes: bytes) -> tuple[dict[str, dict], set[tuple[str
         wb.close()
 
     return grupos, servicos_unicos
+
+
+def _listar_linhas_unimed_xlsx(xlsx_bytes: bytes) -> list[dict[str, Any]]:
+    """Linhas da planilha na ordem do arquivo, com valores normalizados (total = coluna Valor R$)."""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    linhas: list[dict[str, Any]] = []
+    wb = load_workbook(filename=BytesIO(xlsx_bytes), data_only=True, read_only=True)
+    try:
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        for _ in range(UNIMED_XLSX_LINHA_CABECALHO - 1):
+            next(rows_iter, None)
+        try:
+            header_row = next(rows_iter)
+        except StopIteration:
+            return linhas
+
+        headers = [_valor_celula_xlsx(c) for c in header_row]
+        col_map = _mapear_colunas_unimed_xlsx(headers)
+
+        for row in rows_iter:
+            cells = [_valor_celula_xlsx(c) for c in row]
+            if _linha_ignorada(cells):
+                continue
+            lote = _cel(cells, col_map.get('lote'))
+            guia = _cel(cells, col_map.get('guia'))
+            cod_servico = _cel(cells, col_map.get('cod_servico'))
+            if not lote or not guia or not cod_servico:
+                continue
+            qtde = _parse_int(_cel(cells, col_map.get('qtde')))
+            valor_unit = _money_br(_cel(cells, col_map.get('valor_unit')))
+            valor_total = _money_br(_cel(cells, col_map.get('valor_total')))
+            qtde, valor_efetivo, valor_total = _normalizar_valores_import(qtde, valor_unit, valor_total)
+            linhas.append({
+                'lote': lote,
+                'guia': guia,
+                'cod_servico': cod_servico,
+                'qt': qtde,
+                'valor': valor_efetivo,
+                'total': valor_total,
+            })
+    finally:
+        wb.close()
+    return linhas
+
+
+def sincronizar_valores_unimed_planilha(
+    xlsx_bytes: bytes,
+    codigo_relatorio: str,
+    *,
+    empresa_id: int | None = None,
+    dry_run: bool = False,
+) -> tuple[int, float, float]:
+    """
+    Atualiza qt/valor/total dos itens já importados conforme a planilha UNIMED.
+    Retorna (itens_corrigidos, total_planilha, total_antes).
+    """
+    from collections import defaultdict, deque
+    from decimal import Decimal
+
+    codigo_relatorio = (codigo_relatorio or '').strip()
+    linhas_planilha = _listar_linhas_unimed_xlsx(xlsx_bytes)
+    total_planilha = sum(lin['total'] for lin in linhas_planilha)
+
+    filas: dict[tuple[str, str], deque] = defaultdict(deque)
+    for lin in linhas_planilha:
+        filas[(lin['guia'], lin['cod_servico'])].append(lin)
+
+    qs = ItemServico.objects.select_related('faturamento').filter(
+        faturamento__codigo_relatorio=codigo_relatorio,
+    ).order_by('id')
+    if empresa_id:
+        qs = qs.filter(faturamento__empresa_id=empresa_id)
+
+    total_antes = sum(float(i.total or 0) for i in qs)
+    corrigidos = 0
+    fat_ids: set[int] = set()
+
+    for item in qs:
+        key = (item.faturamento.guia or '', item.codigo_servico or '')
+        if not filas[key]:
+            continue
+        lin = filas[key].popleft()
+        novo_qt = int(lin['qt'])
+        novo_valor = Decimal(str(lin['valor']))
+        novo_total = Decimal(str(lin['total']))
+        if (
+            item.qt == novo_qt
+            and Decimal(str(item.valor or 0)) == novo_valor
+            and Decimal(str(item.total or 0)) == novo_total
+        ):
+            continue
+        if not dry_run:
+            item.qt = novo_qt
+            item.valor = novo_valor
+            item.percentual = Decimal('1')
+            item.save()
+        corrigidos += 1
+        fat_ids.add(item.faturamento_id)
+
+    if not dry_run and fat_ids:
+        for fat in FaturamentoMedico.objects.filter(pk__in=fat_ids):
+            fat.atualizar_total()
+
+    return corrigidos, total_planilha, total_antes
 
 
 def _cel(cells: list[str], idx: int | None) -> str:
