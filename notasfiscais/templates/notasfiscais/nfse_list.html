@@ -231,6 +231,7 @@
                 <button type="button" class="btn btn-muted btn-sm" id="btnAplicarRegraImposto" {% if periodo_fechado %}onclick="alert('Período fechado - vá para Apuração de Impostos e reabra o período para alterar regras.');" title="Período fechado"{% else %}onclick="document.getElementById('modalRegraImposto').showModal();" title="Aplicar regra de imposto"{% endif %}><i class="fas fa-calculator"></i> Aplicar Regra Imposto</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnSegmentar" disabled><i class="fas fa-cut"></i> Segmentar NFSe</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnExcluirNfse" disabled title="Excluir notas selecionadas e contas a receber vinculadas"><i class="fas fa-trash-alt"></i> Excluir Selecionadas</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnAISegmentacao" disabled><i class="fas fa-brain"></i> IA Segmentação</button>
             </div>
         </div>
@@ -935,6 +936,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnAplicarRegra = document.getElementById('btnAplicarRegraImposto');
     const btnSegmentar = document.getElementById('btnSegmentar');
     const btnGerarContas = document.getElementById('btnGerarContasReceber');
+    const btnExcluirNfse = document.getElementById('btnExcluirNfse');
     const btnAISegmentacao = document.getElementById('btnAISegmentacao');
 
     // Array para armazenar IDs selecionados (apenas da página atual)
@@ -948,6 +950,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btnAplicarRegra.disabled = selectedIds.length === 0;
         btnSegmentar.disabled = selectedIds.length !== 1;  // Só habilita se exatamente 1 selecionado
         btnGerarContas.disabled = selectedIds.length === 0;
+        if (btnExcluirNfse) btnExcluirNfse.disabled = selectedIds.length === 0;
         btnAISegmentacao.disabled = selectedIds.length === 0;
         const btnAlterarSocio = document.getElementById('btnAlterarSocio');
         if (btnAlterarSocio) btnAlterarSocio.disabled = selectedIds.length === 0;
@@ -1387,6 +1390,60 @@ document.addEventListener('DOMContentLoaded', function() {
         const nfseId = selectedIds[0];
         window.location.href = `/notasfiscais/${nfseId}/segmentar/`;
     });
+
+    if (btnExcluirNfse) {
+        btnExcluirNfse.addEventListener('click', function() {
+            if (selectedIds.length === 0) {
+                mostrarMensagem('Selecione pelo menos uma NFSe para excluir.', 'warning');
+                return;
+            }
+            const qtd = selectedIds.length;
+            const msg = qtd === 1
+                ? 'Excluir a NFSe selecionada? Contas a receber vinculadas também serão removidas. Esta ação não pode ser desfeita.'
+                : `Excluir ${qtd} NFSe selecionadas? Contas a receber vinculadas também serão removidas. Esta ação não pode ser desfeita.`;
+            if (!confirm(msg)) {
+                return;
+            }
+
+            this.disabled = true;
+            const textoOriginal = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Excluindo...';
+
+            const formData = new FormData();
+            selectedIds.forEach(id => formData.append('ids[]', id.toString()));
+
+            fetch('{% url "notasfiscais:nfse_excluir_bulk" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json().then(data => ({ okHttp: response.ok, data })))
+            .then(({ okHttp, data }) => {
+                if (data.ok) {
+                    mostrarMensagem(data.message || 'NFSe excluída(s) com sucesso.', 'success');
+                    if (data.avisos && data.avisos.length) {
+                        setTimeout(() => mostrarMensagem('Avisos: ' + data.avisos.join('; '), 'warning'), 800);
+                    }
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    mostrarMensagem(data.error || 'Erro ao excluir NFSe.', 'error');
+                    if (data.avisos && data.avisos.length) {
+                        setTimeout(() => mostrarMensagem('Avisos: ' + data.avisos.join('; '), 'warning'), 800);
+                    }
+                }
+            })
+            .catch(error => {
+                mostrarMensagem('Erro ao processar a requisição: ' + error.message, 'error');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = textoOriginal;
+                atualizarBotoes();
+            });
+        });
+    }
 
     // Função para gerar contas a receber das notas selecionadas
     btnGerarContas.addEventListener('click', function() {

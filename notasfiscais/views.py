@@ -2299,6 +2299,107 @@ def gerar_contas_receber_bulk(request):
     except Exception as e:
         return JsonResponse({"ok": False, "error": f"Erro interno: {str(e)}"}, status=500)
 
+
+def _nfse_em_periodo_fechado(nf, empresa_id):
+    from .models import ApuracaoPeriodo
+
+    if not nf.data_emissao:
+        return False
+    return ApuracaoPeriodo.objects.filter(
+        empresa_id=empresa_id,
+        data_inicio__lte=nf.data_emissao,
+        data_fim__gte=nf.data_emissao,
+        status='fechado',
+    ).exists()
+
+
+def _excluir_contas_vinculadas_nfse(nota_ids, empresa_id):
+    from contasareceber.models import BaixaContaAReceber, ContaAReceber
+    from extrato.models import ExtratoMovimento
+    from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
+
+    car_ids = list(
+        ContaAReceber.objects.filter(nota_id__in=nota_ids, empresa_id=empresa_id).values_list(
+            'pk', flat=True
+        )
+    )
+    if not car_ids:
+        return 0
+
+    RelatorioRecebiveisMaquinaCartao.objects.filter(
+        conta_a_receber_id__in=car_ids,
+        empresa_id=empresa_id,
+    ).update(conta_a_receber=None)
+    ExtratoMovimento.objects.filter(conta_receber_id__in=car_ids).delete()
+    BaixaContaAReceber.objects.filter(conta_a_receber_id__in=car_ids).delete()
+    n, _ = ContaAReceber.objects.filter(pk__in=car_ids).delete()
+    return n
+
+
+@login_required
+@require_POST
+def excluir_nfse_bulk(request):
+    """Exclui NFSe selecionadas e contas a receber vinculadas."""
+    try:
+        ids = request.POST.getlist('ids[]') or request.POST.getlist('ids')
+        if not ids:
+            return JsonResponse({'ok': False, 'error': 'IDs não enviados.'}, status=400)
+
+        try:
+            ids = [int(x) for x in ids]
+        except ValueError:
+            return JsonResponse({'ok': False, 'error': 'IDs inválidos.'}, status=400)
+
+        empresa_id = request.session.get('empresa_id')
+        if not empresa_id:
+            return JsonResponse({'ok': False, 'error': 'Empresa não selecionada.'}, status=400)
+
+        qs = NotaFiscalServico.objects.filter(id__in=ids, empresa_id=empresa_id)
+        if not qs.exists():
+            return JsonResponse(
+                {'ok': False, 'error': 'Nenhuma NFSe encontrada com os IDs fornecidos.'},
+                status=404,
+            )
+
+        excluidas = 0
+        contas_excluidas = 0
+        avisos = []
+
+        for nf in qs:
+            if _nfse_em_periodo_fechado(nf, empresa_id):
+                avisos.append(
+                    f'NF {nf.numero_nota}: período fechado — reabra em Apuração de Impostos.'
+                )
+                continue
+            try:
+                with transaction.atomic():
+                    contas_excluidas += _excluir_contas_vinculadas_nfse([nf.pk], empresa_id)
+                    nf.delete()
+                    excluidas += 1
+            except Exception as exc:
+                avisos.append(f'NF {nf.numero_nota}: {exc}')
+
+        if excluidas == 0:
+            msg = avisos[0] if avisos else 'Nenhuma NFSe pôde ser excluída.'
+            return JsonResponse({'ok': False, 'error': msg, 'avisos': avisos}, status=400)
+
+        response = {
+            'ok': True,
+            'excluidas': excluidas,
+            'contas_excluidas': contas_excluidas,
+            'message': (
+                f'{excluidas} NFSe excluída(s)'
+                + (f' e {contas_excluidas} conta(s) a receber vinculada(s).' if contas_excluidas else '.')
+            ),
+        }
+        if avisos:
+            response['avisos'] = avisos
+        return JsonResponse(response)
+
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Erro interno: {str(e)}'}, status=500)
+
+
 @login_required
 @require_POST
 def aplicar_regra_imposto_bulk(request):
