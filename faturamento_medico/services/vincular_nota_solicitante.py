@@ -6,6 +6,7 @@ import json
 import re
 from collections import defaultdict
 from datetime import date, timedelta
+from functools import lru_cache
 
 from django.urls import reverse
 
@@ -25,14 +26,26 @@ _RE_FIM_PACIENTE = re.compile(
 )
 
 
-def _extrair_paciente_discriminacao(discriminacao: str | None) -> str:
+def _extrair_paciente_discriminacao(discriminacao) -> str:
     """
     Extrai o nome do paciente da discriminação da NFSe.
     Usa o trecho entre PACIENTE: (ou EXAME REALIZADO PELO PACIENTE:) e PARCERIA:.
     """
+    if discriminacao is None:
+        return ''
+    if not isinstance(discriminacao, str):
+        try:
+            discriminacao = str(discriminacao)
+        except Exception:
+            return ''
+    discriminacao = discriminacao.strip()
     if not discriminacao:
         return ''
-    texto = re.sub(r'\s+', ' ', discriminacao.replace('\n', ' ')).strip()
+    texto = re.sub(
+        r'\s+',
+        ' ',
+        discriminacao.replace('\r\n', ' ').replace('\n', ' '),
+    ).strip()
     inicio = _RE_INICIO_PACIENTE.search(texto)
     if not inicio:
         return ''
@@ -45,8 +58,34 @@ def _extrair_paciente_discriminacao(discriminacao: str | None) -> str:
     return nome
 
 
+def _discriminacao_texto(valor) -> str:
+    if valor is None:
+        return ''
+    if isinstance(valor, str):
+        return valor
+    try:
+        return str(valor)
+    except Exception:
+        return ''
+
+
+@lru_cache(maxsize=8192)
+def _nome_paciente_nota_cached(nota_pk: int, discriminacao: str, cliente: str) -> str:
+    """Cache por NFSe — evita reparse da discriminação na grade de faturamento."""
+    paciente = _extrair_paciente_discriminacao(discriminacao)
+    if paciente:
+        return paciente
+    return (cliente or '').strip()
+
+
 def _nome_paciente_nota(nota: NotaFiscalServico) -> str:
     """Nome do paciente na NF: prioriza discriminação (PACIENTE…PARCERIA), senão cliente."""
+    if nota.pk:
+        return _nome_paciente_nota_cached(
+            nota.pk,
+            _discriminacao_texto(nota.discriminacao),
+            (nota.cliente or '').strip(),
+        )
     paciente = _extrair_paciente_discriminacao(nota.discriminacao)
     if paciente:
         return paciente
@@ -178,7 +217,7 @@ def _score_nota_vinculo(
     numero = (nota.numero_nota or '').strip()
     cliente = (nota.cliente or '').strip()
     paciente_nota = _nome_paciente_nota(nota)
-    discriminacao = (nota.discriminacao or '').strip()
+    discriminacao = _discriminacao_texto(nota.discriminacao).strip()
 
     if termo:
         termo_upper = termo.upper()
