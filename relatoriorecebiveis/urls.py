@@ -18,6 +18,7 @@ urlpatterns = [
         name='import_xlsx_cielo',
     ),
     path('conciliate/', views.relatorio_recebiveis_conciliate, name='conciliate'),
+    path('delete-bulk/', views.relatorio_recebiveis_delete_bulk, name='delete_bulk'),
     path('<int:pk>/', views.relatorio_recebiveis_detail, name='detail'),
     path('<int:pk>/update/', views.relatorio_recebiveis_update, name='update'),
     path('<int:pk>/delete/', views.relatorio_recebiveis_delete, name='delete'),

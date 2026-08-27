@@ -61,6 +61,9 @@
                         <button type="submit" form="conciliate-form" class="btn btn-warning btn-sm">
                             <i class="fas fa-link"></i> Conciliar com Extrato
                         </button>
+                        <button type="button" id="btnExcluirSelecionados" class="btn btn-danger btn-sm" disabled>
+                            <i class="fas fa-trash-alt"></i> Excluir Selecionados
+                        </button>
                         <a href="{% url 'relatoriorecebiveis:import_csv' %}" class="btn btn-success btn-sm">
                             <i class="fas fa-upload"></i> Importar CSV
                         </a>
@@ -242,7 +245,7 @@
                         <table class="table table-hover text-nowrap">
                             <thead>
                                 <tr>
-                                    <th>Selecionar</th>
+                                    <th><input type="checkbox" id="chkTodosRecebiveis" title="Selecionar todos não conciliados"></th>
                                     <th>ID</th>
                                 <th>Data Pagamento</th>
                                 <th>Forma Pagamento</th>
@@ -269,7 +272,7 @@
                             <tr>
                                 <td>
                                     {% if relatorio.conciliado == False %}
-                                        <input type="checkbox" name="selected_ids" value="{{ relatorio.id }}">
+                                        <input type="checkbox" name="selected_ids" value="{{ relatorio.id }}" class="chk-recebivel">
                                     {% endif %}
                                 </td>
                                 <td>{{ relatorio.id }}</td>
@@ -410,5 +413,76 @@
             d.removeAttribute('open');
         });
     });
+
+    (function initSelecaoExclusaoRecebiveis() {
+        const formConciliar = document.getElementById('conciliate-form');
+        const btnExcluir = document.getElementById('btnExcluirSelecionados');
+        const chkTodos = document.getElementById('chkTodosRecebiveis');
+        const checkboxes = document.querySelectorAll('.chk-recebivel');
+
+        function atualizarEstado() {
+            const marcados = document.querySelectorAll('.chk-recebivel:checked');
+            if (btnExcluir) {
+                btnExcluir.disabled = marcados.length === 0;
+            }
+            if (chkTodos && checkboxes.length) {
+                chkTodos.checked = marcados.length === checkboxes.length;
+                chkTodos.indeterminate = marcados.length > 0 && marcados.length < checkboxes.length;
+            }
+        }
+
+        if (chkTodos) {
+            chkTodos.addEventListener('change', function() {
+                checkboxes.forEach(function(cb) {
+                    cb.checked = chkTodos.checked;
+                });
+                atualizarEstado();
+            });
+        }
+
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener('change', atualizarEstado);
+        });
+
+        if (btnExcluir && formConciliar) {
+            btnExcluir.addEventListener('click', function() {
+                const marcados = document.querySelectorAll('.chk-recebivel:checked');
+                if (!marcados.length) {
+                    alert('Selecione pelo menos um recebível não conciliado.');
+                    return;
+                }
+                const qtd = marcados.length;
+                const msg = qtd === 1
+                    ? 'Excluir o recebível selecionado? Esta ação não pode ser desfeita.'
+                    : `Excluir ${qtd} recebíveis selecionados? Esta ação não pode ser desfeita.`;
+                if (!confirm(msg)) {
+                    return;
+                }
+
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{% url "relatoriorecebiveis:delete_bulk" %}';
+                const csrf = formConciliar.querySelector('[name=csrfmiddlewaretoken]');
+                if (csrf) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrfmiddlewaretoken';
+                    csrfInput.value = csrf.value;
+                    form.appendChild(csrfInput);
+                }
+                marcados.forEach(function(cb) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_ids';
+                    input.value = cb.value;
+                    form.appendChild(input);
+                });
+                document.body.appendChild(form);
+                form.submit();
+            });
+        }
+
+        atualizarEstado();
+    })();
 </script>
 {% endblock %}

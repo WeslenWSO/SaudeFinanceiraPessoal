@@ -412,6 +412,63 @@ def relatorio_recebiveis_delete(request, pk):
         'title': f'Remover Relatório #{relatorio.id}'
     })
 
+
+def _empresa_recebiveis_request(request):
+    """Retorna empresa da sessão ou None."""
+    try:
+        empresa_id = request.session.get('empresa_id')
+        if empresa_id:
+            return Empresa.objects.get(id=empresa_id)
+        usuario_empresa = UsuarioEmpresa.objects.filter(usuario=request.user, ativo=True).first()
+        if not usuario_empresa:
+            usuario_empresa = UsuarioEmpresa.objects.filter(usuario=request.user).first()
+        return usuario_empresa.empresa if usuario_empresa else None
+    except Empresa.DoesNotExist:
+        return None
+
+
+@login_required
+def relatorio_recebiveis_delete_bulk(request):
+    """Remove vários relatórios não conciliados selecionados na listagem."""
+    if request.method != 'POST':
+        return redirect('relatoriorecebiveis:relReclist')
+
+    empresa = _empresa_recebiveis_request(request)
+    if not empresa:
+        messages.error(request, 'Empresa não selecionada.')
+        return redirect('relatoriorecebiveis:relReclist')
+
+    raw_ids = request.POST.getlist('selected_ids')
+    if not raw_ids:
+        messages.warning(request, 'Nenhum recebível selecionado para exclusão.')
+        return redirect(request.META.get('HTTP_REFERER') or reverse('relatoriorecebiveis:relReclist'))
+
+    try:
+        ids = [int(x) for x in raw_ids]
+    except (TypeError, ValueError):
+        messages.error(request, 'Seleção inválida.')
+        return redirect(request.META.get('HTTP_REFERER') or reverse('relatoriorecebiveis:relReclist'))
+
+    selecionados = RelatorioRecebiveisMaquinaCartao.objects.filter(pk__in=ids, empresa=empresa)
+    conciliados = selecionados.filter(conciliado=True).count()
+    excluir_qs = selecionados.filter(conciliado=False)
+
+    with transaction.atomic():
+        excluidos, _ = excluir_qs.delete()
+
+    if excluidos:
+        messages.success(request, f'{excluidos} recebível(is) excluído(s) com sucesso.')
+    else:
+        messages.warning(request, 'Nenhum recebível pôde ser excluído.')
+    if conciliados:
+        messages.warning(
+            request,
+            f'{conciliados} recebível(is) conciliado(s) foram ignorados (desconcilie antes de excluir).',
+        )
+
+    return redirect(request.META.get('HTTP_REFERER') or reverse('relatoriorecebiveis:relReclist'))
+
+
 @login_required
 def relatorio_recebiveis_import_csv(request):
     """Importa relatórios de recebíveis via arquivo CSV"""
