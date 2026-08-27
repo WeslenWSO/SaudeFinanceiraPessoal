@@ -18,6 +18,7 @@ from .infinitepay_pdf import parse_infinitepay_pdf_bytes, _normalize_parcela_dis
 from .infinitepay_gemini import parse_infinitepay_pdf_with_gemini, validate_gemini_api_key
 from .cielo_xlsx import parse_cielo_xlsx_bytes
 from .stone_csv import parse_stone_csv_bytes
+from .import_dedup import RecebivelImportDedup
 from empresa.models import Empresa, UsuarioEmpresa
 from extrato.models import Lancamento
 
@@ -27,6 +28,15 @@ def normalize_text(text):
     if not text:
         return ''
     return ''.join(c for c in unicodedata.normalize('NFD', text.lower()) if unicodedata.category(c) != 'Mn')
+
+
+def _avisar_duplicados_import(request, dedup: RecebivelImportDedup):
+    if dedup.duplicate_count > 0:
+        messages.info(
+            request,
+            f'{dedup.duplicate_count} linha(s) ignorada(s): já existem com a mesma '
+            f'autorização, data de pagamento, parcela e máquina.',
+        )
 
 
 def _parse_currency_value(value_str):
@@ -877,6 +887,7 @@ def _process_csv_import(request):
             success_count = 0
             error_count = 0
             errors = []
+            dedup = RecebivelImportDedup(empresa.id)
             with transaction.atomic():
                 for row_num, row in enumerate(csv_data['rows'], start=1):
                     try:
@@ -927,8 +938,8 @@ def _process_csv_import(request):
                         conta_bancaria = (row.get('conta_bancaria') or '').strip()
                         if conta_bancaria:
                             relatorio.conta_bancaria = conta_bancaria[:500]
-                        relatorio.save()
-                        success_count += 1
+                        if dedup.salvar(relatorio):
+                            success_count += 1
                     except Exception as e:
                         errors.append(f'Linha {row_num}: {str(e)}')
                         error_count += 1
@@ -939,6 +950,7 @@ def _process_csv_import(request):
             request.session.modified = True
             if success_count > 0:
                 messages.success(request, f'{success_count} relatório(s) importado(s) do CSV Stone.')
+            _avisar_duplicados_import(request, dedup)
             if error_count > 0:
                 messages.warning(request, f'{error_count} linha(s) com erro foram ignoradas.')
                 for err in errors[:5]:
@@ -952,6 +964,7 @@ def _process_csv_import(request):
         success_count = 0
         error_count = 0
         errors = []
+        dedup = RecebivelImportDedup(empresa.id)
 
         with transaction.atomic():
             for row_num, row in enumerate(reader, start=2):
@@ -1354,12 +1367,10 @@ def _process_csv_import(request):
                     print(f"DEBUG SIPAG: Tipo do campo numero_autorizacao: {type(relatorio.numero_autorizacao)}")
 
                     # Salva o relatório
-                    relatorio.save()
-                    success_count += 1
-
-                    # DEBUG: Verificar se o relatório foi salvo corretamente
-                    relatorio_salvo = RelatorioRecebiveisMaquinaCartao.objects.get(id=relatorio.id)
-                    print(f"DEBUG SIPAG: Após salvar - relatorio.numero_autorizacao = '{relatorio_salvo.numero_autorizacao}'")
+                    if dedup.salvar(relatorio):
+                        success_count += 1
+                        relatorio_salvo = RelatorioRecebiveisMaquinaCartao.objects.get(id=relatorio.id)
+                        print(f"DEBUG SIPAG: Após salvar - relatorio.numero_autorizacao = '{relatorio_salvo.numero_autorizacao}'")
 
                 except Exception as e:
                     errors.append(f"Linha {row_num}: Erro inesperado - {str(e)}")
@@ -1375,6 +1386,7 @@ def _process_csv_import(request):
         # Mensagens de resultado
         if success_count > 0:
             messages.success(request, f'{success_count} relatórios importados com sucesso!')
+        _avisar_duplicados_import(request, dedup)
 
         if error_count > 0:
             messages.warning(request, f'{error_count} linhas com erro foram ignoradas.')
@@ -1423,6 +1435,7 @@ def _process_infinitepay_pdf_import(request):
     success_count = 0
     error_count = 0
     errors = []
+    dedup = RecebivelImportDedup(empresa.id)
 
     with transaction.atomic():
         for row_num, row in enumerate(rows, start=1):
@@ -1507,8 +1520,8 @@ def _process_infinitepay_pdf_import(request):
                 relatorio.nota_fiscal = (row.get('Nota Fiscal') or '').strip()
                 relatorio.razao = (row.get('Razão') or '').strip()
 
-                relatorio.save()
-                success_count += 1
+                if dedup.salvar(relatorio):
+                    success_count += 1
             except Exception as e:
                 errors.append(f'Linha {row_num}: {str(e)}')
                 error_count += 1
@@ -1520,6 +1533,7 @@ def _process_infinitepay_pdf_import(request):
 
     if success_count > 0:
         messages.success(request, f'{success_count} relatório(s) importado(s) do PDF Infinite Pay.')
+    _avisar_duplicados_import(request, dedup)
     if error_count > 0:
         messages.warning(request, f'{error_count} linha(s) com erro foram ignoradas.')
         for err in errors[:5]:
@@ -1725,6 +1739,7 @@ def _process_cielo_xlsx_import(request):
     success_count = 0
     error_count = 0
     errors = []
+    dedup = RecebivelImportDedup(empresa.id)
 
     with transaction.atomic():
         for row_num, row in enumerate(rows, start=1):
@@ -1785,8 +1800,8 @@ def _process_cielo_xlsx_import(request):
                 if conta_bancaria:
                     relatorio.conta_bancaria = conta_bancaria[:500]
 
-                relatorio.save()
-                success_count += 1
+                if dedup.salvar(relatorio):
+                    success_count += 1
             except Exception as e:
                 errors.append(f'Linha {row_num}: {str(e)}')
                 error_count += 1
@@ -1798,6 +1813,7 @@ def _process_cielo_xlsx_import(request):
 
     if success_count > 0:
         messages.success(request, f'{success_count} relatório(s) importado(s) do XLSX Cielo.')
+    _avisar_duplicados_import(request, dedup)
     if error_count > 0:
         messages.warning(request, f'{error_count} linha(s) com erro foram ignoradas.')
         for err in errors[:5]:
