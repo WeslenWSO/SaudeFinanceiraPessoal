@@ -20,6 +20,10 @@
                class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-calendar"></i> Calendário
             </a>
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=kanban{% if filtros.status %}&status={{ filtros.status }}{% endif %}{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-columns"></i> Kanban
+            </a>
             <a href="{% url 'agendador_tarefas:criar' %}" class="btn btn-primary btn-sm">
                 <i class="fas fa-plus"></i> Nova tarefa
             </a>

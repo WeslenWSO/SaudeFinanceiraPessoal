@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0">{{ title }}</h3>
+            <small class="text-muted">
+                {% if empresa %}{{ empresa.nome_fantasia|default:empresa.razao }} + {% endif %}
+                Tarefas gerais — {{ filtros.mes|stringformat:"02d" }}/{{ filtros.ano }} · Kanban
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=calendario{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-calendar"></i> Calendário
+            </a>
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=lista{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-list"></i> Lista
+            </a>
+            <a href="{% url 'agendador_tarefas:criar' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Nova tarefa
+            </a>
+        </div>
+    </div>
+
+    {% include 'parcial/_messages.html' %}
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="vista" value="kanban">
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroMes">Mês</label>
+                    <input type="number" min="1" max="12" name="mes" id="filtroMes"
+                           class="form-control form-control-sm" value="{{ filtros.mes }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1" for="filtroAno">Ano</label>
+                    <input type="number" min="2000" max="2100" name="ano" id="filtroAno"
+                           class="form-control form-control-sm" value="{{ filtros.ano }}">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small mb-1" for="filtroQ">Busca</label>
+                    <input type="text" name="q" id="filtroQ" class="form-control form-control-sm"
+                           value="{{ filtros.q }}" placeholder="Título, descrição, responsável">
+                </div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filtrar</button>
+                    <a href="{% url 'agendador_tarefas:listar' %}?vista=kanban" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="kanban-board" id="kanbanBoard">
+        {% for col in kanban_colunas %}
+        <div class="kanban-coluna" data-status="{{ col.status }}">
+            <div class="kanban-coluna-head bg-{{ col.badge }} bg-opacity-10">
+                <span class="kanban-coluna-titulo">{{ col.rotulo }}</span>
+                <span class="badge bg-{{ col.badge }} kanban-coluna-count">{{ col.tarefas|length }}</span>
+            </div>
+            <div class="kanban-coluna-body" data-drop-status="{{ col.status }}">
+                {% for t in col.tarefas %}
+                <article class="kanban-card"
+                         draggable="true"
+                         data-tarefa-id="{{ t.pk }}"
+                         data-status="{{ t.status }}">
+                    <div class="kanban-card-top">
+                        <strong class="kanban-card-titulo">{{ t.titulo }}</strong>
+                        <div class="kanban-card-acoes btn-group btn-group-sm">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm py-0 px-1"
+                                    title="Trâmites"
+                                    data-tramites-btn
+                                    data-tarefa-id="{{ t.pk }}"
+                                    data-tarefa-titulo="{{ t.titulo }}">
+                                <i class="fas fa-comments"></i>
+                                {% if t.tramites_count %}
+                                <span class="badge bg-secondary">{{ t.tramites_count }}</span>
+                                {% endif %}
+                            </button>
+                            <a href="{% url 'agendador_tarefas:editar' t.pk %}" class="btn btn-outline-primary btn-sm py-0 px-1" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% if t.descricao %}
+                    <p class="kanban-card-desc">{{ t.descricao|truncatechars:120 }}</p>
+                    {% endif %}
+                    <ul class="kanban-card-meta list-unstyled mb-0">
+                        <li><i class="fas fa-building text-muted"></i> {{ t.empresa_rotulo }}</li>
+                        <li><i class="fas fa-calendar-day text-muted"></i> Previsão: {{ t.previsao_conclusao|date:"d/m/Y" }}</li>
+                        {% if t.horario_rotulo %}
+                        <li><i class="fas fa-clock text-muted"></i> {{ t.horario_rotulo }}</li>
+                        {% endif %}
+                        <li><i class="fas fa-user text-muted"></i> {{ t.responsavel|default:"—" }}</li>
+                    </ul>
+                </article>
+                {% empty %}
+                <p class="kanban-vazio text-muted small mb-0">Nenhuma tarefa</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
+    gap: 1rem;
+    align-items: start;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+@media (max-width: 992px) {
+    .kanban-board {
+        grid-template-columns: repeat(3, minmax(240px, 1fr));
+    }
+}
+.kanban-coluna {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+}
+.kanban-coluna-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 0.5rem 0.5rem 0 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.kanban-coluna-body {
+    flex: 1;
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 200px;
+    transition: background 0.15s ease;
+}
+.kanban-coluna-body.kanban-drop-over {
+    background: #eff6ff;
+    outline: 2px dashed #3b82f6;
+    outline-offset: -4px;
+}
+.kanban-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.45rem;
+    padding: 0.65rem 0.75rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    cursor: grab;
+}
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.kanban-dragging { opacity: 0.45; }
+.kanban-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+}
+.kanban-card-titulo { font-size: 0.88rem; line-height: 1.3; }
+.kanban-card-desc {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-bottom: 0.45rem;
+}
+.kanban-card-meta {
+    font-size: 0.74rem;
+    color: #475569;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.kanban-card-meta i { width: 1rem; }
+.kanban-vazio { padding: 0.5rem 0.25rem; text-align: center; }
+</style>
+
+<form id="csrfKanban" style="display:none;">{% csrf_token %}</form>
+
+<script>
+(function() {
+    const board = document.getElementById('kanbanBoard');
+    if (!board) return;
+
+    const csrf = document.querySelector('#csrfKanban [name=csrfmiddlewaretoken]')?.value
+        || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+    let dragged = null;
+
+    function atualizarContadores() {
+        board.querySelectorAll('.kanban-coluna').forEach(function(col) {
+            const body = col.querySelector('.kanban-coluna-body');
+            const count = body.querySelectorAll('.kanban-card').length;
+            const badge = col.querySelector('.kanban-coluna-count');
+            if (badge) badge.textContent = count;
+            const vazio = body.querySelector('.kanban-vazio');
+            if (vazio) vazio.style.display = count ? 'none' : '';
+        });
+    }
+
+    function moverCard(card, colBody) {
+        const vazio = colBody.querySelector('.kanban-vazio');
+        if (vazio) vazio.remove();
+        colBody.appendChild(card);
+        atualizarContadores();
+    }
+
+    board.querySelectorAll('.kanban-card').forEach(function(card) {
+        card.addEventListener('dragstart', function(e) {
+            dragged = card;
+            card.classList.add('kanban-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', card.dataset.tarefaId);
+        });
+        card.addEventListener('dragend', function() {
+            card.classList.remove('kanban-dragging');
+            dragged = null;
+            board.querySelectorAll('.kanban-coluna-body').forEach(function(b) {
+                b.classList.remove('kanban-drop-over');
+            });
+        });
+    });
+
+    board.querySelectorAll('.kanban-coluna-body').forEach(function(body) {
+        body.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            body.classList.add('kanban-drop-over');
+        });
+        body.addEventListener('dragleave', function() {
+            body.classList.remove('kanban-drop-over');
+        });
+        body.addEventListener('drop', function(e) {
+            e.preventDefault();
+            body.classList.remove('kanban-drop-over');
+            if (!dragged) return;
+
+            const novoStatus = body.dataset.dropStatus;
+            const statusAtual = dragged.dataset.status;
+            if (!novoStatus || novoStatus === statusAtual) return;
+
+            const tarefaId = dragged.dataset.tarefaId;
+            const colOrigem = dragged.closest('.kanban-coluna-body');
+            moverCard(dragged, body);
+            dragged.dataset.status = novoStatus;
+
+            const fd = new FormData();
+            fd.append('status', novoStatus);
+            fd.append('next', window.location.href);
+
+            fetch('{% url "agendador_tarefas:alterar_status" pk=0 %}'.replace('/0/', '/' + tarefaId + '/'), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: fd,
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.ok) throw new Error('Falha ao atualizar status');
+            })
+            .catch(function() {
+                if (colOrigem) {
+                    moverCard(dragged, colOrigem);
+                    dragged.dataset.status = statusAtual;
+                }
+                alert('Não foi possível mover a tarefa. Tente novamente.');
+            });
+        });
+    });
+})();
+</script>
+
+{% include 'agendador_tarefas/_modal_tramites.html' %}
+{% endblock %}

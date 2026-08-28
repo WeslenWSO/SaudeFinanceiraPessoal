@@ -69,7 +69,7 @@ def _filtros_get(request):
         ano = hoje.year
     if mes < 1 or mes > 12:
         mes = hoje.month
-    if vista not in ('calendario', 'lista'):
+    if vista not in ('calendario', 'lista', 'kanban'):
         vista = 'calendario'
     return mes, ano, status, q, vista
 
@@ -149,8 +149,33 @@ def _montar_calendario(mes, ano, tarefas):
     }
 
 
+STATUS_BADGE_MAP = {
+    TarefaAgendada.STATUS_PENDENTE: 'warning',
+    TarefaAgendada.STATUS_CONCLUIDO: 'success',
+    TarefaAgendada.STATUS_COM_SUPERVISOR: 'info',
+}
+
+
+def _montar_kanban(tarefas):
+    """Agrupa tarefas por status para o quadro Kanban."""
+    por_status = {val: [] for val, _ in TarefaAgendada.STATUS_CHOICES}
+    for tarefa in tarefas:
+        por_status.setdefault(tarefa.status, []).append(tarefa)
+    return [
+        {
+            'status': val,
+            'rotulo': rotulo,
+            'badge': STATUS_BADGE_MAP.get(val, 'secondary'),
+            'tarefas': por_status.get(val, []),
+        }
+        for val, rotulo in TarefaAgendada.STATUS_CHOICES
+    ]
+
+
 def _contexto_listagem(request, empresa):
     mes, ano, status, q, vista = _filtros_get(request)
+    if vista == 'kanban':
+        status = ''
     tarefas = _queryset_tarefas(empresa, mes, ano, status, q)
     ctx = {
         'title': 'Agendador de Tarefas',
@@ -159,6 +184,7 @@ def _contexto_listagem(request, empresa):
         'filtros': {'mes': mes, 'ano': ano, 'status': status, 'q': q, 'vista': vista},
         'status_choices': TarefaAgendada.STATUS_CHOICES,
         'calendario': _montar_calendario(mes, ano, tarefas),
+        'kanban_colunas': _montar_kanban(tarefas),
     }
     return ctx, vista
 
@@ -167,7 +193,11 @@ def _contexto_listagem(request, empresa):
 def tarefa_listar(request):
     empresa = _empresa_sessao(request)
     ctx, vista = _contexto_listagem(request, empresa)
-    template = 'agendador_tarefas/lista.html' if vista == 'lista' else 'agendador_tarefas/calendario.html'
+    templates = {
+        'lista': 'agendador_tarefas/lista.html',
+        'kanban': 'agendador_tarefas/kanban.html',
+    }
+    template = templates.get(vista, 'agendador_tarefas/calendario.html')
     return render(request, template, ctx)
 
 
@@ -314,12 +344,17 @@ def tarefa_concluir(request, pk):
 def tarefa_alterar_status(request, pk):
     empresa = _empresa_sessao(request)
     tarefa = get_object_or_404(TarefaAgendada, pk=pk)
+    ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not _usuario_pode_tarefa(tarefa, empresa):
+        if ajax:
+            return JsonResponse({'ok': False, 'erro': 'Tarefa não disponível.'}, status=403)
         messages.error(request, 'Tarefa não disponível.')
         return redirect('agendador_tarefas:listar')
     novo = (request.POST.get('status') or '').strip()
     validos = {c[0] for c in TarefaAgendada.STATUS_CHOICES}
     if novo not in validos:
+        if ajax:
+            return JsonResponse({'ok': False, 'erro': 'Status inválido.'}, status=400)
         messages.error(request, 'Status inválido.')
         return redirect('agendador_tarefas:listar')
 
@@ -331,6 +366,13 @@ def tarefa_alterar_status(request, pk):
         tarefa.data_conclusao = None
         tarefa.concluido_por = None
     tarefa.save(update_fields=['status', 'data_conclusao', 'concluido_por', 'atualizado_em'])
+    if ajax:
+        return JsonResponse({
+            'ok': True,
+            'status': novo,
+            'status_rotulo': tarefa.get_status_display(),
+            'status_badge': STATUS_BADGE_MAP.get(novo, 'secondary'),
+        })
     messages.success(request, f'Status de "{tarefa.titulo}" atualizado.')
     return _redirect_voltar(request)
 

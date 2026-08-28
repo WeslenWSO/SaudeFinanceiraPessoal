@@ -16,6 +16,10 @@
             </small>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=kanban{% if filtros.status %}&status={{ filtros.status }}{% endif %}{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-columns"></i> Kanban
+            </a>
             <a href="{% url 'agendador_tarefas:listar' %}?mes={{ filtros.mes }}&ano={{ filtros.ano }}&vista=lista{% if filtros.status %}&status={{ filtros.status }}{% endif %}{% if filtros.q %}&q={{ filtros.q }}{% endif %}"
                class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-list"></i> Lista
