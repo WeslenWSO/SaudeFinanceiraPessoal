@@ -60,14 +60,6 @@
                 <div class="card-header">
                     <h3 class="card-title">Faturamentos Médicos</h3>
                     <div class="card-tools">
-                        <a href="{% url 'faturamento_medico:dashboard_exames' %}" class="btn btn-outline-info btn-sm me-1">
-                            <i class="fas fa-chart-pie"></i> Dashboard dos Exames
-                        </a>
-                        <a href="{% url 'faturamento_medico:relatorio_sedacao_anestesista' %}?{{ relatorio_sedacao_query_string }}"
-                           class="btn btn-outline-secondary btn-sm me-1" target="_blank" rel="noopener"
-                           title="Usa Data início e Data fim dos filtros">
-                            <i class="fas fa-syringe"></i> Relatório Sedação Anestesista
-                        </a>
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-upload"></i> Importar
@@ -93,14 +85,8 @@
                                 </a></li>
                             </ul>
                         </div>
-                        <a href="{% url 'faturamento_medico:listar_extrato_pagamento' %}" class="btn btn-outline-info btn-sm">
-                            <i class="fas fa-receipt"></i> Extrato Pagamento
-                        </a>
                         <a href="{% url 'faturamento_medico:listar_cancelados' %}" class="btn btn-danger btn-sm">
                             <i class="fas fa-ban"></i> Cancelados / Desistência / Deletados
-                        </a>
-                        <a href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}" class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-user-md"></i> Exames por Solicitante
                         </a>
                         <a href="{% url 'faturamento_medico:verificar_corrigir_precos' %}" class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-balance-scale"></i> Verificar / Corrigir Preços

@@ -22,6 +22,7 @@ class MenuItemDef:
     url_name: str | None = None
     url_externa: str | None = None
     url_hash: str | None = None
+    permissao: str | None = None
 
 
 @dataclass
@@ -58,6 +59,22 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
     MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='accounts:backup_banco'),
     MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'faturamento', url_name='faturamento_medico:ftlistar'),
+    MenuItemDef(
+        'faturamento_dashboard_exames', 'Dashboard dos Exames', 'fa-chart-pie', 'faturamento',
+        url_name='faturamento_medico:dashboard_exames', permissao='faturamento_medico',
+    ),
+    MenuItemDef(
+        'faturamento_relatorio_sedacao', 'Relatório Sedação Anestesista', 'fa-syringe', 'faturamento',
+        url_name='faturamento_medico:relatorio_sedacao_anestesista', permissao='faturamento_medico',
+    ),
+    MenuItemDef(
+        'faturamento_extrato_pagamento', 'Extrato Pagamento', 'fa-receipt', 'faturamento',
+        url_name='faturamento_medico:listar_extrato_pagamento', permissao='faturamento_medico',
+    ),
+    MenuItemDef(
+        'faturamento_exames_solicitante', 'Exames por Solicitante', 'fa-user-md', 'faturamento',
+        url_name='faturamento_medico:listar_exames_por_solicitante', permissao='faturamento_medico',
+    ),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-calendar-check', 'tarefas', url_name='agendador_tarefas:listar'),
     MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
     MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
@@ -135,7 +152,18 @@ def permissoes_menu_do_usuario(user: User | None) -> set[str]:
         return set(CODIGOS_MENU)
 
 
+def _codigo_permissao_item(item: MenuItemDef) -> str:
+    return item.permissao or item.codigo
+
+
+def _item_permitido(item: MenuItemDef, permitidos: set[str]) -> bool:
+    return _codigo_permissao_item(item) in permitidos
+
+
 def usuario_pode_menu(user: User | None, codigo: str) -> bool:
+    item = ITENS_POR_CODIGO.get(codigo)
+    if item:
+        return _item_permitido(item, permissoes_menu_do_usuario(user))
     return codigo in permissoes_menu_do_usuario(user)
 
 
@@ -171,7 +199,7 @@ def montar_menu_nav(user: User | None) -> dict[str, Any]:
     for item in ITENS_MENU:
         if item.codigo == 'backup_banco' and not (user and user.is_superuser):
             continue
-        if item.secao is None and item.codigo in permitidos:
+        if item.secao is None and _item_permitido(item, permitidos):
             links.append(_item_para_template(item))
 
     for secao in SECOES_MENU:
@@ -179,7 +207,7 @@ def montar_menu_nav(user: User | None) -> dict[str, Any]:
             _item_para_template(item)
             for item in ITENS_MENU
             if item.secao == secao.codigo
-            and item.codigo in permitidos
+            and _item_permitido(item, permitidos)
             and not (item.codigo == 'backup_banco' and not (user and user.is_superuser))
         ]
         if filhos:
@@ -202,7 +230,7 @@ def opcoes_permissao_por_secao() -> list[dict[str, Any]]:
         itens = [
             {'codigo': item.codigo, 'rotulo': item.rotulo}
             for item in ITENS_MENU
-            if item.secao == secao.codigo
+            if item.secao == secao.codigo and item.permissao is None
         ]
         if itens:
             secoes.append({'codigo': secao.codigo, 'rotulo': secao.rotulo, 'itens': itens})
