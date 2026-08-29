@@ -41,12 +41,12 @@ SECOES_MENU: tuple[MenuSecaoDef, ...] = (
     MenuSecaoDef('financeiro', 'Financeiro', 'fa-wallet', 'dropdown-financeiro', 'trigger-financeiro'),
     MenuSecaoDef('relatorios', 'Relatórios', 'fa-chart-bar', 'dropdown-relatorios', 'trigger-relatorios'),
     MenuSecaoDef('tarefas', 'Tarefas', 'fa-tasks', 'dropdown-tarefas', 'trigger-tarefas'),
+    MenuSecaoDef('meta_academia', 'Meta Academia', 'fa-dumbbell', 'dropdown-meta-academia', 'trigger-meta-academia'),
     MenuSecaoDef('links_uteis', 'Links úteis', 'fa-link', 'dropdown-links-uteis', 'trigger-links-uteis'),
 )
 
 ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('dashboard', 'Dashboard', 'fa-cloud', url_name='dashboard:index'),
-    MenuItemDef('dashboard_academia', 'Dashboard de Academia', 'fa-dumbbell', url_name='indicadores:dashboard_academia'),
     MenuItemDef('dashboard_por_tipo', 'Dashboard — R/D/I/L', 'fa-chart-pie', 'relatorios', url_name='dashboard:por_tipo'),
     MenuItemDef('empresa', 'Empresa', 'fa-building', 'cadastro', url_name='empresa:lista'),
     MenuItemDef('fornecedor', 'Fornecedor', 'fa-truck', 'cadastro', url_name='fornecedor:fornList'),
@@ -80,7 +80,14 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='faturamento_medico:listar_cancelados', permissao='faturamento_medico',
     ),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-calendar-check', 'tarefas', url_name='agendador_tarefas:listar'),
-    MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
+    MenuItemDef(
+        'dashboard_academia', 'Dashboard de Academia', 'fa-chart-line', 'meta_academia',
+        url_name='indicadores:dashboard_academia',
+    ),
+    MenuItemDef(
+        'indicadores', 'Indicadores', 'fa-bullseye', 'meta_academia',
+        url_name='indicadores:listar',
+    ),
     MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
     MenuItemDef('atendentes_academia', 'Atendentes academia', 'fa-user-friends', 'cadastro', url_name='indicadores:atendente_listar'),
     MenuItemDef('convenios', 'Convênios', 'fa-hand-holding-medical', 'cadastro', url_name='servicos_medicos:convenio_list'),
