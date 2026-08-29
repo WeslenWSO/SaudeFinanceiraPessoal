@@ -39,6 +39,7 @@ SECOES_MENU: tuple[MenuSecaoDef, ...] = (
     MenuSecaoDef('fiscal', 'Fiscal', 'fa-file-invoice', 'dropdown-fiscal', 'trigger-fiscal'),
     MenuSecaoDef('financeiro', 'Financeiro', 'fa-wallet', 'dropdown-financeiro', 'trigger-financeiro'),
     MenuSecaoDef('relatorios', 'Relatórios', 'fa-chart-bar', 'dropdown-relatorios', 'trigger-relatorios'),
+    MenuSecaoDef('tarefas', 'Tarefas', 'fa-tasks', 'dropdown-tarefas', 'trigger-tarefas'),
     MenuSecaoDef('links_uteis', 'Links úteis', 'fa-link', 'dropdown-links-uteis', 'trigger-links-uteis'),
 )
 
@@ -57,7 +58,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
     MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='accounts:backup_banco'),
     MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'faturamento', url_name='faturamento_medico:ftlistar'),
-    MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-tasks', 'cadastro', url_name='agendador_tarefas:listar'),
+    MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-calendar-check', 'tarefas', url_name='agendador_tarefas:listar'),
     MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
     MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
     MenuItemDef('atendentes_academia', 'Atendentes academia', 'fa-user-friends', 'cadastro', url_name='indicadores:atendente_listar'),
