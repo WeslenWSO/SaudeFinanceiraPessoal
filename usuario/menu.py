@@ -35,6 +35,7 @@ class MenuSecaoDef:
 
 SECOES_MENU: tuple[MenuSecaoDef, ...] = (
     MenuSecaoDef('cadastro', 'Cadastro', 'fa-folder-open', 'dropdown-cadastro', 'trigger-cadastro'),
+    MenuSecaoDef('faturamento', 'Faturamento', 'fa-file-medical', 'dropdown-faturamento', 'trigger-faturamento'),
     MenuSecaoDef('fiscal', 'Fiscal', 'fa-file-invoice', 'dropdown-fiscal', 'trigger-fiscal'),
     MenuSecaoDef('financeiro', 'Financeiro', 'fa-wallet', 'dropdown-financeiro', 'trigger-financeiro'),
     MenuSecaoDef('relatorios', 'Relatórios', 'fa-chart-bar', 'dropdown-relatorios', 'trigger-relatorios'),
@@ -55,7 +56,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('regrarateio', 'Regra do Rateio', 'fa-share-nodes', 'cadastro', url_name='regrarateio:regraList'),
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
     MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='accounts:backup_banco'),
-    MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'cadastro', url_name='faturamento_medico:ftlistar'),
+    MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'faturamento', url_name='faturamento_medico:ftlistar'),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-tasks', 'cadastro', url_name='agendador_tarefas:listar'),
     MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
     MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
