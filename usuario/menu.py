@@ -75,6 +75,10 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         'faturamento_exames_solicitante', 'Exames por Solicitante', 'fa-user-md', 'faturamento',
         url_name='faturamento_medico:listar_exames_por_solicitante', permissao='faturamento_medico',
     ),
+    MenuItemDef(
+        'faturamento_cancelados', 'Cancelados / Desistência / Deletados', 'fa-ban', 'faturamento',
+        url_name='faturamento_medico:listar_cancelados', permissao='faturamento_medico',
+    ),
     MenuItemDef('agendador_tarefas', 'Agendador de Tarefas', 'fa-calendar-check', 'tarefas', url_name='agendador_tarefas:listar'),
     MenuItemDef('indicadores', 'Indicadores', 'fa-bullseye', 'cadastro', url_name='indicadores:listar'),
     MenuItemDef('lancamento_vendas_dia', 'Lançamento diário academia', 'fa-calendar-day', 'cadastro', url_name='indicadores:lancamento_vendas_listar'),
