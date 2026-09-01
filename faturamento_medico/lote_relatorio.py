@@ -64,7 +64,7 @@ def convenio_usa_layout_publico(nome_convenio: str) -> bool:
 
 
 def convenio_relatorio_coluna_guia(nome_convenio: str) -> bool:
-    """FUSEX e PM exibem número da guia; Bombeiro e PP Saúde exibem associado."""
+    """FUSEX e PM exibem número da guia além do associado."""
     nome = (nome_convenio or '').upper().strip()
     if any(palavra in nome for palavra in CONVENIOS_RELATORIO_COLUNA_GUIA):
         return True
@@ -291,3 +291,115 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote
         'usa_layout_publico': convenio_usa_layout_publico(lote.convenio),
         'coluna_terceira_guia': convenio_relatorio_coluna_guia(lote.convenio) if layout == 'publico' else False,
     }
+
+
+def _cabecalhos_tabela_publico(coluna_guia: bool) -> list[str]:
+    cols = ['Data', 'Paciente']
+    if coluna_guia:
+        cols.extend(['Número da Guia', 'Associado'])
+    else:
+        cols.append('Associado')
+    cols.extend(['Procedimento', 'Modalidade', 'Contraste', 'Valor'])
+    return cols
+
+
+def _linha_tabela_publico(linha: dict, coluna_guia: bool) -> list:
+    data = linha.get('data')
+    data_fmt = data.strftime('%d/%m/%Y') if data else '—'
+    valores = [data_fmt, linha.get('paciente') or '-']
+    if coluna_guia:
+        valores.extend([
+            linha.get('numero_guia') or '-',
+            linha.get('nome_associado') or '-',
+        ])
+    else:
+        valores.append(linha.get('nome_associado') or '-')
+    valor = linha.get('valor') or Decimal('0')
+    valores.extend([
+        linha.get('procedimento') or '-',
+        linha.get('modalidade') or '-',
+        'Sim' if linha.get('com_contraste') else 'Não',
+        float(valor),
+    ])
+    return valores
+
+
+def montar_workbook_lote_publico(context) -> Workbook:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    coluna_guia = bool(context.get('coluna_terceira_guia'))
+    cabecalhos = _cabecalhos_tabela_publico(coluna_guia)
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    header_font = Font(bold=True)
+    empresa = context.get('empresa')
+    convenio = context.get('convenio_nome') or 'Convênio'
+
+    for idx, secao in enumerate(context.get('secoes') or []):
+        titulo = f'Lote {secao["lote"].id}' if len(context.get('secoes') or []) > 1 else 'Controle Exames'
+        ws = wb.create_sheet(title=titulo[:31])
+        row = 1
+        if empresa:
+            ws.cell(row=row, column=1, value=empresa.razao).font = Font(bold=True, size=12)
+            row += 1
+        ws.cell(row=row, column=1, value=f'CONTROLE DE EXAMES — {convenio}').font = Font(bold=True, size=11)
+        row += 1
+        ws.cell(row=row, column=1, value=f'MÊS DE REFERÊNCIA: {secao.get("mes_referencia") or "—"}').font = Font(bold=True)
+        row += 1
+        meta = [
+            f'Lote: {secao["lote"].id}',
+            f'Protocolo: {secao.get("protocolo") or "—"}',
+        ]
+        if secao.get('periodo_inicio') and secao.get('periodo_fim'):
+            pi = secao['periodo_inicio'].strftime('%d/%m/%Y')
+            pf = secao['periodo_fim'].strftime('%d/%m/%Y')
+            meta.append(f'Período: {pi} a {pf}')
+        emissao = context.get('data_emissao_relatorio')
+        if emissao:
+            meta.append(f'Emissão: {emissao.strftime("%d/%m/%Y")}')
+        ws.cell(row=row, column=1, value=' · '.join(meta))
+        row += 2
+
+        for col, titulo_col in enumerate(cabecalhos, start=1):
+            cell = ws.cell(row=row, column=col, value=titulo_col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', wrap_text=True)
+        row += 1
+
+        for linha in secao.get('linhas') or []:
+            for col, valor in enumerate(_linha_tabela_publico(linha, coluna_guia), start=1):
+                ws.cell(row=row, column=col, value=valor)
+            row += 1
+
+        resumo = secao.get('resumo_publico')
+        if resumo:
+            row += 1
+            ws.cell(row=row, column=1, value='Resumo por modalidade').font = Font(bold=True)
+            row += 1
+            for item in resumo.get('modalidades') or []:
+                ws.cell(row=row, column=1, value=item.get('label'))
+                ws.cell(row=row, column=2, value=item.get('quantidade'))
+                row += 1
+            ws.cell(row=row, column=1, value='Quantidade total').font = Font(bold=True)
+            ws.cell(row=row, column=2, value=resumo.get('quantidade_total')).font = Font(bold=True)
+            row += 1
+            ws.cell(row=row, column=1, value='Valor total').font = Font(bold=True)
+            ws.cell(row=row, column=2, value=float(resumo.get('valor_total') or 0)).font = Font(bold=True)
+
+        if idx == 0 and len(cabecalhos) >= 4:
+            ws.column_dimensions['A'].width = 12
+            ws.column_dimensions['B'].width = 36
+            if coluna_guia:
+                ws.column_dimensions['C'].width = 16
+                ws.column_dimensions['D'].width = 36
+                ws.column_dimensions['E'].width = 42
+            else:
+                ws.column_dimensions['C'].width = 36
+                ws.column_dimensions['D'].width = 42
+
+    if not wb.sheetnames:
+        wb.create_sheet('Controle Exames')
+    return wb

@@ -1,0 +1,537 @@
+================================================================================
+03_Treinamento_Implantacao_por_Setor.docx
+================================================================================
+PROJETO BLUE 7K
+Bluefit Maceió · Ponta Verde + Farol
+MANUAL DE TREINAMENTO
+DE IMPLANTAÇÃO POR SETOR
+Conduzido pela Gerência  ·  Recepção · Professor Padrinho · Gerente/Concierge · Coordenação Técnica · Vendas
+Documento de execução. Imprima. Treine na ordem. Não pule etapas.
+Maio/2026
+Filosofia de execução
+Sete decisões de liderança para os próximos 12 meses. Curtas de propósito — porque o que cabe no bolso é o que se executa.
+Foco antes de escopo. Entregar 3 pilares a 100% vale mais que 8 pilares a 50%. A recepção, o padrinho e a bonificação — nessa ordem.
+Padrão antes de incentivo. Bonificação sem onboarding estruturado e recepção treinada é custo sem retorno. Primeiro o sistema, depois o prêmio.
+Ninguém vai a campo sem certificação. Não passou no role-play, não atende. O treinamento tem porta de saída — e ela tem critério.
+O detalhe é o produto. A diferença entre “bom dia” e “bom dia, Beatriz!” é o projeto inteiro. Treine o detalhe, audite o detalhe.
+Sem registro, não aconteceu. O toque que não está na planilha não conta — nem para o aluno, nem para o bônus, nem para a sua leitura de KPI.
+A recepção é o seu CEO operacional. O que ela faz nos primeiros 30 segundos vale mais que qualquer campanha de mídia.
+Comunidade é o fosso. Equipamento, preço e ponto são copiáveis. A turma fixa da sexta às 19h não é. Treine para criar pertencimento.
+A sequência é inegociável
+As ondas de implantação acontecem em ordem: Fundação (M1) → Bonificação e refino (M2–M3) → Pilares de suporte (M4–M6) → Otimização e escala (M7–M12). Treinar fora de ordem é a forma mais cara de não mudar nada.
+Como conduzir este treinamento
+Este manual é seu, Gerente. Cada setor tem um currículo, roteiros de role-play e um critério de certificação. Você é o instrutor — ou nomeia e supervisiona quem será. A regra mestra: 
+o treinamento só termina quando a pessoa passa na certificação prática. Assistir ao conteúdo não certifica. Executar no role-play, sim.
+A porta de certificação (gate)
+Aprovado: ≥ 80% dos itens do checklist de certificação do setor, demonstrados em role-play observado. Libera para operar.
+Em ajuste: 70–79%. Opera sob supervisão direta + reforço de 1 SOP por semana até atingir o padrão.
+Reprovado: < 70%. Refaz o módulo. Não atende sozinho até certificar.
+Cronograma mestre — quem treina quando
+Calendário sugerido para a Onda 1 (M1). As duas unidades em paralelo, turmas pequenas.
+Semana
+Setor em foco
+Conteúdo principal
+Carga
+Sem. 1
+Recepção + Gerente
+Identidade Bluefit, tom de voz; SOP 1, 2, 6 (boas-vindas e prospect)
+14h
+Sem. 2
+Recepção + Padrinho
+SOP 3 e 5 (cancelamento e reclamação); régua D0–D14 do onboarding
+14h
+Sem. 3
+Recepção + Padrinho
+SOP 4 (cobrança); jornada D15–D90; sistema de padrinho
+12h
+Sem. 4
+Todos
+Certificação de campo; LRD diária; 1ª reunião de retenção
+10h
+Princípio do instrutor
+Treine como o aluno será atendido: pelo nome, com calor, com padrão. A forma como você conduz o treinamento é o primeiro exemplo do atendimento que você quer ver no balcão.
+Setor 1 — Recepção
+A interação mais frequente e mais barata da operação — e a mais negligenciada. Aqui se decide o custo emocional de cancelar.
+O que muda (a virada)
+A recepção sai do “modo bancário” (fila, senha, resolve, próximo) para o modelo dual: um papel de Relacionamento (Hospitality) e um papel de Operação (Transacional), executados pelas mesmas pessoas em momentos diferentes do turno.
+Papel A — Hospitality (Relacionamento)
+Papel B — Transacional (Operação)
+Reconhece e chama pelo nome; cria micro-momentos de conexão (3–10s); conhece a história dos ~100 alunos mais frequentes; aciona resgates e onboarding.
+Pagamento, atestado, trancamento, dúvidas; executa matrícula com agilidade; resolve reclamações e escalonamentos.
+Por que importa
+Quando os dois papéis se misturam, vence sempre o transacional — tem fila, urgência, máquina apitando. O relacional, que é mais valioso, vira “quando der tempo”. E nunca dá tempo. O treinamento existe para proteger o papel relacional.
+Currículo — 6 semanas (34h)
+Sem.
+Foco
+Formato
+Carga
+1
+Identidade Bluefit, missão e proposta de valor; valores e tom de voz
+Workshop presencial
+8h
+2
+SOP 1, 2, 6 — boas-vindas e prospect
+Role-play + simulação
+6h
+3
+SOP 3, 5 — cancelamento e reclamação
+Role-play intensivo + casos
+8h
+4
+SOP 4 — cobrança e recuperação
+Treino de sistema + scripts
+4h
+5
+SOP 7 e jornada do aluno antigo
+Workshop + acompanhamento
+4h
+6
+Auditoria de campo + feedback individual
+Observação real + 1:1
+4h
+Reciclagem: 4h trimestrais obrigatórias, 2 SOPs rotativos. Recepcionista novo faz o programa completo nas 6 primeiras semanas, sob supervisão direta.
+Roteiro de role-play (use em cada SOP)
+Instrutor lê a situação e assume o papel do aluno (use os casos reais mais difíceis do mês).
+Recepcionista executa o SOP de memória — passo a passo e script.
+Turma pontua de 0 a 3 cada item do SOP (mesma régua da auditoria de campo).
+Instrutor dá 1 reforço positivo + 1 ajuste. Repete a cena uma vez com o ajuste aplicado.
+Certificação da Recepção (checklist)
+Demonstrar em role-play observado, ≥ 80% dos itens:
+☐  Cumprimenta pelo nome em < 10 segundos, levantando o olhar da tela (SOP 1).
+☐  Conduz o tour de 5 minutos completo e apresenta 1 professor por nome (SOP 2).
+☐  Agenda avaliação física dentro de 7 dias no ato — não “depois você marca”.
+☐  Aplica as 4 perguntas da conversa de retenção antes de qualquer cancelamento (SOP 3).
+☐  Categoriza o motivo da saída no sistema e aciona a resposta padrão correta.
+☐  Acolhe reclamação sem defesa, registra com tag “VOLTA EM 24H” quando preciso (SOP 5).
+☐  Executa a régua de cobrança D+0 a D+10 e o script de falha de pagamento (SOP 4).
+☐  Trabalha a LRD do dia e registra resultado de cada contato.
+Setor 2 — Professor Padrinho
+O dono da janela crítica. 72% dos cancelamentos acontecem nos primeiros 90 dias — e o padrinho é quem segura essa porta.
+O sistema de padrinho (regras fixas)
+Cada aluno novo recebe um padrinho ANTES de pisar pela 1ª vez na musculação.
+Designação por algoritmo simples (rodízio + carga atual) — nunca por “boa vontade”.
+Máximo de 20 afilhados ativos por padrinho (alunos nos primeiros 90 dias).
+Só vira padrinho com 90 dias de casa + certificação. Performance < 70% por 2 meses seguidos sai do programa e volta após reciclagem.
+Bônus mensal atrelado à retenção D90 dos afilhados (ver Calculadora de Bonificação).
+A jornada de 90 dias que o padrinho executa
+São 14 toques rastreáveis ao longo de 90 dias — cerca de 1 a cada 4–6 dias. Cada um registrado na aba “Padrinho — Régua 90 dias”.
+Dia
+Ação
+Canal
+D1
+“Bom-dia! Vai treinar hoje? Te vejo na recepção.” + receber no 1º treino
+WhatsApp / presencial
+D2
+“Como foi seu primeiro treino? Dor em algum lugar?”
+WhatsApp
+D3
+Reforço positivo + lembrete do treino de hoje
+WhatsApp
+D5
+ALERTA VERMELHO se não voltou — ligação obrigatória
+Voz
+D7
+Avaliação física (se não agendada, marcar AGORA)
+Presencial
+D10
+“Está conseguindo manter o ritmo? Posso ajustar algo?”
+WhatsApp
+D14
+Encontro de 10 min — revisar treino, alinhar próximos 30 dias
+Presencial
+D21
+“Você já completou 3 semanas — parabéns!” + conquista
+WhatsApp
+D28
+Convite para 1 aula coletiva nova (porta da comunidade)
+App / WhatsApp
+D30
+Reavaliação rápida (10 min) — mostrar a 1ª evolução
+Presencial
+D45
+Encontro: ajuste de treino para o próximo ciclo
+Presencial
+D60
+Apresentar 1 modalidade nova (jiu, dança, funcional...)
+App / presencial
+D75
+Reavaliação física completa (a 2ª)
+Presencial
+D90
+Diploma simbólico “3 meses Bluefit” + foto no mural
+Presencial
+Por que a reavaliação do D30 é crítica
+O aluno que vê progresso objetivo no 1º mês tem o dobro de chance de retenção. Não precisa de BIA cara: fita métrica + peso + 3 fotos de postura, registrados no app. O ponto é mostrar que algo está mudando.
+Treinamento do padrinho (2h por turma + acompanhamento)
+O papel e as regras do sistema de padrinho (máx. 20 afilhados, registro obrigatório).
+Roteiro de cada toque: o que dizer no D1, D2, D3 e a ligação do D5 (treinar a ligação, não só o WhatsApp).
+Como conduzir o encontro presencial do D14 e a reavaliação do D30.
+Como registrar cada toque na planilha e por que % Régua impacta o bônus.
+Certificação do Padrinho (checklist)
+☐  Sabe quantos afilhados pode ter e como são designados.
+☐  Executa de memória os scripts de D1, D2, D3 e faz a ligação do D5 em role-play.
+☐  Conduz o encontro do D14 (revisão de treino + próximos 30 dias).
+☐  Realiza e registra a reavaliação do D30 mostrando evolução ao aluno.
+☐  Atualiza a régua na planilha e lê o próprio % de cumprimento.
+Setor 3 — Gerente / Concierge
+O orquestrador. Cobra prazos, lê KPIs, conduz cadências e protege a cultura quando a motivação da equipe cai.
+Cadência de gestão (decore e cumpra)
+Reunião
+Participantes
+Duração
+Frequência
+Huddle
+Gerente + Concierge + Recepção
+15 min
+Diária
+Weekly operacional
+Gerente + líderes
+60 min
+Semanal
+Weekly onboarding
+Gerente + Concierge/Padrinhos
+45 min
+Semanal
+Reunião de retenção
+Gerente + Recepção + 1 prof.
+60 min
+Mensal
+Comitê estratégico
+Diretoria + Gerentes + RH
+3 h
+Mensal
+Como conduzir o huddle de 15 minutos
+Novatos do dia (quem entrou ontem, padrinho designado).
+Aniversariantes de hoje (brinde preparado?).
+Alertas vermelhos: alunos em D5 sem retorno e inadimplência nova.
+LRD do dia: quantos nomes, quem trabalha a lista, meta 100% no mesmo dia.
+Como rodar a LRD (Lista de Resgate Diária)
+8h: o sistema emite a lista por unidade (1º treino sem retorno D5; 3+ ausências em 14 dias; avaliação não agendada após D+7).
+Janela 8h–10h: recepção da manhã contata 100% da lista (90 segundos por aluno via WhatsApp).
+Janela 18h–19h: recepção da noite faz follow-up dos não respondidos.
+Registrar resultado de cada contato na aba “LRD Diária”. Uma lista típica tem 8 a 15 nomes por unidade.
+Como ler os KPIs (Painel)
+Cinco números na parede, atualizados toda segunda 8h: churn mensal, gross adds, net adds, inadimplência, NPS. Três números no celular, diários: check-ins, alunos sem visita há 7 dias, cancelamentos da semana com motivo.
+Regra de ouro
+Dado sem ação é só relatório. Cada KPI tem dono nomeado e uma decisão na weekly. Cada ⚠ no painel vira tarefa com responsável e prazo.
+Como conduzir a reunião mensal de retenção (60 min)
+% de cada categoria de cancelamento (aba Registro Cancel. & Saves).
+Top 3 motivos do mês.
+1 ação corretiva por categoria, com dono e prazo.
+Histórico vs. metas — a curva está virando?
+Auditoria: cliente oculto trimestral
+Obrigatória. Você não pode auditar o que não experimenta como cliente. 10 observações silenciosas por semana na recepção (pontue 0–3 cada item do SOP 1) + 1 cliente oculto por trimestre por unidade. Resultado entra no painel de bônus.
+Certificação do Gerente (checklist)
+☐  Conduz huddle, weeklies e reunião de retenção no formato e no tempo.
+☐  Roda a LRD diariamente e cobra os 100% de contato.
+☐  Lê o Painel de KPIs e transforma cada ⚠ em tarefa com dono e prazo.
+☐  Aplica a categorização de cancelamentos e extrai 1 ação por categoria.
+☐  Executa observação silenciosa semanal e cliente oculto trimestral.
+☐  Fecha o ciclo de bonificação no dia 5 e entrega extratos no dia 6.
+Setor 4 — Coordenação Técnica
+O multiplicador do padrinho. Garante que avaliação vira evolução e que a sala de aula vira comunidade.
+Responsabilidades
+Supervisiona os professores padrinho e a qualidade das fichas/avaliações.
+Garante que avaliações agendadas viram avaliações executadas e registradas.
+Cuida da ocupação das aulas coletivas (gateway de comunidade).
+KPIs do cargo (ver Calculadora de Bonificação)
+KPI
+Peso
+Como medir
+Retenção D90 média dos afilhados da unidade
+40%
+Sistema
+% de avaliações executadas vs. agendadas
+35%
+Sistema
+% de aulas coletivas com ocupação ≥ 75%
+25%
+Sistema / app
+Treinamento e certificação
+☐  Sabe extrair e ler a retenção D90 por padrinho e agir sobre os mais baixos.
+☐  Audita 5 fichas/semana e dá feedback de qualidade ao padrinho.
+☐  Acompanha ocupação das aulas e propõe ajustes de grade com base em dados.
+Setor 5 — Consultor de Vendas
+Captação é a última peça do sistema, não a primeira. O vendedor é o único cargo pago por volume — mas com filtro de qualidade que o alinha à retenção.
+O modelo de comissão (com filtro de qualidade)
+Componente
+Regra
+Matrícula confirmada
++ R$ 35 por matrícula que pagou a 1ª mensalidade
+Bônus de qualidade (retroativo M+2)
++ R$ 50 por matrícula que chegou ao D60 ativa
+Penalidade de churn precoce
+− R$ 20 por matrícula que cancelou em até 30 dias
+Por que o retroativo importa: sem ele, o vendedor vende para qualquer um e ainda aplaude. O bônus pago em M+2 é o que o alinha com a retenção da casa.
+SOP 6 — Visita de prospect (resumo para o vendedor)
+“É sua primeira vez aqui? Posso te mostrar a casa.” — tour comercial de 8 min.
+Captura obrigatória de WhatsApp com promessa: “Vou te mandar a grade de aulas. Sem spam.”
+Oferta de 1 aula experimental. Não force o fechamento na hora.
+Registro no CRM como prospect com tag de origem (Google, indicação, passou na frente).
+Régua: D+1 WhatsApp; D+3 2ª mensagem; D+7 entra em nutrição (1 msg/semana por 4 semanas).
+Certificação do Vendedor (checklist)
+☐  Conduz o tour comercial de 8 min e captura WhatsApp com a promessa correta.
+☐  Registra origem do prospect e executa a régua D+1 / D+3 / D+7.
+☐  Entende o filtro de qualidade e por que o churn precoce custa comissão.
+Anexo — Kit de materiais por setor
+Setor
+Materiais necessários
+Recepção
+Cartão de bolso laminado “Os 7 SOPs”; mural interno de KPIs; mural do aluno (aluno do mês, aniversariantes, eventos).
+Padrinho
+Kit de medidas (balança, fita, oxímetro — R$ 200/unidade); anamnese impressa; manual de bolso plastificado; app para registro.
+Gerente
+Planilha de Onboarding; Calculadora de Bonificação; TV/painel de KPIs; modelo de extrato individual.
+Coordenação técnica
+Acesso aos relatórios de retenção por padrinho e ocupação de aulas.
+Vendas
+Cartão de visita digital; régua de nutrição configurada no CRM; tags de origem padronizadas.
+Fechamento
+Retenção é cultura, não campanha. Quem trata como projeto pontual perde aluno em ciclos. Treine o sistema, certifique as pessoas, audite o detalhe — e a curva vira.
+Projeto Blue 7K — Manual de Treinamento de Implantação · Bluefit Maceió · Maio/2026
+
+================================================================================
+04_Scripts_Recepcao_7_SOPs.docx
+================================================================================
+PROJETO BLUE 7K
+Bluefit Maceió · Ponta Verde + Farol
+MANUAL DE SCRIPTS
+DA RECEPÇÃO
+Os 7 Momentos Críticos  ·  O que fazer e o que dizer em cada situação
+A recepção é o CEO operacional da unidade. O que ela faz nos primeiros 30 segundos vale mais que qualquer campanha.
+Maio/2026
+A virada: de balcão de banco para anfitrião
+A recepção da maioria das academias opera no “modo bancário”: fila, senha, resolve o problema, próximo. O cliente sai com o problema resolvido — e sem nenhum laço criado. Quando decide cancelar, não há custo emocional na decisão. Este manual existe para mudar isso.
+Dois papéis, não um cargo
+Papel A — Hospitality
+Papel B — Transacional
+Chama pelo nome. Cria conexão de 3 a 10 segundos. Conhece a história dos ~100 mais frequentes. Aciona resgate e onboarding.
+Pagamento, atestado, trancamento. Matrícula ágil. Resolve reclamações e escalonamentos.
+A regra que protege o relacionamento: quando os dois papéis se misturam, vence sempre o transacional — tem fila, tem urgência. Por isso o relacional precisa ser treinado, roteirizado e auditado. É o que este manual faz.
+Como usar este manual
+São 7 SOPs. Cada um tem: a situação, o tempo-alvo, o passo a passo, o que dizer (palavra por palavra), o que nunca fazer e o registro obrigatório.
+As frases em verde são para usar de verdade. Não são sugestão literária — são o padrão da casa. Adapte ao seu jeito, mantenha a intenção.
+Sem registro, não aconteceu. Todo atendimento entra no CRM com motivo e ação.
+Imprima o Cartão de Bolso (última página) plastificado, formato cartão de crédito, sempre no bolso do uniforme.
+SOP 1 — Chegada do aluno habitual
+A interação mais frequente da operação: 200 a 500 vezes por dia, por recepcionista. É barata, é rápida — e é onde se constrói (ou se perde) o pertencimento.
+Tempo-alvo
+Frequência
+5 a 10 segundos
+200 a 500 vezes/dia por recepcionista
+O que fazer
+Levantar o olhar do computador no momento em que a porta abre.
+Sorrir e cumprimentar pelo nome (o sistema mostra o nome quando passa a digital/QR).
+Se for aluno em alerta amarelo (3+ ausências em 14 dias): acrescentar o reconhecimento de retorno.
+Se for aniversariante do mês: lembrar do brinde.
+DIGA ASSIM
+“Bom dia, Beatriz! Bom treino!”
+“Que bom te ver de volta, Rafael!”
+“E aí, mês de aniversário, hein? Anota aí: tem brinde te esperando.”
+NUNCA
+Atender de cabeça baixa, sem olhar para o aluno.
+Tratar como número: “passa a digital aí” sem cumprimentar.
+Deixar o aluno passar em silêncio quando você sabe o nome dele.
+Registro obrigatório: Não há registro manual — mas o gerente faz 10 observações silenciosas por semana e pontua 0 a 3 cada item. Resultado entra no painel de bônus.
+SOP 2 — Atendimento ao aluno novo (D0)
+A primeira impressão da casa. O aluno novo é “seu aluno de honra” — e sai daqui com avaliação agendada e padrinho apresentado.
+Tempo-alvo
+Frequência
+12 a 15 minutos
+8 a 20 por dia por unidade
+O que fazer
+Receber e se apresentar.
+Verificar cadastro completo no sistema.
+Tirar a foto para o sistema (a foto aparece no check-in e personaliza o atendimento futuro).
+Tour físico de 5 minutos: vestiários e armários; sala de musculação (aquecimento, alongamento, área tranquila); sala de aulas coletivas (grade na parede + app); bebedouros e banheiros.
+Apresentar pelo menos 1 professor por nome.
+Confirmar o nome do padrinho designado e explicar o papel.
+Agendar a avaliação física dentro de 7 dias — no ato, não “depois você marca”.
+Fechar prometendo o próximo toque.
+DIGA ASSIM
+“Seja bem-vindo(a) à Bluefit! Sou a Camila. Você vai ser meu aluno de honra hoje.”
+“Esse é o professor Diego, ele vai te chamar amanhã.”
+“Vou te mandar uma mensagem hoje à noite e o professor Diego te chama amanhã. Pode contar.”
+NUNCA
+Pular o tour porque “está cheio” — é justamente quando mais importa.
+Deixar a avaliação física para o aluno marcar sozinho depois.
+Esquecer de apresentar o padrinho pelo nome.
+Registro obrigatório: Cadastro completo + foto no sistema; padrinho vinculado; avaliação física agendada (data) na planilha de Onboarding.
+SOP 3 — Solicitação de cancelamento
+O momento da verdade. A regra de ouro: ninguém cancela na recepção sem passar pela conversa de retenção. Não como obstáculo — como cuidado.
+Tempo-alvo
+Frequência
+8 a 12 minutos
+1 a 10 por dia por unidade
+O que fazer
+Pedir 3 minutos de conversa antes de qualquer coisa.
+Aplicar as 4 perguntas-padrão.
+Categorizar o motivo no sistema (vira inteligência operacional).
+Acionar a resposta padrão por categoria.
+Se mesmo assim cancelar: deixar a porta aberta e marcar retorno em 30 dias.
+As 4 perguntas
+O que te trouxe aqui originalmente?
+O que mudou desde então?
+Tem algo específico que poderia ter sido melhor da nossa parte?
+Se a gente resolvesse [problema X], você ficaria?
+Resposta por categoria
+Categoria
+Resposta padrão
+Mudança de cidade/emprego
+Trancamento ou cancelamento com porta aberta.
+Financeiro
+Migração para plano básico ou pausa de 30 dias.
+Saúde / atestado
+Trancamento gratuito + retorno orientado.
+Insatisfação técnica
+Escalar para o gerente (não tentar resolver no balcão).
+Falta de tempo / desmotivação
+Oferta do “Plano Comeback 7 dias”: avaliação + treino expresso de 30 min.
+DIGA ASSIM
+“Antes de tudo, posso te ouvir 3 minutos? Quero entender o que aconteceu.”
+“Se a gente resolvesse isso, você ficaria?”
+“A porta fica aberta. Te chamo daqui a 30 dias só pra saber se você está bem.”
+NUNCA
+Cancelar direto, sem conversa, “pra não criar atrito”.
+Transformar a conversa em barreira ou pressão — é cuidado, não retenção forçada.
+Deixar de categorizar o motivo (sem isso você melhora o que não importa).
+Registro obrigatório: Conversa de retenção marcada como realizada; motivo categorizado (1 das 7 categorias); resultado (salvou / trancou / pausou / cancelou) na aba Registro Cancel. & Saves.
+Meta: bem aplicado, este fluxo recupera 8% a 15% das tentativas de cancelamento.
+SOP 4 — Falha de pagamento (o churn invisível)
+A operação que mais paga ROI rápido. 20% a 35% dos cancelamentos do setor são por falha de cobrança — não por desejo do aluno. Quem não cuida disso deixa 1 ponto de churn na mesa.
+Tempo-alvo
+Frequência
+Régua automática + toque humano
+Disparo por aluno com pagamento recusado
+A régua (D+0 a D+10)
+Quando
+Ação
+D+0
+WhatsApp automático com link de pagamento alternativo.
+D+2
+Ligação da recepção — oferecer ajuda para resolver agora.
+D+5
+2º contato com opção de cartão alternativo / Pix.
+D+7
+Escalonamento para o gerente — “Está tudo bem?”
+D+10
+Suspensão técnica com mensagem de “porta aberta”.
+DIGA ASSIM
+“Oi, João! Notei aqui que sua mensalidade não passou. Você quer que eu te ajude a resolver agora?”
+“Consigo te mandar um link novo ou a gente faz um Pix rapidinho — o que for melhor pra você.”
+NUNCA
+Tratar como cobrança fria, com tom de inadimplência.
+Suspender sem antes tentar o contato humano do D+2 e D+5.
+Deixar a régua só no automático — o toque de voz é o que recupera.
+Registro obrigatório: Cada etapa da régua registrada; resultado da recuperação (resolveu / não resolveu) no CRM.
+SOP 5 — Reclamação aberta
+Tom de acolhimento, não de defesa. Uma reclamação bem tratada vira lealdade; mal tratada, vira post negativo.
+Tempo-alvo
+Frequência
+5 a 10 minutos
+Conforme demanda
+O que fazer
+Ouvir até o fim, sem interromper. Anotar.
+Validar a frustração antes de qualquer explicação.
+Resolver no balcão se for resolvível. Limite de autonomia da recepção: R$ 100 ou 1 mês de cortesia. Acima disso, escalar.
+Se não for resolvível na hora: registrar com tag “VOLTA EM 24H” — o gerente é obrigado a retornar em 24h, sem exceção.
+7 dias depois: WhatsApp do gerente conferindo se ficou tudo bem.
+DIGA ASSIM
+“Obrigado por me trazer isso. Faz total sentido a sua frustração.”
+“Vou resolver isso agora com você. / Vou levar pro gerente e ele te retorna em até 24h, sem falta.”
+“Quero saber se ficou tudo bem após nossa conversa.”
+NUNCA
+Interromper ou se defender antes de o aluno terminar.
+Prometer o que não pode cumprir só para encerrar a conversa.
+Deixar a tag “VOLTA EM 24H” sem o retorno do gerente.
+Registro obrigatório: Reclamação no CRM com motivo, ação e — se aplicável — tag “VOLTA EM 24H” e o follow-up de 7 dias.
+SOP 6 — Visita de prospect
+Cada visitante é uma matrícula em potencial. Trate como tal — sem empurrar a venda.
+Tempo-alvo
+Frequência
+15 minutos
+Conforme demanda
+O que fazer
+Acolher e oferecer o tour.
+Tour comercial estruturado de 8 minutos (como o do aluno novo, com gancho comercial).
+Captura obrigatória de WhatsApp com promessa explícita.
+Oferta de 1 aula experimental gratuita — sem forçar fechamento na hora.
+Registro no CRM como prospect com tag de origem (Google, indicação, passou na frente).
+Régua: D+1 WhatsApp do consultor; D+3 2ª mensagem; D+7 entra em nutrição (1 msg/semana por 4 semanas).
+DIGA ASSIM
+“É sua primeira vez aqui? Posso te mostrar a casa.”
+“Vou te mandar a grade de aulas. Sem spam, prometo.”
+“Quer experimentar uma aula sem compromisso? Eu marco pra você.”
+NUNCA
+Deixar o visitante ir embora sem o WhatsApp.
+Pressionar o fechamento na primeira visita.
+Esquecer de registrar a origem do prospect.
+Registro obrigatório: Prospect no CRM com tag de origem; régua D+1 / D+3 / D+7 agendada.
+SOP 7 — Aluno de 90+ dias ativo
+A base de 1+ ano é o maior ativo da unidade. Não pode ser tratada como “já está aqui, segue o jogo”.
+Tempo-alvo
+Frequência
+Rotina contínua
+Cadência mensal/trimestral/anual
+A rotina de manutenção
+Mensalmente: check-in do gerente (rotativo — ~5 alunos por dia útil).
+Trimestralmente: reavaliação física obrigatória, registrada no app.
+Semestralmente: convite para evento exclusivo “+1 ano de casa”.
+Aniversário: brinde + foto + post no story da unidade (com autorização).
+DIGA ASSIM
+“Oi, Sofia! Faz um tempo que a gente não conversa direito — como está o treino? Quer que eu marque sua reavaliação?”
+“Parabéns pelos seus meses de casa! Preparei uma coisinha pra você aqui na recepção.”
+Registro obrigatório: Check-in, reavaliação e contatos registrados no CRM por aluno.
+Categorização de cancelamentos
+Toda saída é dado. Categorize 100% — sem isso, você passa 12 meses melhorando o que não importa.
+As 7 categorias (use exatamente estas, iguais à aba Registro Cancel. & Saves):
+Mudança de cidade/endereço
+Financeiro
+Saúde / lesão / gravidez
+Insatisfação técnica (equipamento, professor, limpeza)
+Insatisfação com atendimento
+Falta de tempo / desmotivação
+Migrou para concorrente
+Na reunião mensal de retenção (60 min): % de cada categoria, top 3 motivos, 1 ação corretiva por categoria, histórico vs. metas.
+Templates de WhatsApp
+Copie, troque os campos entre colchetes, envie. Mantenha o tom: humano, curto, sem spam.
+D0 — Boas-vindas
+DIGA ASSIM
+“[Nome], seja muito bem-vindo(a) à Bluefit [unidade]! Sou o [gerente]. A partir de amanhã, o professor [padrinho] vai te acompanhar nos primeiros 90 dias. Sua avaliação física está agendada para [dia/hora]. Qualquer dúvida, me chama por aqui. Bom treino!”
+D5 — Resgate de quem não voltou
+DIGA ASSIM
+“Oi [nome], tudo bem? Reparei que você ainda não conseguiu voltar pra treinar desde [data]. Tá tudo certo? Posso te ajudar com horário, com treino, com qualquer coisa. Me responde aqui que a gente conversa.”
+D30 — Marco do mês
+DIGA ASSIM
+“[Nome], hoje você completa 30 dias com a gente! Que tal a gente refazer sua avaliação na próxima semana pra você ver como evoluiu? Tem 3 horários abertos: [opções]. Me avisa qual te serve melhor.”
+Pré-cancelamento
+DIGA ASSIM
+“Oi [nome], a recepção me avisou que você pensou em cancelar. Antes de tudo, posso te pedir 5 minutos? Quero entender o que aconteceu e ver se tem algo que a gente pode resolver. Pode ser?”
+Cartão de bolso — Os 7 SOPs
+Imprima, plastifique no formato cartão de crédito, mantenha no bolso do uniforme. É a cola oficial da casa.
+SOP
+Gatilho
+A essência
+1
+Aluno habitual chega
+Olho, sorriso, nome em < 10s. “Bom treino, [nome]!”
+2
+Aluno novo (D0)
+Foto + tour 5min + padrinho + avaliação em 7 dias. Promessa do próximo toque.
+3
+Quer cancelar
+3 minutos + 4 perguntas + categorizar + resposta por categoria + porta aberta.
+4
+Pagamento falhou
+D+0 link · D+2 ligação · D+5 alternativa · D+7 gerente · D+10 porta aberta.
+5
+Reclamação
+Ouvir, validar, resolver até R$100/1 mês — ou tag VOLTA EM 24H. Follow-up em 7 dias.
+6
+Visita de prospect
+Tour 8min + WhatsApp (sem spam) + aula experimental + tag de origem + régua D+1/D+3/D+7.
+7
+Aluno 90+ dias
+Check-in mensal · reavaliação trimestral · evento semestral · brinde de aniversário.
+A recepção é o fosso. Equipamento, preço e ponto qualquer concorrente copia. O “bom treino, Beatriz!” dito de verdade, todos os dias, ninguém copia.
+Projeto Blue 7K — Manual de Scripts da Recepção · Bluefit Maceió · Maio/2026

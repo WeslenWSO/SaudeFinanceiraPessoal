@@ -204,8 +204,9 @@
                     <th>Paciente</th>
                     {% if coluna_terceira_guia %}
                     <th>Número da Guia</th>
+                    <th>Associado</th>
                     {% else %}
-                    <th>Nome Associado</th>
+                    <th>Associado</th>
                     {% endif %}
                     <th>Procedimento</th>
                     <th class="col-modalidade">Modalidade</th>
@@ -220,6 +221,7 @@
                     <td>{{ linha.paciente }}</td>
                     {% if coluna_terceira_guia %}
                     <td>{{ linha.numero_guia }}</td>
+                    <td>{{ linha.nome_associado }}</td>
                     {% else %}
                     <td>{{ linha.nome_associado }}</td>
                     {% endif %}
@@ -230,7 +232,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="col-data">Nenhum procedimento encontrado neste lote.</td>
+                    <td colspan="{% if coluna_terceira_guia %}8{% else %}7{% endif %}" class="col-data">Nenhum procedimento encontrado neste lote.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -287,8 +289,13 @@
     </section>
     {% endfor %}
 
-    <div class="no-print" style="text-align: center; margin-top: 24px;">
+    <div class="no-print" style="text-align: center; margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
         <button type="button" onclick="window.print()">Imprimir</button>
+        <a href="{% url 'faturamento_medico:exportar_lote_convenio_publico_excel' %}?{{ request.GET.urlencode }}"
+           class="btn btn-success"
+           style="display: inline-block; padding: 6px 14px; text-decoration: none; color: #fff; background: #198754; border-radius: 4px; font-size: 13px;">
+            Exportar Excel
+        </a>
     </div>
 </body>
 </html>

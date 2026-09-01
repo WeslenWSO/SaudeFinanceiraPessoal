@@ -68,6 +68,11 @@ urlpatterns = [
     path('imprimir-lote/', views.selecionar_lote_imprimir, name='selecionar_lote_imprimir'),
     path('imprimir-lote/<int:lote_id>/', views.imprimir_lote, name='imprimir_lote'),
     path(
+        'exportar-lote-convenio-publico/',
+        views.exportar_lote_convenio_publico_excel,
+        name='exportar_lote_convenio_publico_excel',
+    ),
+    path(
         'imprimir-lote-convenio-publico/<int:lote_id>/',
         views.imprimir_lote_convenio_publico,
         name='imprimir_lote_convenio_publico',

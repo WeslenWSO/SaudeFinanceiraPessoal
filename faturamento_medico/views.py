@@ -5336,6 +5336,53 @@ def imprimir_lote_convenio_publico(request, lote_id):
     return render(request, 'faturamento_medico/imprimir_lote_convenio_publico.html', context)
 
 
+def exportar_lote_convenio_publico_excel(request, lote_id=0):
+    """Exporta o relatório convênio público (FUSEX, PM, etc.) para Excel."""
+    from faturamento_medico.lote_utils import parse_lote_ids
+    from .lote_relatorio import montar_contexto_relatorio_lote, montar_workbook_lote_publico
+
+    lote_ids_raw = request.GET.get('lote_ids') or request.GET.get('lote_id')
+    if lote_id == 0:
+        if not lote_ids_raw:
+            return HttpResponse('Lote não selecionado', status=400)
+    elif not lote_ids_raw:
+        lote_ids_raw = str(lote_id)
+
+    lote_ids = parse_lote_ids(lote_ids_raw)
+    if not lote_ids:
+        return HttpResponse('Lote não selecionado', status=400)
+
+    empresa_id = request.GET.get('empresa_id') or request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    try:
+        context = montar_contexto_relatorio_lote(
+            lote_ids[0], empresa_id, layout='publico', lote_ids=lote_ids,
+        )
+    except Lote.DoesNotExist:
+        return HttpResponse('Lote não encontrado', status=404)
+    except PermissionError:
+        return HttpResponse('Acesso negado', status=403)
+
+    wb = montar_workbook_lote_publico(context)
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    convenio_slug = re.sub(r'[^\w\-]+', '_', (context.get('convenio_nome') or 'convenio').strip())[:30]
+    nome_arquivo = f'controle_exames_{convenio_slug}_lote_{context["lote"].id}.xlsx'
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True,
+        filename=nome_arquivo,
+    )
+    return response
+
+
 def imprimir_repasses_fechados(request):
     """View para imprimir relatório de repasses fechados em HTML"""
     empresa_id = request.session.get('empresa_id')
