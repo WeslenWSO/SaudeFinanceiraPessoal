@@ -514,6 +514,17 @@ METAS_MODALIDADES_SOLICITANTE = (
     ('EG', 'EEG'),
 )
 
+ROTULOS_MODALIDADE_RELATORIO = {
+    'US': 'US - ULTRASSON',
+    'MR': 'MR - RESSONANCIA',
+    'CR': 'CR - RAIO -X',
+    'CT': 'CT - TOMOGRAFIA',
+    'MG': 'MG - MAMOGRAFIA',
+    'EC': 'EC - ECG',
+    'EG': 'EG - EEG',
+    'OUTROS': 'OUTROS',
+}
+
 
 def _normalizar_codigo_modalidade(codigo):
     cod = (codigo or '').strip().upper()
@@ -2672,6 +2683,199 @@ def listar_cancelados(request):
         'periodo_fim_fmt': df.strftime('%d/%m/%Y'),
     }
     return render(request, 'faturamento_medico/listar_cancelados.html', context)
+
+
+def _coletar_cards_map_exames_solicitante(request):
+    """Aplica filtros da tela Exames por Solicitante e retorna cards_map agregado."""
+    empresa_id = request.session.get('empresa_id')
+    if empresa_id:
+        qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
+    else:
+        qs_base = FaturamentoMedico.objects.all()
+
+    hoje = date.today()
+    di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+    di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
+    df = _parse_data_filtro(request.GET.get('data_fim')) or df_padrao
+    if di > df:
+        di, df = df, di
+
+    solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
+    medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
+    status_agendamento_sel = [
+        s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
+    ]
+    qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
+
+    freq_solicitante = defaultdict(int)
+    for raw in qs_periodo.values_list('medico_solicitante', flat=True):
+        nome = (raw or '').strip()
+        if nome:
+            freq_solicitante[nome] += 1
+
+    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
+        grafia_para_apelido,
+        apelido_info,
+        freq_solicitante.keys(),
+    )
+    mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
+        freq_solicitante.keys(),
+        freq_solicitante,
+        empresa_id=empresa_id,
+        grafia_para_apelido=grafia_para_apelido,
+        apelido_info=apelido_info,
+    )
+
+    qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
+    qs = _filtrar_por_medicos(qs, medicos_sel)
+    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+
+    codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
+    periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
+    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel)
+    cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
+
+    for faturamento in qs:
+        solicitante_apelido = _canonico_solicitante(
+            faturamento.medico_solicitante,
+            mapa_solicitante,
+            grafia_para_apelido,
+        )
+        if solicitante_apelido is None and not incluir_lista_detalhada:
+            continue
+        itens = list(faturamento.itens_servico.all())
+
+        def _acumular_card(modalidade, valor):
+            if solicitante_apelido is None:
+                return
+            card = cards_map[solicitante_apelido]
+            _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
+            if periodo_multimes and faturamento.data:
+                chave_mes = (faturamento.data.year, faturamento.data.month)
+                _acumular_modalidade_resumo(card['meses'][chave_mes], modalidade, valor, codigos_modalidade)
+
+        if not itens:
+            _acumular_card(
+                _modalidade_faturamento_item(faturamento),
+                faturamento.total or 0,
+            )
+            continue
+        for item in itens:
+            valor_item = item.total if item.total is not None else (item.valor or 0)
+            _acumular_card(
+                _modalidade_faturamento_item(faturamento, item),
+                valor_item,
+            )
+
+    meses_periodo = _meses_no_periodo(di, df) if periodo_multimes else [(di.year, di.month)]
+    return {
+        'empresa_id': empresa_id,
+        'di': di,
+        'df': df,
+        'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+        'periodo_multimes': periodo_multimes,
+        'meses_periodo': meses_periodo,
+        'codigos_modalidade': codigos_modalidade,
+        'cards_map': cards_map,
+        'filtros': {
+            'data_inicio': di.isoformat(),
+            'data_fim': df.isoformat(),
+            'solicitante': solicitantes_sel,
+            'medico': medicos_sel,
+            'status_agendamento': status_agendamento_sel,
+        },
+    }
+
+
+def _montar_pivot_resumo_mes_solicitante(cards_map, codigos_modalidade, meses_periodo, periodo_multimes):
+    """Monta tabelas pivot: modalidades nas linhas, meses nas colunas."""
+    tabelas = []
+    for nome, dados in sorted(cards_map.items(), key=lambda x: (-x[1]['total'], x[0].lower())):
+        tem_outros = bool(dados.get('outros'))
+        if periodo_multimes:
+            for dm in dados.get('meses', {}).values():
+                if dm.get('outros'):
+                    tem_outros = True
+                    break
+
+        linhas_codigos = list(codigos_modalidade)
+        if tem_outros:
+            linhas_codigos.append('OUTROS')
+
+        meses_colunas = [
+            {'label': f'{mes:02d}/{ano}', 'ano': ano, 'mes': mes}
+            for ano, mes in meses_periodo
+        ]
+
+        linhas = []
+        for codigo in linhas_codigos:
+            celulas = []
+            total_linha = 0
+            for ano, mes in meses_periodo:
+                if periodo_multimes:
+                    dm = dados['meses'].get((ano, mes), {})
+                    qtd = dm.get('outros', 0) if codigo == 'OUTROS' else dm.get('modalidades', {}).get(codigo, 0)
+                else:
+                    qtd = dados.get('outros', 0) if codigo == 'OUTROS' else dados.get('modalidades', {}).get(codigo, 0)
+                celulas.append(qtd)
+                total_linha += qtd
+            linhas.append({
+                'rotulo': ROTULOS_MODALIDADE_RELATORIO.get(codigo, codigo),
+                'celulas': celulas,
+                'total': total_linha,
+            })
+
+        totais_mes = []
+        for ano, mes in meses_periodo:
+            if periodo_multimes:
+                dm = dados['meses'].get((ano, mes), {})
+                totais_mes.append(dm.get('total', 0))
+            else:
+                totais_mes.append(dados.get('total', 0))
+
+        tabelas.append({
+            'nome': nome,
+            'total_exames': dados.get('total', 0),
+            'meses_colunas': meses_colunas,
+            'linhas': linhas,
+            'totais_mes': totais_mes,
+        })
+    return tabelas
+
+
+def imprimir_resumo_mes_solicitante(request):
+    """Relatório pivot: modalidades x meses por médico solicitante (filtros da tela)."""
+    coleta = _coletar_cards_map_exames_solicitante(request)
+    empresa_id = coleta.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+
+    tabelas = _montar_pivot_resumo_mes_solicitante(
+        coleta['cards_map'],
+        coleta['codigos_modalidade'],
+        coleta['meses_periodo'],
+        coleta['periodo_multimes'],
+    )
+
+    try:
+        empresa = Empresa.objects.get(id=empresa_id)
+    except Empresa.DoesNotExist:
+        empresa = None
+
+    context = {
+        'empresa': empresa,
+        'tabelas': tabelas,
+        'periodo_fmt': coleta['periodo_fmt'],
+        'periodo_multimes': coleta['periodo_multimes'],
+        'qtd_meses': len(coleta['meses_periodo']),
+        'filtros': coleta['filtros'],
+        'total_exames': sum(t['total_exames'] for t in tabelas),
+        'data_impressao': timezone.localtime(timezone.now()),
+        'redirect_qs': request.GET.urlencode(),
+    }
+    return render(request, 'faturamento_medico/imprimir_resumo_mes_solicitante.html', context)
 
 
 def listar_exames_por_solicitante(request):
