@@ -16,6 +16,8 @@ Documentação de planejamento do módulo **Meta Academia** (app `indicadores`),
 | [04-marcos-entrega.md](04-marcos-entrega.md) | Datas de go-live e critérios de pronto |
 | [05-fases-implementacao.md](05-fases-implementacao.md) | Escopo técnico de cada fase |
 | [06-cronograma-planilha.md](06-cronograma-planilha.md) | Tabela + CSV para Excel/Sheets |
+| [Meta_Academia_Cronograma_Orcamento.xlsx](Meta_Academia_Cronograma_Orcamento.xlsx) | **Planilha Excel** — Cronograma, Orçamento e Marcos |
+| [gerar_planilha.py](gerar_planilha.py) | Script para regenerar a planilha |
 
 ## Referências externas
 

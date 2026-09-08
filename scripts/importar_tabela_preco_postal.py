@@ -25,13 +25,22 @@ CONVENIO_NOME = "POSTAL SAÚDE"
 CABECALHO_NOME = "TABELA - POSTAL"
 EMPRESA_ID_DEFAULT = 16
 TSV_DEFAULT = Path(__file__).resolve().parent / "dados" / "tabela_preco_postal.tsv"
+TSV_COMPLEMENTO = Path(__file__).resolve().parent / "dados" / "tabela_preco_postal_complemento.tsv"
 
 MAX_CODIGO = 20
 MAX_SERVICO = 200
+TUSS_RE = re.compile(r"^\d{8}$")
+
+
+def _codigo_tuss(codigo: str) -> str:
+    digits = re.sub(r"\D", "", codigo or "")
+    if len(digits) < 8:
+        return digits
+    return digits[:8]
 
 
 def _tuss_para_cbhpm(codigo: str) -> str | None:
-    c = re.sub(r"\D", "", codigo or "")
+    c = _codigo_tuss(codigo)
     if len(c) != 8:
         return None
     return f"{c[0]}.{c[1:3]}.{c[3:5]}.{c[5:7]}-{c[7]}"
@@ -62,16 +71,155 @@ def _parse_tsv(caminho: Path) -> list[tuple[str, str, Decimal]]:
         if len(partes) < 2:
             continue
         codigo = partes[0].strip()
-        if not codigo.isdigit():
+        tuss = _codigo_tuss(codigo)
+        if len(tuss) != 8:
             continue
         if len(partes) >= 3:
             nome = partes[1].strip()[:MAX_SERVICO]
             valor = _parse_valor(partes[2])
         else:
-            nome = f"Servico {codigo}"
+            nome = f"Servico {tuss}"
             valor = _parse_valor(partes[1])
-        registros.append((codigo[:MAX_CODIGO], nome, valor))
+        registros.append((tuss, nome, valor))
     return registros
+
+
+def _mesclar_registros(*fontes: list[tuple[str, str, Decimal]]) -> list[tuple[str, str, Decimal]]:
+    """Última fonte prevalece (complemento sobrescreve OCR)."""
+    por_codigo: dict[str, tuple[str, str, Decimal]] = {}
+    ordem: list[str] = []
+    for fonte in fontes:
+        for codigo, nome, valor in fonte:
+            if codigo not in por_codigo:
+                ordem.append(codigo)
+            por_codigo[codigo] = (codigo, nome, valor)
+    return [por_codigo[c] for c in ordem]
+
+
+def _indice_servicos(servicos) -> dict[str, object]:
+    """Mapeia código TUSS (8 dígitos) e CBHPM para ServicosMedicos."""
+    indice: dict[str, object] = {}
+    for servico in servicos:
+        tuss = _codigo_tuss(servico.codigo)
+        if len(tuss) == 8:
+            indice.setdefault(tuss, servico)
+        indice.setdefault(servico.codigo, servico)
+        cbhpm = _tuss_para_cbhpm(servico.codigo)
+        if cbhpm:
+            indice.setdefault(cbhpm, servico)
+    return indice
+
+
+def _preferir_servico(candidatos: list) -> object:
+    """Prefere registro com código TUSS puro (8 dígitos)."""
+    for servico in candidatos:
+        if TUSS_RE.fullmatch(servico.codigo or ""):
+            return servico
+    return candidatos[0]
+
+
+def _resolver_servico(tuss: str, nome: str, indice: dict, cache: dict[str, object]):
+    if tuss in cache:
+        return cache[tuss], False
+
+    candidatos = []
+    for chave in (tuss, _tuss_para_cbhpm(tuss) or ""):
+        if chave and chave in indice:
+            candidatos.append(indice[chave])
+    candidatos = list({s.pk: s for s in candidatos}.values())
+
+    criado = False
+    if candidatos:
+        servico = _preferir_servico(candidatos)
+    else:
+        from servicos_medicos.models import ServicosMedicos
+
+        servico = ServicosMedicos.objects.create(codigo=tuss, servicos=nome)
+        indice[tuss] = servico
+        cbhpm = _tuss_para_cbhpm(tuss)
+        if cbhpm:
+            indice[cbhpm] = servico
+        criado = True
+
+    if nome and (not servico.servicos or servico.servicos.startswith("Servico ")):
+        servico.servicos = nome[:MAX_SERVICO]
+        servico.save(update_fields=["servicos"])
+
+    cache[tuss] = servico
+    return servico, criado
+
+
+def _buscar_preco_por_tuss(empresa, convenio, cabecalho, tuss: str, cache: dict[str, object]):
+    if tuss in cache:
+        return cache[tuss]
+    from servicos_medicos.models import TabelaPreco
+
+    for tp in TabelaPreco.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        cabecalho=cabecalho,
+    ).select_related("codigo_servico"):
+        if _codigo_tuss(tp.codigo_servico.codigo) == tuss:
+            cache[tuss] = tp
+            return tp
+    return None
+
+
+def _limpar_duplicatas_postal(empresa, convenio, cabecalho) -> int:
+    from collections import defaultdict
+
+    from servicos_medicos.models import ServicosMedicos, TabelaPreco
+
+    grupos: dict[str, list] = defaultdict(list)
+    for tp in TabelaPreco.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        cabecalho=cabecalho,
+    ).select_related("codigo_servico"):
+        tuss = _codigo_tuss(tp.codigo_servico.codigo)
+        if len(tuss) == 8:
+            grupos[tuss].append(tp)
+
+    removidos = 0
+    for tuss, itens in grupos.items():
+        if len(itens) <= 1:
+            keeper = itens[0]
+            tuss_servico = ServicosMedicos.objects.filter(codigo=tuss).first()
+            if tuss_servico and keeper.codigo_servico_id != tuss_servico.pk:
+                keeper.codigo_servico = tuss_servico
+                keeper.save(update_fields=["codigo_servico"])
+            continue
+        itens.sort(
+            key=lambda tp: (
+                0 if TUSS_RE.fullmatch(tp.codigo_servico.codigo or "") else 1,
+                tp.pk,
+            )
+        )
+        keeper = itens[0]
+        tuss_servico = ServicosMedicos.objects.filter(codigo=tuss).first()
+        if tuss_servico and keeper.codigo_servico_id != tuss_servico.pk:
+            keeper.codigo_servico = tuss_servico
+            keeper.save(update_fields=["codigo_servico"])
+        for duplicata in itens[1:]:
+            duplicata.delete()
+            removidos += 1
+    return removidos
+
+
+def _remover_ausentes_postal(empresa, convenio, cabecalho, tuss_validos: set[str]) -> int:
+    from servicos_medicos.models import TabelaPreco
+
+    removidos = 0
+    for tp in TabelaPreco.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        cabecalho=cabecalho,
+    ).select_related("codigo_servico"):
+        tuss = _codigo_tuss(tp.codigo_servico.codigo)
+        if tuss not in tuss_validos:
+            tp.delete()
+            removidos += 1
+    return removidos
 
 
 def main() -> int:
@@ -79,7 +227,23 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--arquivo", type=Path, default=TSV_DEFAULT)
     parser.add_argument("--empresa-id", type=int, default=EMPRESA_ID_DEFAULT)
+    parser.add_argument("--complemento", type=Path, default=TSV_COMPLEMENTO)
+    parser.add_argument(
+        "--sem-complemento",
+        action="store_true",
+        help="Usa apenas o TSV principal (ex.: extraído do PDF completo)",
+    )
+    parser.add_argument(
+        "--remover-ausentes",
+        action="store_true",
+        help="Remove preços do cabeçalho que não constam no TSV importado",
+    )
     parser.add_argument("--somente-novos", action="store_true")
+    parser.add_argument(
+        "--sem-limpar-duplicatas",
+        action="store_true",
+        help="Não remove linhas duplicadas CBHPM/TUSS após importar",
+    )
     args = parser.parse_args()
 
     if not args.arquivo.is_file():
@@ -87,7 +251,12 @@ def main() -> int:
         print("Execute: python scripts/gerar_tsv_postal.py", file=sys.stderr)
         return 1
 
-    linhas = _parse_tsv(args.arquivo)
+    fontes = [_parse_tsv(args.arquivo)]
+    if not args.sem_complemento and args.complemento.is_file():
+        comp = _parse_tsv(args.complemento)
+        if comp:
+            fontes.append(comp)
+    linhas = _mesclar_registros(*fontes)
     if not linhas:
         print("Nenhuma linha válida no TSV.", file=sys.stderr)
         return 1
@@ -137,67 +306,64 @@ def main() -> int:
     print(f"Convênio: {convenio.nome} (id={convenio.pk})")
     print(f"Cabeçalho: {cabecalho.nome_tabela} (id={cabecalho.pk})")
 
-    servicos_por_codigo = {s.codigo: s for s in ServicosMedicos.objects.all()}
-    cbhpm_map = {_tuss_para_cbhpm(c): c for c in servicos_por_codigo if _tuss_para_cbhpm(c)}
-
-    existentes: set[int] = set()
-    if args.somente_novos:
-        existentes = set(
-            TabelaPreco.objects.filter(
-                empresa=empresa, convenio=convenio, cabecalho=cabecalho
-            ).values_list("codigo_servico_id", flat=True)
-        )
+    indice_servicos = _indice_servicos(ServicosMedicos.objects.all())
+    cache_servicos: dict[str, object] = {}
+    cache_precos: dict[str, object] = {}
 
     servicos_criados = criados = atualizados = pulados = 0
 
-    for codigo, nome, valor in linhas:
-        if codigo not in servicos_por_codigo:
-            cbhpm = _tuss_para_cbhpm(codigo)
-            alt = cbhpm_map.get(cbhpm) if cbhpm else None
-            if not alt:
-                obj = ServicosMedicos.objects.create(codigo=codigo, servicos=nome)
-                servicos_por_codigo[codigo] = obj
-                if cbhpm:
-                    cbhpm_map[cbhpm] = codigo
-                servicos_criados += 1
-            else:
-                servicos_por_codigo.setdefault(alt, servicos_por_codigo[alt])
+    for tuss, nome, valor in linhas:
+        servico, servico_novo = _resolver_servico(tuss, nome, indice_servicos, cache_servicos)
+        if servico_novo:
+            servicos_criados += 1
 
-        servico = servicos_por_codigo.get(codigo)
-        if not servico:
-            cbhpm = _tuss_para_cbhpm(codigo)
-            alt = cbhpm_map.get(cbhpm) if cbhpm else None
-            if alt:
-                servico = servicos_por_codigo[alt]
-        if not servico:
-            print(f"AVISO: não foi possível resolver serviço {codigo}", file=sys.stderr)
-            continue
+        if args.somente_novos:
+            existente = _buscar_preco_por_tuss(empresa, convenio, cabecalho, tuss, cache_precos)
+            if existente:
+                pulados += 1
+                continue
 
-        if args.somente_novos and servico.pk in existentes:
-            pulados += 1
-            continue
-
-        _, created = TabelaPreco.objects.update_or_create(
-            empresa=empresa,
-            convenio=convenio,
-            cabecalho=cabecalho,
-            codigo_servico=servico,
-            defaults={
-                "preco_apartamento": valor,
-                "preco_enfermaria": valor,
-            },
-        )
-        if created:
-            criados += 1
+        preco = _buscar_preco_por_tuss(empresa, convenio, cabecalho, tuss, cache_precos)
+        if preco:
+            mudou = False
+            if preco.preco_apartamento != valor or preco.preco_enfermaria != valor:
+                preco.preco_apartamento = valor
+                preco.preco_enfermaria = valor
+                mudou = True
+            if TUSS_RE.fullmatch(servico.codigo) and preco.codigo_servico_id != servico.pk:
+                preco.codigo_servico = servico
+                mudou = True
+            if mudou:
+                preco.save()
+                atualizados += 1
         else:
-            atualizados += 1
+            preco = TabelaPreco.objects.create(
+                empresa=empresa,
+                convenio=convenio,
+                cabecalho=cabecalho,
+                codigo_servico=servico,
+                preco_apartamento=valor,
+                preco_enfermaria=valor,
+            )
+            cache_precos[tuss] = preco
+            criados += 1
+
+    removidos = 0
+    if not args.sem_limpar_duplicatas:
+        removidos = _limpar_duplicatas_postal(empresa, convenio, cabecalho)
+
+    ausentes = 0
+    if args.remover_ausentes:
+        tuss_validos = {tuss for tuss, _, _ in linhas}
+        ausentes = _remover_ausentes_postal(empresa, convenio, cabecalho, tuss_validos)
 
     total = TabelaPreco.objects.filter(
         empresa=empresa, convenio=convenio, cabecalho=cabecalho
     ).count()
     print(
         f"ServicosMedicos novos: {servicos_criados} | TabelaPreco criados: {criados} | "
-        f"atualizados: {atualizados} | pulados: {pulados} | total cabeçalho: {total}"
+        f"atualizados: {atualizados} | pulados: {pulados} | duplicatas removidas: {removidos} | "
+        f"ausentes removidos: {ausentes} | total cabeçalho: {total}"
     )
     return 0
 

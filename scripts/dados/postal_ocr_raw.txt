@@ -1,623 +1,2780 @@
 === PAGE 1 ===
-Convenio Postal Saude
-CNPJ: 44.818.412/0001-09
+ 
+PRE001 - Consulta Tabela de Precos
+Convênio: 
+ Convênio Postal Saúde
+CPF/CNPJ: 
+ 44.818.412/0001-09
+Nome: 
 MEDICINARTE DIAGNOSTICO POR IMAGEM LTDA
-Valor
-Descricao do Evento
+TABELA DE PREÇO
 Evento
-38.67
-ECG convencional de ate 12 derivacoes
+Descrição do Evento
+Valor
+Grau
+Reg. de Atend.
+CBO-S
 4.01.01.010
-53.83
-ECG de alta resolucao
-4.01.01.029
-179,86
-4.01.01.037 Teste ergometrico computadorizado (inclui ECG basa
-156.08
-Teste ergometrico convencional - 3 ou mais derivac
+ECG convencional de até 12 derivações
+39,47
+22
+-
+-
+4.01.01.037
+Teste ergométrico computadorizado (inclui ECG basa
+183,59
+22
+-
+-
 4.01.01.045
-112,12
-EEG de rotina
-4.01.03.161
-213.55
-EEGQ quantitativo (mapeamento cerebral)
-4.01.03.196
-147,42
-4.07.01.018 Angiografia radioisotopica
-522.54
-4.07.01.026 Cintilografia com hemacias marcadas
-358.34
-4.07.01.034 Cintilografia do miocardio com duplo isotopo (perf
-924,04
-4.07.01.042 Cintilografia do miocardio com FDG-18 F, em camara
-334,66
-4.07.01.050 Cintilografia do miocardio necrose (infarto agudo)
-439,45
+Teste ergométrico convencional - 3 ou mais derivaç
+159,31
+22
+-
+-
+4.07.01.018
+Angiografia radioisotópica
+150,27
+22
+-
+-
+4.07.01.026
+Cintilografia com hemácias marcadas
+533,15
+22
+-
+-
+4.07.01.034
+Cintilografia do miocárdio com duplo isótopo (perf
+365,44
+22
+-
+-
+4.07.01.042
+Cintilografia do miocárdio com FDG-18 F, em câmara
+942,96
+22
+-
+-
+4.07.01.050
+Cintilografia do miocárdio necrose (infarto agudo)
+341,38
+22
+-
+-
 4.07.01.069
-Cintilografia do miocardio perfusao - repouso
-385,40
+Cintilografia do miocárdio perfusão - repouso
+448,23
+22
+-
+-
 4.07.01.077
-Cintilografia sincronizada das camaras cardiacas -
-273.82
+Cintilografia sincronizada das câmaras cardíacas -
+392,95
+22
+-
+-
 4.07.01.085
-Cintilografia sincronizada das camaras cardiacas -
-160,87
+Cintilografia sincronizada das câmaras cardíacas -
+279,28
+22
+-
+-
 4.07.01.093
-Fluxo sanguineo das extremidades
-289,50
+Fluxo sanguíneo das extremidades
+163,93
+22
+-
+-
 4.07.01.107
-Quantificacao de shunt da direita para a esquerda
-308,06
+Quantificação de shunt da direita para a esquerda
+295,18
+22
+-
+-
 4.07.01.115
-Quantificacao de shunt periferico
-286,32
+Quantificação de shunt periférico
+314,12
+22
+-
+-
 4.07.01.123
-Venografia radioisotopica
-439,45
+Venografia radioisotópica
+291,93
+22
+-
+-
 4.07.01.131
-Cintilografia do miocardio perfusao - estresse far
-439.45
-4.07.01.140 Cintilografia do miocardio perfusao - estresse fis
-264.78
-4.07.02.014 Cintilografia das glandulas salivares com ou sem e
-249.88
-4.07.02.022 Cintilografia do figado e do bac0
-356,98
+Cintilografia do miocárdio perfusão - estresse far
+448,23
+22
+-
+-
+4.07.01.140
+Cintilografia do miocárdio perfusão - estresse fís
+448,23
+22
+-
+-
+4.07.01.158
+Cintilografia de perfusão do miocárido, associada 
+0,00
+22
+-
+-
+4.07.02.014
+Cintilografia das glândulas salivares com ou sem e
+269,99
+22
+-
+-
+4.07.02.022
+Cintilografia do fígado e do baço
+254,73
+22
+-
+-
 4.07.02.030
-Cintilografia do figado e vias biliares
-313.84
+Cintilografia do fígado e vias biliares
+363,84
+22
+-
+-
 4.07.02.049
-Cintilografia para deteccao de hemorragia digestor
-586.70
+Cintilografia para detecção de hemorragia digestór
+320,02
+22
+-
+-
 4.07.02.057
-Cintilografia para deteccao de hemorragia digestor
-197.55
+Cintilografia para detecção de hemorragia digestór
+598,32
+22
+-
+-
 4.07.02.065
-Cintilografia para determinacao do tempo de esvazi
-160,81
-Cintilografia para estudo de transito esofagico (l
+Cintilografia para determinação do tempo de esvazi
+201,21
+22
+-
+-
 4.07.02.073
-161,11
-Cintilografia para estudo de transito esofagico (s
+Cintilografia para estudo de trânsito esofágico (l
+163,71
+22
+-
+-
 4.07.02.081
-281.70
-Cintilografia para pesquisa de diverticulo de Meck
+Cintilografia para estudo de trânsito esofágico (s
+164,02
+22
+-
+-
 4.07.02.090
-187.99
+Cintilografia para pesquisa de divertículo de Meck
+287,21
+22
+-
+-
 4.07.02.103
 Cintilografia para pesquisa de refluxo gastro-esof
-121,83
+191,46
+22
+-
+-
 4.07.02.111
-Fluxo sanguineo hepatico (qualitativo e quantitati
-255,09
-Cintilografia da tirebide e/ou captacao (iodo - 12
+Fluxo sanguíneo hepático (qualitativo e quantitati
+124,08
+22
+-
+-
+4.07.02.120
+Absorção de gorduras
+0,00
+22
+-
+-
+4.07.02.138
+Perdas proteicas
+0,00
+22
+-
+-
+4.07.02.146
+Cintilografia, receptores da Somatostatina com lut
+0,00
+22
+-
+-
 4.07.03.010
-255,09
-Cintilografia da tiredide e/ou captagao (iodo - 13
+Cintilografia da tireóide e/ou captação (iodo - 12
+260,26
+22
+-
+-
+03/09/2026
+Pág:
+ 1
+10:52
+=== PAGE 2 ===
+ 
+PRE001 - Consulta Tabela de Precos
 4.07.03.029
-203,76
-Cintilografia da tireoide e/ou captacao (tecnecio
+Cintilografia da tireóide e/ou captação (iodo - 13
+260,26
+22
+-
+-
 4.07.03.037
-432,91
-Cintilografia das paratireoides
+Cintilografia da tireóide e/ou captação (tecnécio 
+207,87
+22
+-
+-
 4.07.03.045
-667,20
-Cintilografia de corpo inteiro para pesquisa de me
+Cintilografia das paratireóides
+441,55
+22
+-
+-
 4.07.03.053
-184,09
-4.07.03.061 Teste de estimulo com TsH recombinante
-143,01
+Cintilografia de corpo inteiro para pesquisa de me
+680,48
+22
+-
+-
+4.07.03.061
+Teste de estímulo com TSH recombinante
+187,79
+22
+-
+-
 4.07.03.070
-Teste de supressao da tireoide com T3
-129,15
+Teste de supressão da tireóide com T3
+145,87
+22
+-
+-
 4.07.03.088
 Teste do perclorato
-287,13
+131,82
+22
+-
+-
+4.07.03.096
+Cintilografia de corpo inteiro com metaiodobenzilg
+0,00
+22
+-
+-
+4.07.03.100
+Cintilografia de corpo inteiro com MIBI marcada co
+0,00
+22
+-
+-
 4.07.04.017
-Cintilografia renal dinarmica
-403.40
+Cintilografia renal dinâmica
+292,75
+22
+-
+-
 4.07.04.025
-Cintilografia renal dinamica com diuretico
-251,51
-Cintilografia renal estatica (quantitativa ou qual
+Cintilografia renal dinâmica com diurético
+411,32
+22
+-
+-
 4.07.04.033
-233,34
-4.07.04.041 Cintilografia testicutar (escrotal)
-=== PAGE 2 ===
-54.88
-4.08.01.110 RX - Articulacao temporomandibular - bilateral
+Cintilografia renal estática (quantitativa ou qual
+256,72
+22
+-
+-
+4.07.04.041
+Cintilografia testicular (escrotal)
+237,74
+22
+-
+-
+4.07.04.050
+Cistocintilografia direta
+277,79
+22
+-
+-
+4.07.04.068
+Cistocintilografia indireta
+244,67
+22
+-
+-
+4.07.04.076
+Determinação da filtração glomerular
+79,28
+22
+-
+-
+4.07.04.084
+Determinação do fluxo plasmático renal
+79,28
+22
+-
+-
+4.07.04.092
+Renograma
+0,00
+22
+-
+-
+4.07.05.013
+Cintilografia do sistema retículo-endotelial (medu
+179,63
+22
+-
+-
+4.07.05.021
+Demonstração do sequestro de hemácias pelo baço
+133,28
+22
+-
+-
+4.07.05.030
+Determinação da sobrevida de hemácias
+81,75
+22
+-
+-
+4.07.05.048
+Determinação do volume eritrocitário
+55,94
+22
+-
+-
+4.07.05.056
+Determinação do volume plasmático
+55,94
+22
+-
+-
+4.07.05.064
+Teste de absorção de vitamina B12 com cobalto - 57
+55,94
+22
+-
+-
+4.07.06.010
+Cintilografia óssea (corpo total)
+309,29
+22
+-
+-
+4.07.06.028
+Fluxo sanguíneo ósseo
+102,03
+22
+-
+-
+4.07.07.016
+Cintilografia cerebral
+204,17
+22
+-
+-
+4.07.07.024
+Cintilografia cerebral com FDG-18 F, em câmara hib
+948,09
+22
+-
+-
+4.07.07.032
+Cintilografia de perfusão cerebral
+371,15
+22
+-
+-
+4.07.07.040
+Cisternocintilografia (inclui estudo do trânsito l
+644,61
+22
+-
+-
+4.07.07.059
+Cisternocintilografia para pesquisa de fístula liq
+644,61
+22
+-
+-
+4.07.07.067
+Fluxo sanguíneo cerebral
+114,48
+22
+-
+-
+4.07.07.075
+Mielocintilografia
+382,69
+22
+-
+-
+4.07.07.083
+Ventrículo-cintilografia
+382,69
+22
+-
+-
+4.07.07.091
+Cintilografia perfusão cerebral para avaliação de 
+371,15
+22
+-
+-
+4.07.08.012
+Cintilografia com análogo de somatostatina
+410,92
+22
+-
+-
+4.07.08.020
+Cintilografia com gálio-67
+472,44
+22
+-
+-
+03/09/2026
+Pág:
+ 2
+10:52
+=== PAGE 3 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.07.08.039
+Cintilografia com leucócitos marcados
+406,22
+22
+-
+-
+4.07.08.047
+Cintilografia com MIBG (metaiodobenzilguanidina)
+523,69
+22
+-
+-
+4.07.08.055
+Cintilografia de corpo total com FDG-18 F, em câma
+958,35
+22
+-
+-
+4.07.08.063
+Cintilografia de mama (bilateral)
+439,39
+22
+-
+-
+4.07.08.071
+Demarcação radioisotópica de lesões tumorais
+293,63
+22
+-
+-
+4.07.08.080
+Detecção intraoperatória radioguiada de lesões tum
+559,63
+22
+-
+-
+4.07.08.098
+Detecção intraoperatória radioguiada de linfonodo 
+559,63
+22
+-
+-
+4.07.08.101
+Linfocintilografia
+217,16
+22
+-
+-
+4.07.08.110
+Quantificação da captação pulmonar com gálio-67
+284,59
+22
+-
+-
+4.07.08.128
+PET dedicado oncológico
+2.232,27
+22
+-
+-
+4.07.09.019
+Cintilografia para detecção de aspiração pulmonar
+141,05
+22
+-
+-
+4.07.09.027
+Cintilografia pulmonar (inalação)
+256,67
+22
+-
+-
+4.07.09.035
+Cintilografia pulmonar (perfusão)
+231,02
+22
+-
+-
+4.07.11.021
+Imunocintilografia (anticorpos monoclonais)
+459,66
+22
+-
+-
+4.08.01.012
+RX - Crânio - 2 incidências
+51,31
+22
+-
+-
+4.08.01.020
+RX - Crânio - 3 incidências
+55,52
+22
+-
+-
+4.08.01.039
+RX - Crânio - 4 incidências
+73,44
+22
+-
+-
+4.08.01.047
+RX - Orelha, mastóides ou rochedos - bilateral
+75,64
+22
+-
+-
+4.08.01.055
+RX - Órbitas - bilateral
+55,92
+22
+-
+-
+4.08.01.063
+RX - Seios da face
+53,19
+22
+-
+-
+4.08.01.071
+RX - Sela túrcica
+51,34
+22
+-
+-
+4.08.01.080
+RX - Maxilar inferior
+51,34
+22
+-
+-
+4.08.01.098
+RX - Ossos da face
+55,92
+22
+-
+-
+4.08.01.101
+RX - Arcos zigomáticos ou malar ou apófises estiló
+53,19
+22
+-
+-
+4.08.01.110
+RX - Articulação temporomandibular - bilateral
+55,92
+22
+-
+-
 4.08.01.128
-Rx - Adenoides ou cavum
-47.54
+RX - Adenóides ou cavum
+48,47
+22
+-
+-
 4.08.01.136
-Rx - Panoramica de mandibula (ortopantomografia)
-52,20
+RX - Panorâmica de mandíbula (ortopantomografia)
+53,14
+22
+-
+-
 4.08.01.144
-RX - Teleperfil em cefalostato - sem tracado
-45.06
-49,09
+RX - Teleperfil em cefalostato - sem traçado
+45,96
+22
+-
+-
 4.08.01.152
-RX - Teleperfil em cefalostato - com tracado
-RX - Arcada dentaria (por arcada)
-45,09
+RX - Teleperfil em cefalostato - com traçado
+50,03
+22
+-
+-
 4.08.01.160
-RX - Radiografia peri-apical
-18,87
+RX - Arcada dentária (por arcada)
+45,95
+22
+-
+-
 4.08.01.179
-Rx - Radiografia oclusal
-23,04
+RX - Radiografia peri-apical
+19,25
+22
+-
+-
 4.08.01.187
-RX - Planigrafia linear de cranio ou sela turcica
-104,41
+RX - Radiografia oclusal
+23,45
+22
+-
+-
 4.08.01.195
-Rx - Incidencia adicional de cranio ou face
-19,82
+RX - Planigrafia linear de crânio ou sela túrcica 
+106,19
+22
+-
+-
 4.08.01.209
-Rx - Coluna cervical - 3 incidencias
-49,96
+RX - Incidência adicional de crânio ou face
+20,19
+22
+-
+-
 4.08.02.019
-70.16
+RX - Coluna cervical - 3 incidências
+50,92
+22
+-
+-
 4.08.02.027
-Rx - Coluna cervical - 5 incidencias
-54.19
+RX - Coluna cervical - 5 incidências
+71,49
+22
+-
+-
 4.08.02.035
-RX - Coluna dorsal - 2 incidencias
-77,20
+RX - Coluna dorsal - 2 incidências
+55,18
+22
+-
+-
+03/09/2026
+Pág:
+ 3
+10:52
+=== PAGE 4 ===
+ 
+PRE001 - Consulta Tabela de Precos
 4.08.02.043
-Rx - Coluna dorsal - 4 incidencias
-56,13
+RX - Coluna dorsal - 4 incidências
+78,54
+22
+-
+-
 4.08.02.051
-Rx - Coluna ombo-sacra - 3 incidencias
-77,20
+RX - Coluna lombo-sacra - 3 incidências
+57,12
+22
+-
+-
 4.08.02.060
-Rx - Coluna lombo-sacra - 5 incidencias
-52,38
+RX - Coluna lombo-sacra - 5 incidências
+78,54
+22
+-
+-
 4.08.02.078
-Rx - Sacro-coccix
-71.12
-4.08.02.086 RX - Coluna dorso-lombar para escoliose
-Rx - Coluna total para escoliose (telespondilograf
-98,49
+RX - Sacro-coccix
+53,36
+22
+-
+-
+4.08.02.086
+RX - Coluna dorso-lombar para escoliose
+72,42
+22
+-
+-
 4.08.02.094
-Rx - Planigrafia de coluna vertebral (dois planos)
-155,39
+RX - Coluna total para escoliose (telespondilograf
+100,18
+22
+-
+-
 4.08.02.108
-Rx - Incidencia adicional de coluna
-21,81
+RX - Planigrafia de coluna vertebral (dois planos)
+158,32
+22
+-
+-
 4.08.02.116
-RX - Esterno
-52,29
+RX - Incidência adicional de coluna
+22,19
+22
+-
+-
 4.08.03.015
-49,96
+RX - Esterno
+53,25
+22
+-
+-
 4.08.03.023
-RX - Articulacao esternoclavicular
-52,94
-4.08.03.031 F
-RX - Costelas - por hernitorax
-50,35
+RX - Articulação esternoclavicular
+50,92
+22
+-
+-
+4.08.03.031
+RX - Costelas - por hemitórax
+53,90
+22
+-
+-
 4.08.03.040
-RX - Clavicula
-52,29
+RX - Clavícula
+51,31
+22
+-
+-
 4.08.03.058
-RX - Omoplata ou escapula
-48.79
-4.08.03.066 RX - Articulacao acromioclavicular
-48.79
+RX - Omoplata ou escápula
+53,25
+22
+-
+-
+4.08.03.066
+RX - Articulação acromioclavicular
+49,75
+22
+-
+-
 4.08.03.074
-RX - Articulacao escapuloumerat (ombro)
-50.35
+RX - Articulação escapuloumeral (ombro)
+49,75
+22
+-
+-
 4.08.03.082
-RX- Braco
-47.54
+RX - Braço
+51,31
+22
+-
+-
 4.08.03.090
-Rx - Cotovelo
-49,09
+RX - Cotovelo
+48,47
+22
+-
+-
 4.08.03.104
-RX - Antebraco
-49.87
+RX - Antebraço
+50,03
+22
+-
+-
 4.08.03.112
 RX - Punho
+50,81
+22
+-
+-
 4.08.03.120
-RX - Mao ou quirodactilo
-47.54
-47.15
+RX - Mão ou quirodáctilo
+48,47
+22
+-
+-
 4.08.03.139
-RX - Maos e punhos para idade ossea
-19,40
+RX - Mãos e punhos para idade óssea
+48,09
+22
+-
+-
 4.08.03.147
-Rx - Incidencia adicional de membro superior
-49,36
+RX - Incidência adicional de membro superior
+19,76
+22
+-
+-
+4.08.03.155
+RX - Escafóide
+0,00
+22
+-
+-
 4.08.04.011
 RX - Bacia
-RX - Articulacoes sacroiliacas
-51.21
+50,30
+22
+-
+-
 4.08.04.020
-51.64
-RX - Articulacao coxofemoral (quadril)
+RX - Articulações sacroilíacas
+52,20
+22
+-
+-
 4.08.04.038
-52,94
-RX - Coxa
+RX - Articulação coxofemoral (quadril)
+52,60
+22
+-
+-
 4.08.04.046
-49.09
-RX - Joelho
+RX - Coxa
+53,90
+22
+-
+-
 4.08.04.054
-51.51
+RX - Joelho
+50,03
+22
+-
+-
 4.08.04.062
 RX - Patela
-51,69
+52,47
+22
+-
+-
 4.08.04.070
 RX - Perna
-47.54
-RX - Articulacao tibiotarsica (tornozelo)
+52,62
+22
+-
+-
 4.08.04.089
-49,09
-RX - Pe ou pododactilo
+RX - Articulação tibiotársica (tornozelo)
+48,47
+22
+-
+-
 4.08.04.097
-47.54
+RX - Pé ou pododáctilo
+50,03
+22
+-
+-
 4.08.04.100
-RX - Calcaneo
-50,62
+RX - Calcâneo
+48,47
+22
+-
+-
 4.08.04.119
 RX - Escanometria
-68.97
-Rx - Panoramica dos membros inferiores
-4.08.04.127 F
-=== PAGE 3 ===
-4.08.08.289 Mamotomia por estereotaxia (nao inclui o exame de
-568.07
-4.08.08.297 Mamotomia por Us (nao inclui o exame de imagem)
-558.89
-4.08.08.300 Mamotomia por RM (nao inclui o exame de imagem)
-568.07
-4.08.08.319 Colocacao de clipes(s) pre QT neoadjuvante ern axil
-259,37
-259,37
-4.08.08.3270
-Colocacao de clipes(s) pre QT neoadjuvante em mama
-88,.11
-4.08.08.335
-5 Revisao de Mamografia por procedimento
-88.11
-4.08.08.343 Revisao de densitometria ossea por procedimento
-4.08.08.351 Revisao de Raio X por procedimento
-28.24
-88.11
-4.08.08.360 Laudo Evoiutivo de Mamografia por procedimento
-4.08.08.378 Laudo Evolutivo de Densitometria Ossea por procedi
-88,11
-4.08.08.386 Laudo Evolutivo de Raio X por procedimento
-28.,24
-Sialografia (por glandula)
-135,03
+51,58
+22
+-
+-
+4.08.04.127
+RX - Panorâmica dos membros inferiores
+70,22
+22
+-
+-
+4.08.04.135
+RX - Incidência adicional de membro inferior
+19,76
+22
+-
+-
+4.08.05.018
+RX - Tórax - 1 incidência
+44,76
+22
+-
+-
+03/09/2026
+Pág:
+ 4
+10:52
+=== PAGE 5 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.08.05.026
+RX - Tórax - 2 incidências
+53,89
+22
+-
+-
+4.08.05.034
+RX - Tórax - 3 incidências
+58,62
+22
+-
+-
+4.08.05.042
+RX - Tórax - 4 incidências
+78,89
+22
+-
+-
+4.08.05.050
+RX - Coração e vasos da base
+78,89
+22
+-
+-
+4.08.05.069
+RX - Planigrafia de tórax, mediastino ou laringe
+118,21
+22
+-
+-
+4.08.05.077
+RX - Laringe ou hipofaringe ou pescoço (partes mol
+52,08
+22
+-
+-
+4.08.05.085
+RX - Abreugrafia 100 mm
+0,00
+22
+-
+-
+4.08.05.093
+RX - Abreugrafia 35 ou 70 mm
+0,00
+22
+-
+-
+4.08.06.014
+RX - Deglutograma
+130,23
+22
+-
+-
+4.08.06.022
+RX - Videodeglutograma
+221,18
+22
+-
+-
+4.08.06.030
+RX - Esôfago
+97,95
+22
+-
+-
+4.08.06.049
+RX - Estômago e duodeno
+153,25
+22
+-
+-
+4.08.06.057
+RX - Esôfago - hiato - estômago e duodeno
+192,82
+22
+-
+-
+4.08.06.065
+RX - Trânsito e morfologia do delgado
+160,43
+22
+-
+-
+4.08.06.073
+RX - Estudo do delgado com duplo contraste
+169,00
+22
+-
+-
+4.08.06.081
+RX - Clister ou enema opaco (duplo contraste)
+209,91
+22
+-
+-
+4.08.06.090
+RX - Defecograma
+191,20
+22
+-
+-
+4.08.06.103
+RX - Colangiografia intra-operatória
+98,22
+22
+-
+-
+4.08.06.111
+RX - Colangiografia pós-operatória (pelo dreno)
+98,22
+22
+-
+-
+4.08.06.120
+RX - Colangiografia pré-operatória
+0,00
+22
+-
+-
+4.08.06.138
+RX - Colangiografia venosa
+0,00
+22
+-
+-
+4.08.06.146
+RX - Colangiografia venosa com tomografias
+0,00
+22
+-
+-
+4.08.06.154
+RX - Colecistograma oral
+0,00
+22
+-
+-
+4.08.06.162
+RX - Colecistograma oral com prova motora
+0,00
+22
+-
+-
+4.08.06.170
+RX - Duodenografia hipotônica
+0,00
+22
+-
+-
+4.08.06.189
+RX - Trânsito colônico
+0,00
+22
+-
+-
+4.08.06.197
+RX - Colangiografia endoscópica
+0,00
+22
+-
+-
+4.08.06.200
+RX - Videodefecograma
+221,18
+22
+-
+-
+4.08.06.219
+RX - Videodefecograma com manometria anorretal
+0,00
+22
+-
+-
+4.08.07.010
+RX - Urografia venosa com bexiga pré e pós-miccion
+161,08
+22
+-
+-
+4.08.07.029
+RX - Pielografia ascendente
+112,49
+22
+-
+-
+4.08.07.037
+RX - Urografia venosa minutada 1-2-3
+168,20
+22
+-
+-
+4.08.07.045
+RX - Urografia venosa com nefrotomografia
+187,14
+22
+-
+-
+4.08.07.053
+RX - Uretrocistografia de adulto
+159,52
+22
+-
+-
+4.08.07.061
+RX - Uretrocistografia de criança (até 12 anos)
+196,03
+22
+-
+-
+4.08.07.070
+RX - Tomografia renal sem contraste
+91,81
+22
+-
+-
+4.08.07.088
+RX - Pênis
+50,81
+22
+-
+-
+03/09/2026
+Pág:
+ 5
+10:52
+=== PAGE 6 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.08.07.096
+RX - Uretrocistografia retrógada
+0,00
+22
+-
+-
+4.08.07.100
+RX - Nefrograma, basal e após captopril
+0,00
+22
+-
+-
+4.08.08.017
+RX - Abdome simples
+50,30
+22
+-
+-
+4.08.08.025
+RX - Abdome agudo
+79,63
+22
+-
+-
+4.08.08.033
+Mamografia convencional bilateral
+161,52
+22
+-
+-
+4.08.08.041
+Mamografia digital bilateral
+214,34
+22
+-
+-
+4.08.08.050
+RX - Ampliação ou magnificação de lesão mamária
+62,63
+22
+-
+-
+4.08.08.114
+RX - Esqueleto (incidências básicas de: crânio, co
+436,80
+22
+-
+-
+4.08.08.122
+Densitometria óssea (um segmento)
+156,33
+22
+-
+-
+4.08.08.130
+Densitometria óssea - rotina: coluna e fêmur (ou d
+235,46
+22
+-
+-
+4.08.08.149
+Densitometria óssea - corpo inteiro (avaliação de 
+202,92
+22
+-
+-
+4.08.08.157
+RX - Avaliação de fraturas vertebrais por DXA
+188,02
+22
+-
+-
+4.08.08.165
+Planigrafia de osso
+89,58
+22
+-
+-
+4.08.08.173
+Xeromamografia
+0,00
+22
+-
+-
+4.08.08.190
+Marcação pré-cirúrgica por nódulo - máximo de 3 nó
+216,38
+22
+-
+-
+4.08.08.203
+Marcação pré-cirúrgica por nódulo - máximo de 3 nó
+207,00
+22
+-
+-
+4.08.08.211
+Marcação pré-cirúrgica por nódulo - máximo de 3 nó
+216,38
+22
+-
+-
+4.08.08.220
+Punção ou biópsia mamária percutânea por agulha fi
+157,03
+22
+-
+-
+4.08.08.238
+Punção ou biópsia mamária percutânea por agulha fi
+157,03
+22
+-
+-
+4.08.08.246
+Punção ou biópsia mamária percutânea por agulha fi
+157,03
+22
+-
+-
+4.08.08.254
+Biópsia percutânea de fragmento mamário por agulha
+350,65
+22
+-
+-
+4.08.08.262
+Biópsia percutânea de fragmento mamário por agulha
+341,28
+22
+-
+-
+4.08.08.289
+Mamotomia por estereotaxia (não inclui o exame de 
+579,83
+22
+-
+-
+4.08.08.297
+Mamotomia por US (não inclui o exame de imagem)
+570,46
+22
+-
+-
+4.08.08.300
+Mamotomia por RM (não inclui o exame de imagem)
+579,83
+22
+-
+-
+4.08.08.319
+Colocação de clipes(s) pré QT neoadjuvante em axil
+264,73
+22
+-
+-
+4.08.08.327
+Colocação de clipes(s) pré QT neoadjuvante em mama
+264,73
+22
+-
+-
+4.08.09.000
+Ductografia (por mama)
+0,00
+22
+-
+-
 4.08.09.021
-4.08.09.030 Histerossalping0grafia
-147,27
-4.08.09.048 Artrografia ou pneumoartrografia
-147.27
-4.08.09.056 Fistulografia
-98,34
-Colangiografia transcutanea
-237,70
+Sialografia (por glândula)
+137,68
+22
+-
+-
+4.08.09.030
+Histerossalpingografia
+150,17
+22
+-
+-
+4.08.09.048
+Artrografia ou pneumoartrografia
+150,17
+22
+-
+-
+4.08.09.056
+Fistulografia
+100,21
+22
+-
+-
 4.08.09.064
-Colangiopancreatografia retrograda
-138,84
+Colangiografia transcutânea
+242,38
+22
+-
+-
 4.08.09.072
-4.08.09.080 Dacriocistografia
-133,86
+Colangiopancreatografia retrógrada
+141,47
+22
+-
+-
+4.08.09.080
+Dacriocistografia
+136,51
+22
+-
+-
 4.08.09.102
-Drenagem percutanea orientada por Rx (acrescentar
-279,21
-4.08.09.153 Puncao biopsia/aspirativa de drgao ou estrutura su
-120,40
-4.08.09.161 Puncao biopsia/aspirativa de orgao ou estrutura su
-120,40
-4.08.09.170 Puncao biopsia/aspirativa de orgao ou estrutura su
-120,40
-4.08.09.188 Puncao biopsia/aspirativa de orgao ou estrutura su
-120,40
-4.08.09.196 Puncao biopsia/aspirativa de orgao ou estrutura pr
-827.73
-4.08.09.200 Pungao biopsia/aspirativa de orgao ou estrutura pr
-827.73
-4.08.09.218 Puncao biopsia/aspirativa de orgao ou estrutura pr
-827.73
-4.08.09.226 Puncao biopsia/aspirativa de 0orgao ou estrutura pr
-827.73
+Drenagem percutânea orientada por RX (acrescentar 
+284,99
+22
+-
+-
+4.08.09.110
+Broncografia (por punção ou entubação traqueal)
+0,00
+22
+-
+-
+03/09/2026
+Pág:
+ 6
+10:52
+=== PAGE 7 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.08.09.129
+Broncografia unilateral
+0,00
+22
+-
+-
+4.08.09.137
+Pneumoperitônio (RX)
+0,00
+22
+-
+-
+4.08.09.145
+Colocação de marcador de local da intervenção
+0,00
+22
+-
+-
+4.08.09.153
+Punção biópsia/aspirativa de órgão ou estrutura su
+122,89
+22
+-
+-
+4.08.09.161
+Punção biópsia/aspirativa de órgão ou estrutura su
+122,89
+22
+-
+-
+4.08.09.170
+Punção biópsia/aspirativa de órgão ou estrutura su
+122,89
+22
+-
+-
+4.08.09.188
+Punção biópsia/aspirativa de órgão ou estrutura su
+122,89
+22
+-
+-
+4.08.09.196
+Punção biópsia/aspirativa de órgão ou estrutura pr
+844,85
+22
+-
+-
+4.08.09.200
+Punção biópsia/aspirativa de órgão ou estrutura pr
+844,85
+22
+-
+-
+4.08.09.218
+Punção biópsia/aspirativa de órgão ou estrutura pr
+844,85
+22
+-
+-
+4.08.09.226
+Punção biópsia/aspirativa de órgão ou estrutura pr
+844,85
+22
+-
+-
+4.08.10.011
 Mielografia segmentar (por segmento)
-267,26
-4.08.10.011[
-723.15
-4.08.10.020 Teste de oclusao de arteria carotida ou vertebral
-Avaliacao hemodinamica por cateterismo (aferimento
-461,20
+272,56
+22
+-
+-
+4.08.10.020
+Teste de oclusão de artéria carótida ou vertebral
+737,47
+22
+-
+-
 4.08.10.046
-118.85
-4.08.11.018 Radioscopia diagnostica
-118,41
-357,21
-4.08.12.014 Aortografia abdominal por puncao translombar
-323.81
-4.08.12.022 Angiografia por puncao
-4.08.12.030 Angiografia por cateterismo nao seletivo de grande
-577.23
-541.85
-4.08.12.049
-Angiografia por cateterismo seletivo de ramo prima
-624,90
-4.08.12.057
-Angiografia por cateterismo superseletivo de ramo
-215.81
-4.08.12.065
-Angiografia transoperatoria de posicionamento
-215.81
-4.08.12.073
-3 Angiografia pos-operatoria de controle
-311,66
-4.08.12.081 Flebografia por puncao venosa unilateral
-566,72
+Avaliação hemodinâmica por cateterismo (aferimento
+470,74
+22
+-
+-
+4.08.11.018
+Radioscopia diagnóstica
+121,31
+22
+-
+-
+4.08.11.026
+Radioscopia para acompanhamento de procedimento ci
+120,86
+22
+-
+-
+4.08.12.014
+Aortografia abdominal por punção translombar
+364,24
+22
+-
+-
+4.08.12.081
+Flebografia por punção venosa unilateral
+317,40
+22
+-
+-
 4.08.12.090
-0 Flebografia retrograda por cateterismo - unilatera
-645,04
-4.08.12.103 Portografia trans-hepatica
-548,11
+Flebografia retrógrada por cateterismo - unilatera
+577,74
+22
+-
+-
+4.08.12.103
+Portografia trans-hepática
+657,68
+22
+-
+-
 4.08.12.111
-Esplenoportografia percutanea
-418,65
+Esplenoportografia percutânea
+558,74
+22
+-
+-
 4.08.12.120
 Linfangioadenografia unilateral
-251.74
+426,63
+22
+-
+-
 4.08.12.138
 Cavernosografia
-307,67
+256,60
+22
+-
+-
 4.08.12.146
-Farmaco-cavernosografia (dinamica)
-176.33
-4.08.14.149 Paracentese orientada por RX ou US
-=== PAGE 4 ===
-255.75
-4.09.01.505 Us - Obstetrica: perfil biofisico fetal
-238,09
+Fármaco-cavernosografia (dinâmica)
+313,69
+22
+-
+-
+4.09.01.017
+US - Globo ocular - bilateral
+133,73
+22
+-
+-
+4.09.01.025
+US - Globo ocular com Doppler colorido - bilateral
+249,34
+22
+-
+-
+4.09.01.033
+US - Glândulas salivares (todas)
+133,73
+22
+-
+-
+4.09.01.041
+US - Torácico extracardíaco
+94,19
+22
+-
+-
+4.09.01.050
+Ecodopplercardiograma com contraste intracavitário
+316,15
+22
+-
+-
+4.09.01.068
+Ecodopplercardiograma com contraste para perfusão 
+748,57
+22
+-
+-
+4.09.01.076
+Ecodopplercardiograma com estresse farmacológico
+563,76
+22
+-
+-
+4.09.01.084
+Ecodopplercardiograma fetal com mapeamento de flux
+298,59
+22
+-
+-
+4.09.01.092
+Ecodopplercardiograma transesofágico (inclui trans
+563,76
+22
+-
+-
+4.09.01.106
+Ecodopplercardiograma transtorácico
+350,79
+22
+-
+-
+4.09.01.114
+US - Mamas
+133,73
+22
+-
+-
+4.09.01.122
+US - Abdome total (abdome superior, rins, bexiga, 
+224,30
+22
+-
+-
+4.09.01.130
+US - Abdome superior (fígado, vias biliares, vesíc
+158,51
+22
+-
+-
+03/09/2026
+Pág:
+ 7
+10:52
+=== PAGE 8 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.09.01.149
+US - Retroperitônio (grandes vasos ou adrenais)
+185,73
+22
+-
+-
+4.09.01.173
+US - Abdome inferior masculino (bexiga, próstata e
+138,18
+22
+-
+-
+4.09.01.181
+US - Abdome inferior feminino (bexiga, útero, ovár
+144,57
+22
+-
+-
+4.09.01.190
+US - Dermatológico - pele e subcutâneo
+98,78
+22
+-
+-
+4.09.01.203
+US - Órgãos superficiais (tireóide ou escroto ou p
+110,80
+22
+-
+-
+4.09.01.211
+US - Estruturas superficiais (cervical ou axila ou
+110,80
+22
+-
+-
+4.09.01.220
+US - Articular (por articulação)
+133,73
+22
+-
+-
+4.09.01.238
+US - Obstétrica
+99,86
+22
+-
+-
+4.09.01.246
+US - Obstétrica com Doppler colorido
+225,68
+22
+-
+-
+4.09.01.254
+US - Obstétrica com translucência nucal
+205,75
+22
+-
+-
+4.09.01.262
+US - Obstétrica morfológica
+260,76
+22
+-
+-
+4.09.01.270
+US - Obstétrica gestação múltipla: cada feto
+69,40
+22
+-
+-
+4.09.01.289
+US - Obstétrica gestação múltipla com Doppler colo
+126,73
+22
+-
+-
+4.09.01.297
+US - Obstétrica 1º trimestre (endovaginal)
+243,39
+22
+-
+-
+4.09.01.300
+US - Transvaginal (útero, ovário, anexos e vagina)
+134,82
+22
+-
+-
+4.09.01.319
+US - Transvaginal para controle de ovulação (3 ou 
+261,60
+22
+-
+-
+4.09.01.327
+US - Histerossonografia
+354,60
+22
+-
+-
+4.09.01.335
+US - Próstata transretal (não inclui abdome inferi
+212,71
+22
+-
+-
+4.09.01.351
+Doppler colorido transfontanela
+283,48
+22
+-
+-
+4.09.01.360
+Doppler colorido de vasos cervicais arteriais bila
+349,70
+22
+-
+-
+4.09.01.378
+Doppler colorido de vasos cervicais venosos bilate
+385,90
+22
+-
+-
+4.09.01.386
+Doppler colorido de órgão ou estrutura isolada
+275,72
+22
+-
+-
+4.09.01.394
+Doppler colorido de aorta e artérias renais
+306,43
+22
+-
+-
+4.09.01.408
+Doppler colorido de aorta e ilíacas
+306,43
+22
+-
+-
+4.09.01.416
+Doppler colorido de artérias viscerais (mesentéric
+306,43
+22
+-
+-
+4.09.01.424
+Doppler colorido de hemangioma
+306,43
+22
+-
+-
+4.09.01.432
+Doppler colorido de veia cava superior ou inferior
+306,43
+22
+-
+-
+4.09.01.440
+Doppler colorido peniano com fármaco-indução
+354,55
+22
+-
+-
+4.09.01.459
+Doppler colorido arterial de membro superior - uni
+416,03
+22
+-
+-
+4.09.01.467
+Doppler colorido venoso de membro superior - unila
+452,24
+22
+-
+-
+4.09.01.475
+Doppler colorido arterial de membro inferior - uni
+416,03
+22
+-
+-
+4.09.01.483
+Doppler colorido venoso de membro inferior - unila
+452,24
+22
+-
+-
+4.09.01.491
+US - Tridimensional - acrescentar ao exame de base
+135,39
+22
+-
+-
+4.09.01.505
+US - Obstétrica: perfil biofísico fetal
+260,76
+22
+-
+-
 4.09.01.513
-Doppler colorido de arterias penianas (sem farmaco
-207,89
+Doppler colorido de artérias penianas (sem fármaco
+242,82
+22
+-
+-
 4.09.01.521
-Uitrassonografia biomicroscopica - monocular
-155,17
-4.09.1.530 Uitrassonografia diagnostica - monocular
-461,89
-4.09.01.58o Us - Estudo sonografico dinamico das vias urinaria
-461,89
-4.09.01.599 Us - Estudo sonografico dinamico das vias urinaria
-4.09.01.602 Doppler transcraniano
-427.55
-4.09.01.610 Us - Cranio para crianca
-154.74
+Ultrassonografia biomicroscópica - monocular
+212,19
+22
+-
+-
+4.09.01.530
+Ultrassonografia diagnóstica - monocular
+158,38
+22
+-
+-
+03/09/2026
+Pág:
+ 8
+10:52
+=== PAGE 9 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.09.01.548
+Doppler convencional órgão/estrutura isolada
+0,00
+22
+-
+-
+4.09.01.556
+Ecocardiografia fetal gestação múltipla
+0,00
+22
+-
+-
+4.09.01.564
+Ecoencefalograma
+0,00
+22
+-
+-
+4.09.01.572
+Ultrassom com doppler abdôme total e pelve feminin
+0,00
+22
+-
+-
+4.09.01.580
+US - Estudo sonográfico dinâmico das vias urinária
+471,07
+22
+-
+-
+4.09.01.599
+US - Estudo sonográfico dinâmico das vias urinária
+471,07
+22
+-
+-
+4.09.01.602
+Doppler transcraniano
+436,21
+22
+-
+-
+4.09.01.610
+US - Crânio para criança
+157,75
+22
+-
+-
 4.09.01.629
-Uus - Ecodopplercardiograma com analise do sincroni
-678.78
+US - Ecodopplercardiograma com análise do sincroni
+692,62
+22
+-
+-
+4.09.01.637
+US - Ecocardiograma com Doppler convencional - art
+0,00
+22
+-
+-
+4.09.01.645
+US - Ecocardiograma com Doppler convencional - car
+0,00
+22
+-
+-
+4.09.01.653
+US - Ecocardiograma com Doppler tecidual para ress
+0,00
+22
+-
+-
+4.09.01.661
+US - Ecodoppler de carótidas
+0,00
+22
+-
+-
+4.09.01.670
+US - Prova de Boyden
+0,00
+22
+-
+-
 4.09.01.688
-Us - Adicional de reconstrucao 3D - ECO
-270,68
-Us - Ecodopplercardiograma com estresse fisico
-552.51
+US - Adicional de reconstrução 3D - ECO
+275,99
+22
+-
+-
 4.09.01.696
-Ecodopplercardiograma sob estresse fisico ou farma
-844.85
+US - Ecodopplercardiograma com estresse físico
+563,76
+22
+-
+-
 4.09.01.700
-Ecodopplercardiograma para ajuste de marca-passo
-858.53
+Ecodopplercardiograma sob estresse físico ou farma
+862,16
+22
+-
+-
 4.09.01.718
+Ecodopplercardiograma para ajuste de marca-passo
+876,12
+22
+-
+-
 4.09.01.726
-Us - Neurossonografia fetal
-427.55
+US - Neurossonografia fetal
+436,21
+22
+-
+-
 4.09.01.734
-+ US-Peca cirugica
-108,64
-4.09.01.742 US . Transretal Radial
-300,41
-4.09.01.750 US - Prostata (via abdominal)
-135,66
-Us - Aparelho urinario (rins, ureteres e bexiga)
-136,21
+US - Peça cirúgica
+110,80
+22
+-
+-
+4.09.01.742
+US - Transretal Radial
+306,43
+22
+-
+-
+4.09.01.750
+US - Próstata (via abdominal)
+138,18
+22
+-
+-
 4.09.01.769
+US - Aparelho urinário (rins, ureteres e bexiga)
+138,84
+22
+-
+-
 4.09.01.793
-Elastografia hepatica ultrassonica
-593,72
+Elastografia hepática ultrassônica
+605,72
+22
+-
+-
 4.09.01.815
-Us - Orgao ou estrutura isolada com contrate micro
-645.38
+US - Órgão ou estrutura isolada com contrate micro
+658,37
+22
+-
+-
 4.09.01.823
-Us - Vascular com contraste microboihas
-645.38
+US - Vascular com contraste microbolhas
+658,37
+22
+-
+-
 4.09.01.858
-Us - Pesguisa de endometriose
-599.79
-4.09.02.013
-Us - obstetrica: com amniocentese
-214,77
-Us - Obstetrica 1o trimestre com puncao: biopsia o
-349.32
-4.09.02.021
-4.09.02.030
-Us - Prostata transretal com biopsia - ate 8 fragm
-347,56
-Us - Prostata transretal com biopsia - mais de 8 f
-429,25
-4.09.02.048
-Us - Intra-operatorio
-302,92
+US - Pesquisa de endometriose
+611,92
+22
+-
+-
 4.09.02.056
-Doppler colorido intra-operatorio
-425,63
-4.09.02.064
-Ecodopplercardiograma transoperatorio (transesofag
-218,90
-4.09.02.072
-Ecodopplercardiograma transoperatorio (transesofag
-61,07
-4.09.02.080
-279.21
-4.09.02.110
-Drenagem percutanea orientada por Us (acrescentar
-120,40
-4.09.02.129
-Reducao de invaginacao intestinal por enema, orien
-83.74
-4.09.02.137
-Monitorizacao por Doppler transcraniano
-1.331.70
-4.09.02.145
-Ecodopplercardiograma intracardiaco
-4.09.03.010 Laudo Evolutivo de Ultrassonografia por procedimen
-120,40
-446,53
+US - Intra-operatório
+309,00
+22
+-
+-
 4.10.01.010
-TC - Cranio ou sela turcica ou orbitas
-472,20
+TC - Crânio ou sela túrcica ou órbitas
+455,21
+22
+-
+-
 4.10.01.028
-TC -Mastoides ou orelhas
-492,15
-4.10.01.036 TC - Face 0u seios da face
-492,15
-4.10.01.044 TC - Articulacoes temporomandibulares
-413.08
-4.10.01.052 TC - Dental (dentascan)
-505.65
-4.10.01.060 TC - Pescoco (partes moles, laringe, tireoide, far
-505,65
-4.10.01.079 TC - Torax
-547.31
-4.10.01.087 Tc - Coracao - para avaliagao do escore de calcio
-764,76
-4.10.01.095 TC - Abdome total (abdone superior, pelve e retrop
-505,65
+TC - Mastóides ou orelhas
+481,14
+22
+-
+-
+4.10.01.036
+TC - Face ou seios da face
+501,78
+22
+-
+-
+4.10.01.044
+TC - Articulações temporomandibulares
+501,78
+22
+-
+-
+4.10.01.052
+TC - Dental (dentascan)
+421,07
+22
+-
+-
+4.10.01.060
+TC - Pescoço (partes moles, laringe, tireóide, far
+515,28
+22
+-
+-
+4.10.01.079
+TC - Tórax
+515,28
+22
+-
+-
+4.10.01.087
+TC - Coração - para avaliação do escore de cálcio 
+558,08
+22
+-
+-
+4.10.01.095
+TC - Abdome total (abdome superior, pelve e retrop
+779,20
+22
+-
+-
+03/09/2026
+Pág:
+ 9
+10:52
+=== PAGE 10 ===
+ 
+PRE001 - Consulta Tabela de Precos
 4.10.01.109
 TC - Abdome superior
-472.20
+515,28
+22
+-
+-
 4.10.01.117
-Tc - Pelve ou bacia
-400,56
-4.0.01.125 TC - Coluna cervical ou dorsal ou lombo-sacra (ate
-=== PAGE 5 ===
+TC - Pelve ou bacia
+481,14
+22
+-
+-
+4.10.01.125
+TC - Coluna cervical ou dorsal ou lombo-sacra (até
+408,29
+22
+-
+-
+4.10.01.133
+TC - Coluna - segmento adicional
+117,50
+22
+-
+-
+4.10.01.141
+TC - Articulação (esternoclavicular ou ombro ou co
+481,14
+22
+-
+-
+4.10.01.150
+TC - Segmento apendicular (braço ou antebraço ou m
+481,14
+22
+-
+-
+4.10.01.176
+Angiotomografia de aorta torácica
+538,23
+22
+-
+-
+4.10.01.184
+Angiotomografia de aorta abdominal
+538,23
+22
+-
+-
+4.10.01.192
+TC - Escanometria digital
+206,63
+22
+-
+-
+4.10.01.206
+TC - Reconstrução tridimensional de qualquer órgão
+148,31
+22
+-
+-
+4.10.01.214
+Endoscopia virtual de qualquer órgão ou estrutura 
+148,31
+22
+-
+-
+4.10.01.222
+TC para PET dedicado oncológico
+951,30
+22
+-
+-
+4.10.01.230
+TC - Angiotomografia coronariana
+724,11
+22
+-
+-
+4.10.01.249
+TC - Artérias de membro superior
+0,00
+22
+-
+-
+4.10.01.257
+TC - Cisternografia por tomografia
+562,91
+22
+-
+-
+4.10.01.265
+TC - Colonoscopia virtual
+0,00
+22
+-
+-
+4.10.01.273
+TC - Mandíbula
+501,78
+22
+-
+-
+4.10.01.281
+TC - Maxilar
+501,78
+22
+-
+-
+4.10.01.290
+PET-CT cardiológico
+0,00
+22
+-
+-
+4.10.01.303
+PET-CT infecção
+0,00
+22
+-
+-
+4.10.01.311
+PET-CT neurológico
+0,00
+22
+-
+-
+4.10.01.320
+TC - Tomossíntese digital mamária
+0,00
+22
+-
+-
+4.10.01.338
+TC - Radiocirurgia esterotáxica
+0,00
+22
+-
+-
+4.10.01.346
+TC - Multifase (dinâmica)
+0,00
+22
+-
+-
+4.10.01.354
+TC - Articular dinâmica
+0,00
+22
+-
+-
+4.10.01.362
+TC - Vias urinárias (Urotomografia)
+973,78
+22
+-
+-
+4.10.01.370
+Angiotomografia arterial de crânio
+538,23
+22
+-
+-
+4.10.01.389
+Angiotomografia venosa de crânio
+538,23
+22
+-
+-
+4.10.01.397
+Angiotomografia arterial de pescoço
+538,23
+22
+-
+-
+4.10.01.400
+Angiotomografia venosa de pescoço
+538,23
+22
+-
+-
+4.10.01.419
+Angiotomografia arterial de tórax
+538,23
+22
+-
+-
+4.10.01.427
+Angiotomografia venosa de tórax
+538,23
+22
+-
+-
+4.10.01.435
+Angiotomografia arterial de abdome superior
+538,23
+22
+-
+-
+4.10.01.443
+Angiotomografia venosa de abdome superior
+538,23
+22
+-
+-
+4.10.01.451
+Angiotomografia arterial de pelve
+538,23
+22
+-
+-
+4.10.01.460
+Angiotomografia venosa de pelve
+538,23
+22
+-
+-
+4.10.01.478
+Angiotomografia arterial de membro inferior
+538,23
+22
+-
+-
+03/09/2026
+Pág:
+ 10
+10:52
+=== PAGE 11 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.10.01.486
+Angiotomografia venosa de membro inferior
+538,23
+22
+-
+-
+4.10.01.494
+Angiotomografia arterial de membro superior
+538,23
+22
+-
+-
+4.10.01.508
+Angiotomografia venosa de membro superior
+538,23
+22
+-
+-
+4.10.01.516
+Angiotomografia arterial pulmonar
+538,23
+22
+-
+-
+4.10.01.524
+Angiotomografia venosa pulmonar
+538,23
+22
+-
+-
+4.10.01.532
+TC para planejamento oncológico
+562,95
+22
+-
+-
+4.10.02.016
+Tomomielografia (até 3 segmentos) - acrescentar a 
+57,65
+22
+-
+-
+4.10.02.032
+Drenagem percutânea orientada por TC (acrescentar 
+284,99
+22
+-
+-
+4.10.02.040
+TC - Punção para introdução de contraste (acrescen
+122,89
+22
+-
+-
+4.10.02.059
+Artro-TC (esternoclavicular ou ombro ou cotovelo o
+627,24
+22
+-
+-
+4.11.01.014
+RM - Crânio (encéfalo)
+958,70
+22
+-
+-
+4.11.01.022
+RM - Sela túrcica (hipófise)
+958,70
+22
+-
+-
+4.11.01.030
+RM - Base do crânio
+958,70
+22
+-
+-
+4.11.01.049
+Estudo funcional (mapeamento cortical por RM)
+353,70
+22
+-
+-
+4.11.01.057
+Perfusão cerebral por RM
+353,70
+22
+-
+-
+4.11.01.065
+Espectroscopia por RM
+353,70
+22
+-
+-
+4.11.01.073
+RM - Órbita bilateral
+958,70
+22
+-
+-
+4.11.01.081
+RM - Ossos temporais bilateral
+958,70
+22
+-
+-
+4.11.01.090
+RM - Face (inclui seios da face)
+958,70
+22
+-
+-
+4.11.01.103
+RM - Articulação temporomandibular (bilateral)
+935,75
+22
+-
+-
 4.11.01.111
-RM - Pescoco (nasofaringe, orofaringe, laringe, tr
-941.44
-RM - Torax (mediastino, pulmao, parede toracica)
-990,68
+RM - Pescoço (nasofaringe, orofaringe, laringe, tr
+958,70
+22
+-
+-
 4.11.01.120
-RM - Coracao - morfologico e funcional
-990,68
+RM - Tórax (mediastino, pulmão, parede torácica)
+1.008,96
+22
+-
+-
 4.11.01.138
-Rm - Coracao - morfologico e funcional + perfusao
-1.059,41
+RM - Coração - morfológico e funcional
+1.008,96
+22
+-
+-
 4.11.01.146
-RM - Coracao - morfologico e funcional + perfusao
-1.140.64
+RM - Coração - morfológico e funcional + perfusão 
+1.078,55
+22
+-
+-
 4.11.01.154
-RM - Abdome superior (figado, pancreas, baco, rins
-990,68
+RM - Coração - morfológico e funcional + perfusão 
+1.161,47
+22
+-
+-
 4.11.01.170
-RM - Pelve (nao inclui articulacoes coxofemorais)
-941.44
+RM - Abdome superior (fígado, pâncreas, baço, rins
+1.008,96
+22
+-
+-
 4.11.01.189
-RM - Fetal
-990.68
+RM - Pelve (não inclui articulações coxofemorais)
+958,70
+22
+-
+-
 4.11.01.197
-918,95
+RM - Fetal
+1.008,96
+22
+-
+-
 4.11.01.200
-RM - Penis
-918,95
+RM - Pênis
+935,75
+22
+-
+-
 4.11.01.219
 RM - Bolsa escrotal
+935,75
+22
+-
+-
 4.11.01.227
 RM - Coluna cervical ou dorsal ou lombar
-941.44
+958,70
+22
+-
+-
 4.11.01.235
-RM - Fluxo liquorico (como complementar)
-267,83
+RM - Fluxo liquórico (como complementar)
+273,10
+22
+-
+-
 4.11.01.243
-RM - Plexo braquial (desfiladeiro toracico) ou lom
-990.68
+RM - Plexo braquial (desfiladeiro torácico) ou lom
+1.008,96
+22
+-
+-
 4.11.01.251
-RM - Membro superior unilateral (nao inclui mao e
-941.44
+RM - Membro superior unilateral (não inclui mão e 
+958,70
+22
+-
+-
 4.11.01.260
-RM - Mao (nao inclui punho)
-941.44
+RM - Mão (não inclui punho)
+958,70
+22
+-
+-
 4.11.01.278
-RM - Bacia (articulacoes sacroiliacas)
-941.33
-RM - Coxa (unilateral)
-941,44
+RM - Bacia (articulações sacroilíacas)
+958,58
+22
+-
+-
 4.11.01.286
-941.44
+RM - Coxa (unilateral)
+958,70
+22
+-
+-
+03/09/2026
+Pág:
+ 11
+10:52
+=== PAGE 12 ===
+ 
+PRE001 - Consulta Tabela de Precos
 4.11.01.294
 RM - Perna (unilateral)
-941.44
+958,70
+22
+-
+-
 4.11.01.308
-RM - Pe (antepe) - nao inctui tornozelo
-941.44
+RM - Pé (antepé) - não inclui tornozelo
+958,70
+22
+-
+-
 4.11.01.316
-RM - Articular (por articulacao)
-990,68
-4.11.01.332 Angio-RM de aorta toracica
-990,68
-4.11.01.340 Angio-RM de aorta abdominal
+RM - Articular (por articulação)
+958,70
+22
+-
+-
+4.11.01.332
+Angio-RM de aorta torácica
+1.008,96
+22
+-
+-
+4.11.01.340
+Angio-RM de aorta abdominal
+1.008,96
+22
+-
+-
 4.11.01.359
-Hidro-RM (colangio-RM ou uro-RM ou mielo-RM ou sia
-941.44
+Hidro-RM (colângio-RM ou uro-RM ou mielo-RM ou sia
+958,70
+22
+-
+-
 4.11.01.375
 Endoscopia virtual por RM - acrescentar ao exame d
-281.33
-267,83
+286,60
+22
+-
+-
 4.11.01.383
-RM - Reconstrucao tridimensional - acrescentar ao
-RM - Avaliacao de ferro (coracao ou figado)
+RM - Reconstrução tridimensional - acrescentar ao 
+273,10
+22
+-
+-
 4.11.01.430
-1.059,41
+RM - Avaliação de ferro (coração ou fígado)
+1.078,55
+22
+-
+-
 4.11.01.448
 RM - Tractografia
-1.040.49
+1.059,80
+22
+-
+-
 4.11.01.456
-RM - Difusao por RM
-347.07
+RM - Difusão por RM
+353,70
+22
+-
+-
+4.11.01.464
+RM - Multiparamétrica transretal da próstata
+0,00
+22
+-
+-
 4.11.01.472
 RM - Planejamento
-1.096,67
+1.117,15
+22
+-
+-
 4.11.01.480
 RM - Mama (bilateral)
-1.574,75
-4.11.01.499 Angio-RM arterial pulmonar
-941,44
-4.11.01.502 Angio-RM venosa pulmonar
-941,44
-4.11.01.510 Angio-RM arterial de abdome superior
-941,44
-4.11.01.529 Angio-RMvenosa de abdome superior
-941.44
-941.44
-4.11.01.537 Angio-RM arterial de cranio
-4.11.01.545 Angio-RM venosa de cranio
-941.44
-4.11.01.553 Angio-RM arterial de membro inferior (unilateral)
-941.44
-4.11.01.561 Angio-RM venosa de rmembro inferior (unilateral)
-941.44
-4.11.01.570 Angio-RM arterial de membro superior (unilateral)
-941.44
-4.11.01.588 Angio-RM venosa de membro superior (unilateral)
-941.44
-941,44
-4.11.01.596 Angio-RM arterial de pelve
-4.11.01.600 Angio-RM venosa de pelve
-941.44
-4.11.01.618 Angio-RM arterial de pescoco
-941.44
-4.11.01.626 Angio-RMvenosa de pescoco
-941.44
-4.11.01.634 RM - Endorretal
-1.032,41
-1.032,41
-4.11.01.642 RM - Endovaginal
-4.11.01.650 RM - Neuronavegador
-346,92
+1.605,12
+22
+-
+-
+4.11.01.499
+Angio-RM arterial pulmonar
+958,70
+22
+-
+-
+4.11.01.502
+Angio-RM venosa pulmonar
+958,70
+22
+-
+-
+4.11.01.510
+Angio-RM arterial de abdome superior
+958,70
+22
+-
+-
+4.11.01.529
+Angio-RM venosa de abdome superior
+958,70
+22
+-
+-
+4.11.01.537
+Angio-RM arterial de crânio
+958,70
+22
+-
+-
+4.11.01.545
+Angio-RM venosa de crânio
+958,70
+22
+-
+-
+4.11.01.553
+Angio-RM arterial de membro inferior (unilateral)
+958,70
+22
+-
+-
+4.11.01.561
+Angio-RM venosa de membro inferior (unilateral)
+958,70
+22
+-
+-
+4.11.01.570
+Angio-RM arterial de membro superior (unilateral)
+958,70
+22
+-
+-
+4.11.01.588
+Angio-RM venosa de membro superior (unilateral)
+958,70
+22
+-
+-
+4.11.01.596
+Angio-RM arterial de pelve
+958,70
+22
+-
+-
+4.11.01.600
+Angio-RM venosa de pelve
+958,70
+22
+-
+-
+4.11.01.618
+Angio-RM arterial de pescoço
+958,70
+22
+-
+-
+4.11.01.626
+Angio-RM venosa de pescoço
+958,70
+22
+-
+-
+4.11.01.634
+RM - Endorretal
+1.051,55
+22
+-
+-
+4.11.01.642
+RM - Endovaginal
+1.051,55
+22
+-
+-
+4.11.01.650
+RM - Neuronavegador
+353,54
+22
+-
+-
+4.11.01.669
+RM para planejamento oncológico
+1.117,10
+22
+-
+-
+4.11.02.010
+Artro-RM (incluir a punção articular) - por articu
+1.008,96
+22
+-
+-
+4.15.01.012
+Biometria ultrassônica - monocular
+97,31
+22
+-
+-
+4.15.01.020
+Cavernosometria
+43,23
+22
+-
+-
+4.15.01.047
+Dopplermetria dos cordões espermáticos
+63,05
+22
+-
+-
+4.15.01.063
+Investigação ultrassônica com registro gráfico (qu
+90,19
+22
+-
+-
+03/09/2026
+Pág:
+ 12
+10:52
+=== PAGE 13 ===
+ 
+PRE001 - Consulta Tabela de Precos
+4.15.01.071
+Investigação ultrassônica com teste de stress e co
+28,82
+22
+-
+-
+4.15.01.080
+Investigação ultrassônica com teste de stress e se
+28,82
+22
+-
+-
+4.15.01.098
+Investigação ultrassônica com teste de stress em e
+159,31
+22
+-
+-
+4.15.01.101
+Investigação ultrassônica sem registro gráfico (qu
+43,23
+22
+-
+-
+4.15.01.128
+Paquimetria ultrassônica - monocular
+65,03
+22
+-
+-
+4.15.01.144
+Tomografia de coerência óptica - monocular
+247,83
+22
+-
+-
+03/09/2026
+Pág:
+ 13
+10:52

@@ -294,11 +294,9 @@ def montar_contexto_relatorio_lote(lote_id, empresa_id, *, layout='padrao', lote
 
 
 def _cabecalhos_tabela_publico(coluna_guia: bool) -> list[str]:
-    cols = ['Data', 'Paciente']
+    cols = ['Data', 'Paciente', 'Associado']
     if coluna_guia:
-        cols.extend(['Número da Guia', 'Associado'])
-    else:
-        cols.append('Associado')
+        cols.append('Número da Guia')
     cols.extend(['Procedimento', 'Modalidade', 'Contraste', 'Valor'])
     return cols
 
@@ -306,25 +304,146 @@ def _cabecalhos_tabela_publico(coluna_guia: bool) -> list[str]:
 def _linha_tabela_publico(linha: dict, coluna_guia: bool) -> list:
     data = linha.get('data')
     data_fmt = data.strftime('%d/%m/%Y') if data else '—'
-    valores = [data_fmt, linha.get('paciente') or '-']
+    valores = [
+        data_fmt,
+        linha.get('paciente') or '-',
+        linha.get('nome_associado') or '-',
+    ]
     if coluna_guia:
-        valores.extend([
-            linha.get('numero_guia') or '-',
-            linha.get('nome_associado') or '-',
-        ])
-    else:
-        valores.append(linha.get('nome_associado') or '-')
+        valores.append(linha.get('numero_guia') or '-')
     valor = linha.get('valor') or Decimal('0')
     valores.extend([
         linha.get('procedimento') or '-',
         linha.get('modalidade') or '-',
         'Sim' if linha.get('com_contraste') else 'Não',
-        float(valor),
+        _fmt_moeda_br(valor),
     ])
     return valores
 
 
-def montar_workbook_lote_publico(context) -> Workbook:
+def _fmt_moeda_br(valor):
+    from django.utils.numberformat import format as number_format
+
+    try:
+        return f'R$ {number_format(valor or 0, decimal_pos=2, force_grouping=True, use_l10n=True)}'
+    except (TypeError, ValueError):
+        return 'R$ 0,00'
+
+
+def _excel_borda_azul():
+    from openpyxl.styles import Border, Side
+
+    lado = Side(style='thin', color='8EAADB')
+    return Border(left=lado, right=lado, top=lado, bottom=lado)
+
+
+def _excel_escrever_resumo_assinatura(ws, row_start, secao, context, *, incluir_assinatura=False):
+    """Bloco RESUMO — LOTE + campos de assinatura (mesmo layout da impressão)."""
+    from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+
+    resumo = secao.get('resumo_publico')
+    if not resumo:
+        return row_start
+
+    borda = _excel_borda_azul()
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    total_qtd_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+    total_valor_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
+    bold = Font(bold=True)
+    center = Alignment(horizontal='center', vertical='center')
+    left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    linha_assinatura = Border(bottom=Side(style='thin', color='000000'))
+
+    row = row_start
+    lote_id = secao['lote'].id
+    assinatura_row = row
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+    titulo = ws.cell(row=row, column=1, value=f'RESUMO — LOTE {lote_id}')
+    titulo.font = bold
+    titulo.fill = header_fill
+    titulo.alignment = center
+    for col in (1, 2):
+        cell = ws.cell(row=row, column=col)
+        cell.border = borda
+        cell.fill = header_fill
+    row += 1
+
+    for item in resumo.get('modalidades') or []:
+        c_label = ws.cell(row=row, column=1, value=item.get('label'))
+        c_label.font = bold
+        c_label.alignment = left
+        c_qtd = ws.cell(row=row, column=2, value=item.get('quantidade'))
+        c_qtd.alignment = center
+        for col in (1, 2):
+            ws.cell(row=row, column=col).border = borda
+        row += 1
+
+    for label, valor, fill in (
+        ('Quantidade total', resumo.get('quantidade_total'), total_qtd_fill),
+        ('Valor total', _fmt_moeda_br(resumo.get('valor_total')), total_valor_fill),
+    ):
+        c_label = ws.cell(row=row, column=1, value=label)
+        c_label.font = bold
+        c_label.fill = fill
+        c_label.alignment = left
+        c_valor = ws.cell(row=row, column=2, value=valor)
+        c_valor.font = bold
+        c_valor.fill = fill
+        c_valor.alignment = center
+        for col in (1, 2):
+            ws.cell(row=row, column=col).border = borda
+        row += 1
+
+    resumo_fim = row - 1
+
+    if incluir_assinatura:
+        col_rotulo = 4
+        col_valor_ini = 5
+        col_valor_fim = 7
+        empresa = context.get('empresa')
+        emissao = context.get('data_emissao_relatorio')
+        local = (context.get('local_relatorio') or '').strip()
+
+        campos = [
+            ('DATA', emissao.strftime('%d/%m/%Y') if emissao else '', 1),
+            ('LOCAL', local, 1),
+            ('RESPONSÁVEL PARA ASSINATURA', '', 4),
+        ]
+        r = assinatura_row
+        for rotulo, valor, linhas in campos:
+            ws.cell(row=r, column=col_rotulo, value=rotulo).font = bold
+            ws.merge_cells(
+                start_row=r,
+                start_column=col_valor_ini,
+                end_row=r + linhas - 1,
+                end_column=col_valor_fim,
+            )
+            val_cell = ws.cell(row=r, column=col_valor_ini, value=valor or None)
+            val_cell.alignment = Alignment(vertical='bottom')
+            borda_fim = r + linhas - 1
+            for col in range(col_valor_ini, col_valor_fim + 1):
+                ws.cell(row=borda_fim, column=col).border = linha_assinatura
+            r += linhas + 2
+
+        if empresa:
+            footer_row = resumo_fim + 2
+            cnpj = (empresa.cnpj or '').strip()
+            texto = f'{empresa.razao} · CNPJ {cnpj}' if cnpj else empresa.razao
+            ws.cell(row=footer_row, column=1, value=texto).font = Font(size=9, color='333333')
+
+        ws.column_dimensions['D'].width = 30
+        ws.column_dimensions['E'].width = 14
+        ws.column_dimensions['F'].width = 14
+        ws.column_dimensions['G'].width = 14
+
+    ws.column_dimensions['A'].width = max(ws.column_dimensions['A'].width or 0, 40)
+    ws.column_dimensions['B'].width = max(ws.column_dimensions['B'].width or 0, 12)
+
+    return row
+
+
+def montar_workbook_lote_publico(context):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -334,11 +453,14 @@ def montar_workbook_lote_publico(context) -> Workbook:
     cabecalhos = _cabecalhos_tabela_publico(coluna_guia)
     header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
     header_font = Font(bold=True)
+    borda = _excel_borda_azul()
     empresa = context.get('empresa')
     convenio = context.get('convenio_nome') or 'Convênio'
+    secoes = context.get('secoes') or []
+    ultima_secao = len(secoes) - 1
 
-    for idx, secao in enumerate(context.get('secoes') or []):
-        titulo = f'Lote {secao["lote"].id}' if len(context.get('secoes') or []) > 1 else 'Controle Exames'
+    for idx, secao in enumerate(secoes):
+        titulo = f'Lote {secao["lote"].id}' if len(secoes) > 1 else 'Controle Exames'
         ws = wb.create_sheet(title=titulo[:31])
         row = 1
         if empresa:
@@ -367,37 +489,36 @@ def montar_workbook_lote_publico(context) -> Workbook:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center', wrap_text=True)
+            cell.border = borda
         row += 1
 
         for linha in secao.get('linhas') or []:
             for col, valor in enumerate(_linha_tabela_publico(linha, coluna_guia), start=1):
-                ws.cell(row=row, column=col, value=valor)
+                cell = ws.cell(row=row, column=col, value=valor)
+                cell.border = borda
+                if col == len(cabecalhos):
+                    cell.alignment = Alignment(horizontal='right')
             row += 1
 
-        resumo = secao.get('resumo_publico')
-        if resumo:
+        if secao.get('resumo_publico'):
             row += 1
-            ws.cell(row=row, column=1, value='Resumo por modalidade').font = Font(bold=True)
-            row += 1
-            for item in resumo.get('modalidades') or []:
-                ws.cell(row=row, column=1, value=item.get('label'))
-                ws.cell(row=row, column=2, value=item.get('quantidade'))
-                row += 1
-            ws.cell(row=row, column=1, value='Quantidade total').font = Font(bold=True)
-            ws.cell(row=row, column=2, value=resumo.get('quantidade_total')).font = Font(bold=True)
-            row += 1
-            ws.cell(row=row, column=1, value='Valor total').font = Font(bold=True)
-            ws.cell(row=row, column=2, value=float(resumo.get('valor_total') or 0)).font = Font(bold=True)
+            row = _excel_escrever_resumo_assinatura(
+                ws,
+                row,
+                secao,
+                context,
+                incluir_assinatura=(idx == ultima_secao),
+            )
 
-        if idx == 0 and len(cabecalhos) >= 4:
-            ws.column_dimensions['A'].width = 12
-            ws.column_dimensions['B'].width = 36
+        if len(cabecalhos) >= 4:
+            ws.column_dimensions['A'].width = max(ws.column_dimensions['A'].width or 0, 12)
+            ws.column_dimensions['B'].width = max(ws.column_dimensions['B'].width or 0, 36)
             if coluna_guia:
-                ws.column_dimensions['C'].width = 16
-                ws.column_dimensions['D'].width = 36
+                ws.column_dimensions['C'].width = 36
+                ws.column_dimensions['D'].width = 16
                 ws.column_dimensions['E'].width = 42
             else:
-                ws.column_dimensions['C'].width = 36
+                ws.column_dimensions['C'].width = max(ws.column_dimensions['C'].width or 0, 36)
                 ws.column_dimensions['D'].width = 42
 
     if not wb.sheetnames:
