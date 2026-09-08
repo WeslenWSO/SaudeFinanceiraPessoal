@@ -1,198 +1,215 @@
-{% extends 'base.html' %}
-
-{% block title %}Resumo por mês / médico solicitante{% endblock %}
-
-{% block nav_%}
-    {% include 'parcial/_nav.html' %}
-{% endblock %}
-
-{% block conteudo %}
-<style>
-.fm-cabecalho-medicinarte .top-banner {
-    background: #1f3864;
-    color: #fff;
-    text-align: center;
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: bold;
-    letter-spacing: 0.03em;
-}
-.fm-cabecalho-medicinarte .titulo-relatorio {
-    text-align: center;
-    margin: 14px 0 4px;
-}
-.fm-cabecalho-medicinarte .titulo-relatorio h1 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-.fm-cabecalho-medicinarte .titulo-relatorio h2 {
-    margin: 6px 0 0;
-    font-size: 13px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-.fm-cabecalho-medicinarte .meta-relatorio {
-    text-align: center;
-    font-size: 10px;
-    color: #333;
-    margin-bottom: 12px;
-}
-.fm-cabecalho-medicinarte .empresa-detalhe {
-    text-align: center;
-    font-size: 10px;
-    color: #555;
-    margin-top: -6px;
-    margin-bottom: 8px;
-}
-.fm-secao-solicitante + .fm-secao-solicitante {
-    margin-top: 2rem;
-}
-.fm-pivot-table {
-    font-size: 0.82rem;
-}
-.fm-pivot-table th,
-.fm-pivot-table td {
-    text-align: center;
-    vertical-align: middle;
-    white-space: nowrap;
-    border-color: #8eaadb;
-}
-.fm-pivot-table th:first-child,
-.fm-pivot-table td:first-child {
-    text-align: left;
-    white-space: normal;
-    min-width: 12rem;
-}
-.fm-pivot-table thead th {
-    background: #bdd7ee;
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-}
-.fm-pivot-table tfoot td,
-.fm-pivot-table tfoot th {
-    font-weight: 600;
-    background: #f2f2f2;
-}
-.fm-pivot-zero {
-    color: #adb5bd;
-}
-.fm-relatorio-meta {
-    font-size: 0.85rem;
-    color: #6c757d;
-}
-@media print {
-    .no-print { display: none !important; }
-    .card { border: 0 !important; box-shadow: none !important; }
-    .fm-secao-solicitante + .fm-secao-solicitante {
-        page-break-before: always;
-    }
-}
-</style>
-
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 no-print">
-                    <h3 class="card-title mb-0">Resumo por mês / médico solicitante</h3>
-                    <div class="card-tools d-flex gap-2">
-                        <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">
-                            <i class="fas fa-print"></i> Imprimir
-                        </button>
-                        <a href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}"
-                           class="btn btn-secondary btn-sm">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </a>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="fm-relatorio-meta mb-3 no-print">
-                        Impressão em {{ data_impressao|date:"d/m/Y H:i" }}
-                        · Período: <strong>{{ periodo_fmt }}</strong>
-                        · {{ qtd_meses }} mês(es) no período
-                        · {{ total_exames }} exame(s) no total
-                        · {{ tabelas|length }} solicitante(s)
-                    </div>
-
-                    {% if filtros.solicitante or filtros.medico or filtros.status_agendamento %}
-                    <div class="alert alert-light border small py-2 mb-4 no-print">
-                        <strong>Filtros:</strong>
-                        {% if filtros.solicitante %}Solicitante: {{ filtros.solicitante|join:", " }}; {% endif %}
-                        {% if filtros.medico %}Médico: {{ filtros.medico|join:", " }}; {% endif %}
-                        {% if filtros.status_agendamento %}Status: {{ filtros.status_agendamento|join:", " }}; {% endif %}
-                    </div>
-                    {% endif %}
-
-                    {% if tabelas %}
-                    {% for tabela in tabelas %}
-                    <section class="fm-secao-solicitante mb-4">
-                        <header class="fm-cabecalho-medicinarte">
-                            {% if empresa %}
-                            <div class="top-banner">{{ empresa.razao }}</div>
-                            {% if empresa.cnpj %}
-                            <div class="empresa-detalhe">CNPJ {{ empresa.cnpj }}</div>
-                            {% endif %}
-                            {% endif %}
-                            <div class="titulo-relatorio">
-                                <h1>Resumo por mês / médico solicitante</h1>
-                                <h2>{{ tabela.nome }}</h2>
-                            </div>
-                            <p class="meta-relatorio">
-                                Impressão em {{ data_impressao|date:"d/m/Y H:i" }}
-                                · Período {{ periodo_fmt }}
-                                · {{ qtd_meses }} mês(es) no período
-                                · {{ tabela.total_exames }} exame(s)
-                                · Modalidades nas linhas · Meses nas colunas
-                            </p>
-                        </header>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered fm-pivot-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Modalidade</th>
-                                        {% for col in tabela.meses_colunas %}
-                                        <th>{{ col.label }}</th>
-                                        {% endfor %}
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for linha in tabela.linhas %}
-                                    <tr>
-                                        <td>{{ linha.rotulo }}</td>
-                                        {% for qtd in linha.celulas %}
-                                        <td>{% if qtd %}{{ qtd }}{% else %}<span class="fm-pivot-zero">—</span>{% endif %}</td>
-                                        {% endfor %}
-                                        <td><strong>{% if linha.total %}{{ linha.total }}{% else %}<span class="fm-pivot-zero">—</span>{% endif %}</strong></td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <th>Total</th>
-                                        {% for total in tabela.totais_mes %}
-                                        <td>{% if total %}{{ total }}{% else %}<span class="fm-pivot-zero">—</span>{% endif %}</td>
-                                        {% endfor %}
-                                        <td><strong>{{ tabela.total_exames }}</strong></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </section>
-                    {% endfor %}
-                    {% else %}
-                    <div class="alert alert-warning mb-0">
-                        Nenhum exame encontrado para os filtros selecionados.
-                        Verifique o período, solicitantes com apelido cadastrado e status de agendamento.
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumo por mês / médico solicitante</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: Calibri, Arial, Helvetica, sans-serif;
+            margin: 12px 16px;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+        }
+        .barra-acoes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .barra-acoes button,
+        .barra-acoes a {
+            display: inline-block;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-imprimir {
+            background: #0d6efd;
+            color: #fff;
+            border: 1px solid #0d6efd;
+        }
+        .btn-voltar {
+            background: #6c757d;
+            color: #fff;
+            border: 1px solid #6c757d;
+        }
+        .top-banner {
+            background: #1f3864;
+            color: #fff;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.03em;
+        }
+        .empresa-detalhe {
+            text-align: center;
+            font-size: 10px;
+            color: #555;
+            margin: 4px 0 0;
+        }
+        .titulo-relatorio {
+            text-align: center;
+            margin: 14px 0 4px;
+        }
+        .titulo-relatorio h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .titulo-relatorio h2 {
+            margin: 6px 0 0;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .meta-relatorio {
+            text-align: center;
+            font-size: 10px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        table.dados {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 18px;
+        }
+        table.dados th,
+        table.dados td {
+            border: 1px solid #8eaadb;
+            padding: 5px 7px;
+            vertical-align: middle;
+        }
+        table.dados thead th {
+            background: #bdd7ee;
+            color: #000;
+            font-weight: bold;
+            font-size: 10px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        table.dados tbody td {
+            background: #fff;
+            text-align: center;
+        }
+        table.dados tbody td.col-modalidade {
+            text-align: left;
+            font-weight: normal;
+        }
+        table.dados tfoot th,
+        table.dados tfoot td {
+            font-weight: bold;
+            background: #f2f2f2;
+            text-align: center;
+        }
+        table.dados tfoot th.col-modalidade {
+            text-align: left;
+            text-transform: uppercase;
+        }
+        .celula-vazia {
+            color: #999;
+        }
+        .secao-solicitante + .secao-solicitante {
+            page-break-before: always;
+            margin-top: 24px;
+        }
+        .aviso-vazio {
+            padding: 16px;
+            border: 1px solid #ffc107;
+            background: #fff3cd;
+            color: #664d03;
+            border-radius: 4px;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+            .secao-solicitante + .secao-solicitante {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="barra-acoes no-print">
+        <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+        <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
     </div>
-</div>
-{% endblock %}
+
+    {% if tabelas %}
+    {% for tabela in tabelas %}
+    <section class="secao-solicitante">
+        {% if empresa %}
+        <div class="top-banner">{{ empresa.razao }}</div>
+        {% if empresa.cnpj %}
+        <p class="empresa-detalhe">CNPJ {{ empresa.cnpj }}</p>
+        {% endif %}
+        {% endif %}
+
+        <div class="titulo-relatorio">
+            <h1>Resumo por mês / médico solicitante</h1>
+            <h2>{{ tabela.nome }}</h2>
+        </div>
+        <p class="meta-relatorio">
+            Impressão em {{ data_impressao|date:"d/m/Y H:i" }}
+            · Período {{ periodo_fmt }}
+            · {{ qtd_meses }} mês(es) no período
+            · {{ tabela.total_exames }} exame(s)
+            · Modalidades nas linhas · Meses nas colunas
+        </p>
+
+        <table class="dados">
+            <thead>
+                <tr>
+                    <th class="col-modalidade">Modalidade</th>
+                    {% for col in tabela.meses_colunas %}
+                    <th>{{ col.label }}</th>
+                    {% endfor %}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in tabela.linhas %}
+                <tr>
+                    <td class="col-modalidade">{{ linha.rotulo }}</td>
+                    {% for qtd in linha.celulas %}
+                    <td>{% if qtd %}{{ qtd }}{% else %}<span class="celula-vazia">—</span>{% endif %}</td>
+                    {% endfor %}
+                    <td>{% if linha.total %}{{ linha.total }}{% else %}<span class="celula-vazia">—</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th class="col-modalidade">Total</th>
+                    {% for total in tabela.totais_mes %}
+                    <td>{% if total %}{{ total }}{% else %}<span class="celula-vazia">—</span>{% endif %}</td>
+                    {% endfor %}
+                    <td>{{ tabela.total_exames }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </section>
+    {% endfor %}
+    {% else %}
+    <div class="aviso-vazio">
+        Nenhum exame encontrado para os filtros selecionados.
+        Verifique o período, solicitantes com apelido cadastrado e status de agendamento.
+    </div>
+    {% endif %}
+</body>
+</html>
