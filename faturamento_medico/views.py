@@ -3021,6 +3021,291 @@ def exportar_resumo_mes_solicitante_excel(request):
     return response
 
 
+def _excel_texto_nf_linha(linha):
+    qtd = linha.get('qtd_notas') or 0
+    if qtd == 0:
+        return 'Sem NF'
+    notas = linha.get('notas_vinculadas') or []
+    if qtd == 1 and notas:
+        nota = notas[0]
+        partes = [f"NF {nota.get('numero', '-')}"]
+        if nota.get('valor_fmt'):
+            partes.append(f"R$ {nota['valor_fmt']}")
+        if nota.get('forma_pagamento') and nota.get('forma_pagamento') != '-':
+            partes.append(str(nota['forma_pagamento']))
+        if nota.get('manual'):
+            partes.append('Manual')
+        return ' · '.join(partes)
+    return f'{qtd} notas'
+
+
+def _coletar_grid_linhas_exames_solicitante(request):
+    """Lista detalhada de lançamentos com os filtros da tela Exames por Solicitante."""
+    empresa_id = request.session.get('empresa_id')
+    if empresa_id:
+        qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
+    else:
+        qs_base = FaturamentoMedico.objects.all()
+
+    hoje = date.today()
+    di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+    di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
+    df = _parse_data_filtro(request.GET.get('data_fim')) or df_padrao
+    if di > df:
+        di, df = df, di
+
+    solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
+    medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
+    status_agendamento_sel = [
+        s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
+    ]
+    qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
+
+    freq_solicitante = defaultdict(int)
+    for raw in qs_periodo.values_list('medico_solicitante', flat=True):
+        nome = (raw or '').strip()
+        if nome:
+            freq_solicitante[nome] += 1
+
+    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
+        grafia_para_apelido,
+        apelido_info,
+        freq_solicitante.keys(),
+    )
+    mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
+        freq_solicitante.keys(),
+        freq_solicitante,
+        empresa_id=empresa_id,
+        grafia_para_apelido=grafia_para_apelido,
+        apelido_info=apelido_info,
+    )
+
+    qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
+    qs = _filtrar_por_medicos(qs, medicos_sel)
+    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+
+    ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
+    grid_linhas = []
+    totais_solicitante = defaultdict(int)
+
+    from faturamento_medico.services.vincular_nota_solicitante import (
+        carregar_notas_por_data,
+        notas_linha_para_json,
+        resolver_notas_linha,
+    )
+    notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+
+    for faturamento in qs:
+        raw_solicitante = (faturamento.medico_solicitante or '').strip()
+        solicitante_apelido = _canonico_solicitante(
+            faturamento.medico_solicitante,
+            mapa_solicitante,
+            grafia_para_apelido,
+        )
+        solicitante_linha = (
+            solicitante_apelido
+            or raw_solicitante
+            or SOLICITANTE_NAO_INFORMADO
+        )
+        itens = list(faturamento.itens_servico.all())
+
+        def _registrar_linha(procedimento, modalidade, valor, item=None):
+            status_label, _status_css = _status_linha_faturamento(
+                faturamento, item, ids_internos=ids_lotes_int
+            )
+            status_ag_label, _status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
+            notas_vinculadas = resolver_notas_linha(
+                notas_por_data,
+                empresa_id,
+                faturamento.nome or '',
+                faturamento.data,
+                faturamento.nota_fiscal,
+            )
+            grid_linhas.append({
+                'data': faturamento.data,
+                'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
+                'paciente': faturamento.nome or '-',
+                'procedimento': procedimento,
+                'modalidade': modalidade or '-',
+                'status': status_label,
+                'status_agendamento': status_ag_label,
+                'valor': valor,
+                'valor_fmt': _moeda_br(valor),
+                'solicitante': solicitante_linha,
+                'medico': _rotulo_medico_faturamento(faturamento),
+                'convenio': faturamento.convenio or '-',
+                'notas_vinculadas': notas_vinculadas,
+                'qtd_notas': len(notas_vinculadas),
+                'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
+            })
+            totais_solicitante[solicitante_linha] += 1
+
+        if not itens:
+            _registrar_linha(
+                faturamento.servico or '-',
+                _modalidade_faturamento_item(faturamento),
+                faturamento.total or 0,
+            )
+            continue
+        for item in itens:
+            valor_item = item.total if item.total is not None else (item.valor or 0)
+            _registrar_linha(
+                item.servico or '-',
+                _modalidade_faturamento_item(faturamento, item),
+                valor_item,
+                item,
+            )
+
+    grid_linhas.sort(key=lambda linha: (
+        -totais_solicitante.get(linha['solicitante'], 0),
+        -(linha['data'].toordinal() if linha['data'] else 0),
+        linha['paciente'].lower(),
+    ))
+
+    return {
+        'empresa_id': empresa_id,
+        'di': di,
+        'df': df,
+        'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+        'grid_linhas': grid_linhas,
+        'valor_total': sum((linha.get('valor') or 0) for linha in grid_linhas),
+    }
+
+
+def _montar_workbook_lancamentos_solicitante(empresa, coleta):
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Lancamentos'
+
+    banner_fill = PatternFill(start_color='1F3864', end_color='1F3864', fill_type='solid')
+    banner_font = Font(bold=True, color='FFFFFF', size=12)
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    total_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+    bold = Font(bold=True)
+    lado = Side(style='thin', color='8EAADB')
+    borda = Border(left=lado, right=lado, top=lado, bottom=lado)
+    center = Alignment(horizontal='center', vertical='center')
+    left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    right = Alignment(horizontal='right', vertical='center')
+
+    headers = [
+        'Data', 'Paciente', 'Exame', 'Modalidade', 'Status agendamento',
+        'Status conferência', 'Valor', 'NF / Pagamento', 'Solicitante', 'Médico', 'Convênio',
+    ]
+    num_cols = len(headers)
+    row = 1
+
+    if empresa:
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+        cell = ws.cell(row=row, column=1, value=empresa.razao)
+        cell.font = banner_font
+        cell.fill = banner_fill
+        cell.alignment = center
+        row += 1
+        if empresa.cnpj:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+            ws.cell(row=row, column=1, value=f'CNPJ {empresa.cnpj}').alignment = center
+            row += 1
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+    ws.cell(row=row, column=1, value='LISTA DE EXAMES — EXAMES POR SOLICITANTE').font = bold
+    row += 1
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+    ws.cell(row=row, column=1, value=f'Período {coleta["periodo_fmt"]} · {len(coleta["grid_linhas"])} lançamento(s)')
+    row += 2
+
+    for col_idx, titulo in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col_idx, value=titulo)
+        cell.font = bold
+        cell.fill = header_fill
+        cell.border = borda
+        cell.alignment = center if col_idx not in (2, 3, 8, 9, 10, 11) else left
+    row += 1
+
+    for linha in coleta['grid_linhas']:
+        valores = [
+            linha['data_fmt'],
+            linha['paciente'],
+            linha['procedimento'],
+            linha['modalidade'],
+            linha['status_agendamento'],
+            linha['status'],
+            float(linha['valor'] or 0),
+            _excel_texto_nf_linha(linha),
+            linha['solicitante'],
+            linha['medico'],
+            linha['convenio'],
+        ]
+        for col_idx, valor in enumerate(valores, start=1):
+            cell = ws.cell(row=row, column=col_idx, value=valor)
+            cell.border = borda
+            if col_idx == 7:
+                cell.number_format = '#,##0.00'
+                cell.alignment = right
+            elif col_idx in (2, 3, 8, 9, 10, 11):
+                cell.alignment = left
+            else:
+                cell.alignment = center
+        row += 1
+
+    if coleta['grid_linhas']:
+        ws.cell(row=row, column=1, value='Total').font = bold
+        ws.cell(row=row, column=1).fill = total_fill
+        ws.cell(row=row, column=1).border = borda
+        total_cell = ws.cell(row=row, column=7, value=float(coleta['valor_total'] or 0))
+        total_cell.number_format = '#,##0.00'
+        total_cell.font = bold
+        total_cell.fill = total_fill
+        total_cell.border = borda
+        total_cell.alignment = right
+        ws.cell(row=row, column=6, value=f'{len(coleta["grid_linhas"])} exame(s)').font = bold
+        for col_idx in (2, 3, 4, 5, 6, 8, 9, 10, 11):
+            c = ws.cell(row=row, column=col_idx)
+            c.fill = total_fill
+            c.border = borda
+
+    widths = [12, 32, 42, 12, 22, 18, 12, 28, 28, 24, 22]
+    for col_idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    return wb
+
+
+def exportar_lancamentos_solicitante_excel(request):
+    """Exporta a tabela de lançamentos (lista de exames) para Excel."""
+    coleta = _coletar_grid_linhas_exames_solicitante(request)
+    if not coleta.get('empresa_id'):
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    try:
+        empresa = Empresa.objects.get(id=coleta['empresa_id'])
+    except Empresa.DoesNotExist:
+        empresa = None
+
+    wb = _montar_workbook_lancamentos_solicitante(empresa, coleta)
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    di = coleta['di'].strftime('%Y%m%d')
+    df = coleta['df'].strftime('%Y%m%d')
+    nome_arquivo = f'exames_solicitante_lancamentos_{di}_{df}.xlsx'
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True,
+        filename=nome_arquivo,
+    )
+    return response
+
+
 def listar_exames_por_solicitante(request):
     """Relatório de exames agrupados por médico solicitante."""
     if request.method == 'POST':
