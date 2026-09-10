@@ -329,6 +329,12 @@ class ItemServico(models.Model):
         decimal_places=2,
         default=0
     )
+    valor_desconto = models.DecimalField(
+        verbose_name='Valor do Desconto',
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
     percentual = models.DecimalField(
         verbose_name='Percentual',
         max_digits=5,

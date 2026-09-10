@@ -591,8 +591,9 @@
                                     <th>Paciente</th>
                                     <th>Exame</th>
                                     <th>Modalidade</th>
-                                    <th>Status agendamento</th>
+                                    <th>Status da agenda</th>
                                     <th class="text-end">Valor</th>
+                                    <th class="text-end">Valor desconto</th>
                                     <th>NF / Pagamento</th>
                                     <th>Solicitante</th>
                                     <th>Médico</th>
@@ -610,6 +611,7 @@
                                         <span class="badge bg-{{ linha.status_agendamento_css }}">{{ linha.status_agendamento }}</span>
                                     </td>
                                     <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                                    <td class="text-end">{% if linha.valor_desconto_fmt != '0,00' %}R$ {{ linha.valor_desconto_fmt }}{% else %}—{% endif %}</td>
                                     <td class="fm-celula-nf" data-faturamento-id="{{ linha.faturamento_id }}">
                                         {% if linha.qtd_notas == 0 %}
                                         <div class="d-flex flex-column gap-1">

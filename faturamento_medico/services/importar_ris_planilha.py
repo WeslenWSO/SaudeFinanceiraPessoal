@@ -43,6 +43,7 @@ def _mapear_colunas(headers: list[str]) -> dict[str, int | None]:
         'horario_fim': idx('Horário de fim', 'Horario de fim'),
         'modalidade': idx('Modalidade'),
         'valor': idx('Valor'),
+        'acrescimo_desconto': idx('Acréscimo/Desconto', 'Acrescimo/Desconto'),
         'agendado_via': idx('Agendado via', 'Agendado Via'),
         'status': idx('Status do Agendamento'),
         'motivo_cancelamento': idx(
@@ -91,6 +92,8 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
         cns = _celula_texto(get(row, 'cns'), 50)
         convenio = _celula_texto(get(row, 'convenio'), 100) or 'Particular'
         valor = _parse_valor_ris(get(row, 'valor'))
+        acrescimo = _parse_valor_ris(get(row, 'acrescimo_desconto'))
+        valor_desconto = abs(acrescimo) if acrescimo < 0 else Decimal('0')
         if _eh_status_agendamento_cancelado(status_raw):
             linhas_canceladas += 1
 
@@ -150,6 +153,7 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
             'com_contraste': 'contraste' in procedimento.lower(),
             'valor': valor,
             'total': valor,
+            'valor_desconto': valor_desconto,
         })
 
     return list(grupos_map.values()), linhas_ignoradas, linhas_canceladas, datas_planilha
@@ -249,6 +253,7 @@ def importar_ris_planilha(
                         qt=1,
                         valor=servico['valor'],
                         total=servico['total'],
+                        valor_desconto=servico.get('valor_desconto') or Decimal('0'),
                     ))
 
             ItemServico.objects.bulk_create(item_objs, batch_size=BATCH_SIZE)

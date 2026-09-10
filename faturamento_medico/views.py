@@ -3021,6 +3021,21 @@ def exportar_resumo_mes_solicitante_excel(request):
     return response
 
 
+def _valor_desconto_linha(linha):
+    """Desconto do item RIS ou, se zero, diferença bruto−líquido da NF vinculada."""
+    vd = linha.get('valor_desconto')
+    if vd is not None and vd != 0:
+        return Decimal(str(vd))
+    notas = linha.get('notas_vinculadas') or []
+    if len(notas) == 1:
+        bruto = notas[0].get('valor_bruto')
+        liquido = notas[0].get('valor_liquido')
+        if bruto is not None and liquido is not None:
+            desconto = Decimal(str(bruto)) - Decimal(str(liquido))
+            return desconto if desconto > 0 else Decimal('0')
+    return Decimal('0')
+
+
 def _excel_texto_nf_linha(linha):
     qtd = linha.get('qtd_notas') or 0
     if qtd == 0:
@@ -3115,7 +3130,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
             status_label, _status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
             )
-            status_ag_label, _status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
+            status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             notas_vinculadas = resolver_notas_linha(
                 notas_por_data,
                 empresa_id,
@@ -3123,7 +3138,10 @@ def _coletar_grid_linhas_exames_solicitante(request):
                 faturamento.data,
                 faturamento.nota_fiscal,
             )
-            grid_linhas.append({
+            valor_desconto_item = (
+                item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
+            )
+            linha = {
                 'data': faturamento.data,
                 'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
                 'paciente': faturamento.nome or '-',
@@ -3131,15 +3149,20 @@ def _coletar_grid_linhas_exames_solicitante(request):
                 'modalidade': modalidade or '-',
                 'status': status_label,
                 'status_agendamento': status_ag_label,
+                'status_agendamento_css': status_ag_css,
                 'valor': valor,
                 'valor_fmt': _moeda_br(valor),
+                'valor_desconto': valor_desconto_item,
                 'solicitante': solicitante_linha,
                 'medico': _rotulo_medico_faturamento(faturamento),
                 'convenio': faturamento.convenio or '-',
                 'notas_vinculadas': notas_vinculadas,
                 'qtd_notas': len(notas_vinculadas),
                 'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
-            })
+            }
+            linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
+            linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
+            grid_linhas.append(linha)
             totais_solicitante[solicitante_linha] += 1
 
         if not itens:
@@ -3194,8 +3217,9 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     right = Alignment(horizontal='right', vertical='center')
 
     headers = [
-        'Data', 'Paciente', 'Exame', 'Modalidade', 'Status agendamento',
-        'Status conferência', 'Valor', 'NF / Pagamento', 'Solicitante', 'Médico', 'Convênio',
+        'Data', 'Paciente', 'Exame', 'Modalidade', 'Status da agenda',
+        'Status conferência', 'Valor', 'Valor desconto', 'NF / Pagamento',
+        'Solicitante', 'Médico', 'Convênio',
     ]
     num_cols = len(headers)
     row = 1
@@ -3228,6 +3252,9 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     row += 1
 
     for linha in coleta['grid_linhas']:
+        desconto = linha.get('valor_desconto_efetivo')
+        if desconto is None:
+            desconto = _valor_desconto_linha(linha)
         valores = [
             linha['data_fmt'],
             linha['paciente'],
@@ -3236,6 +3263,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             linha['status_agendamento'],
             linha['status'],
             float(linha['valor'] or 0),
+            float(desconto or 0),
             _excel_texto_nf_linha(linha),
             linha['solicitante'],
             linha['medico'],
@@ -3244,16 +3272,20 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         for col_idx, valor in enumerate(valores, start=1):
             cell = ws.cell(row=row, column=col_idx, value=valor)
             cell.border = borda
-            if col_idx == 7:
+            if col_idx in (7, 8):
                 cell.number_format = '#,##0.00'
                 cell.alignment = right
-            elif col_idx in (2, 3, 8, 9, 10, 11):
+            elif col_idx in (2, 3, 9, 10, 11, 12):
                 cell.alignment = left
             else:
                 cell.alignment = center
         row += 1
 
     if coleta['grid_linhas']:
+        total_desconto = sum(
+            float(l.get('valor_desconto_efetivo') or _valor_desconto_linha(l))
+            for l in coleta['grid_linhas']
+        )
         ws.cell(row=row, column=1, value='Total').font = bold
         ws.cell(row=row, column=1).fill = total_fill
         ws.cell(row=row, column=1).border = borda
@@ -3263,13 +3295,19 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         total_cell.fill = total_fill
         total_cell.border = borda
         total_cell.alignment = right
+        desconto_cell = ws.cell(row=row, column=8, value=total_desconto)
+        desconto_cell.number_format = '#,##0.00'
+        desconto_cell.font = bold
+        desconto_cell.fill = total_fill
+        desconto_cell.border = borda
+        desconto_cell.alignment = right
         ws.cell(row=row, column=6, value=f'{len(coleta["grid_linhas"])} exame(s)').font = bold
-        for col_idx in (2, 3, 4, 5, 6, 8, 9, 10, 11):
+        for col_idx in (2, 3, 4, 5, 6, 9, 10, 11, 12):
             c = ws.cell(row=row, column=col_idx)
             c.fill = total_fill
             c.border = borda
 
-    widths = [12, 32, 42, 12, 22, 18, 12, 28, 28, 24, 22]
+    widths = [12, 32, 42, 12, 22, 18, 12, 12, 28, 28, 24, 22]
     for col_idx, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
@@ -3437,7 +3475,10 @@ def listar_exames_por_solicitante(request):
                     faturamento.data,
                     faturamento.nota_fiscal,
                 )
-            grid_linhas.append({
+            valor_desconto_item = (
+                item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
+            )
+            linha = {
                 'data': faturamento.data,
                 'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
                 'data_iso': faturamento.data.isoformat() if faturamento.data else '',
@@ -3451,13 +3492,17 @@ def listar_exames_por_solicitante(request):
                 'status_agendamento_css': status_ag_css,
                 'valor': valor,
                 'valor_fmt': _moeda_br(valor),
+                'valor_desconto': valor_desconto_item,
                 'solicitante': solicitante_linha,
                 'medico': _rotulo_medico_faturamento(faturamento),
                 'convenio': faturamento.convenio or '-',
                 'notas_vinculadas': notas_vinculadas,
                 'qtd_notas': len(notas_vinculadas),
                 'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
-            })
+            }
+            linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
+            linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
+            grid_linhas.append(linha)
 
         if not itens:
             _registrar_linha(
@@ -7067,6 +7112,7 @@ def importar_ris(request):
                 'horario_fim': idx('Horário de fim', 'Horario de fim'),
                 'modalidade': idx('Modalidade'),
                 'valor': idx('Valor'),
+                'acrescimo_desconto': idx('Acréscimo/Desconto', 'Acrescimo/Desconto'),
                 'agendado_via': idx('Agendado via', 'Agendado Via'),
                 'status': idx('Status do Agendamento'),
                 'motivo_cancelamento': idx(
@@ -7130,6 +7176,8 @@ def importar_ris(request):
                 # Carteirinha = apenas CNS (não usar CPF)
                 carteirinha = cns or None
                 valor = _parse_valor_ris(get(row, 'valor'))
+                acrescimo = _parse_valor_ris(get(row, 'acrescimo_desconto'))
+                valor_desconto = abs(acrescimo) if acrescimo < 0 else Decimal('0')
                 eh_cancelado = _eh_status_agendamento_cancelado(status_raw)
                 if eh_cancelado:
                     linhas_canceladas += 1
@@ -7196,6 +7244,7 @@ def importar_ris(request):
                     'com_contraste': 'contraste' in procedimento.lower(),
                     'valor': valor,
                     'total': valor,
+                    'valor_desconto': valor_desconto,
                 })
 
             faturamentos_criados = 0
@@ -7244,6 +7293,7 @@ def importar_ris(request):
                         qt=1,
                         valor=servico['valor'],
                         total=servico['total'],
+                        valor_desconto=servico.get('valor_desconto') or Decimal('0'),
                     )
                     itens_criados += 1
 

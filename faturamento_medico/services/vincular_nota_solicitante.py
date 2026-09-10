@@ -118,6 +118,8 @@ def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict
     forma = _forma_pagamento_nota(nota)
     numero = (nota.numero_nota or '').strip() or f'#{nota.pk}'
     paciente_nota = _nome_paciente_nota(nota)
+    valor_bruto = nota.valor_bruto if nota.valor_bruto is not None else None
+    valor_liquido = nota.valor_liquido if nota.valor_liquido is not None else None
     return {
         'pk': nota.pk,
         'numero': numero,
@@ -126,6 +128,8 @@ def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict
         'cliente': (nota.cliente or '').strip() or '-',
         'paciente_nota': paciente_nota or (nota.cliente or '').strip() or '-',
         'valor_fmt': _valor_fmt_nota(nota),
+        'valor_bruto': valor_bruto,
+        'valor_liquido': valor_liquido,
         'data_emissao_fmt': nota.data_emissao.strftime('%d/%m/%Y') if nota.data_emissao else '-',
         'manual': manual,
     }
