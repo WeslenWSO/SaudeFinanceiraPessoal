@@ -2845,12 +2845,24 @@ def _montar_pivot_resumo_mes_solicitante(cards_map, codigos_modalidade, meses_pe
     return tabelas
 
 
-def imprimir_resumo_mes_solicitante(request):
-    """Relatório pivot: modalidades x meses por médico solicitante (filtros da tela)."""
+def _excel_nome_aba_solicitante(nome, usados: set[str]) -> str:
+    base = re.sub(r'[\\/*?:\[\]]', '', (nome or 'Solicitante').strip()) or 'Solicitante'
+    base = base[:28]
+    titulo = base
+    contador = 2
+    while titulo in usados:
+        sufixo = f' ({contador})'
+        titulo = f'{base[:28 - len(sufixo)]}{sufixo}'
+        contador += 1
+    usados.add(titulo)
+    return titulo
+
+
+def _montar_contexto_resumo_mes_solicitante(request):
     coleta = _coletar_cards_map_exames_solicitante(request)
     empresa_id = coleta.get('empresa_id')
     if not empresa_id:
-        return HttpResponse('Sessão expirada. Faça login novamente.')
+        return None, coleta
 
     tabelas = _montar_pivot_resumo_mes_solicitante(
         coleta['cards_map'],
@@ -2875,7 +2887,138 @@ def imprimir_resumo_mes_solicitante(request):
         'data_impressao': timezone.localtime(timezone.now()),
         'redirect_qs': request.GET.urlencode(),
     }
+    return context, coleta
+
+
+def _montar_workbook_resumo_mes_solicitante(context):
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    banner_fill = PatternFill(start_color='1F3864', end_color='1F3864', fill_type='solid')
+    banner_font = Font(bold=True, color='FFFFFF', size=12)
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    total_fill = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
+    bold = Font(bold=True)
+    lado = Side(style='thin', color='8EAADB')
+    borda = Border(left=lado, right=lado, top=lado, bottom=lado)
+    center = Alignment(horizontal='center', vertical='center')
+    left = Alignment(horizontal='left', vertical='center')
+
+    empresa = context.get('empresa')
+    data_impressao = context.get('data_impressao')
+    periodo_fmt = context.get('periodo_fmt') or ''
+    qtd_meses = context.get('qtd_meses') or 0
+    tabelas = context.get('tabelas') or []
+    usados: set[str] = set()
+
+    for tabela in tabelas:
+        ws = wb.create_sheet(title=_excel_nome_aba_solicitante(tabela['nome'], usados))
+        row = 1
+        num_cols = 1 + len(tabela['meses_colunas']) + 1
+
+        if empresa:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+            cell = ws.cell(row=row, column=1, value=empresa.razao)
+            cell.font = banner_font
+            cell.fill = banner_fill
+            cell.alignment = center
+            row += 1
+            if empresa.cnpj:
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+                ws.cell(row=row, column=1, value=f'CNPJ {empresa.cnpj}').alignment = center
+                row += 1
+
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+        ws.cell(row=row, column=1, value='RESUMO POR MÊS / MÉDICO SOLICITANTE').font = bold
+        row += 1
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+        ws.cell(row=row, column=1, value=(tabela['nome'] or '').upper()).font = bold
+        row += 1
+
+        meta = (
+            f'Impressão em {data_impressao:%d/%m/%Y %H:%M}'
+            f' · Período {periodo_fmt}'
+            f' · {qtd_meses} mês(es) no período'
+            f' · {tabela["total_exames"]} exame(s)'
+            f' · Modalidades nas linhas · Meses nas colunas'
+        )
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+        ws.cell(row=row, column=1, value=meta)
+        row += 2
+
+        col = 1
+        headers = ['Modalidade'] + [c['label'] for c in tabela['meses_colunas']] + ['Total']
+        for titulo_col in headers:
+            cell = ws.cell(row=row, column=col, value=titulo_col)
+            cell.font = bold
+            cell.fill = header_fill
+            cell.alignment = center if col > 1 else left
+            cell.border = borda
+            col += 1
+        row += 1
+
+        for linha in tabela['linhas']:
+            valores = [linha['rotulo']]
+            valores.extend(linha['celulas'])
+            valores.append(linha['total'] or '')
+            for col_idx, valor in enumerate(valores, start=1):
+                cell = ws.cell(row=row, column=col_idx, value=valor if valor else '—')
+                cell.border = borda
+                cell.alignment = left if col_idx == 1 else center
+            row += 1
+
+        totais = ['Total'] + list(tabela['totais_mes']) + [tabela['total_exames']]
+        for col_idx, valor in enumerate(totais, start=1):
+            cell = ws.cell(row=row, column=col_idx, value=valor if valor else '—')
+            cell.font = bold
+            cell.fill = total_fill
+            cell.border = borda
+            cell.alignment = left if col_idx == 1 else center
+
+        from openpyxl.utils import get_column_letter
+
+        ws.column_dimensions['A'].width = 34
+        for col_idx in range(2, num_cols + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 12
+
+    if not wb.sheetnames:
+        wb.create_sheet('Resumo')
+    return wb
+
+
+def imprimir_resumo_mes_solicitante(request):
+    """Relatório pivot: modalidades x meses por médico solicitante (filtros da tela)."""
+    context, _coleta = _montar_contexto_resumo_mes_solicitante(request)
+    if context is None:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
     return render(request, 'faturamento_medico/imprimir_resumo_mes_solicitante.html', context)
+
+
+def exportar_resumo_mes_solicitante_excel(request):
+    """Exporta o resumo mês/solicitante (pivot) para Excel — uma aba por solicitante."""
+    context, coleta = _montar_contexto_resumo_mes_solicitante(request)
+    if context is None:
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    wb = _montar_workbook_resumo_mes_solicitante(context)
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    di = coleta['di'].strftime('%Y%m%d')
+    df = coleta['df'].strftime('%Y%m%d')
+    nome_arquivo = f'resumo_mes_solicitante_{di}_{df}.xlsx'
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True,
+        filename=nome_arquivo,
+    )
+    return response
 
 
 def listar_exames_por_solicitante(request):

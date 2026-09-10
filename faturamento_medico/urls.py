@@ -12,6 +12,11 @@ urlpatterns = [
         views.imprimir_resumo_mes_solicitante,
         name='imprimir_resumo_mes_solicitante',
     ),
+    path(
+        'exames-por-solicitante/resumo-mes/excel/',
+        views.exportar_resumo_mes_solicitante_excel,
+        name='exportar_resumo_mes_solicitante_excel',
+    ),
     path('dashboard-exames/', views.dashboard_exames, name='dashboard_exames'),
     path('dashboard-exames/diario/', views.dashboard_exames_diario, name='dashboard_exames_diario'),
     path(

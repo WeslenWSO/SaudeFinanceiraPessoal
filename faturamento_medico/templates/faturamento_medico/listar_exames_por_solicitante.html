@@ -158,6 +158,12 @@
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <h3 class="card-title mb-0">Exames por Solicitante</h3>
                     <div class="card-tools d-flex flex-wrap gap-2">
+                        <a href="{% url 'faturamento_medico:exportar_resumo_mes_solicitante_excel' %}?{{ redirect_qs }}"
+                           class="btn btn-success btn-sm"
+                           id="btnExportarResumoMesExcel"
+                           title="Exportar tabela pivot para Excel">
+                            <i class="fas fa-file-excel"></i> Excel resumo
+                        </a>
                         <a href="{% url 'faturamento_medico:imprimir_resumo_mes_solicitante' %}?{{ redirect_qs }}"
                            class="btn btn-primary btn-sm"
                            id="btnResumoMesSolicitante"
@@ -317,8 +323,15 @@
                             {% endif %}
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
+                            <a href="{% url 'faturamento_medico:exportar_resumo_mes_solicitante_excel' %}?{{ redirect_qs }}"
+                               class="btn btn-outline-success btn-sm"
+                               id="btnExportarResumoMesExcelBarra"
+                               title="Exportar tabela pivot para Excel">
+                                <i class="fas fa-file-excel"></i> Excel resumo
+                            </a>
                             <a href="{% url 'faturamento_medico:imprimir_resumo_mes_solicitante' %}?{{ redirect_qs }}"
                                class="btn btn-outline-primary btn-sm"
+                               id="btnResumoMesSolicitanteBarra"
                                target="_blank"
                                rel="noopener"
                                title="Tabela pivot: modalidades x meses por solicitante">
@@ -1344,17 +1357,27 @@ initMultiPicker({
     atualizarBotaoSalvar();
 
     (function() {
-        var btnResumo = document.getElementById('btnResumoMesSolicitante');
         var formFiltros = document.querySelector('form[method="GET"]');
-        if (!btnResumo || !formFiltros) return;
-        var baseResumo = btnResumo.getAttribute('href').split('?')[0];
-        function atualizarLinkResumo() {
-            var params = new URLSearchParams(new FormData(formFiltros));
-            btnResumo.setAttribute('href', baseResumo + '?' + params.toString());
+        if (!formFiltros) return;
+        var botoes = [
+            document.getElementById('btnResumoMesSolicitante'),
+            document.getElementById('btnResumoMesSolicitanteBarra'),
+            document.getElementById('btnExportarResumoMesExcel'),
+            document.getElementById('btnExportarResumoMesExcelBarra'),
+        ].filter(Boolean);
+        if (!botoes.length) return;
+        var bases = botoes.map(function(btn) {
+            return { el: btn, base: btn.getAttribute('href').split('?')[0] };
+        });
+        function atualizarLinksResumo() {
+            var qs = new URLSearchParams(new FormData(formFiltros)).toString();
+            bases.forEach(function(item) {
+                item.el.setAttribute('href', item.base + '?' + qs);
+            });
         }
-        formFiltros.addEventListener('change', atualizarLinkResumo);
-        formFiltros.addEventListener('submit', atualizarLinkResumo);
-        atualizarLinkResumo();
+        formFiltros.addEventListener('change', atualizarLinksResumo);
+        formFiltros.addEventListener('submit', atualizarLinksResumo);
+        atualizarLinksResumo();
     })();
 })();
 </script>

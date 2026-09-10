@@ -47,6 +47,11 @@
             color: #fff;
             border: 1px solid #6c757d;
         }
+        .btn-excel {
+            background: #198754;
+            color: #fff;
+            border: 1px solid #198754;
+        }
         .top-banner {
             background: #1f3864;
             color: #fff;
@@ -147,6 +152,7 @@
 <body>
     <div class="barra-acoes no-print">
         <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+        <a class="btn-excel" href="{% url 'faturamento_medico:exportar_resumo_mes_solicitante_excel' %}?{{ redirect_qs }}">Exportar Excel</a>
         <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
     </div>
 
