@@ -3054,6 +3054,28 @@ def _excel_texto_nf_linha(linha):
     return f'{qtd} notas'
 
 
+def _excel_discriminacao_linha(linha):
+    qtd = linha.get('qtd_notas') or 0
+    if qtd == 0:
+        return ''
+    notas = linha.get('notas_vinculadas') or []
+
+    def _texto_plano(texto):
+        if not texto:
+            return ''
+        return re.sub(r'\s+', ' ', str(texto).replace('\r\n', ' ').replace('\n', ' ')).strip()
+
+    if qtd == 1 and notas:
+        disc = _texto_plano(notas[0].get('discriminacao'))
+        return disc or '-'
+    partes = []
+    for nota in notas:
+        numero = nota.get('numero', '-')
+        disc = _texto_plano(nota.get('discriminacao'))
+        partes.append(f"NF {numero}: {disc}" if disc else f"NF {numero}")
+    return ' | '.join(partes) if partes else f'{qtd} notas'
+
+
 def _coletar_grid_linhas_exames_solicitante(request):
     """Lista detalhada de lançamentos com os filtros da tela Exames por Solicitante."""
     empresa_id = request.session.get('empresa_id')
@@ -3219,7 +3241,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     headers = [
         'Data', 'Paciente', 'Exame', 'Modalidade', 'Status da agenda',
         'Status conferência', 'Valor', 'Valor desconto', 'NF / Pagamento',
-        'Solicitante', 'Médico', 'Convênio',
+        'Discriminação', 'Solicitante', 'Médico', 'Convênio',
     ]
     num_cols = len(headers)
     row = 1
@@ -3248,7 +3270,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         cell.font = bold
         cell.fill = header_fill
         cell.border = borda
-        cell.alignment = center if col_idx not in (2, 3, 8, 9, 10, 11) else left
+        cell.alignment = center if col_idx not in (2, 3, 9, 10, 11, 12, 13) else left
     row += 1
 
     for linha in coleta['grid_linhas']:
@@ -3265,6 +3287,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             float(linha['valor'] or 0),
             float(desconto or 0),
             _excel_texto_nf_linha(linha),
+            _excel_discriminacao_linha(linha),
             linha['solicitante'],
             linha['medico'],
             linha['convenio'],
@@ -3275,7 +3298,9 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             if col_idx in (7, 8):
                 cell.number_format = '#,##0.00'
                 cell.alignment = right
-            elif col_idx in (2, 3, 9, 10, 11, 12):
+            elif col_idx == 10:
+                cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+            elif col_idx in (2, 3, 9, 11, 12, 13):
                 cell.alignment = left
             else:
                 cell.alignment = center
@@ -3302,12 +3327,12 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         desconto_cell.border = borda
         desconto_cell.alignment = right
         ws.cell(row=row, column=6, value=f'{len(coleta["grid_linhas"])} exame(s)').font = bold
-        for col_idx in (2, 3, 4, 5, 6, 9, 10, 11, 12):
+        for col_idx in (2, 3, 4, 5, 6, 9, 10, 11, 12, 13):
             c = ws.cell(row=row, column=col_idx)
             c.fill = total_fill
             c.border = borda
 
-    widths = [12, 32, 42, 12, 22, 18, 12, 12, 28, 28, 24, 22]
+    widths = [12, 32, 42, 12, 22, 18, 12, 12, 28, 52, 28, 24, 22]
     for col_idx, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 

@@ -140,6 +140,7 @@ def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict
         'valor_fmt': _valor_fmt_nota(nota),
         'valor_bruto': valor_bruto,
         'valor_liquido': valor_liquido,
+        'discriminacao': _discriminacao_texto(nota.discriminacao).strip(),
         'data_emissao_fmt': nota.data_emissao.strftime('%d/%m/%Y') if nota.data_emissao else '-',
         'manual': manual,
     }
