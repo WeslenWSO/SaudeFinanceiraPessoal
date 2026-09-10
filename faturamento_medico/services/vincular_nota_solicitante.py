@@ -6,6 +6,7 @@ import json
 import re
 from collections import defaultdict
 from datetime import date, timedelta
+from decimal import Decimal
 from functools import lru_cache
 
 from django.urls import reverse
@@ -114,12 +115,21 @@ def _valor_fmt_nota(nota: NotaFiscalServico) -> str:
     return f'{valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def _decimal_para_json(valor):
+    """Converte Decimal para float — json.dumps não serializa Decimal."""
+    if valor is None:
+        return None
+    if isinstance(valor, Decimal):
+        return float(valor)
+    return valor
+
+
 def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict:
     forma = _forma_pagamento_nota(nota)
     numero = (nota.numero_nota or '').strip() or f'#{nota.pk}'
     paciente_nota = _nome_paciente_nota(nota)
-    valor_bruto = nota.valor_bruto if nota.valor_bruto is not None else None
-    valor_liquido = nota.valor_liquido if nota.valor_liquido is not None else None
+    valor_bruto = _decimal_para_json(nota.valor_bruto)
+    valor_liquido = _decimal_para_json(nota.valor_liquido)
     return {
         'pk': nota.pk,
         'numero': numero,
