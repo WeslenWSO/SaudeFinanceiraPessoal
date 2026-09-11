@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% load faturamento_extras %}
+
+{% block main_container_class %}container-fluid{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h3 class="mb-0"><i class="fas fa-calendar-alt text-primary"></i> {{ title }}</h3>
+        <small class="text-muted">
+            {{ empresa.nome_fantasia|default:empresa.razao }} ·
+            soma diária de despesas e impostos planejados
+        </small>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'planejamento_orcamentario:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+        <a href="{% url 'planejamento_orcamentario:visao_real_plan' %}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-table"></i> Visão anual
+        </a>
+    </div>
+</div>
+
+{% if messages %}{% include 'parcial/_messages.html' %}{% endif %}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small mb-1" for="filtroMes">Mês</label>
+                <select name="mes" id="filtroMes" class="form-select form-select-sm">
+                    <option value="1" {% if mes == 1 %}selected{% endif %}>Janeiro</option>
+                    <option value="2" {% if mes == 2 %}selected{% endif %}>Fevereiro</option>
+                    <option value="3" {% if mes == 3 %}selected{% endif %}>Março</option>
+                    <option value="4" {% if mes == 4 %}selected{% endif %}>Abril</option>
+                    <option value="5" {% if mes == 5 %}selected{% endif %}>Maio</option>
+                    <option value="6" {% if mes == 6 %}selected{% endif %}>Junho</option>
+                    <option value="7" {% if mes == 7 %}selected{% endif %}>Julho</option>
+                    <option value="8" {% if mes == 8 %}selected{% endif %}>Agosto</option>
+                    <option value="9" {% if mes == 9 %}selected{% endif %}>Setembro</option>
+                    <option value="10" {% if mes == 10 %}selected{% endif %}>Outubro</option>
+                    <option value="11" {% if mes == 11 %}selected{% endif %}>Novembro</option>
+                    <option value="12" {% if mes == 12 %}selected{% endif %}>Dezembro</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-1" for="filtroAno">Ano</label>
+                <select name="ano" id="filtroAno" class="form-select form-select-sm">
+                    {% for a in anos_disponiveis %}
+                    <option value="{{ a }}" {% if ano == a %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Ir
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+    <a class="btn btn-sm btn-outline-secondary"
+       href="?mes={{ calendario.mes_anterior }}&ano={{ calendario.ano_anterior }}">
+        <i class="fas fa-chevron-left"></i>
+        {{ calendario.mes_anterior|stringformat:"02d" }}/{{ calendario.ano_anterior }}
+    </a>
+    <div class="text-center">
+        <h5 class="mb-0">{{ calendario.mes_nome }} de {{ calendario.ano }}</h5>
+        <small class="text-muted">
+            Total do mês: <strong class="text-danger">R$ {{ calendario.total_mes|moeda_br }}</strong>
+            · {{ calendario.dias_com_despesa }} dia(s) com vencimento
+            · {{ calendario.qtd_lancamentos }} lançamento(s)
+        </small>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary"
+       href="?mes={{ calendario.mes_proximo }}&ano={{ calendario.ano_proximo }}">
+        {{ calendario.mes_proximo|stringformat:"02d" }}/{{ calendario.ano_proximo }}
+        <i class="fas fa-chevron-right"></i>
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body p-0">
+        <div class="orc-calendario">
+            <div class="orc-calendario-head">
+                <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
+            </div>
+            {% for semana in calendario.semanas %}
+            <div class="orc-calendario-semana">
+                {% for dia in semana %}
+                <div class="orc-calendario-dia {% if dia.fora_mes %}fora-mes{% endif %} {% if dia.hoje %}hoje{% endif %} {% if dia.domingo %}domingo{% endif %} {% if dia.tem_valor %}com-despesa{% endif %}">
+                    {% if not dia.fora_mes %}
+                    <div class="orc-calendario-num">{{ dia.numero }}</div>
+                    {% if dia.tem_valor %}
+                    <button type="button"
+                            class="orc-calendario-total"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalDiaDespesas"
+                            data-dia-iso="{{ dia.data_iso }}"
+                            data-dia-label="{{ dia.data|date:'d/m/Y' }}"
+                            data-dia-total="{{ dia.total|moeda_br }}"
+                            title="{{ dia.qtd }} despesa(s) — clique para detalhes">
+                        <span class="orc-calendario-valor">R$ {{ dia.total|moeda_br }}</span>
+                        <span class="orc-calendario-qtd">{{ dia.qtd }} item{{ dia.qtd|pluralize }}</span>
+                    </button>
+                    {% else %}
+                    <div class="orc-calendario-vazio text-muted">—</div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<p class="small text-muted mb-0">
+    Inclui despesas fixas, semi-fixas, variáveis e impostos com lançamento no mês selecionado.
+    Clique no valor do dia para ver o detalhamento.
+</p>
+
+<div class="modal fade" id="modalDiaDespesas" tabindex="-1" aria-labelledby="modalDiaDespesasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDiaDespesasLabel">
+                    <i class="fas fa-calendar-day me-2"></i>
+                    Despesas do dia <span id="modalDiaLabel"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Tipo</th>
+                            <th>Categoria</th>
+                            <th class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalDiaCorpo"></tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="3" class="text-end">Total do dia</th>
+                            <th class="text-end text-danger" id="modalDiaTotal"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ detalhes_por_dia|json_script:"detalhes-por-dia" }}
+
+<style>
+.orc-calendario { display: flex; flex-direction: column; }
+.orc-calendario-head,
+.orc-calendario-semana {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+.orc-calendario-head {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.5rem 0;
+    color: #495057;
+}
+.orc-calendario-dia {
+    min-height: 110px;
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    padding: 0.35rem;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+}
+.orc-calendario-dia.fora-mes { background: #fafafa; }
+.orc-calendario-dia.hoje { box-shadow: inset 0 0 0 2px #0d6efd; }
+.orc-calendario-dia.domingo { background: #f8f9fa; }
+.orc-calendario-dia.com-despesa { background: #fff5f5; }
+.orc-calendario-num {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+.orc-calendario-total {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    border: none;
+    border-radius: 6px;
+    background: #fee2e2;
+    border-left: 3px solid #dc3545;
+    padding: 0.35rem 0.4rem;
+    cursor: pointer;
+    text-align: left;
+    transition: filter 0.15s;
+}
+.orc-calendario-total:hover { filter: brightness(0.97); }
+.orc-calendario-valor {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #b91c1c;
+    line-height: 1.2;
+    word-break: break-word;
+}
+.orc-calendario-qtd {
+    font-size: 0.62rem;
+    color: #6b7280;
+    margin-top: 0.15rem;
+}
+.orc-calendario-vazio {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+@media (max-width: 768px) {
+    .orc-calendario-dia { min-height: 72px; }
+    .orc-calendario-valor { font-size: 0.62rem; }
+}
+</style>
+
+<script>
+(function () {
+  var modalEl = document.getElementById('modalDiaDespesas');
+  var jsonEl = document.getElementById('detalhes-por-dia');
+  if (!modalEl || !jsonEl) return;
+
+  var detalhesPorDia = JSON.parse(jsonEl.textContent);
+
+  function fmtMoeda(v) {
+    return Number(v || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  modalEl.addEventListener('show.bs.modal', function (event) {
+    var btn = event.relatedTarget;
+    if (!btn) return;
+
+    var iso = btn.getAttribute('data-dia-iso') || '';
+    document.getElementById('modalDiaLabel').textContent = btn.getAttribute('data-dia-label') || '';
+    document.getElementById('modalDiaTotal').textContent = 'R$ ' + (btn.getAttribute('data-dia-total') || '0,00');
+
+    var corpo = document.getElementById('modalDiaCorpo');
+    corpo.innerHTML = '';
+    (detalhesPorDia[iso] || []).forEach(function (item) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><strong>' + (item.nome || '') + '</strong></td>' +
+        '<td><span class="badge text-bg-' + (item.tipo_cor || 'secondary') + '">' + (item.tipo_label || '') + '</span></td>' +
+        '<td>' + (item.categoria || '—') + '</td>' +
+        '<td class="text-end fw-semibold">R$ ' + fmtMoeda(item.valor) + '</td>';
+      corpo.appendChild(tr);
+    });
+  });
+})();
+</script>
+{% endblock %}

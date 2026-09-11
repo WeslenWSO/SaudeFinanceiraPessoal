@@ -205,6 +205,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'SaudeFinanceira.context_processors.cotacao_context',
                 'agendador_tarefas.context_processors.tarefas_letreiro',
+                'SaudeFinanceira.context_processors.vencimentos_dia_popup',
                 'usuario.context_processors.menu_nav',
             ],
         },

@@ -32,18 +32,33 @@ _RE_COMO_GERAR = re.compile(
     re.IGNORECASE,
 )
 
+_RE_PROXIMOS_MESES = re.compile(
+    r'GERAR\s+OS?\s+PROXIMOS?\s+(\d+)\s+MESES?\s+COMECANDO\s+(\d{1,2})\s*/\s*(\d{4})',
+    re.IGNORECASE,
+)
+
 
 def _normalizar_mes(texto: str) -> str:
     t = unicodedata.normalize('NFKD', (texto or '').strip().upper())
     return ''.join(c for c in t if not unicodedata.combining(c))
 
 
-def parse_como_gerar(texto: str) -> tuple[int, date]:
+def parse_como_gerar(texto: str) -> tuple[int, date, int]:
     """
-    Ex.: 'GERAR AS PARCELAS 28 ATE 36 APARTIR DE SETEMBRO/2026'
-    Retorna (qtd_meses, data_inicio) — data_inicio usa dia informado separadamente.
+    Interpreta instrução de geração.
+    Retorna (qtd_meses, ref_mes_ano, intervalo_meses).
     """
-    m = _RE_COMO_GERAR.search(texto or '')
+    texto = (texto or '').strip()
+    m = _RE_PROXIMOS_MESES.search(texto)
+    if m:
+        qtd_meses = int(m.group(1))
+        mes = int(m.group(2))
+        ano = int(m.group(3))
+        if not 1 <= mes <= 12:
+            raise ValueError(f'Mês inválido em COMO GERAR: {m.group(2)!r}')
+        return qtd_meses, date(ano, mes, 1), 1
+
+    m = _RE_COMO_GERAR.search(texto)
     if not m:
         raise ValueError(f'Coluna COMO GERAR inválida: {texto!r}')
     parcela_ini = int(m.group(1))
@@ -56,7 +71,18 @@ def parse_como_gerar(texto: str) -> tuple[int, date]:
     if parcela_fim < parcela_ini:
         raise ValueError(f'Parcela final ({parcela_fim}) menor que inicial ({parcela_ini}).')
     qtd_meses = parcela_fim - parcela_ini + 1
-    return qtd_meses, date(ano, mes, 1)
+    return qtd_meses, date(ano, mes, 1), 1
+
+
+def intervalo_por_ocorrencia(ocorrencias: str) -> int:
+    occ = (ocorrencias or 'MENSAL').strip().upper()
+    if occ.startswith('TRIM'):
+        return 3
+    if occ.startswith('SEM'):
+        return 6
+    if occ.startswith('ANU') or occ.startswith('ANUAL'):
+        return 12
+    return 1
 
 
 def data_inicio_com_dia(dia: int, mes: int, ano: int) -> date:
@@ -79,7 +105,10 @@ def parse_valor_br(valor) -> Decimal:
     return Decimal(s).quantize(Decimal('0.01'))
 
 
-def tipo_por_observacao(observacao: str) -> str:
+def tipo_por_observacao(observacao: str, impostos: str = '') -> str:
+    imp = (impostos or '').strip().upper()
+    if imp in ('SIM', 'S', 'YES', '1'):
+        return ItemOrcamento.TIPO_IMPOSTO
     obs = (observacao or '').strip().lower()
     if 'semi-fix' in obs or 'semi fix' in obs:
         return ItemOrcamento.TIPO_SEMI_FIXA
@@ -92,6 +121,32 @@ def tipo_por_observacao(observacao: str) -> str:
     return ItemOrcamento.TIPO_FIXA
 
 
+def gerar_lancamentos_intervalo(item, intervalo_meses: int = 1) -> int:
+    """Gera lançamentos a cada N meses dentro de qtd_meses (ex.: trimestral = 3)."""
+    from planejamento_orcamentario.models import LancamentoOrcamento, _add_months
+
+    item.lancamentos.all().delete()
+    if not item.data_inicio:
+        return 0
+    horizonte = max(1, int(item.qtd_meses or 1))
+    intervalo = max(1, int(intervalo_meses or 1))
+    criar = []
+    seq = 0
+    for offset in range(0, horizonte, intervalo):
+        seq += 1
+        criar.append(
+            LancamentoOrcamento(
+                item=item,
+                empresa=item.empresa,
+                data_lancamento=_add_months(item.data_inicio, offset),
+                valor=item.valor_mensal or Decimal('0'),
+                sequencia=seq,
+            )
+        )
+    LancamentoOrcamento.objects.bulk_create(criar)
+    return len(criar)
+
+
 def montar_item_da_linha(
     *,
     dia: int,
@@ -101,16 +156,20 @@ def montar_item_da_linha(
     categoria_nome: str,
     observacao: str = '',
     ocorrencias: str = 'MENSAL',
+    impostos: str = '',
 ) -> dict:
-    qtd_meses, ref = parse_como_gerar(como_gerar)
+    qtd_meses, ref, _intervalo_instrucao = parse_como_gerar(como_gerar)
+    intervalo_meses = intervalo_por_ocorrencia(ocorrencias)
     data_inicio = data_inicio_com_dia(dia, ref.month, ref.year)
+    obs_partes = [p for p in ((observacao or '').strip(), (ocorrencias or '').strip()) if p]
     return {
         'nome': (fornecedor or '').strip(),
-        'tipo': tipo_por_observacao(observacao),
-        'observacao': (observacao or ocorrencias or '').strip(),
+        'tipo': tipo_por_observacao(observacao, impostos),
+        'observacao': ' · '.join(obs_partes),
         'valor_mensal': parse_valor_br(valor_mensal),
         'data_inicio': data_inicio,
         'qtd_meses': qtd_meses,
+        'intervalo_meses': intervalo_meses,
         'categoria_busca': (categoria_nome or '').strip(),
         'forma_calculo': ItemOrcamento.FORMA_FIXO,
     }

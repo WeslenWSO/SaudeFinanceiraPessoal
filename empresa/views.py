@@ -16,6 +16,7 @@ from .forms import EmpresaForm, EmpresaIntegracaoForm
 from .certificado_windows import listar_certificados_windows_por_cnpj
 from socio.models import Socio
 from fornecedor.models import Fornecedor
+from SaudeFinanceira.services.vencimentos_dia import marcar_popup_vencimentos_dia
 
 logger = logging.getLogger(__name__)
 
@@ -541,6 +542,7 @@ def selecionar_empresa_ajax(request):
         request.session['empresa_id'] = empresa_id
         request.session['empresa_nome'] = usuario_empresa.empresa.razao
         request.session['regime_tributario'] = usuario_empresa.empresa.regime_tributario
+        marcar_popup_vencimentos_dia(request)
 
         return JsonResponse({
             'success': True,
@@ -580,8 +582,8 @@ def selecionar_empresa(request, empresa_id):
         request.session['empresa_id'] = empresa_id
         request.session['empresa_nome'] = usuario_empresa.empresa.razao
         request.session['regime_tributario'] = usuario_empresa.empresa.regime_tributario
-        
-        
+        marcar_popup_vencimentos_dia(request)
+
         messages.success(request, f'Empresa {usuario_empresa.empresa.razao} selecionada com sucesso!')
         
         # Sempre vai para o dashboard (início) após escolher a empresa

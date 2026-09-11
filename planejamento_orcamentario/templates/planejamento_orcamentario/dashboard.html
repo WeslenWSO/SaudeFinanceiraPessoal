@@ -10,6 +10,9 @@
         <small class="text-muted">{{ empresa.nome_fantasia|default:empresa.razao }}</small>
     </div>
     <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'planejamento_orcamentario:calendario' %}" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-calendar-alt"></i> Calendário de despesas
+        </a>
         <a href="{% url 'planejamento_orcamentario:visao_real_plan' %}" class="btn btn-primary btn-sm">
             <i class="fas fa-table"></i> Visão anual + Empréstimos
         </a>

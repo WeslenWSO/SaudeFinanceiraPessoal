@@ -363,6 +363,39 @@ def _grafico_torre(empresa, data_ini, data_fim, tabela_despesas):
 
 
 @login_required
+def calendario_despesas(request):
+    """Calendário mensal com soma das despesas planejadas por dia."""
+    from planejamento_orcamentario.services.montar_calendario_despesas import montar_calendario_despesas
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('accounts:login')
+
+    hoje = date.today()
+    try:
+        ano = int(request.GET.get('ano') or hoje.year)
+        mes = int(request.GET.get('mes') or hoje.month)
+    except (TypeError, ValueError):
+        ano, mes = hoje.year, hoje.month
+    mes = max(1, min(12, mes))
+    if ano < 2000 or ano > 2100:
+        ano = hoje.year
+
+    cal = montar_calendario_despesas(empresa, ano, mes)
+
+    return render(request, 'planejamento_orcamentario/calendario.html', {
+        'title': 'Calendário de despesas',
+        'empresa': empresa,
+        'calendario': cal,
+        'ano': ano,
+        'mes': mes,
+        'detalhes_por_dia': cal['detalhes_por_dia'],
+        'anos_disponiveis': range(hoje.year - 1, hoje.year + 3),
+    })
+
+
+@login_required
 def dashboard(request):
     empresa = _empresa_sessao(request)
     if not empresa:

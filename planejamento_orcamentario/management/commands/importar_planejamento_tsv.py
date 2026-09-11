@@ -10,7 +10,10 @@ from django.db import transaction
 from categoria.models import Categoria
 from empresa.models import Empresa
 from planejamento_orcamentario.models import ItemOrcamento
-from planejamento_orcamentario.services.parse_planilha_orcamento import montar_item_da_linha
+from planejamento_orcamentario.services.parse_planilha_orcamento import (
+    gerar_lancamentos_intervalo,
+    montar_item_da_linha,
+)
 
 
 class Command(BaseCommand):
@@ -43,6 +46,16 @@ class Command(BaseCommand):
             help='Apenas simula, sem gravar no banco.',
         )
 
+    _ALIASES_CATEGORIA = {
+        'CSLL': ['CSLL'],
+        'IRPJ': ['IRPJ'],
+        'PIS': ['PIS 8109', 'PIS'],
+        'COFINS': ['COFINS'],
+        'ISS': ['ISS SOBRE FATURAMENTO'],
+        'FGTS': ['FGTS E MULTA DE FGTS', 'FGTS'],
+        'INSS': ['INSS SOBRE SALÁRIOS - GPS', 'INSS SOBRE SALARIOS - GPS'],
+    }
+
     def _buscar_categoria(self, empresa_id: int, texto: str):
         texto = (texto or '').strip()
         if not texto:
@@ -54,9 +67,15 @@ class Command(BaseCommand):
         cat = qs.filter(classificacao__iexact=texto).first()
         if cat:
             return cat
-        cat = qs.filter(nome__icontains=texto[:40]).first()
-        if cat:
-            return cat
+        chave = texto.upper().split()[0]
+        for termo in self._ALIASES_CATEGORIA.get(chave, []):
+            cat = qs.filter(nome__icontains=termo).order_by('nome').first()
+            if cat:
+                return cat
+        if len(texto) >= 4:
+            cat = qs.filter(nome__icontains=texto[:40]).first()
+            if cat:
+                return cat
         numeros = re.findall(r'\d{5,}', texto)
         for num in numeros:
             cat = qs.filter(nome__icontains=num).first()
@@ -65,6 +84,13 @@ class Command(BaseCommand):
         if 'DLL' in texto.upper():
             return qs.filter(nome__icontains='DLL').order_by('nome').first()
         return None
+
+    @staticmethod
+    def _col(row: dict, *nomes: str, default='') -> str:
+        for nome in nomes:
+            if nome in row and (row[nome] or '').strip():
+                return row[nome].strip()
+        return default
 
     def handle(self, *args, **options):
         empresa_id = options['empresa_id']
@@ -101,13 +127,14 @@ class Command(BaseCommand):
         with transaction.atomic():
             for idx, row in enumerate(linhas, start=1):
                 dados = montar_item_da_linha(
-                    dia=int(row['dia']),
-                    fornecedor=row['fornecedor'],
-                    valor_mensal=row['valor_mensal'],
-                    como_gerar=row['como_gerar'],
-                    categoria_nome=row.get('categoria', ''),
-                    observacao=row.get('observacao', ''),
-                    ocorrencias=row.get('ocorrencias', 'MENSAL'),
+                    dia=int(self._col(row, 'dia', 'dia_estimado')),
+                    fornecedor=self._col(row, 'fornecedor'),
+                    valor_mensal=self._col(row, 'valor_mensal', 'media_mensal'),
+                    como_gerar=self._col(row, 'como_gerar', 'dias'),
+                    categoria_nome=self._col(row, 'categoria'),
+                    observacao=self._col(row, 'observacao'),
+                    ocorrencias=self._col(row, 'ocorrencias', default='MENSAL'),
+                    impostos=self._col(row, 'impostos'),
                 )
                 cat = self._buscar_categoria(empresa_id, dados['categoria_busca'])
                 if not cat:
@@ -115,9 +142,11 @@ class Command(BaseCommand):
                         f'Linha {idx}: categoria não encontrada — {dados["categoria_busca"]!r}'
                     ))
 
+                intervalo = dados.get('intervalo_meses', 1)
                 self.stdout.write(
                     f'  {dados["nome"]}: R$ {dados["valor_mensal"]} · '
-                    f'{dados["data_inicio"].strftime("%d/%m/%Y")} · {dados["qtd_meses"]} meses'
+                    f'{dados["data_inicio"].strftime("%d/%m/%Y")} · '
+                    f'{dados["qtd_meses"]} meses · intervalo {intervalo} · {dados["tipo"]}'
                 )
 
                 if options['dry_run']:
@@ -143,7 +172,10 @@ class Command(BaseCommand):
                     ordem=ordem,
                     ativo=True,
                 )
-                n = item.gerar_lancamentos()
+                if intervalo > 1:
+                    n = gerar_lancamentos_intervalo(item, intervalo)
+                else:
+                    n = item.gerar_lancamentos()
                 criados += 1
                 lancamentos += n
 
