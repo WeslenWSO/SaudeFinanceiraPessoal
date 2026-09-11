@@ -3647,7 +3647,6 @@ def listar_exames_por_solicitante(request):
 
     cards_resumo.sort(key=lambda c: (-c['total'], c['nome'].lower()))
 
-    total_exames = sum(card['total'] for card in cards_resumo)
     if incluir_lista_detalhada:
         totais_solicitante = {card['nome']: card['total'] for card in cards_resumo}
         grid_linhas.sort(key=lambda linha: (
@@ -3656,7 +3655,9 @@ def listar_exames_por_solicitante(request):
             linha['paciente'].lower(),
         ))
         valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
+        total_exames = len(grid_linhas)
     else:
+        total_exames = sum(card['total'] for card in cards_resumo)
         valor_total = sum(cards_map[card['nome']]['valor'] for card in cards_resumo)
 
     context = {
