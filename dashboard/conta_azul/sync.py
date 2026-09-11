@@ -1189,6 +1189,27 @@ def importar_receitas(
     return stats
 
 
+def _params_busca_despesas(
+    data_de: date,
+    data_ate: date,
+    *,
+    por_pagamento: bool = False,
+) -> dict:
+    """Monta filtros da API CA. Por pagamento usa janela ampla de vencimento (campo exigido pela API)."""
+    params: dict = {'pagina': 1, 'tamanho_pagina': 100}
+    if por_pagamento:
+        params['data_pagamento_de'] = data_de.isoformat()
+        params['data_pagamento_ate'] = data_ate.isoformat()
+        venc_de = date(max(2000, data_de.year - 5), 1, 1)
+        venc_ate = date(data_ate.year + 1, 12, 31)
+        params['data_vencimento_de'] = venc_de.isoformat()
+        params['data_vencimento_ate'] = venc_ate.isoformat()
+    else:
+        params['data_vencimento_de'] = data_de.isoformat()
+        params['data_vencimento_ate'] = data_ate.isoformat()
+    return params
+
+
 def importar_despesas(
     empresa,
     client: ContaAzulClient,
@@ -1196,15 +1217,12 @@ def importar_despesas(
     data_de: date,
     data_ate: date,
     dry_run: bool = False,
+    por_pagamento: bool = False,
+    somente_pagos: bool = False,
 ) -> dict:
-    stats = {'criados': 0, 'atualizados': 0, 'erros': 0}
+    stats = {'criados': 0, 'atualizados': 0, 'erros': 0, 'ignorados_nao_pagos': 0}
     cobranca_padrao = _cobranca_padrao()
-    params = {
-        'pagina': 1,
-        'tamanho_pagina': 100,
-        'data_vencimento_de': data_de.isoformat(),
-        'data_vencimento_ate': data_ate.isoformat(),
-    }
+    params = _params_busca_despesas(data_de, data_ate, por_pagamento=por_pagamento)
     try:
         itens = client.buscar_despesas(**params)
     except ContaAzulAPIError as exc:
@@ -1280,9 +1298,15 @@ def importar_despesas(
             else:
                 item = _enriquecer_item_receita(client, item, cache_parcelas)
         status_local = _map_status_despesa(item)
+        if somente_pagos and status_local != 'pago':
+            stats['ignorados_nao_pagos'] += 1
+            continue
         valor = _parse_decimal(item.get('valor') or item.get('total'))
         valor_pago = _valor_pago_item(item)
         data_pg = _data_pagamento_item(item, data_de)
+        if somente_pagos and not data_pg:
+            stats['ignorados_nao_pagos'] += 1
+            continue
         cobranca = _cobranca_de_item(item, cache_cobranca) or cobranca_padrao
         numdoc = _documento_despesa_item(item)
         preparados.append((
@@ -1435,6 +1459,8 @@ def sincronizar_conta_azul(
     data_de: date | None = None,
     data_ate: date | None = None,
     dry_run: bool = False,
+    despesas_por_pagamento: bool = False,
+    despesas_somente_pagos: bool = False,
 ) -> dict[str, Any]:
     def _rodar() -> dict[str, Any]:
         client = ContaAzulClient.para_empresa(empresa)
@@ -1452,7 +1478,13 @@ def sincronizar_conta_azul(
                 )
             if despesas:
                 resultado['despesas'] = importar_despesas(
-                    empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
+                    empresa,
+                    client,
+                    data_de=data_de,
+                    data_ate=data_ate,
+                    dry_run=dry_run,
+                    por_pagamento=despesas_por_pagamento,
+                    somente_pagos=despesas_somente_pagos,
                 )
             if transferencias:
                 resultado['transferencias'] = importar_transferencias(
