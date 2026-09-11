@@ -11,6 +11,7 @@ urlpatterns = [
     path('real-plan/pdf/', views.visao_real_plan_pdf, name='visao_real_plan_pdf'),
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('calendario/', views.calendario_despesas, name='calendario'),
+    path('calendario/mover-dia/', views.calendario_mover_dia, name='calendario_mover_dia'),
     path('item/<int:pk>/editar/', views.editar, name='editar'),
     path('item/<int:pk>/excluir/', views.excluir, name='excluir'),
     path('<str:tipo>/', views.listar_tipo, name='listar_tipo'),

@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Prefetch, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -360,6 +360,37 @@ def _grafico_torre(empresa, data_ini, data_fim, tabela_despesas):
             v > 0 for serie in (receitas, despesas, impostos) for v in serie
         ),
     }
+
+
+@login_required
+@require_POST
+def calendario_mover_dia(request):
+    """Move despesas de fim de semana/feriado para dia útil (AJAX)."""
+    from planejamento_orcamentario.services.mover_lancamentos_calendario import (
+        MoverLancamentoError,
+        mover_despesas_dia,
+    )
+
+    empresa = _empresa_sessao(request)
+    if not empresa:
+        return JsonResponse({'ok': False, 'erro': 'Selecione uma empresa.'}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') if request.body else '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'erro': 'JSON inválido.'}, status=400)
+
+    data_origem = _parse_date(payload.get('data_origem'))
+    data_destino = _parse_date(payload.get('data_destino'))
+    if not data_origem or not data_destino:
+        return JsonResponse({'ok': False, 'erro': 'Informe data_origem e data_destino.'}, status=400)
+
+    try:
+        resultado = mover_despesas_dia(empresa, data_origem, data_destino)
+    except MoverLancamentoError as exc:
+        return JsonResponse({'ok': False, 'erro': str(exc)}, status=400)
+
+    return JsonResponse({'ok': True, **resultado})
 
 
 @login_required

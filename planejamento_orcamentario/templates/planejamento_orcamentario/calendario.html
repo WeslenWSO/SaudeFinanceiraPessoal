@@ -91,21 +91,29 @@
             {% for semana in calendario.semanas %}
             <div class="orc-calendario-semana">
                 {% for dia in semana %}
-                <div class="orc-calendario-dia {% if dia.fora_mes %}fora-mes{% endif %} {% if dia.hoje %}hoje{% endif %} {% if dia.domingo %}domingo{% endif %} {% if dia.tem_valor %}com-despesa{% endif %}">
+                <div class="orc-calendario-dia {% if dia.fora_mes %}fora-mes{% endif %} {% if dia.hoje %}hoje{% endif %} {% if dia.sabado %}sabado{% endif %} {% if dia.domingo %}domingo{% endif %} {% if dia.feriado %}feriado{% endif %} {% if dia.nao_util %}nao-util{% endif %} {% if dia.dia_util %}dia-util{% endif %} {% if dia.tem_valor %}com-despesa{% endif %}"
+                     {% if not dia.fora_mes and dia.dia_util %}data-drop-dia="{{ dia.data_iso }}"{% endif %}>
                     {% if not dia.fora_mes %}
-                    <div class="orc-calendario-num">{{ dia.numero }}</div>
+                    <div class="orc-calendario-num">
+                        {{ dia.numero }}
+                        {% if dia.feriado %}<span class="orc-calendario-badge-feriado" title="Feriado">F</span>{% endif %}
+                    </div>
                     {% if dia.tem_valor %}
-                    <button type="button"
-                            class="orc-calendario-total"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalDiaDespesas"
-                            data-dia-iso="{{ dia.data_iso }}"
-                            data-dia-label="{{ dia.data|date:'d/m/Y' }}"
-                            data-dia-total="{{ dia.total|moeda_br }}"
-                            title="{{ dia.qtd }} despesa(s) — clique para detalhes">
+                    <div class="orc-calendario-total {% if dia.arrastavel %}orc-arrastavel{% endif %}"
+                         {% if dia.arrastavel %}draggable="true" data-drag-dia="{{ dia.data_iso }}"{% endif %}
+                         role="button" tabindex="0"
+                         data-bs-toggle="modal"
+                         data-bs-target="#modalDiaDespesas"
+                         data-dia-iso="{{ dia.data_iso }}"
+                         data-dia-label="{{ dia.data|date:'d/m/Y' }}"
+                         data-dia-total="{{ dia.total|moeda_br }}"
+                         title="{% if dia.arrastavel %}Arraste para um dia útil ou clique para detalhes{% else %}{{ dia.qtd }} despesa(s) — clique para detalhes{% endif %}">
+                        {% if dia.arrastavel %}
+                        <span class="orc-calendario-grip"><i class="fas fa-grip-vertical"></i></span>
+                        {% endif %}
                         <span class="orc-calendario-valor">R$ {{ dia.total|moeda_br }}</span>
                         <span class="orc-calendario-qtd">{{ dia.qtd }} item{{ dia.qtd|pluralize }}</span>
-                    </button>
+                    </div>
                     {% else %}
                     <div class="orc-calendario-vazio text-muted">—</div>
                     {% endif %}
@@ -120,8 +128,18 @@
 
 <p class="small text-muted mb-0">
     Inclui despesas fixas, semi-fixas, variáveis e impostos com lançamento no mês selecionado.
-    Clique no valor do dia para ver o detalhamento.
+    Despesas em <strong>sábado, domingo ou feriado</strong> podem ser <strong>arrastadas</strong> para o dia útil em que serão pagas.
+    Clique no valor para ver o detalhamento.
 </p>
+
+<div id="orcCalendarioToast" class="toast align-items-center text-bg-primary border-0 position-fixed bottom-0 end-0 m-3" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+        <div class="toast-body" id="orcCalendarioToastMsg"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+</div>
+
+{% csrf_token %}
 
 <div class="modal fade" id="modalDiaDespesas" tabindex="-1" aria-labelledby="modalDiaDespesasLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -188,8 +206,24 @@
 }
 .orc-calendario-dia.fora-mes { background: #fafafa; }
 .orc-calendario-dia.hoje { box-shadow: inset 0 0 0 2px #0d6efd; }
-.orc-calendario-dia.domingo { background: #f8f9fa; }
+.orc-calendario-dia.sabado,
+.orc-calendario-dia.domingo,
+.orc-calendario-dia.feriado { background: #f3f4f6; }
 .orc-calendario-dia.com-despesa { background: #fff5f5; }
+.orc-calendario-dia.nao-util.com-despesa { background: #fef3c7; }
+.orc-calendario-dia.drop-over {
+    box-shadow: inset 0 0 0 2px #198754;
+    background: #ecfdf5 !important;
+}
+.orc-calendario-badge-feriado {
+    font-size: 0.55rem;
+    background: #6b7280;
+    color: #fff;
+    border-radius: 3px;
+    padding: 0 0.2rem;
+    margin-left: 0.15rem;
+    vertical-align: middle;
+}
 .orc-calendario-num {
     font-size: 0.8rem;
     font-weight: 600;
@@ -211,6 +245,18 @@
     transition: filter 0.15s;
 }
 .orc-calendario-total:hover { filter: brightness(0.97); }
+.orc-calendario-total.orc-arrastavel {
+    cursor: grab;
+    border-left-color: #f59e0b;
+    background: #fef3c7;
+}
+.orc-calendario-total.orc-arrastavel:active { cursor: grabbing; }
+.orc-calendario-total.orc-dragging { opacity: 0.45; }
+.orc-calendario-grip {
+    font-size: 0.55rem;
+    color: #92400e;
+    margin-bottom: 0.1rem;
+}
 .orc-calendario-valor {
     font-size: 0.72rem;
     font-weight: 700;
@@ -240,6 +286,14 @@
   if (!modalEl || !jsonEl) return;
 
   var detalhesPorDia = JSON.parse(jsonEl.textContent);
+  var moverUrl = '{% url "planejamento_orcamentario:calendario_mover_dia" %}';
+  var csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  var csrfToken = csrfInput ? csrfInput.value : '';
+  var toastEl = document.getElementById('orcCalendarioToast');
+  var toastMsg = document.getElementById('orcCalendarioToastMsg');
+  var toast = toastEl && typeof bootstrap !== 'undefined' ? bootstrap.Toast.getOrCreateInstance(toastEl) : null;
+  var dragOrigem = null;
+  var dragging = false;
 
   function fmtMoeda(v) {
     return Number(v || 0).toLocaleString('pt-BR', {
@@ -248,7 +302,19 @@
     });
   }
 
+  function showToast(msg, ok) {
+    if (!toast || !toastMsg) return;
+    toastMsg.textContent = msg;
+    toastEl.classList.remove('text-bg-primary', 'text-bg-danger', 'text-bg-success');
+    toastEl.classList.add(ok ? 'text-bg-success' : 'text-bg-danger');
+    toast.show();
+  }
+
   modalEl.addEventListener('show.bs.modal', function (event) {
+    if (dragging) {
+      event.preventDefault();
+      return;
+    }
     var btn = event.relatedTarget;
     if (!btn) return;
 
@@ -266,6 +332,66 @@
         '<td>' + (item.categoria || '—') + '</td>' +
         '<td class="text-end fw-semibold">R$ ' + fmtMoeda(item.valor) + '</td>';
       corpo.appendChild(tr);
+    });
+  });
+
+  document.querySelectorAll('.orc-arrastavel').forEach(function (el) {
+    el.addEventListener('dragstart', function (ev) {
+      dragging = true;
+      dragOrigem = el.getAttribute('data-drag-dia');
+      el.classList.add('orc-dragging');
+      ev.dataTransfer.setData('text/plain', dragOrigem);
+      ev.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', function () {
+      dragging = false;
+      el.classList.remove('orc-dragging');
+      document.querySelectorAll('.orc-calendario-dia.drop-over').forEach(function (c) {
+        c.classList.remove('drop-over');
+      });
+    });
+  });
+
+  document.querySelectorAll('[data-drop-dia]').forEach(function (celula) {
+    celula.addEventListener('dragover', function (ev) {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      celula.classList.add('drop-over');
+    });
+    celula.addEventListener('dragleave', function () {
+      celula.classList.remove('drop-over');
+    });
+    celula.addEventListener('drop', function (ev) {
+      ev.preventDefault();
+      celula.classList.remove('drop-over');
+      var origem = ev.dataTransfer.getData('text/plain') || dragOrigem;
+      var destino = celula.getAttribute('data-drop-dia');
+      if (!origem || !destino || origem === destino) return;
+
+      fetch(moverUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ data_origem: origem, data_destino: destino })
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (res.body.ok) {
+            showToast(
+              res.body.lancamentos_movidos + ' lançamento(s) movido(s) para ' +
+              destino.split('-').reverse().join('/'),
+              true
+            );
+            setTimeout(function () { window.location.reload(); }, 700);
+          } else {
+            showToast(res.body.erro || 'Não foi possível mover.', false);
+          }
+        })
+        .catch(function () {
+          showToast('Erro de comunicação ao mover despesas.', false);
+        });
     });
   });
 })();

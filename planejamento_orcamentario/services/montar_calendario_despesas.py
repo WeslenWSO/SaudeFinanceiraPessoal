@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 
 from planejamento_orcamentario.models import ItemOrcamento, LancamentoOrcamento
+from planejamento_orcamentario.services.feriados_br import dia_nao_util, feriados_nacionais
 
 _MESES_NOME = (
     '',
@@ -64,11 +65,15 @@ def montar_calendario_despesas(empresa, ano: int, mes: int) -> dict:
         .order_by('data_lancamento', 'item__nome')
     )
 
+    feriados = feriados_nacionais(ano)
+
     totais_dia: dict[date, Decimal] = defaultdict(lambda: Decimal('0'))
     itens_dia: dict[date, list] = defaultdict(list)
     for lanc in lancamentos:
         totais_dia[lanc.data_lancamento] += lanc.valor or Decimal('0')
-        itens_dia[lanc.data_lancamento].append(_detalhe_lancamento(lanc))
+        det = _detalhe_lancamento(lanc)
+        det['lancamento_id'] = lanc.pk
+        itens_dia[lanc.data_lancamento].append(det)
 
     semanas = []
     for semana in cal_mod.monthcalendar(ano, mes):
@@ -80,13 +85,20 @@ def montar_calendario_despesas(empresa, ano: int, mes: int) -> dict:
             d = date(ano, mes, dia_num)
             total = totais_dia.get(d, Decimal('0'))
             detalhes = itens_dia.get(d, [])
+            nao_util = dia_nao_util(d)
             dias.append({
                 'numero': dia_num,
                 'data': d,
                 'data_iso': d.isoformat(),
                 'fora_mes': False,
                 'hoje': d == date.today(),
+                'sabado': d.weekday() == 5,
                 'domingo': d.weekday() == 6,
+                'feriado': d in feriados,
+                'nao_util': nao_util,
+                'dia_util': not nao_util,
+                'arrastavel': total > 0 and nao_util,
+                'drop_alvo': not nao_util,
                 'total': total,
                 'tem_valor': total > 0,
                 'qtd': len(detalhes),

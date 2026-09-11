@@ -148,16 +148,43 @@ def _map_status_despesa(item: dict) -> str:
     return 'pendente'
 
 
+def _data_pagamento_de_baixas(item: dict) -> date | None:
+    for baixa in reversed(item.get('baixas') or []):
+        if not isinstance(baixa, dict):
+            continue
+        dt = _parse_data(
+            baixa.get('data_pagamento')
+            or baixa.get('data_baixa')
+            or baixa.get('data')
+        )
+        if dt:
+            return dt
+    return None
+
+
+def _item_financeiro_pago(item: dict) -> bool:
+    if _valor_pago_item(item) > 0:
+        return True
+    return _status_api_item(item) in (
+        'RECEBIDO', 'PAGO', 'ACQUITTED', 'QUITADO', 'RECEBIDO_PARCIAL', 'PAGO_PARCIAL',
+    )
+
+
 def _data_pagamento_item(item: dict, fallback: date) -> date | None:
     dt = _parse_data(
         item.get('data_pagamento') or item.get('data_baixa') or item.get('data_recebimento')
     )
     if dt:
         return dt
-    if _valor_pago_item(item) > 0:
+    dt = _data_pagamento_de_baixas(item)
+    if dt:
+        return dt
+    if _item_financeiro_pago(item):
+        # Vencimento antes de competência: CA costuma omitir data_pagamento na busca
+        # e competência (= emissão) não é a data do pagamento.
         return (
-            _parse_data(item.get('data_competencia'))
-            or _parse_data(item.get('data_vencimento'))
+            _parse_data(item.get('data_vencimento'))
+            or _parse_data(item.get('data_competencia'))
             or fallback
         )
     return None
@@ -338,6 +365,17 @@ def _item_receita_pago(item: dict) -> bool:
 def _precisa_detalhe_parcela(item: dict) -> bool:
     """Busca detalhe só para NSU em títulos já pagos (forma de pagamento vem da categoria/descrição)."""
     return _item_receita_pago(item) and not _nsu_receita_item(item)
+
+
+def _precisa_detalhe_parcela_despesa(item: dict) -> bool:
+    """Detalhe da parcela traz baixas com data_pagamento real (busca resumida não traz)."""
+    if not _item_financeiro_pago(item):
+        return False
+    if _parse_data(item.get('data_pagamento') or item.get('data_baixa')):
+        return False
+    if _data_pagamento_de_baixas(item):
+        return False
+    return True
 
 
 def _mesclar_item_receita(item_busca: dict, item_detalhe: dict) -> dict:
@@ -1230,7 +1268,11 @@ def importar_despesas(
             continue
 
         item = _aplicar_campos_da_descricao(item)
-        if not _documento_despesa_item(item):
+        precisa_detalhe = (
+            not _documento_despesa_item(item)
+            or _precisa_detalhe_parcela_despesa(item)
+        )
+        if precisa_detalhe:
             if parcela_id not in cache_parcelas:
                 if chamadas_detalhe < LIMITE_DETALHE_PARCELA_SYNC:
                     chamadas_detalhe += 1
