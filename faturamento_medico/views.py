@@ -7110,240 +7110,47 @@ def importar_ris(request):
             messages.error(request, 'Envie um arquivo Excel no modelo RIS (.xlsx).')
             return redirect('faturamento_medico:importar_ris')
 
+        substituir_periodo = request.POST.get('substituir_periodo') == '1'
+
+        import os
+        import tempfile
+        from faturamento_medico.services.importar_ris_planilha import importar_ris_planilha
+
+        tmp_path = None
         try:
-            wb = load_workbook(filename=BytesIO(arquivo.read()), data_only=True)
-            ws = wb.active
+            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+                for chunk in arquivo.chunks():
+                    tmp.write(chunk)
+                tmp_path = tmp.name
 
-            headers = []
-            for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-                headers.append(_celula_texto(cell.value).lower())
-
-            def idx(*nomes):
-                for nome in nomes:
-                    nome_l = nome.lower()
-                    if nome_l in headers:
-                        return headers.index(nome_l)
-                return None
-
-            col = {
-                'unidade': idx('Unidade'),
-                'data': idx('Data'),
-                'paciente': idx('Paciente'),
-                'cns': idx('Cartão Nacional de Saúde', 'Cartao Nacional de Saude'),
-                'cpf': idx('CPF'),
-                'lote': idx('Número do lote', 'Numero do lote'),
-                'procedimento': idx('Procedimento'),
-                'prioridade': idx('Prioridade'),
-                'horario_inicio': idx('Horário de início', 'Horario de inicio'),
-                'horario_fim': idx('Horário de fim', 'Horario de fim'),
-                'modalidade': idx('Modalidade'),
-                'valor': idx('Valor'),
-                'acrescimo_desconto': idx('Acréscimo/Desconto', 'Acrescimo/Desconto'),
-                'agendado_via': idx('Agendado via', 'Agendado Via'),
-                'status': idx('Status do Agendamento'),
-                'motivo_cancelamento': idx(
-                    'Motivo Cancelamento/Desistência/Deleção',
-                    'Motivo Cancelamento/Desistencia/Delecao',
-                ),
-                'medico': idx('Médico', 'Medico'),
-                'medico_solicitante': idx('Médico solicitante', 'Medico solicitante'),
-                'tecnico': idx('Técnico', 'Tecnico'),
-                'checkin_por': idx('Check-in por', 'Check-in Por'),
-                'agendado_por': idx('Agendado por', 'Agendado Por'),
-                'convenio': idx('Viabilidade'),
-                'tag': idx('Tag'),
-                'indicacao': idx('Indicação clínica', 'Indicacao clinica'),
-                'descricao': idx('Descrição', 'Descricao'),
-                'obs_pagamento': idx('Observações de Pagamento', 'Observacoes de Pagamento'),
-            }
-
-            obrigatorias = ['data', 'paciente', 'procedimento', 'valor']
-            faltando = [c for c in obrigatorias if col[c] is None]
-            if faltando:
-                messages.error(
-                    request,
-                    'Arquivo fora do modelo RIS. Colunas obrigatórias não encontradas: '
-                    + ', '.join(faltando)
-                    + '. Baixe o modelo próprio RIS e use esse layout.'
-                )
-                return redirect('faturamento_medico:importar_ris')
-
-            status_ignorar = set()  # Cancelado/Desistência/Deletado passam a ser importados
-            grupos = {}
-            linhas_ignoradas = 0
-            linhas_canceladas = 0
-
-            def get(row, chave):
-                i = col.get(chave)
-                if i is None or i >= len(row):
-                    return None
-                return row[i]
-
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                if not row or not any(row):
-                    continue
-
-                status_raw = _celula_texto(get(row, 'status'), 50)
-                status = status_raw.lower()
-                if status in status_ignorar:
-                    linhas_ignoradas += 1
-                    continue
-
-                paciente = _celula_texto(get(row, 'paciente'), 200)
-                procedimento = _celula_texto(get(row, 'procedimento'), 200)
-                if not paciente or not procedimento:
-                    linhas_ignoradas += 1
-                    continue
-
-                data_fat = _parse_data_ris(get(row, 'data'))
-                cpf = _celula_texto(get(row, 'cpf'), 50)
-                cns = _celula_texto(get(row, 'cns'), 50)
-                convenio = _celula_texto(get(row, 'convenio'), 100) or 'Particular'
-                # Carteirinha = apenas CNS (não usar CPF)
-                carteirinha = cns or None
-                valor = _parse_valor_ris(get(row, 'valor'))
-                acrescimo = _parse_valor_ris(get(row, 'acrescimo_desconto'))
-                valor_desconto = abs(acrescimo) if acrescimo < 0 else Decimal('0')
-                eh_cancelado = _eh_status_agendamento_cancelado(status_raw)
-                if eh_cancelado:
-                    linhas_canceladas += 1
-
-                medico_solicitante = _celula_texto(get(row, 'medico_solicitante'), 200) or ''
-                from faturamento_medico.procedimento_utils import eh_procedimento_transvaginal
-                flag_transvaginal = '1' if eh_procedimento_transvaginal(procedimento) else '0'
-                # Separa cancelados da lista principal no agrupamento
-                chave = (
-                    f"{paciente}|{data_fat.isoformat()}|{cpf}|{convenio}|"
-                    f"{status_raw or 'ok'}|{medico_solicitante}|tv{flag_transvaginal}"
-                )
-                modalidade = _celula_texto(get(row, 'modalidade'), 20)
-                agendado_via = _celula_texto(get(row, 'agendado_via'), 50) or 'RIS'
-                if chave not in grupos:
-                    horario_inicio = _celula_texto(get(row, 'horario_inicio'), 20) or None
-                    horario_fim = _celula_texto(get(row, 'horario_fim'), 20) or None
-                    horario = ''
-                    if horario_inicio or horario_fim:
-                        horario = f"{(horario_inicio or '')} - {(horario_fim or '')}".strip(' -')
-                    status_agendamento = status_raw or None
-                    indicacao = _celula_texto(get(row, 'indicacao')) or None
-                    descricao = _celula_texto(get(row, 'descricao')) or None
-                    obs_pag = _celula_texto(get(row, 'obs_pagamento'))
-                    observacao = f"Pagamento: {obs_pag}" if obs_pag else None
-
-                    prioridade = _celula_texto(get(row, 'prioridade'), 50) or None
-                    urgencia = 'Não'
-                    if prioridade and prioridade.lower() not in ('eletivo', ''):
-                        urgencia = 'Sim'
-
-                    grupos[chave] = {
-                        'lote': _celula_texto(get(row, 'lote'), 50) or None,
-                        'carteirinha': carteirinha,
-                        'cpf': cpf or None,
-                        'horario': horario or None,
-                        'horario_inicio': horario_inicio,
-                        'horario_fim': horario_fim,
-                        'prioridade': prioridade,
-                        'status_agendamento': status_agendamento,
-                        'motivo_cancelamento': _celula_texto(get(row, 'motivo_cancelamento'), 255) or None,
-                        'nome': paciente,
-                        'nome_associado': paciente,
-                        'data': data_fat,
-                        'local': _celula_texto(get(row, 'unidade'), 200) or None,
-                        'medico': _celula_texto(get(row, 'medico'), 200) or None,
-                        'medico_solicitante': _celula_texto(get(row, 'medico_solicitante'), 200) or None,
-                        'tecnico': _celula_texto(get(row, 'tecnico'), 200) or None,
-                        'checkin_por': _celula_texto(get(row, 'checkin_por'), 200) or None,
-                        'agendado_por': _celula_texto(get(row, 'agendado_por'), 200) or None,
-                        'convenio': convenio,
-                        'tag': _celula_texto(get(row, 'tag'), 100) or None,
-                        'indicacao_clinica': indicacao,
-                        'descricao': descricao,
-                        'agendado_via': agendado_via,
-                        'urgencia': urgencia,
-                        'observacao': observacao,
-                        'servicos': [],
-                    }
-
-                grupos[chave]['servicos'].append({
-                    'descricao': procedimento,
-                    'modalidade': modalidade,
-                    'com_contraste': 'contraste' in procedimento.lower(),
-                    'valor': valor,
-                    'total': valor,
-                    'valor_desconto': valor_desconto,
-                })
-
-            faturamentos_criados = 0
-            itens_criados = 0
-
-            for dados in grupos.values():
-                faturamento = FaturamentoMedico.objects.create(
-                    empresa_id=empresa_id,
-                    lote=dados['lote'],
-                    carteirinha=dados['carteirinha'],
-                    cpf=dados['cpf'],
-                    horario=dados['horario'],
-                    horario_inicio=dados['horario_inicio'],
-                    horario_fim=dados['horario_fim'],
-                    prioridade=dados['prioridade'],
-                    status_agendamento=dados['status_agendamento'],
-                    motivo_cancelamento=dados['motivo_cancelamento'],
-                    nome=dados['nome'],
-                    nome_associado=dados.get('nome_associado') or dados['nome'],
-                    data=dados['data'],
-                    local=dados['local'],
-                    medico=dados['medico'],
-                    medico_solicitante=dados['medico_solicitante'],
-                    tecnico=dados['tecnico'],
-                    checkin_por=dados['checkin_por'],
-                    agendado_por=dados['agendado_por'],
-                    convenio=dados['convenio'],
-                    tag=dados['tag'],
-                    indicacao_clinica=dados['indicacao_clinica'],
-                    descricao=dados['descricao'],
-                    agendado_via=dados['agendado_via'],
-                    urgencia=dados['urgencia'],
-                    observacao=dados['observacao'],
-                    codigo_relatorio=None,
-                    status='pendente',
-                )
-
-                for servico in dados['servicos']:
-                    ItemServico.objects.create(
-                        faturamento=faturamento,
-                        codigo_servico='',
-                        servico=servico['descricao'],
-                        modalidade=servico['modalidade'] or None,
-                        com_contraste=servico['com_contraste'],
-                        porte='',
-                        qt=1,
-                        valor=servico['valor'],
-                        total=servico['total'],
-                        valor_desconto=servico.get('valor_desconto') or Decimal('0'),
-                    )
-                    itens_criados += 1
-
-                faturamento.atualizar_total()
-                faturamentos_criados += 1
-
+            stats = importar_ris_planilha(
+                empresa_id,
+                tmp_path,
+                substituir_periodo=substituir_periodo,
+            )
             msg = (
                 f'Importação RIS concluída! '
-                f'{faturamentos_criados} faturamentos criados, '
-                f'{itens_criados} itens de serviço criados.'
+                f'{stats["faturamentos_criados"]} faturamentos criados, '
+                f'{stats.get("faturamentos_atualizados", 0)} atualizados, '
+                f'{stats["itens_criados"]} itens de serviço criados.'
             )
-            if linhas_canceladas:
+            if stats.get('apagados_antes'):
+                msg += f' {stats["apagados_antes"]} faturamentos removidos antes da importação.'
+            if stats.get('linhas_canceladas'):
                 msg += (
-                    f' {linhas_canceladas} linhas Cancelado/Desistência/Deletado '
+                    f' {stats["linhas_canceladas"]} linhas Cancelado/Desistência/Deletado '
                     f'(disponíveis em Procedimentos Cancelados).'
                 )
-            if linhas_ignoradas:
-                msg += f' {linhas_ignoradas} linhas ignoradas (vazias).'
+            if stats.get('linhas_ignoradas'):
+                msg += f' {stats["linhas_ignoradas"]} linhas ignoradas (vazias).'
             messages.success(request, msg)
-
         except Exception as e:
             logger.exception('Erro ao importar relatório RIS')
             messages.error(request, f'Erro durante a importação RIS: {str(e)}')
             return redirect('faturamento_medico:importar_ris')
+        finally:
+            if tmp_path and os.path.isfile(tmp_path):
+                os.unlink(tmp_path)
 
         return redirect('faturamento_medico:ftlistar')
 

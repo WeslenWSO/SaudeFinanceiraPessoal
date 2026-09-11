@@ -10,6 +10,10 @@ from django.db import transaction
 from openpyxl import load_workbook
 
 from faturamento_medico.models import FaturamentoMedico, ItemServico
+from faturamento_medico.services.ris_sync_medico import (
+    buscar_faturamento_ris_existente,
+    sincronizar_faturamento_ris,
+)
 from faturamento_medico.views import (
     _celula_texto,
     _eh_status_agendamento_cancelado,
@@ -198,14 +202,23 @@ def importar_ris_planilha(
         ).delete()
 
     faturamentos_criados = 0
+    faturamentos_atualizados = 0
     itens_criados = 0
 
     with transaction.atomic():
         for offset in range(0, len(grupos), BATCH_SIZE):
             lote_grupos = grupos[offset:offset + BATCH_SIZE]
             fat_objs: list[FaturamentoMedico] = []
+            dados_novos: list[dict] = []
             for dados in lote_grupos:
+                if not substituir_periodo:
+                    existente = buscar_faturamento_ris_existente(empresa_id, dados)
+                    if existente:
+                        if sincronizar_faturamento_ris(existente, dados):
+                            faturamentos_atualizados += 1
+                        continue
                 total = sum((s['total'] for s in dados['servicos']), Decimal('0'))
+                dados_novos.append(dados)
                 fat_objs.append(FaturamentoMedico(
                     empresa_id=empresa_id,
                     lote=dados['lote'],
@@ -238,10 +251,13 @@ def importar_ris_planilha(
                     total=total,
                 ))
 
+            if not fat_objs:
+                continue
+
             FaturamentoMedico.objects.bulk_create(fat_objs, batch_size=BATCH_SIZE)
 
             item_objs: list[ItemServico] = []
-            for fat, dados in zip(fat_objs, lote_grupos):
+            for fat, dados in zip(fat_objs, dados_novos):
                 for servico in dados['servicos']:
                     item_objs.append(ItemServico(
                         faturamento=fat,
@@ -262,6 +278,7 @@ def importar_ris_planilha(
 
     return {
         'faturamentos_criados': faturamentos_criados,
+        'faturamentos_atualizados': faturamentos_atualizados,
         'itens_criados': itens_criados,
         'linhas_ignoradas': linhas_ignoradas,
         'linhas_canceladas': linhas_canceladas,

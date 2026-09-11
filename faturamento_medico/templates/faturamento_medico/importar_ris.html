@@ -32,7 +32,14 @@
                                 Formato do modelo RIS: Unidade, Data, Paciente, CPF, Procedimento, Valor, Viabilidade (convênio), Médico, etc.
                                 Status Cancelado, Desistência e Deletado são importados e listados na tela de procedimentos cancelados.
                                 Procedimentos do mesmo paciente/data/convênio/status são agrupados.
+                                Se o exame já existir, o sistema <strong>atualiza médico e solicitante</strong> a partir da planilha (sem duplicar).
                             </small>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="substituir_periodo" name="substituir_periodo" value="1">
+                            <label class="form-check-label" for="substituir_periodo">
+                                Substituir período da planilha (apaga faturamentos existentes nas datas do arquivo antes de importar)
+                            </label>
                         </div>
                         <button type="submit" class="btn btn-primary">Importar</button>
                         <a href="{% url 'faturamento_medico:baixar_modelo_ris' %}" class="btn btn-outline-success">
