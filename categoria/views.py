@@ -147,6 +147,64 @@ class CatCreate(CreateView):
         return super(CatCreate,self).form_valid(form)
 
 
+class CatClone(CreateView):
+    """Clona uma categoria existente; nome e classificação podem ser alterados antes de salvar."""
+    model = Categoria
+    form_class = CategoriaForm
+    template_name = 'cat-add-alterar.html'
+    success_url = reverse_lazy('categoria:catList')
+
+    def dispatch(self, request, *args, **kwargs):
+        empresa_id = request.session.get('empresa_id')
+        qs = Categoria.objects.all()
+        if empresa_id:
+            qs = qs.filter(empresa_id=empresa_id)
+        self.categoria_origem = get_object_or_404(qs, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        origem = self.categoria_origem
+        return {
+            'empresa': origem.empresa_id,
+            'nome': origem.nome,
+            'grupo': origem.grupo,
+            'classificacao': origem.classificacao,
+            'sintetico': origem.sintetico,
+            'tipo': origem.tipo,
+            'bloquear_sync_conta_azul': origem.bloquear_sync_conta_azul,
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['descricao'] = f'Clonar categoria: {self.categoria_origem.nome}'
+        context['titulo'] = 'Clonar Categoria'
+        context['categoria_origem'] = self.categoria_origem
+        return context
+
+    def form_valid(self, form):
+        empresa_id = form.instance.empresa_id or self.request.session.get('empresa_id')
+        nome = (form.cleaned_data.get('nome') or '').strip()
+        classificacao = (form.cleaned_data.get('classificacao') or '').strip()
+        tipo = form.cleaned_data.get('tipo')
+        if Categoria.objects.filter(
+            empresa_id=empresa_id,
+            nome__iexact=nome,
+            tipo=tipo,
+            classificacao__iexact=classificacao,
+        ).exists():
+            form.add_error(
+                'nome',
+                'Já existe uma categoria com este nome, tipo e classificação.',
+            )
+            return self.form_invalid(form)
+        form.instance.conta_azul_id = ''
+        messages.success(
+            self.request,
+            f'Categoria clonada com sucesso a partir de "{self.categoria_origem.nome}".',
+        )
+        return super().form_valid(form)
+
+
 class CatDelete(DeleteView):
     model = Categoria
     success_url = reverse_lazy('categoria:catList')

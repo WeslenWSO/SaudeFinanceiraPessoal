@@ -10,9 +10,17 @@
 				
 
 	 {%block conteudo%}
-	 
-	   
- 
+
+	   {% if descricao %}
+	   <p class="mb-3"><strong>{{ descricao }}</strong></p>
+	   {% if categoria_origem %}
+	   <p class="text-muted small mb-3">
+	     Origem: {{ categoria_origem.nome }} ({{ categoria_origem.classificacao }}).
+	     Altere o <strong>nome</strong> e a <strong>classificação</strong> antes de salvar.
+	   </p>
+	   {% endif %}
+	   {% endif %}
+
 	   <form method="post" novalidate class="card">
 		{%csrf_token %}
 		{% if messages %}
@@ -41,7 +49,7 @@
 	   {% endfor %}
 	   
 	   <div class="form-buttons">
-		   <input type="submit" value="Save" class="btn btn-primary"/>
+		   <input type="submit" value="{% if categoria_origem %}Clonar{% else %}Save{% endif %}" class="btn btn-primary"/>
 		   <a href="{%url 'categoria:catList'%}" class="btn btn-cancel btn-outline">Cancel</a>
 	   </div>
 	   

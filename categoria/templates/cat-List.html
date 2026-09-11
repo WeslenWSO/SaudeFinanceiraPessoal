@@ -187,6 +187,7 @@
             </th>
             {% endfor %}
             <th>Editar</th>
+            <th>Clonar</th>
             <th>Excluir</th>
           </tr>
         </thead>
@@ -203,12 +204,13 @@
             </td>
             <td>{{ cat.get_tipo_display|default:cat.tipo }}</td>
             <td>{{ cat.sintetico }}</td>
-            <td><a href="{% url 'categoria:cat-update' cat.id %}" role="button" class="secondary"><i class="fa-solid fa-pen-to-square"></i></a></td>
-            <td><a href="{% url 'categoria:cat-delete' cat.pk %}" role="button" class="contrast" onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"><i class="fas fa-trash"></i></a></td>
+            <td><a href="{% url 'categoria:cat-update' cat.id %}" role="button" class="secondary" title="Editar"><i class="fa-solid fa-pen-to-square"></i></a></td>
+            <td><a href="{% url 'categoria:cat-clone' cat.pk %}" role="button" class="secondary" title="Clonar categoria"><i class="fas fa-copy"></i></a></td>
+            <td><a href="{% url 'categoria:cat-delete' cat.pk %}" role="button" class="contrast" title="Excluir" onclick="return confirm('Tem certeza que deseja excluir esta categoria?')"><i class="fas fa-trash"></i></a></td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="9" class="text-center text-muted py-4">Nenhuma categoria encontrada.</td>
+            <td colspan="10" class="text-center text-muted py-4">Nenhuma categoria encontrada.</td>
           </tr>
           {% endfor %}
         </tbody>

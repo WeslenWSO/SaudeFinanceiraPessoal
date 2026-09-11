@@ -12,6 +12,7 @@ urlpatterns = [
     path("catList/", CatList.as_view(), name='catList'),
     # path("cob/<pk>", CobDetail.as_view(), name="cob-detail"),
     path("<pk>/update", CatUpdate.as_view(), name="cat-update"),
+    path('<pk>/clone/', CatClone.as_view(), name='cat-clone'),
     path('cat/create/', CatCreate.as_view(),name='cat-create'),
     path('<pk>/delete/', CatDelete.as_view(), name='cat-delete'),
     path('copiar/', copiar_categorias, name='copiar'),
