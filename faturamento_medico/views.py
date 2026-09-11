@@ -941,6 +941,30 @@ def _filtrar_por_medicos(qs, medicos_sel):
     return qs.filter(q_med) if q_med else qs
 
 
+def _codigos_modalidade_filtro_validos():
+    return {codigo for codigo, _ in MODALIDADES_SOLICITANTE} | {'OUTROS'}
+
+
+def _parse_modalidades_filtro(request) -> list[str]:
+    codigos_validos = _codigos_modalidade_filtro_validos()
+    selecionados = []
+    for raw in request.GET.getlist('modalidade'):
+        codigo = _normalizar_codigo_modalidade(str(raw).strip())
+        if codigo in codigos_validos and codigo not in selecionados:
+            selecionados.append(codigo)
+    return selecionados
+
+
+def _modalidade_permitida(codigo_normalizado: str, modalidades_sel: list[str]) -> bool:
+    if not modalidades_sel:
+        return True
+    return codigo_normalizado in modalidades_sel
+
+
+def _codigo_modalidade_faturamento_item(faturamento, item=None) -> str:
+    return _normalizar_codigo_modalidade(_modalidade_faturamento_item(faturamento, item))
+
+
 def _listar_nomes_medico_periodo(qs_periodo) -> list[str]:
     return sorted({
         (nome or '').strip() or SOLICITANTE_NAO_INFORMADO
@@ -2702,6 +2726,7 @@ def _coletar_cards_map_exames_solicitante(request):
 
     solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
     medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
+    modalidades_sel = _parse_modalidades_filtro(request)
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
@@ -2734,7 +2759,7 @@ def _coletar_cards_map_exames_solicitante(request):
 
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
     periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
-    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel)
+    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel or modalidades_sel)
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     for faturamento in qs:
@@ -2748,6 +2773,9 @@ def _coletar_cards_map_exames_solicitante(request):
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
+            cod_mod = _normalizar_codigo_modalidade(modalidade)
+            if not _modalidade_permitida(cod_mod, modalidades_sel):
+                return
             if solicitante_apelido is None:
                 return
             card = cards_map[solicitante_apelido]
@@ -2784,6 +2812,7 @@ def _coletar_cards_map_exames_solicitante(request):
             'data_fim': df.isoformat(),
             'solicitante': solicitantes_sel,
             'medico': medicos_sel,
+            'modalidade': modalidades_sel,
             'status_agendamento': status_agendamento_sel,
         },
     }
@@ -3093,6 +3122,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
 
     solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
     medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
+    modalidades_sel = _parse_modalidades_filtro(request)
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
@@ -3149,6 +3179,8 @@ def _coletar_grid_linhas_exames_solicitante(request):
         itens = list(faturamento.itens_servico.all())
 
         def _registrar_linha(procedimento, modalidade, valor, item=None):
+            if not _modalidade_permitida(_normalizar_codigo_modalidade(modalidade), modalidades_sel):
+                return
             status_label, _status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
             )
@@ -3392,6 +3424,7 @@ def listar_exames_por_solicitante(request):
 
     solicitantes_sel = [s.strip() for s in request.GET.getlist('solicitante') if s and str(s).strip()]
     medicos_sel = [s.strip() for s in request.GET.getlist('medico') if s and str(s).strip()]
+    modalidades_sel = _parse_modalidades_filtro(request)
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
@@ -3445,7 +3478,7 @@ def listar_exames_por_solicitante(request):
     metas_map = _carregar_metas_solicitante(empresa_id)
 
     grid_linhas = []
-    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel)
+    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel or modalidades_sel)
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
@@ -3475,6 +3508,9 @@ def listar_exames_por_solicitante(request):
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
+            cod_mod = _normalizar_codigo_modalidade(modalidade)
+            if not _modalidade_permitida(cod_mod, modalidades_sel):
+                return
             if solicitante_apelido is None:
                 return
             card = cards_map[solicitante_apelido]
@@ -3484,6 +3520,8 @@ def listar_exames_por_solicitante(request):
                 _acumular_modalidade_resumo(card['meses'][chave_mes], modalidade, valor, codigos_modalidade)
 
         def _registrar_linha(procedimento, modalidade, valor, item=None):
+            if not _modalidade_permitida(_normalizar_codigo_modalidade(modalidade), modalidades_sel):
+                return
             _acumular_card(modalidade, valor)
             if not incluir_lista_detalhada:
                 return
@@ -3647,6 +3685,9 @@ def listar_exames_por_solicitante(request):
 
     cards_resumo.sort(key=lambda c: (-c['total'], c['nome'].lower()))
 
+    if modalidades_sel:
+        cards_resumo = [card for card in cards_resumo if card['total'] > 0]
+
     if incluir_lista_detalhada:
         totais_solicitante = {card['nome']: card['total'] for card in cards_resumo}
         grid_linhas.sort(key=lambda linha: (
@@ -3676,8 +3717,10 @@ def listar_exames_por_solicitante(request):
             'data_fim': df.isoformat(),
             'solicitante': solicitantes_sel,
             'medico': medicos_sel,
+            'modalidade': modalidades_sel,
             'status_agendamento': status_agendamento_sel,
         },
+        'modalidades_opcoes': MODALIDADES_SOLICITANTE,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
         'periodo_multimes': periodo_multimes,
         'metas_modalidades_opcoes': METAS_MODALIDADES_SOLICITANTE,

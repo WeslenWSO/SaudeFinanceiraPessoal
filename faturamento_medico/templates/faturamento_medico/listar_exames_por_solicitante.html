@@ -279,6 +279,30 @@
                             </div>
                         </div>
                         <div class="row g-2 align-items-end mt-2">
+                            <div class="col-md-3">
+                                <label class="form-label small mb-0 text-muted">Modalidade (múltiplo)</label>
+                                <div class="fm-solicitante-picker py-2">
+                                    <div class="fm-solicitante-lista" style="max-height: 9rem;">
+                                        {% for codigo, label in modalidades_opcoes %}
+                                        <label class="fm-solicitante-item">
+                                            <input type="checkbox"
+                                                   name="modalidade"
+                                                   value="{{ codigo }}"
+                                                   {% if codigo in filtros.modalidade %}checked{% endif %}>
+                                            <span>{{ codigo }} — {{ label }}</span>
+                                        </label>
+                                        {% endfor %}
+                                        <label class="fm-solicitante-item">
+                                            <input type="checkbox"
+                                                   name="modalidade"
+                                                   value="OUTROS"
+                                                   {% if 'OUTROS' in filtros.modalidade %}checked{% endif %}>
+                                            <span>Outros</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-text">Vazio = todas as modalidades.</div>
+                            </div>
                             <div class="col-md-4">
                                 <label class="form-label small mb-0 text-muted">Médico (múltiplo)</label>
                                 <div class="fm-solicitante-picker" id="pickerMedico">
@@ -323,6 +347,9 @@
                             {% endif %}
                             {% if filtros.medico %}
                             · {{ filtros.medico|length }} médico(s) selecionado(s)
+                            {% endif %}
+                            {% if filtros.modalidade %}
+                            · {{ filtros.modalidade|length }} modalidade(s) selecionada(s)
                             {% endif %}
                             {% if filtros.status_agendamento %}
                             · {{ filtros.status_agendamento|length }} status selecionado(s)
