@@ -33,6 +33,7 @@ from django.utils.dateparse import parse_date
 from decimal import Decimal
 
 from django.db.models import Count, Min, Q, Sum
+from django.db.models.functions import Coalesce
 from socio.models import Socio
 from .forms import FormRecalcularRateioGrupo, FormRegraItem, FormRegraRateio
 
@@ -287,6 +288,83 @@ def _q_dist_lucro_com_dtpg():
 
 _LANCAMENTO_RATEIO_FILTRO_CORE = ('data_inicio', 'data_fim', 'socio', 'tipo')
 
+_LANCAMENTO_RATEIO_SORT_FIELDS = {
+    'id': ['id'],
+    'origem': ['origem'],
+    'titulo': ['titulo_id_sort'],
+    'modalidade': ['modalidade'],
+    'viabilidade': ['viabilidade'],
+    'obs_forma': ['obs_forma'],
+    'valor_bruto': ['valor_bruto_sort'],
+    'data': ['data_pagamento'],
+    'tipo': ['tipo'],
+    'descricao': ['descricao'],
+    'regra': ['regra_rateio__codigo', 'regra_rateio__nomedaregra'],
+    'socio': ['socio__socio', 'socio__lastname'],
+    'obs_rateio': ['obs'],
+    'valor': ['valor'],
+}
+
+
+def _sort_params_lancamento_rateio(request):
+    sort = (request.GET.get('sort') or '').strip()
+    dir_ = (request.GET.get('dir') or 'asc').strip().lower()
+    if sort not in _LANCAMENTO_RATEIO_SORT_FIELDS:
+        return '', 'asc'
+    if dir_ not in ('asc', 'desc'):
+        dir_ = 'asc'
+    return sort, dir_
+
+
+def _ordenar_queryset_lancamento_rateio(qs, request):
+    sort, dir_ = _sort_params_lancamento_rateio(request)
+    default = ('-data_pagamento', '-id')
+    if not sort:
+        return qs.order_by(*default)
+
+    if sort in ('titulo', 'valor_bruto'):
+        qs = qs.annotate(
+            titulo_id_sort=Coalesce('conta_pagar_id', 'conta_receber_id'),
+            valor_bruto_sort=Coalesce('conta_pagar__valorDoc', 'conta_receber__valor_a_receber'),
+        )
+
+    fields = list(_LANCAMENTO_RATEIO_SORT_FIELDS[sort])
+    if dir_ == 'desc':
+        order = ['-' + f for f in fields] + ['-id']
+    else:
+        order = fields + ['id']
+    return qs.order_by(*order)
+
+
+def _lancamento_rateio_list_query(request, extra=None, *, sort_override=None, dir_override=None):
+    q = QueryDict(mutable=True)
+    filtros = _filtros_efetivos_lancamento_rateio(request)
+    for k, v in filtros.items():
+        if v:
+            q[k] = v
+    for flag in ('abrir_convenio', 'abrir_obs_forma'):
+        v = (request.GET.get(flag) or '').strip()
+        if v:
+            q[flag] = v
+    sort = sort_override if sort_override is not None else (request.GET.get('sort') or '').strip()
+    dir_ = dir_override if dir_override is not None else (request.GET.get('dir') or 'asc').strip().lower()
+    if sort and sort in _LANCAMENTO_RATEIO_SORT_FIELDS:
+        q['sort'] = sort
+        q['dir'] = dir_ if dir_ in ('asc', 'desc') else 'asc'
+    if extra:
+        for k, v in extra.items():
+            if v is not None and str(v) != '':
+                q[k] = str(v)
+    return q.urlencode()
+
+
+def _sort_url_lancamento_rateio(request, col):
+    if col not in _LANCAMENTO_RATEIO_SORT_FIELDS:
+        return '?' + _lancamento_rateio_list_query(request)
+    cur_sort, cur_dir = _sort_params_lancamento_rateio(request)
+    new_dir = 'desc' if cur_sort == col and cur_dir == 'asc' else 'asc'
+    return '?' + _lancamento_rateio_list_query(request, sort_override=col, dir_override=new_dir)
+
 
 def _session_key_lancamento_rateio_filtro(empresa_id):
     return f'lancamento_rateio_filtro_{empresa_id or 0}'
@@ -314,12 +392,9 @@ def _filtros_efetivos_lancamento_rateio(request):
 
 
 def _url_lancamento_rateio_list_com_filtro(request, extra=None):
-    filtros = _filtros_efetivos_lancamento_rateio(request)
-    params = {k: v for k, v in filtros.items() if v}
-    if extra:
-        params.update({k: v for k, v in extra.items() if v})
-    if params:
-        return reverse('regrarateio:lancamentoRateioList') + '?' + urlencode(params)
+    qs = _lancamento_rateio_list_query(request, extra=extra)
+    if qs:
+        return reverse('regrarateio:lancamentoRateioList') + '?' + qs
     return reverse('regrarateio:lancamentoRateioList')
 
 
@@ -413,7 +488,7 @@ class LancamentoRateioList(ListView):
                 ad = (request.GET.get('ad_irpj_periodo') or saved.get('ad_irpj_periodo') or '').strip()
                 if ad:
                     q['ad_irpj_periodo'] = ad
-                for flag in ('abrir_convenio', 'abrir_obs_forma', 'page'):
+                for flag in ('abrir_convenio', 'abrir_obs_forma', 'page', 'sort', 'dir'):
                     v = (request.GET.get(flag) or '').strip()
                     if v:
                         q[flag] = v
@@ -467,7 +542,7 @@ class LancamentoRateioList(ListView):
         if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_RECEBIMENTO):
             qs = qs.filter(tipo=tipo)
 
-        return qs.order_by('-data_pagamento', '-id')
+        return _ordenar_queryset_lancamento_rateio(qs, self.request)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -487,15 +562,14 @@ class LancamentoRateioList(ListView):
         context['filtro_socio_id'] = int(socio_get) if socio_get.isdigit() else None
         context['filtro_tipo'] = (filtros.get('tipo') or '').strip()
         context['tipo_choices'] = LancamentoRateio.TIPO_CHOICES
-        q = QueryDict(mutable=True)
-        for k, v in filtros.items():
-            if v:
-                q[k] = v
-        for flag in ('abrir_convenio', 'abrir_obs_forma'):
-            v = (self.request.GET.get(flag) or '').strip()
-            if v:
-                q[flag] = v
-        context['filter_query'] = q.urlencode()
+        sort_col, sort_dir = _sort_params_lancamento_rateio(self.request)
+        context['sort_col'] = sort_col
+        context['sort_dir'] = sort_dir
+        context['sort_urls'] = {
+            col: _sort_url_lancamento_rateio(self.request, col)
+            for col in _LANCAMENTO_RATEIO_SORT_FIELDS
+        }
+        context['filter_query'] = _lancamento_rateio_list_query(self.request)
         context['voltar_list_url'] = _url_lancamento_rateio_list_com_filtro(self.request)
         context['regras_rateio_modal'] = (
             RegraRateio.objects.filter(empresa_id=empresa_id)

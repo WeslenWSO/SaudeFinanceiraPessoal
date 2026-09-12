@@ -87,27 +87,42 @@
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
     }
-    .rateio-modal-table th.rateio-th-sortable {
+    .rateio-modal-table th.rateio-th-sortable,
+    .rfr-convenio-grade th.rateio-th-sortable,
+    .table-lr-list th.lr-th-sortable {
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
     }
-    .rateio-modal-table th.rateio-th-sortable:hover {
-        background: rgba(0, 0, 0, 0.06);
+    .rateio-modal-table th.rateio-th-sortable:hover,
+    .rfr-convenio-grade th.rateio-th-sortable:hover,
+    .table-lr-list th.lr-th-sortable:hover {
+        background: rgba(255, 255, 255, 0.08);
     }
-    .rateio-modal-table th.rateio-th-sortable::after {
+    .rateio-modal-table th.rateio-th-sortable::after,
+    .rfr-convenio-grade th.rateio-th-sortable::after,
+    .table-lr-list th.lr-th-sortable::after {
         content: ' ⇅';
         font-size: 0.7em;
         opacity: 0.35;
         margin-left: 0.15rem;
     }
-    .rateio-modal-table th.rateio-th-sorted-asc::after {
+    .rateio-modal-table th.rateio-th-sorted-asc::after,
+    .rfr-convenio-grade th.rateio-th-sorted-asc::after,
+    .table-lr-list th.lr-th-sorted-asc::after {
         content: ' ▲';
         opacity: 0.85;
     }
-    .rateio-modal-table th.rateio-th-sorted-desc::after {
+    .rateio-modal-table th.rateio-th-sorted-desc::after,
+    .rfr-convenio-grade th.rateio-th-sorted-desc::after,
+    .table-lr-list th.lr-th-sorted-desc::after {
         content: ' ▼';
         opacity: 0.85;
+    }
+    .table-lr-list th.lr-th-sortable a {
+        color: inherit;
+        text-decoration: none;
+        display: inline-block;
     }
     .rfr-obs-forma-scroll thead th {
         position: sticky;
@@ -242,26 +257,26 @@
                 </p>
             </form>
             <div class="table-responsive">
-                <table class="table table-striped table-hover table-sm">
+                <table class="table table-striped table-hover table-sm table-lr-list">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
-                            <th>Origem</th>
-                            <th>ID título</th>
-                            <th>Modalidade</th>
-                            <th>Viabilidade</th>
-                            <th>Obs. forma</th>
+                            <th class="lr-th-sortable{% if sort_col == 'id' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.id }}">ID</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'origem' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.origem }}">Origem</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'titulo' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.titulo }}">ID título</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'modalidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.modalidade }}">Modalidade</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'viabilidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.viabilidade }}">Viabilidade</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'obs_forma' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.obs_forma }}">Obs. forma</a></th>
                             <th>Nota</th>
                             <th>Cobrança</th>
                             <th>Conta / Caixa</th>
-                            <th class="text-end" title="Valor do documento (CAP) ou valor da parcela (CAR)">Valor bruto título</th>
-                            <th>Data</th>
-                            <th>Tipo</th>
-                            <th>Descrição</th>
-                            <th>Regra</th>
-                            <th>Sócio</th>
-                            <th>Obs. rateio</th>
-                            <th class="text-end">Valor</th>
+                            <th class="text-end lr-th-sortable{% if sort_col == 'valor_bruto' %} lr-th-sorted-{{ sort_dir }}{% endif %}" title="Valor do documento (CAP) ou valor da parcela (CAR)"><a href="{{ sort_urls.valor_bruto }}">Valor bruto título</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'data' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.data }}">Data</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'tipo' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.tipo }}">Tipo</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'descricao' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.descricao }}">Descrição</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'regra' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.regra }}">Regra</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'socio' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.socio }}">Sócio</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'obs_rateio' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.obs_rateio }}">Obs. rateio</a></th>
+                            <th class="text-end lr-th-sortable{% if sort_col == 'valor' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.valor }}">Valor</a></th>
                             <th class="text-end">Ações</th>
                         </tr>
                     </thead>
@@ -714,9 +729,10 @@
                 tr.setAttribute('data-sort-' + key, v == null ? '' : String(v));
             });
         },
-        sortTbody: function (tbody, col, type, dir) {
+        sortTbody: function (tbody, col, type, dir, rowSelector) {
             if (!tbody || !col) return;
-            var rows = Array.from(tbody.querySelectorAll('tr[data-titulo-id]'));
+            var sel = rowSelector || 'tr[data-titulo-id]';
+            var rows = Array.from(tbody.querySelectorAll(sel));
             if (rows.length < 2) return;
             var mul = dir === 'desc' ? -1 : 1;
             var attr = 'data-sort-' + col;
@@ -746,7 +762,7 @@
             table._rateioSortState = { col: null, dir: 'asc' };
             this.clearSortHeaders(table);
         },
-        initSortableTable: function (table, tbody) {
+        initSortableTable: function (table, tbody, rowSelector) {
             if (!table || !tbody || table._rateioSortInit) return;
             table._rateioSortInit = true;
             table._rateioSortState = { col: null, dir: 'asc' };
@@ -764,7 +780,7 @@
                         st.col = col;
                         st.dir = 'asc';
                     }
-                    self.sortTbody(tbody, col, type, st.dir);
+                    self.sortTbody(tbody, col, type, st.dir, rowSelector);
                     self.clearSortHeaders(table);
                     th.classList.add(st.dir === 'asc' ? 'rateio-th-sorted-asc' : 'rateio-th-sorted-desc');
                 });
@@ -772,6 +788,7 @@
         }
     };
     RateioModal.load();
+    window.RateioModal = RateioModal;
 })();
 </script>
 
@@ -1317,6 +1334,17 @@
             bootstrap.Modal.getOrCreateInstance(modalConv).show();
         }
     }
+
+    var modalConvenioViab = document.getElementById('modalTotalConvenioViabilidade');
+    if (modalConvenioViab && window.RateioModal) {
+        modalConvenioViab.addEventListener('shown.bs.modal', function () {
+            var tblConv = modalConvenioViab.querySelector('.rfr-convenio-grade');
+            if (!tblConv) return;
+            var tbodyConv = tblConv.querySelector('tbody');
+            if (!tbodyConv || !tbodyConv.querySelector('tr[data-sort-row]')) return;
+            RateioModal.initSortableTable(tblConv, tbodyConv, 'tr[data-sort-row]');
+        });
+    }
 })();
 </script>
 
@@ -1470,23 +1498,35 @@
                         </colgroup>
                         <thead class="table-dark">
                             <tr>
-                                <th>Viabilidade / Convênio</th>
-                                <th class="text-end">Qtd.</th>
-                                <th class="text-end">Total (R$)</th>
-                                <th class="text-end">ISS ap.</th>
-                                <th class="text-end">PIS ap.</th>
-                                <th class="text-end">COFINS ap.</th>
-                                <th class="text-end">CSLL ap.</th>
-                                <th class="text-end">IRPJ ap.</th>
-                                <th class="text-end">Impostos ap.</th>
-                                <th class="text-end">Ad. IRPJ</th>
-                                <th class="text-end">Total imposto</th>
-                                <th class="text-end">Líquido ap.</th>
+                                <th data-sortable data-col="viabilidade" data-sort-type="text">Viabilidade / Convênio</th>
+                                <th class="text-end" data-sortable data-col="qtd" data-sort-type="num">Qtd.</th>
+                                <th class="text-end" data-sortable data-col="total" data-sort-type="num">Total (R$)</th>
+                                <th class="text-end" data-sortable data-col="iss_ap" data-sort-type="num">ISS ap.</th>
+                                <th class="text-end" data-sortable data-col="pis_ap" data-sort-type="num">PIS ap.</th>
+                                <th class="text-end" data-sortable data-col="cofins_ap" data-sort-type="num">COFINS ap.</th>
+                                <th class="text-end" data-sortable data-col="csll_ap" data-sort-type="num">CSLL ap.</th>
+                                <th class="text-end" data-sortable data-col="irpj_ap" data-sort-type="num">IRPJ ap.</th>
+                                <th class="text-end" data-sortable data-col="impostos_ap" data-sort-type="num">Impostos ap.</th>
+                                <th class="text-end" data-sortable data-col="ad_irpj" data-sort-type="num">Ad. IRPJ</th>
+                                <th class="text-end" data-sortable data-col="total_imposto" data-sort-type="num">Total imposto</th>
+                                <th class="text-end" data-sortable data-col="liquido_ap" data-sort-type="num">Líquido ap.</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for lin in totais_convenio_viabilidade.linhas %}
-                            <tr>
+                            <tr data-sort-row
+                                data-sort-viabilidade="{{ lin.viabilidade|escape }}"
+                                data-sort-qtd="{{ lin.qtd }}"
+                                data-sort-total="{{ lin.total }}"
+                                data-sort-iss_ap="{{ lin.iss_ap }}"
+                                data-sort-pis_ap="{{ lin.pis_ap }}"
+                                data-sort-cofins_ap="{{ lin.cofins_ap }}"
+                                data-sort-csll_ap="{{ lin.csll_ap }}"
+                                data-sort-irpj_ap="{{ lin.irpj_ap }}"
+                                data-sort-impostos_ap="{{ lin.impostos_ap }}"
+                                data-sort-ad_irpj="{{ lin.ad_irpj }}"
+                                data-sort-total_imposto="{{ lin.total_imposto }}"
+                                data-sort-liquido_ap="{{ lin.liquido_ap }}">
                                 <td>
                                     {{ lin.viabilidade }}
                                     {% if lin.sem_aliquota %}
