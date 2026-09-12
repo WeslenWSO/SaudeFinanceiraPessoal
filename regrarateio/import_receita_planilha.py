@@ -26,6 +26,8 @@ MODELO_PLANILHA_PATH = (
 
 # Lotes pequenos evitam timeout (ex.: Render ~30s por requisição).
 IMPORTACAO_LOTE_TAMANHO = 35
+# Prévia HTML: evita renderizar centenas de linhas (timeout no Render).
+PREVIEW_TABELA_MAX_LINHAS = 40
 
 
 def preparar_linhas_para_sessao(linhas: list[dict]) -> list[dict]:
@@ -210,29 +212,67 @@ def _filtro_conta_importada(empresa_id: int, valor, data, a_faturar: bool) -> di
     return filt
 
 
+def _chave_importacao_linha(ln: dict, *, obs: str | None = None) -> tuple:
+    """Chave única para detectar linha já importada (obs inclui ImpLn)."""
+    if obs is None:
+        obs = _montar_observacao(
+            ln.get('paciente') or '',
+            ln.get('procedimento') or '',
+            ln.get('modalidade') or '',
+            ln.get('viabilidade') or '',
+            linha=ln.get('linha'),
+        )
+    status = 'pendente' if ln.get('a_faturar') else 'pago'
+    return (obs, str(ln['valor']), ln['data'], status)
+
+
+def carregar_chaves_importadas(empresa_id: int) -> set[tuple]:
+    """Carrega em uma consulta as chaves de títulos importados via planilha."""
+    chaves: set[tuple] = set()
+    qs = ContaAReceber.objects.filter(
+        empresa_id=empresa_id,
+        observacao__contains='Pac:',
+    ).values_list(
+        'observacao', 'valor_a_receber', 'data_emissao', 'data_recebimento', 'status'
+    )
+    for obs, valor, dt_emissao, dt_receb, status in qs:
+        if not obs:
+            continue
+        v = str(valor)
+        if status == 'pendente' and dt_emissao:
+            chaves.add((obs, v, dt_emissao.isoformat(), status))
+        elif status == 'pago' and dt_receb:
+            chaves.add((obs, v, dt_receb.isoformat(), status))
+    return chaves
+
+
 def _linha_ja_importada(
     empresa_id: int,
     ln: dict,
     *,
     obs_com_linha: str | None = None,
+    chaves: set[tuple] | None = None,
 ) -> bool:
-    """Verifica se a linha da planilha já virou título (inclui importações antigas sem ImpLn)."""
+    chave = _chave_importacao_linha(ln, obs=obs_com_linha)
+    if chaves is not None:
+        return chave in chaves
     data = date.fromisoformat(ln['data'])
     valor = Decimal(ln['valor'])
     a_faturar = ln.get('a_faturar', False)
-    obs = obs_com_linha or _montar_observacao(
-        ln.get('paciente') or '',
-        ln.get('procedimento') or '',
-        ln.get('modalidade') or '',
-        ln.get('viabilidade') or '',
-        linha=ln.get('linha'),
-    )
+    obs = chave[0]
     base = _filtro_conta_importada(empresa_id, valor, data, a_faturar)
     return ContaAReceber.objects.filter(**base, observacao=obs).exists()
 
 
-def resumo_previa_importacao(empresa_id: int, linhas: list[dict]) -> dict:
+def resumo_previa_importacao(
+    empresa_id: int,
+    linhas: list[dict],
+    *,
+    chaves: set[tuple] | None = None,
+) -> dict:
     """Totais da planilha vs linhas novas / já importadas (para a tela de prévia)."""
+    if chaves is None:
+        chaves = carregar_chaves_importadas(empresa_id)
     total_valor = Decimal('0')
     novo_valor = Decimal('0')
     ja_valor = Decimal('0')
@@ -245,7 +285,7 @@ def resumo_previa_importacao(empresa_id: int, linhas: list[dict]) -> dict:
         total += 1
         v = Decimal(ln['valor'])
         total_valor += v
-        if _linha_ja_importada(empresa_id, ln):
+        if _linha_ja_importada(empresa_id, ln, chaves=chaves):
             ja += 1
             ja_valor += v
         else:
@@ -438,11 +478,18 @@ def parse_receita_planilha_xlsx(
     return linhas, avisos
 
 
-def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list[dict], list[str]]:
+def validar_linhas_importacao(
+    empresa_id: int,
+    linhas: list[dict],
+    *,
+    incluir_preview_por_linha: bool | None = None,
+) -> tuple[list[dict], list[str]]:
     erros = []
     regra_cache: dict = {}
     itens_cache: dict = {}
     preview_cache: dict = {}
+    if incluir_preview_por_linha is None:
+        incluir_preview_por_linha = len(linhas) <= PREVIEW_TABELA_MAX_LINHAS
     for ln in linhas:
         ln['valido'] = True
         ln['preview_rateio'] = []
@@ -484,7 +531,8 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
                 empresa_id=empresa_id,
             )
         prev = preview_cache[prev_key]
-        ln['preview_rateio'] = prev
+        if incluir_preview_por_linha:
+            ln['preview_rateio'] = prev
         ln['regra_nome'] = str(regra)
 
         vr_plan = Decimal(ln.get('valor_rateio') or ln['valor'])
@@ -513,6 +561,7 @@ def _importar_linha_receita(
     itens_cache: dict,
     cobranca_cache: dict,
     nota_cache: dict,
+    chaves_importadas: set[tuple] | None = None,
 ) -> tuple[int, int, int, list[str]]:
     """Importa uma linha. Retorna (car_criados, lr_criados, ignorados, erros)."""
     if not ln.get('valido', True):
@@ -533,10 +582,9 @@ def _importar_linha_receita(
     if not regra:
         return 0, 0, 1, []
 
-    if _linha_ja_importada(empresa_id, ln):
-        return 0, 0, 1, []
-
     obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade, linha=ln.get('linha'))
+    if _linha_ja_importada(empresa_id, ln, obs_com_linha=obs, chaves=chaves_importadas):
+        return 0, 0, 1, []
 
     nota = _nota_por_numero(empresa_id, nf, nota_cache)
     cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
@@ -589,6 +637,9 @@ def _importar_linha_receita(
         obs_forma=obs_forma[:120],
     )
 
+    if chaves_importadas is not None:
+        chaves_importadas.add(_chave_importacao_linha(ln, obs=obs))
+
     return 1, n, 0, []
 
 
@@ -606,6 +657,7 @@ def importar_receitas_planilha_lote(
     itens_cache: dict = {}
     cobranca_cache: dict = {}
     nota_cache: dict = {}
+    chaves_importadas = carregar_chaves_importadas(empresa_id)
 
     criados_car = 0
     criados_lr = 0
@@ -620,6 +672,7 @@ def importar_receitas_planilha_lote(
             itens_cache=itens_cache,
             cobranca_cache=cobranca_cache,
             nota_cache=nota_cache,
+            chaves_importadas=chaves_importadas,
         )
         criados_car += c_car
         criados_lr += c_lr

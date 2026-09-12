@@ -2,7 +2,7 @@ import decimal
 from multiprocessing import context
 from typing import Any
 from django.db.models.query import QuerySet
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render, redirect
@@ -947,6 +947,39 @@ def import_receita_planilha_modelo(request):
     return gerar_modelo_receita_planilha_excel()
 
 
+def _render_import_receita_preview(request, *, empresa_id, payload, regras, voltar_url):
+    from regrarateio.import_receita_planilha import (
+        PREVIEW_TABELA_MAX_LINHAS,
+        carregar_chaves_importadas,
+        resumo_previa_importacao,
+    )
+
+    linhas = payload.get('linhas') or []
+    chaves = carregar_chaves_importadas(empresa_id)
+    resumo = resumo_previa_importacao(empresa_id, linhas, chaves=chaves)
+    tem_validas = any(ln.get('valido') for ln in linhas)
+    total = len(linhas)
+    ocultas = max(0, total - PREVIEW_TABELA_MAX_LINHAS)
+    return render(
+        request,
+        'import_receita_planilha_preview.html',
+        {
+            'titulo': 'Prévia — importar receitas da planilha',
+            'filename': payload.get('filename', ''),
+            'linhas': linhas[:PREVIEW_TABELA_MAX_LINHAS],
+            'linhas_ocultas': ocultas,
+            'avisos': payload.get('avisos') or [],
+            'erros': payload.get('erros') or [],
+            'regras': regras,
+            'voltar_url': voltar_url,
+            'confirm_url': reverse_lazy('regrarateio:importReceitaPlanilha'),
+            'total_linhas': total,
+            'tem_linhas_validas': tem_validas,
+            'resumo': resumo,
+        },
+    )
+
+
 def import_receita_planilha(request):
     """Importa receitas de planilha Excel (exames) e gera rateio pela regra informada."""
     empresa_id = request.session.get('empresa_id')
@@ -955,6 +988,22 @@ def import_receita_planilha(request):
 
     regras = RegraRateio.objects.filter(empresa_id=empresa_id, rateio='S').order_by('codigo', 'nomedaregra')
     voltar_url = reverse_lazy('regrarateio:lancamentoRateioList')
+
+    if request.method == 'GET' and request.GET.get('preview') == '1':
+        payload = request.session.get('rateio_import_preview')
+        if not payload or payload.get('empresa_id') != empresa_id:
+            messages.error(request, 'Prévia expirada. Envie a planilha novamente.')
+            return redirect('regrarateio:importReceitaPlanilha')
+        if not payload.get('linhas'):
+            messages.error(request, 'Dados da importação não encontrados. Envie a planilha novamente.')
+            return redirect('regrarateio:importReceitaPlanilha')
+        return _render_import_receita_preview(
+            request,
+            empresa_id=empresa_id,
+            payload=payload,
+            regras=regras,
+            voltar_url=voltar_url,
+        )
 
     if request.method == 'POST' and request.POST.get('confirm_import') == '1':
         payload = request.session.get('rateio_import_preview')
@@ -1038,7 +1087,6 @@ def import_receita_planilha(request):
 
         from regrarateio.import_receita_planilha import (
             parse_receita_planilha_xlsx,
-            resumo_previa_importacao,
             validar_linhas_importacao,
         )
 
@@ -1066,30 +1114,14 @@ def import_receita_planilha(request):
             'empresa_id': empresa_id,
             'filename': arquivo.name,
             'linhas': preparar_linhas_para_sessao(linhas),
+            'avisos': avisos[:20],
+            'erros': erros[:30],
             'offset': 0,
             'totais': None,
         }
         request.session.modified = True
 
-        tem_validas = any(ln.get('valido') for ln in linhas)
-        resumo = resumo_previa_importacao(empresa_id, linhas)
-        return render(
-            request,
-            'import_receita_planilha_preview.html',
-            {
-                'titulo': 'Prévia — importar receitas da planilha',
-                'filename': arquivo.name,
-                'linhas': linhas,
-                'avisos': avisos,
-                'erros': erros,
-                'regras': regras,
-                'voltar_url': voltar_url,
-                'confirm_url': reverse_lazy('regrarateio:importReceitaPlanilha'),
-                'total_linhas': len(linhas),
-                'tem_linhas_validas': tem_validas,
-                'resumo': resumo,
-            },
-        )
+        return redirect(reverse('regrarateio:importReceitaPlanilha') + '?preview=1')
 
     return render(
         request,
