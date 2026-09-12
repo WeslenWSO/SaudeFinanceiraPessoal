@@ -386,13 +386,21 @@ def _gerar_linhas_rateio_conta_pagar(cap, regra, itens):
 
 
 @transaction.atomic
-def gerar_rateio_contas_pagar(empresa_id=None, conta_pagar_ids=None, regra_id_forcar=None):
+def gerar_rateio_contas_pagar(
+    empresa_id=None,
+    conta_pagar_ids=None,
+    regra_id_forcar=None,
+    *,
+    origem_pagos=False,
+):
     """
     Para cada conta a pagar paga: gera lançamentos por item da regra (valor negativo).
 
     Se ``regra_id_forcar`` for informado, essa regra é usada para **todos** os títulos
     selecionados (útil no modal sem regra no cadastro). Caso contrário, usa a regra
     já cadastrada em cada título (e exige itens na regra do título).
+
+    ``origem_pagos``: modal de contas já pagas (regime de caixa); senão, despesas sem pagamento.
 
     Ignora contas que já possuem lançamentos de rateio.
     """
@@ -409,7 +417,11 @@ def gerar_rateio_contas_pagar(empresa_id=None, conta_pagar_ids=None, regra_id_fo
 
     base_qs = ContasaPagar.objects.select_related('rateio', 'empresa', 'fornecedor')
     if conta_pagar_ids is not None:
-        base_qs = base_qs.filter(~Q(status='cancelado')).filter(~Q(status='pago'), dtPag__isnull=True)
+        base_qs = base_qs.filter(~Q(status='cancelado'))
+        if origem_pagos:
+            base_qs = base_qs.filter(status='pago', dtPag__isnull=False)
+        else:
+            base_qs = base_qs.filter(~Q(status='pago'), dtPag__isnull=True)
     else:
         base_qs = base_qs.filter(status='pago')
     if empresa_id:

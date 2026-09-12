@@ -730,8 +730,15 @@ def contas_pagar_rateio_candidatas(request):
     if di > df:
         return JsonResponse({'erro': 'A data inicial não pode ser maior que a final.'}, status=400)
 
+    somente_pagos = (request.GET.get('somente_pagos') or '').strip() == '1'
+
     try:
-        contas = query_contas_pagar_rateio_candidatas(empresa_id, di, df)
+        contas = query_contas_pagar_rateio_candidatas(
+            empresa_id,
+            di,
+            df,
+            alinhado_grade_resumo=somente_pagos,
+        )
     except Exception as exc:
         return JsonResponse({'erro': str(exc)}, status=500)
 
@@ -781,12 +788,14 @@ def gerar_rateio_contas_pagar_aplicar(request):
 
     rid = (request.POST.get('regra_rateio') or '').strip()
     regra_id_forcar = int(rid) if rid.isdigit() else None
+    origem_pagos = (request.POST.get('origem_pagos') or '').strip() == '1'
 
     try:
         criados, ignorados = gerar_rateio_contas_pagar(
             empresa_id=empresa_id,
             conta_pagar_ids=ids,
             regra_id_forcar=regra_id_forcar,
+            origem_pagos=origem_pagos,
         )
         if criados > 0:
             messages.success(

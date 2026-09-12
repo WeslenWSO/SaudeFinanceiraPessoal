@@ -11,8 +11,12 @@
             <h3 class="card-title mb-0">Lançamentos de rateio</h3>
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRateioCap"
-                    title="Filtrar por período, escolher contas e gravar o rateio">
+                    title="Despesas sem pagamento (emissão e vencimento no período)">
                     <i class="fas fa-calculator"></i> Gerar a partir de contas a pagar
+                </button>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalRateioCapPagos"
+                    title="Títulos já pagos no período (data de pagamento — regime de caixa)">
+                    <i class="fas fa-check-circle"></i> Contas já pagas — gerar rateio
                 </button>
                 <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRateioCar"
                     title="Período, contas a receber pagas e regra — lançamentos com valor positivo">
@@ -26,7 +30,9 @@
         <div class="card-body">
             <p class="text-muted small mb-3">
                 Pagamentos (PGTO) ficam com valor negativo; recebimentos com valor positivo.
-                No modal, listam-se todos os títulos <strong>pagos</strong> no período. Só dá para aplicar rateio com <strong>regra no título</strong> e <strong>sócios/% na regra</strong>. Linhas em amarelo mostram o que falta cadastrar.
+                Use <strong>Gerar a partir de contas a pagar</strong> para despesas <strong>sem pagamento</strong> (emissão e vencimento no período).
+                Use <strong>Contas já pagas</strong> para títulos <strong>pagos</strong> pela <strong>data de pagamento</strong> (regime de caixa).
+                Só dá para aplicar rateio com <strong>regra no título</strong> (ou regra escolhida no modal) e <strong>sócios/% na regra</strong>. Linhas em amarelo mostram o que falta cadastrar.
             </p>
 
             {% if cards_socios %}
@@ -263,6 +269,88 @@
     </div>
 </div>
 
+<!-- Modal: rateio a partir de contas a pagar já pagas -->
+<div class="modal fade" id="modalRateioCapPagos" tabindex="-1" aria-labelledby="modalRateioCapPagosLabel" aria-hidden="true"
+     data-candidatas-url="{% url 'regrarateio:contasPagarRateioCandidatas' %}">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRateioCapPagosLabel">Gerar rateio — contas já pagas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="rateio-cap-pagos-di" class="form-label">Data inicial</label>
+                        <input type="date" id="rateio-cap-pagos-di" class="form-control form-control-sm" required
+                               value="{{ filtro_data_inicio }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="rateio-cap-pagos-df" class="form-label">Data final</label>
+                        <input type="date" id="rateio-cap-pagos-df" class="form-control form-control-sm" required
+                               value="{{ filtro_data_fim }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-success btn-sm w-100" id="btn-buscar-cap-pagos-rateio">
+                            <i class="fas fa-search"></i> Buscar contas pagas
+                        </button>
+                    </div>
+                </div>
+                <p class="small text-muted mb-2">Lista títulos <strong>pagos</strong> no período pela <strong>data de pagamento</strong> (regime de caixa). Distribuição de lucro usa data de emissão.</p>
+                <div id="rateio-cap-pagos-msg" class="alert alert-danger py-2 d-none" role="alert"></div>
+                <div id="rateio-cap-pagos-loading" class="d-none small text-muted mb-2"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>
+                <form method="post" action="{% url 'regrarateio:gerarRateioCap' %}" id="form-rateio-cap-pagos">
+                    {% csrf_token %}
+                    <input type="hidden" name="origem_pagos" value="1">
+                    <div class="mb-3 p-2 bg-light rounded border">
+                        <label for="regra-rateio-modal-pagos" class="form-label fw-semibold mb-1">Regra de rateio a aplicar</label>
+                        <select name="regra_rateio" id="regra-rateio-modal-pagos" class="form-select form-select-sm">
+                            <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
+                            {% for r in regras_rateio_modal %}
+                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="form-text small mb-0 mt-1">
+                            Se o título está <strong>sem regra</strong>, escolha uma regra aqui antes de gravar.
+                            A regra precisa ter sócios e percentuais em <b>Cadastro → Regra do Rateio</b>.
+                        </p>
+                    </div>
+                    <div class="table-responsive border rounded" style="max-height: 380px;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width:2.5rem;">
+                                        <input type="checkbox" id="rateio-cap-pagos-check-all" class="form-check-input" title="Marcar todos disponíveis">
+                                    </th>
+                                    <th>ID</th>
+                                    <th>Descrição</th>
+                                    <th>Fornecedor</th>
+                                    <th>Emissão</th>
+                                    <th>Pagamento</th>
+                                    <th>Valor base</th>
+                                    <th>Regra</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rateio-cap-pagos-tbody">
+                                <tr id="rateio-cap-pagos-empty">
+                                    <td colspan="9" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas pagas</strong>.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button type="submit" form="form-rateio-cap-pagos" class="btn btn-success btn-sm" id="btn-aplicar-rateio-cap-pagos" disabled>
+                    Aplicar regra e gravar lançamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: rateio a partir de contas a receber -->
 <div class="modal fade" id="modalRateioCar" tabindex="-1" aria-labelledby="modalRateioCarLabel" aria-hidden="true"
      data-candidatas-url="{% url 'regrarateio:contasReceberRateioCandidatas' %}">
@@ -461,6 +549,150 @@
 
     checkAll.addEventListener('change', function () {
         tbody.querySelectorAll('input.rateio-cap-cb:not(:disabled)').forEach(function (cb) {
+            cb.checked = checkAll.checked;
+        });
+        updateAplicarState();
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        showMsg('');
+    });
+
+    function preencherDatasPadraoModal() {
+        if (!inpDi || !inpDf) return;
+        if (inpDi.value && inpDf.value) return;
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, '0');
+        var first = y + '-' + m + '-01';
+        var lastD = new Date(y, now.getMonth() + 1, 0).getDate();
+        var last = y + '-' + m + '-' + String(lastD).padStart(2, '0');
+        if (!inpDi.value) inpDi.value = first;
+        if (!inpDf.value) inpDf.value = last;
+    }
+
+    modalEl.addEventListener('shown.bs.modal', function () {
+        preencherDatasPadraoModal();
+    });
+})();
+</script>
+
+<script>
+(function () {
+    const modalEl = document.getElementById('modalRateioCapPagos');
+    if (!modalEl) return;
+
+    const urlBase = modalEl.getAttribute('data-candidatas-url');
+    const tbody = document.getElementById('rateio-cap-pagos-tbody');
+    const msgEl = document.getElementById('rateio-cap-pagos-msg');
+    const loadingEl = document.getElementById('rateio-cap-pagos-loading');
+    const btnBuscar = document.getElementById('btn-buscar-cap-pagos-rateio');
+    const btnAplicar = document.getElementById('btn-aplicar-rateio-cap-pagos');
+    const checkAll = document.getElementById('rateio-cap-pagos-check-all');
+    const inpDi = document.getElementById('rateio-cap-pagos-di');
+    const inpDf = document.getElementById('rateio-cap-pagos-df');
+
+    function showMsg(text) {
+        msgEl.textContent = text || '';
+        msgEl.classList.toggle('d-none', !text);
+    }
+
+    function fmtIso(iso) {
+        if (!iso) return '—';
+        const p = iso.split('-');
+        if (p.length !== 3) return iso;
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function updateAplicarState() {
+        const enabled = tbody.querySelectorAll('input.rateio-cap-pagos-cb:not(:disabled):checked');
+        btnAplicar.disabled = enabled.length === 0;
+    }
+
+    btnBuscar.addEventListener('click', function () {
+        showMsg('');
+        const di = inpDi.value;
+        const df = inpDf.value;
+        if (!di || !df) {
+            showMsg('Preencha data inicial e data final.');
+            return;
+        }
+        loadingEl.classList.remove('d-none');
+        btnBuscar.disabled = true;
+
+        const fetchUrl = urlBase + '?data_inicio=' + encodeURIComponent(di) + '&data_fim=' + encodeURIComponent(df) + '&somente_pagos=1';
+
+        fetch(fetchUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (_ref) {
+                const ok = _ref.ok, data = _ref.j;
+                loadingEl.classList.add('d-none');
+                btnBuscar.disabled = false;
+                if (!ok && data.erro) {
+                    showMsg(data.erro);
+                    return;
+                }
+                if (data.erro) {
+                    showMsg(data.erro);
+                    return;
+                }
+                const contas = data.contas || [];
+                tbody.innerHTML = '';
+                checkAll.checked = false;
+
+                if (contas.length === 0) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = '<td colspan="9" class="text-center text-muted py-4">Nenhuma conta <strong>paga</strong> encontrada com data de pagamento no período informado.</td>';
+                    tbody.appendChild(tr);
+                    btnAplicar.disabled = true;
+                    return;
+                }
+
+                contas.forEach(function (c) {
+                    const tr = document.createElement('tr');
+                    const pode = !!c.pode_aplicar;
+                    var desabilitar = !!c.ja_gerado;
+                    if (c.ja_gerado) tr.classList.add('table-secondary');
+                    else if (!pode) tr.classList.add('table-warning');
+                    const disabled = desabilitar ? 'disabled' : '';
+                    let badgeClass = 'bg-success';
+                    if (c.ja_gerado) badgeClass = 'bg-secondary';
+                    else if (!pode) badgeClass = 'bg-warning text-dark';
+                    const rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
+                    const status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
+                    tr.innerHTML =
+                        '<td><input type="checkbox" name="conta_pagar_id" value="' + esc(c.id) + '" class="form-check-input rateio-cap-pagos-cb" ' + disabled + '></td>' +
+                        '<td>' + esc(c.id) + '</td>' +
+                        '<td>' + esc(c.descricao) + '</td>' +
+                        '<td>' + esc(c.fornecedor) + '</td>' +
+                        '<td>' + fmtIso(c.dt_emissao) + '</td>' +
+                        '<td>' + fmtIso(c.dt_pag) + '</td>' +
+                        '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        '<td><small>' + esc(c.regra) + '</small></td>' +
+                        '<td>' + status + '</td>';
+                    tbody.appendChild(tr);
+                });
+
+                tbody.querySelectorAll('input.rateio-cap-pagos-cb').forEach(function (cb) {
+                    cb.addEventListener('change', updateAplicarState);
+                });
+                updateAplicarState();
+            })
+            .catch(function () {
+                loadingEl.classList.add('d-none');
+                btnBuscar.disabled = false;
+                showMsg('Falha na busca. Tente novamente.');
+            });
+    });
+
+    checkAll.addEventListener('change', function () {
+        tbody.querySelectorAll('input.rateio-cap-pagos-cb:not(:disabled)').forEach(function (cb) {
             cb.checked = checkAll.checked;
         });
         updateAplicarState();
