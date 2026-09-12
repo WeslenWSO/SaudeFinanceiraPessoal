@@ -82,6 +82,11 @@
         background: #f8f9fa;
         border-bottom: 1px solid #dee2e6;
     }
+    .rfr-convenio-irpj-resumo {
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        font-size: 0.875rem;
+    }
     .rfr-convenio-grade tfoot td {
         position: sticky;
         bottom: 0;
@@ -1598,6 +1603,11 @@
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
+                    <div class="rfr-convenio-irpj-resumo d-flex flex-wrap justify-content-end align-items-center gap-2 gap-md-3 px-3 py-2">
+                        <span class="text-muted">IRPJ ap.: <strong>R$ {{ totais_convenio_irpj_txt }}</strong></span>
+                        <span class="text-muted">+ Ad. IRPJ: <strong class="text-danger">R$ {{ totais_convenio_ad_irpj_txt }}</strong></span>
+                        <span class="fw-semibold border-start ps-2 ms-1">Total IRPJ + Ad. IRPJ: <strong class="text-danger">R$ {{ totais_convenio_irpj_mais_ad_txt }}</strong></span>
                     </div>
                 </div>
                 {% else %}
