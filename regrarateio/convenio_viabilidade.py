@@ -5,6 +5,12 @@ from django.db.models import Count, Sum
 
 from servicos_medicos.models import Convenio
 
+# Adicional de IRPJ (presunção 32% − limite × 15%, rateado por convênio)
+AD_IRPJ_BASE_LUCRO_PCT = Decimal('32')
+AD_IRPJ_ALIQUOTA_PCT = Decimal('15')
+AD_IRPJ_LIMITE_MENSAL = Decimal('20000')
+AD_IRPJ_LIMITE_TRIMESTRAL = Decimal('60000')
+
 
 def _to_dec(x) -> Decimal:
     if x is None:
@@ -18,7 +24,48 @@ def _imposto_apuracao(base: Decimal, pct: Decimal) -> Decimal:
     return (abs(base) * pct / Decimal('100')).quantize(Decimal('0.01'))
 
 
-def coletar_totais_por_viabilidade_convenio(empresa_id, qs) -> dict:
+def _calc_ad_irpj_global(total_geral: Decimal, periodo: str = 'mensal') -> dict:
+    """
+    (Total × 32% − limite) × 15% = adicional IRPJ do período.
+    Limite: R$ 20.000 (mensal) ou R$ 60.000 (trimestral).
+    Índice = adicional ÷ total → aplicado em cada convênio.
+    """
+    total_abs = abs(total_geral)
+    limite = (
+        AD_IRPJ_LIMITE_TRIMESTRAL
+        if (periodo or '').strip().lower() == 'trimestral'
+        else AD_IRPJ_LIMITE_MENSAL
+    )
+    base_lucro = (total_abs * AD_IRPJ_BASE_LUCRO_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    excedente = base_lucro - limite
+    if excedente <= 0:
+        return {
+            'periodo': periodo,
+            'limite': limite,
+            'base_lucro': base_lucro,
+            'excedente': Decimal('0'),
+            'ad_irpj_total': Decimal('0'),
+            'indice': Decimal('0'),
+        }
+    ad_total = (excedente * AD_IRPJ_ALIQUOTA_PCT / Decimal('100')).quantize(Decimal('0.01'))
+    indice = (ad_total / total_abs) if total_abs else Decimal('0')
+    return {
+        'periodo': periodo,
+        'limite': limite,
+        'base_lucro': base_lucro,
+        'excedente': excedente.quantize(Decimal('0.01')),
+        'ad_irpj_total': ad_total,
+        'indice': indice,
+    }
+
+
+def _liquido_com_impostos(total: Decimal, impostos: Decimal, ad_irpj: Decimal) -> Decimal:
+    if total >= 0:
+        return total - impostos - ad_irpj
+    return total + impostos + ad_irpj
+
+
+def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str = 'mensal') -> dict:
     """
     Soma valores do queryset filtrado onde viabilidade coincide com convênio cadastrado
     (nome igual, sem diferenciar maiúsculas/minúsculas).
@@ -62,7 +109,8 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs) -> dict:
             'csll_ap': csll,
             'irpj_ap': irpj,
             'impostos_ap': impostos,
-            'liquido_ap': total - impostos if total >= 0 else total + impostos,
+            'ad_irpj': Decimal('0'),
+            'liquido_ap': Decimal('0'),
         })
         total_geral += total
         total_impostos += impostos
@@ -88,6 +136,7 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs) -> dict:
                     'csll_ap': Decimal('0'),
                     'irpj_ap': Decimal('0'),
                     'impostos_ap': Decimal('0'),
+                    'ad_irpj': Decimal('0'),
                     'liquido_ap': total,
                     'sem_aliquota': True,
                 })
@@ -109,10 +158,24 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs) -> dict:
                 'csll_ap': Decimal('0'),
                 'irpj_ap': Decimal('0'),
                 'impostos_ap': Decimal('0'),
+                'ad_irpj': Decimal('0'),
                 'liquido_ap': total,
                 'sem_aliquota': True,
             })
             total_geral += total
+
+    ad_info = _calc_ad_irpj_global(total_geral, periodo_ad_irpj)
+    indice = ad_info['indice']
+    total_ad_irpj = Decimal('0')
+    total_liquido = Decimal('0')
+    for linha in linhas:
+        total_lin = _to_dec(linha['total'])
+        ad = (abs(total_lin) * indice).quantize(Decimal('0.01'))
+        linha['ad_irpj'] = ad
+        imp = _to_dec(linha['impostos_ap'])
+        linha['liquido_ap'] = _liquido_com_impostos(total_lin, imp, ad)
+        total_ad_irpj += ad
+        total_liquido += linha['liquido_ap']
 
     # Outras viabilidades no filtro que não batem com cadastro
     outros_qs = qs.exclude(viabilidade='').exclude(viabilidade__isnull=True)
@@ -139,6 +202,9 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs) -> dict:
         'linhas': linhas,
         'total_geral': total_geral,
         'total_impostos_ap': total_impostos,
+        'total_ad_irpj': total_ad_irpj,
+        'total_liquido_ap': total_liquido,
+        'ad_irpj': ad_info,
         'outros': outros,
         'tem_convenio_cadastrado': bool(convenios),
     }

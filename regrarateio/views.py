@@ -486,7 +486,12 @@ class LancamentoRateioList(ListView):
 
         from regrarateio.convenio_viabilidade import coletar_totais_por_viabilidade_convenio
 
-        tot_conv = coletar_totais_por_viabilidade_convenio(empresa_id, qs_filtro)
+        periodo_ad = (self.request.GET.get('ad_irpj_periodo') or 'mensal').strip().lower()
+        if periodo_ad not in ('mensal', 'trimestral'):
+            periodo_ad = 'mensal'
+        tot_conv = coletar_totais_por_viabilidade_convenio(
+            empresa_id, qs_filtro, periodo_ad_irpj=periodo_ad
+        )
         for linha in tot_conv['linhas']:
             linha['total_txt'] = _fmt_br_moeda(linha['total'])
             linha['iss_ap_txt'] = _fmt_br_moeda(linha['iss_ap'])
@@ -495,12 +500,23 @@ class LancamentoRateioList(ListView):
             linha['csll_ap_txt'] = _fmt_br_moeda(linha['csll_ap'])
             linha['irpj_ap_txt'] = _fmt_br_moeda(linha['irpj_ap'])
             linha['impostos_ap_txt'] = _fmt_br_moeda(linha['impostos_ap'])
+            linha['ad_irpj_txt'] = _fmt_br_moeda(linha['ad_irpj'])
             linha['liquido_ap_txt'] = _fmt_br_moeda(linha['liquido_ap'])
         for out in tot_conv['outros']:
             out['total_txt'] = _fmt_br_moeda(out['total'])
+        ad = tot_conv.get('ad_irpj') or {}
+        context['filtro_ad_irpj_periodo'] = periodo_ad
         context['totais_convenio_viabilidade'] = tot_conv
         context['totais_convenio_total_txt'] = _fmt_br_moeda(tot_conv['total_geral'])
         context['totais_convenio_impostos_txt'] = _fmt_br_moeda(tot_conv['total_impostos_ap'])
+        context['totais_convenio_ad_irpj_txt'] = _fmt_br_moeda(tot_conv['total_ad_irpj'])
+        context['totais_convenio_liquido_txt'] = _fmt_br_moeda(tot_conv['total_liquido_ap'])
+        context['ad_irpj_base_lucro_txt'] = _fmt_br_moeda(ad.get('base_lucro'))
+        context['ad_irpj_excedente_txt'] = _fmt_br_moeda(ad.get('excedente'))
+        context['ad_irpj_total_txt'] = _fmt_br_moeda(ad.get('ad_irpj_total'))
+        context['ad_irpj_limite_txt'] = _fmt_br_moeda(ad.get('limite'))
+        indice = ad.get('indice') or Decimal('0')
+        context['ad_irpj_indice_txt'] = f'{indice:.10f}'.replace('.', ',')
 
         return context
 

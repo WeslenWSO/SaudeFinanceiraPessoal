@@ -1098,6 +1098,13 @@
     modalCar.addEventListener('shown.bs.modal', function () {
         preencherDatasPadraoModalCar();
     });
+
+    if (new URLSearchParams(window.location.search).get('abrir_convenio') === '1') {
+        var modalConv = document.getElementById('modalTotalConvenioViabilidade');
+        if (modalConv && window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalConv).show();
+        }
+    }
 })();
 </script>
 
@@ -1109,11 +1116,36 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
-                <p class="small text-muted">
+                <p class="small text-muted mb-2">
                     Soma dos lançamentos do filtro atual cuja coluna <strong>Viabilidade</strong> coincide com o
                     <strong>nome do convênio</strong> cadastrado (ex.: PM, GEAP).
                     Impostos de apuração usam as alíquotas do cadastro de convênio.
                 </p>
+                <form method="get" class="row g-2 align-items-end mb-3">
+                    {% if filtro_data_inicio %}<input type="hidden" name="data_inicio" value="{{ filtro_data_inicio }}">{% endif %}
+                    {% if filtro_data_fim %}<input type="hidden" name="data_fim" value="{{ filtro_data_fim }}">{% endif %}
+                    {% if filtro_socio %}<input type="hidden" name="socio" value="{{ filtro_socio }}">{% endif %}
+                    {% if filtro_tipo %}<input type="hidden" name="tipo" value="{{ filtro_tipo }}">{% endif %}
+                    <div class="col-auto">
+                        <label for="ad-irpj-periodo" class="form-label small mb-0">Adicional IRPJ — limite</label>
+                        <select name="ad_irpj_periodo" id="ad-irpj-periodo" class="form-select form-select-sm">
+                            <option value="mensal" {% if filtro_ad_irpj_periodo != 'trimestral' %}selected{% endif %}>Mensal (− R$ 20.000)</option>
+                            <option value="trimestral" {% if filtro_ad_irpj_periodo == 'trimestral' %}selected{% endif %}>Trimestral (− R$ 60.000)</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="abrir_convenio" value="1">
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Recalcular</button>
+                    </div>
+                </form>
+                {% if totais_convenio_viabilidade.linhas %}
+                <p class="small text-muted mb-2">
+                    Ad. IRPJ: (Total × 32% − {{ ad_irpj_limite_txt }}) × 15% =
+                    <strong>R$ {{ ad_irpj_total_txt }}</strong>
+                    · índice <strong>{{ ad_irpj_indice_txt }}</strong>
+                    (valor convênio × índice)
+                </p>
+                {% endif %}
                 {% if not totais_convenio_viabilidade.tem_convenio_cadastrado %}
                 <div class="alert alert-warning py-2 small">
                     Nenhum convênio cadastrado para esta empresa.
@@ -1134,6 +1166,7 @@
                                 <th class="text-end">CSLL ap.</th>
                                 <th class="text-end">IRPJ ap.</th>
                                 <th class="text-end">Impostos ap.</th>
+                                <th class="text-end">Ad. IRPJ</th>
                                 <th class="text-end">Líquido ap.</th>
                             </tr>
                         </thead>
@@ -1156,6 +1189,7 @@
                                 <td class="text-end">R$ {{ lin.csll_ap_txt }}</td>
                                 <td class="text-end">R$ {{ lin.irpj_ap_txt }}</td>
                                 <td class="text-end text-danger">R$ {{ lin.impostos_ap_txt }}</td>
+                                <td class="text-end text-danger">R$ {{ lin.ad_irpj_txt }}</td>
                                 <td class="text-end text-success">R$ {{ lin.liquido_ap_txt }}</td>
                             </tr>
                             {% endfor %}
@@ -1164,9 +1198,10 @@
                             <tr>
                                 <td colspan="2" class="text-end">Total convênios</td>
                                 <td class="text-end">R$ {{ totais_convenio_total_txt }}</td>
-                                <td colspan="6"></td>
+                                <td colspan="5"></td>
                                 <td class="text-end text-danger">R$ {{ totais_convenio_impostos_txt }}</td>
-                                <td></td>
+                                <td class="text-end text-danger">R$ {{ totais_convenio_ad_irpj_txt }}</td>
+                                <td class="text-end text-success">R$ {{ totais_convenio_liquido_txt }}</td>
                             </tr>
                         </tfoot>
                     </table>
