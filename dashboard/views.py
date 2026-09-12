@@ -856,7 +856,10 @@ def resumo_fechamento_por_resultado(request):
     if not empresa_id:
         return redirect('empresa:lista')
 
-    from dashboard.resumo_fechamento_resultado import coletar_dados_resumo_resultado
+    from dashboard.resumo_fechamento_resultado import (
+        coletar_dados_resumo_resultado,
+        coletar_resumo_mensal_resultado,
+    )
 
     empresa_ctx = Empresa.objects.filter(pk=empresa_id).first()
     empresa_razao_social = (empresa_ctx.razao or '').strip() if empresa_ctx else ''
@@ -918,6 +921,19 @@ def resumo_fechamento_por_resultado(request):
     dados = coletar_dados_resumo_resultado(
         empresa_id, data_inicio, data_fim, filtro_socio_ids
     )
+    resumo_mensal = coletar_resumo_mensal_resultado(
+        empresa_id, data_inicio, data_fim, filtro_socio_ids
+    )
+    resumo_mensal_json = json.dumps(
+        [
+            {
+                'label': m['label'],
+                'resultado': str(m['resultado'].quantize(Decimal('0.01'))),
+            }
+            for m in resumo_mensal
+        ],
+        ensure_ascii=False,
+    )
 
     filtro_socio_nome = None
     if filtro_socio_ids:
@@ -951,6 +967,8 @@ def resumo_fechamento_por_resultado(request):
         'resultado_txt': dados['resultado_txt'],
         'resultado_negativo': dados['resultado_negativo'],
         'resultado_valor': str(dados['resultado'].quantize(Decimal('0.01'))),
+        'resumo_mensal': resumo_mensal,
+        'resumo_mensal_json': resumo_mensal_json,
     }
 
     export_qs = request.GET.copy()

@@ -1,8 +1,25 @@
 """Consultas e formatação para o relatório Resumo fechamento por resultado."""
+from collections import defaultdict
 from decimal import Decimal
 
 from regrarateio.models import LancamentoRateio
 from regrarateio.views import _filtra_queryset_lancamento_rateio_por_periodo
+
+MESES_PT = (
+    '',
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+)
 
 
 def _meta_observacao_car(car):
@@ -104,6 +121,66 @@ def _grade_linhas_rateio(qs):
             }
         )
     return out, soma
+
+
+def _iter_chaves_mes(data_inicio, data_fim):
+    y, m = data_inicio.year, data_inicio.month
+    yf, mf = data_fim.year, data_fim.month
+    while (y, m) <= (yf, mf):
+        yield y, m
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+
+def _label_mes(ano: int, mes: int) -> str:
+    nome = MESES_PT[mes] if 1 <= mes <= 12 else str(mes)
+    return f'{nome}/{ano}'
+
+
+def coletar_resumo_mensal_resultado(empresa_id, data_inicio, data_fim, filtro_socio_ids):
+    """Totais mês a mês (receita, despesa, resultado) para todos os meses do filtro."""
+    base = LancamentoRateio.objects.filter(empresa_id=empresa_id)
+    qs = _filtra_queryset_lancamento_rateio_por_periodo(base, data_inicio, data_fim)
+    if filtro_socio_ids:
+        qs = qs.filter(socio_id__in=filtro_socio_ids)
+
+    agg: dict[tuple[int, int], dict] = defaultdict(
+        lambda: {'receita': Decimal('0'), 'despesa': Decimal('0')}
+    )
+    for lr in qs.values_list('data_pagamento', 'tipo', 'valor'):
+        data_pg, tipo, valor = lr
+        if not data_pg:
+            continue
+        chave = (data_pg.year, data_pg.month)
+        v = valor if valor is not None else Decimal('0')
+        if tipo == LancamentoRateio.TIPO_RECEBIMENTO:
+            agg[chave]['receita'] += abs(v)
+        elif tipo == LancamentoRateio.TIPO_PGTO:
+            agg[chave]['despesa'] += abs(v)
+
+    resumo = []
+    for ano, mes in _iter_chaves_mes(data_inicio, data_fim):
+        tot = agg.get((ano, mes), {'receita': Decimal('0'), 'despesa': Decimal('0')})
+        receita = tot['receita']
+        despesa = tot['despesa']
+        resultado = receita - despesa
+        resumo.append(
+            {
+                'ano': ano,
+                'mes': mes,
+                'label': _label_mes(ano, mes),
+                'receita': receita,
+                'despesa': despesa,
+                'resultado': resultado,
+                'receita_txt': _fmt_moeda_br(receita),
+                'despesa_txt': _fmt_moeda_br(despesa),
+                'resultado_txt': _fmt_moeda_br(resultado),
+                'resultado_negativo': resultado < 0,
+            }
+        )
+    return resumo
 
 
 def coletar_dados_resumo_resultado(empresa_id, data_inicio, data_fim, filtro_socio_ids):

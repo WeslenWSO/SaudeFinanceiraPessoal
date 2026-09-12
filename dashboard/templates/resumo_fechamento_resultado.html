@@ -155,6 +155,49 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-header py-2">
+        <h2 class="h5 mb-0">Resumo por mês do resultado</h2>
+        <p class="small text-muted mb-0">
+            Todos os meses do período filtrado: receita − despesas = resultado.
+            Os valores por sócio usam os percentuais informados acima em «Distribuição do resultado entre sócios».
+        </p>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle" id="rfr-tabela-meses">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Mês</th>
+                        <th class="text-end">Receita</th>
+                        <th class="text-end">Despesas</th>
+                        <th class="text-end">Resultado</th>
+                        <th>Sócio</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mes in resumo_mensal %}
+                    <tr class="table-secondary fw-semibold rfr-mes-cabecalho" data-mes-idx="{{ forloop.counter0 }}">
+                        <td>{{ mes.label }}</td>
+                        <td class="text-end text-success">R$ {{ mes.receita_txt }}</td>
+                        <td class="text-end text-danger">R$ {{ mes.despesa_txt }}</td>
+                        <td class="text-end {% if mes.resultado_negativo %}text-danger{% else %}text-primary{% endif %}">
+                            R$ {{ mes.resultado_txt }}
+                        </td>
+                        <td colspan="2" class="small fw-normal text-muted">Distribuição do resultado</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">Nenhum mês no período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
         <h2 class="h5 mb-0">Receitas rateadas</h2>
     </div>
     <div class="card-body p-0">
@@ -264,6 +307,7 @@
 (function () {
     var SOCIOS = {{ socios_json|safe }};
     var RESULTADO = parseFloat('{{ resultado_valor }}') || 0;
+    var MESES = {{ resumo_mensal_json|safe }};
 
     function fmtMoeda(n) {
         var neg = n < 0;
@@ -363,6 +407,48 @@
         recalcular();
     }
 
+    function lerDistribuicaoAtual() {
+        var out = [];
+        document.querySelectorAll('#rfr-distribuicao-corpo tr').forEach(function (tr) {
+            var sel = tr.querySelector('.rfr-socio-select');
+            var inp = tr.querySelector('.rfr-pct-input');
+            if (!sel || !inp || !sel.value) return;
+            var pct = parsePct(inp.value);
+            if (pct <= 0) return;
+            out.push({
+                nome: sel.options[sel.selectedIndex].textContent,
+                pct: pct,
+            });
+        });
+        return out;
+    }
+
+    function atualizarResumoMensal() {
+        document.querySelectorAll('.rfr-mes-socio-linha').forEach(function (el) {
+            el.remove();
+        });
+        var dist = lerDistribuicaoAtual();
+        if (!dist.length || !MESES.length) return;
+
+        document.querySelectorAll('.rfr-mes-cabecalho').forEach(function (trCab, idx) {
+            var mes = MESES[idx];
+            if (!mes) return;
+            var resultado = parseFloat(mes.resultado) || 0;
+            var insertAfter = trCab;
+            dist.forEach(function (d) {
+                var tr = document.createElement('tr');
+                tr.className = 'rfr-mes-socio-linha';
+                var valor = resultado * d.pct / 100;
+                tr.innerHTML =
+                    '<td></td><td></td><td></td><td></td>' +
+                    '<td class="ps-4">' + d.nome + '</td>' +
+                    '<td class="text-end">R$ ' + fmtMoeda(valor) + '</td>';
+                insertAfter.parentNode.insertBefore(tr, insertAfter.nextSibling);
+                insertAfter = tr;
+            });
+        });
+    }
+
     function recalcular() {
         var linhas = document.querySelectorAll('#rfr-distribuicao-corpo tr');
         var totalPct = 0;
@@ -415,6 +501,7 @@
             alerta.classList.remove('visivel');
             alerta.textContent = '';
         }
+        atualizarResumoMensal();
     }
 
     document.getElementById('rfr-btn-aplicar-qtd').addEventListener('click', function () {
@@ -424,6 +511,12 @@
 
     document.getElementById('rfr-qtd-socios').addEventListener('change', function () {
         renderLinhas(parseInt(this.value, 10) || 2);
+    });
+
+    document.getElementById('rfr-distribuicao-corpo').addEventListener('change', function (ev) {
+        if (ev.target && ev.target.classList.contains('rfr-socio-select')) {
+            recalcular();
+        }
     });
 
     renderLinhas(2);
