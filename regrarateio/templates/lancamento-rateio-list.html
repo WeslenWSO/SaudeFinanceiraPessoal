@@ -242,7 +242,7 @@
                         <select name="regra_rateio" id="regra-rateio-modal" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            <option value="{{ r.id }}" {% if r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">
@@ -325,7 +325,7 @@
                         <select name="regra_rateio" id="regra-rateio-modal-pagos" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            <option value="{{ r.id }}" {% if r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">
@@ -407,7 +407,7 @@
                         <select name="regra_rateio" id="regra-rateio-modal-car" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}">{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}</option>
+                            <option value="{{ r.id }}" {% if r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">

@@ -392,7 +392,9 @@ class LancamentoRateioList(ListView):
         q.pop('page', None)
         context['filter_query'] = q.urlencode()
         context['regras_rateio_modal'] = (
-            RegraRateio.objects.filter(empresa_id=empresa_id).order_by('nomedaregra')
+            RegraRateio.objects.filter(empresa_id=empresa_id)
+            .annotate(n_itens=Count('regrarateioitem'))
+            .order_by('codigo', 'nomedaregra')
             if empresa_id
             else RegraRateio.objects.none()
         )

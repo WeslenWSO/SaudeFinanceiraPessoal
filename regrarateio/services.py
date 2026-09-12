@@ -73,6 +73,24 @@ def _base_valor_conta_pagar(conta):
     return conta.get_valor_total_com_ajustes()
 
 
+def _regra_forcada_validada(regra_id_forcar, empresa_id=None) -> RegraRateio | None:
+    """Retorna a regra escolhida no modal ou None; exige sócios/% cadastrados."""
+    if not regra_id_forcar:
+        return None
+    qrf = RegraRateio.objects.filter(pk=regra_id_forcar)
+    if empresa_id:
+        qrf = qrf.filter(empresa_id=empresa_id)
+    regra = qrf.first()
+    if not regra:
+        raise ValueError('Regra de rateio não encontrada para esta empresa.')
+    if not RegraRateioItem.objects.filter(regrarateio=regra).exists():
+        raise ValueError(
+            f'A regra «{regra}» não possui sócios nem percentuais. '
+            'Abra Cadastro > Regra do Rateio e inclua os sócios com %.'
+        )
+    return regra
+
+
 def query_contas_pagar_sem_lancamento_rateio_resumo(
     empresa_id, data_inicio, data_fim, socio_ids=None
 ):
@@ -407,14 +425,7 @@ def gerar_rateio_contas_pagar(
     """
     from contasapagar.models import ContasaPagar
 
-    regra_forcada = None
-    if regra_id_forcar:
-        qrf = RegraRateio.objects.filter(pk=regra_id_forcar)
-        if empresa_id:
-            qrf = qrf.filter(empresa_id=empresa_id)
-        regra_forcada = qrf.first()
-        if not regra_forcada or not RegraRateioItem.objects.filter(regrarateio=regra_forcada).exists():
-            return 0, 0
+    regra_forcada = _regra_forcada_validada(regra_id_forcar, empresa_id)
 
     base_qs = ContasaPagar.objects.select_related('rateio', 'empresa', 'fornecedor')
     if conta_pagar_ids is not None:
@@ -601,14 +612,7 @@ def gerar_rateio_contas_receber(empresa_id=None, conta_receber_ids=None, regra_i
     """
     from contasareceber.models import ContaAReceber
 
-    regra_forcada = None
-    if regra_id_forcar:
-        qrf = RegraRateio.objects.filter(pk=regra_id_forcar)
-        if empresa_id:
-            qrf = qrf.filter(empresa_id=empresa_id)
-        regra_forcada = qrf.first()
-        if not regra_forcada or not RegraRateioItem.objects.filter(regrarateio=regra_forcada).exists():
-            return 0, 0
+    regra_forcada = _regra_forcada_validada(regra_id_forcar, empresa_id)
 
     base_qs = ContaAReceber.objects.filter(status='pago').select_related('regra_rateio', 'empresa')
     if empresa_id:
