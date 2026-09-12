@@ -5,6 +5,7 @@ import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+from pathlib import Path
 
 from django.db import transaction
 from django.http import HttpResponse
@@ -20,6 +21,23 @@ from regrarateio.services import (
     preview_linhas_rateio_por_regra,
 )
 
+MODELO_PLANILHA_PATH = (
+    Path(__file__).resolve().parent / 'static' / 'modelos' / 'importar_receita_modelo.xlsx'
+)
+
+# Cabeçalhos oficiais do modelo «Importar Receita MM-AAAA.xlsx»
+COLUNAS_MODELO = (
+    'Data',
+    'Paciente',
+    'Procedimento',
+    'Modalidade',
+    'Viabilizacao',
+    'Forma de Pagamento',
+    'Valor',
+    'REGRA DE RATEUIO',
+    'VALOR DO RATEIO',
+)
+
 
 def _norm_header(val) -> str:
     if val is None:
@@ -32,15 +50,6 @@ def _norm_header(val) -> str:
     ):
         s = s.replace(old, new)
     return s
-
-
-def _find_col(norm_headers: list[str], *patterns: str) -> int | None:
-    for i, h in enumerate(norm_headers):
-        for p in patterns:
-            pn = _norm_header(p)
-            if h == pn or h.startswith(pn) or pn in h:
-                return i
-    return None
 
 
 def _parse_data(val) -> date | None:
@@ -83,21 +92,53 @@ def _parse_moeda(val) -> Decimal:
 
 
 def _map_colunas(headers: list) -> dict[str, int | None]:
+    """Mapeia cabeçalhos; prioriza nomes exatos do modelo oficial."""
     norm = [_norm_header(h) for h in headers]
-    return {
-        'data': _find_col(norm, 'data'),
-        'paciente': _find_col(norm, 'paciente'),
-        'procedimento': _find_col(norm, 'procedimento'),
-        'modalidade': _find_col(norm, 'modalidade', 'moda'),
-        'viabilidade': _find_col(norm, 'viabilidade', 'viabilizacao', 'viabiliz'),
-        'forma_pagamento': _find_col(norm, 'forma de pagamento', 'forma pagamento'),
-        'valor': _find_col(norm, 'valor'),
-        'regra': _find_col(norm, 'regra do rateio', 'regra rateio', 'regra'),
-        # compatibilidade modelo antigo
-        'socio': _find_col(norm, 'socio'),
-        'descricao': _find_col(norm, 'descricao'),
-        'nf': _find_col(norm, 'nf', 'nota'),
+    col: dict[str, int | None] = {
+        'data': None,
+        'paciente': None,
+        'procedimento': None,
+        'modalidade': None,
+        'viabilidade': None,
+        'forma_pagamento': None,
+        'valor': None,
+        'valor_rateio': None,
+        'regra': None,
     }
+
+    for i, h in enumerate(norm):
+        if h == 'data':
+            col['data'] = i
+        elif h == 'paciente':
+            col['paciente'] = i
+        elif h == 'procedimento':
+            col['procedimento'] = i
+        elif h == 'modalidade' or h.startswith('moda'):
+            col['modalidade'] = col['modalidade'] if col['modalidade'] is not None else i
+        elif h in ('viabilizacao', 'viabilidade'):
+            col['viabilidade'] = i
+        elif 'forma' in h and 'pag' in h:
+            col['forma_pagamento'] = i
+        elif h == 'valor do rateio' or h == 'valor rateio':
+            col['valor_rateio'] = i
+        elif h == 'valor':
+            col['valor'] = i
+        elif 'regra' in h and ('rateio' in h or 'rateuio' in h):
+            col['regra'] = i
+
+    # Fallbacks parciais (planilhas antigas)
+    if col['valor'] is None:
+        for i, h in enumerate(norm):
+            if h == 'valor' or (h.startswith('valor') and 'rateio' not in h):
+                col['valor'] = i
+                break
+    if col['regra'] is None:
+        for i, h in enumerate(norm):
+            if 'regra' in h:
+                col['regra'] = i
+                break
+
+    return col
 
 
 def _cel(row, col_map, key):
@@ -139,14 +180,23 @@ def _resolver_regra(empresa_id: int, texto: str, cache: dict) -> RegraRateio | N
     qs = RegraRateio.objects.filter(empresa_id=empresa_id, rateio='S')
     regra = None
     if key.isdigit():
-        regra = qs.filter(pk=int(key)).first()
+        regra = qs.filter(pk=int(texto.strip())).first()
     if not regra:
         regra = qs.filter(codigo__iexact=texto.strip()).first()
     if not regra:
         regra = qs.filter(nomedaregra__iexact=texto.strip()).first()
     if not regra:
+        # «100% USG» → regra «003 — 100% USG»
         for r in qs:
-            if key in str(r).upper():
+            rotulo = str(r).upper()
+            if key == rotulo or key in rotulo or rotulo in key:
+                regra = r
+                break
+    if not regra:
+        token = key.replace('%', '').strip()
+        for r in qs:
+            rotulo = str(r).upper()
+            if token and token in rotulo:
                 regra = r
                 break
     cache[key] = regra
@@ -159,9 +209,23 @@ def _resolver_cobranca(texto: str, cache: dict) -> Cobranca | None:
         return None
     if key in cache:
         return cache[key]
-    c = Cobranca.objects.filter(descricao__iexact=texto.strip()).first()
+    t = texto.strip()
+    c = Cobranca.objects.filter(descricao__iexact=t).first()
     if not c:
-        c = Cobranca.objects.filter(descricao__icontains=texto.strip()[:30]).first()
+        c = Cobranca.objects.filter(descricao__icontains=t[:25]).first()
+    if not c:
+        aliases = {
+            'DH': 'DINHEIRO',
+            'PIX': 'PIX',
+            'CARTAO CREDITO': 'CARTAO',
+            'CARTAO DEBITO': 'CARTAO',
+            'CARTAO': 'CARTAO',
+        }
+        for frag, busca in aliases.items():
+            if frag in key:
+                c = Cobranca.objects.filter(descricao__icontains=busca).first()
+                if c:
+                    break
     cache[key] = c
     return c
 
@@ -202,7 +266,8 @@ def parse_receita_planilha_xlsx(
         return [], ['Coluna «Valor» não encontrada.']
     if col_map.get('regra') is None and not regra_padrao_id:
         return [], [
-            'Informe a coluna «Regra do rateio» na planilha ou selecione uma regra padrão no formulário.'
+            'Coluna «REGRA DE RATEUIO» não encontrada. '
+            'Use o modelo oficial ou selecione uma regra padrão no formulário.'
         ]
 
     regra_cache: dict = {}
@@ -215,11 +280,11 @@ def parse_receita_planilha_xlsx(
 
         data = _parse_data(_cel(row, col_map, 'data'))
         valor = _parse_moeda(_cel(row, col_map, 'valor'))
+        valor_rateio_raw = _cel(row, col_map, 'valor_rateio')
+        valor_rateio = _parse_moeda(valor_rateio_raw) if valor_rateio_raw not in (None, '') else valor
+
         paciente = str(_cel(row, col_map, 'paciente') or '').strip()
         procedimento = str(_cel(row, col_map, 'procedimento') or '').strip()
-        descricao = str(_cel(row, col_map, 'descricao') or '').strip()
-        if not procedimento and descricao:
-            procedimento = descricao
         if not paciente and not procedimento:
             avisos.append(f'Linha {num}: paciente/procedimento vazio — ignorada.')
             continue
@@ -233,7 +298,6 @@ def parse_receita_planilha_xlsx(
         modalidade = str(_cel(row, col_map, 'modalidade') or '').strip()
         viabilidade = str(_cel(row, col_map, 'viabilidade') or '').strip()
         forma_pg = str(_cel(row, col_map, 'forma_pagamento') or '').strip()
-        nf_col = str(_cel(row, col_map, 'nf') or '').strip()
         regra_txt = str(_cel(row, col_map, 'regra') or '').strip()
 
         regra_id = regra_padrao_id
@@ -255,7 +319,7 @@ def parse_receita_planilha_xlsx(
             avisos.append(f'Linha {num}: sem regra de rateio — ignorada.')
             continue
 
-        nf = nf_col or _extrair_nf_forma_pagamento(forma_pg)
+        nf = _extrair_nf_forma_pagamento(forma_pg)
         a_faturar = _a_faturar(forma_pg)
 
         linhas.append(
@@ -269,7 +333,9 @@ def parse_receita_planilha_xlsx(
                 'forma_pagamento': forma_pg,
                 'nf': nf,
                 'valor': str(valor),
+                'valor_rateio': str(valor_rateio),
                 'regra_id': regra_id,
+                'regra_txt': regra_txt,
                 'regra_nome': regra_nome,
                 'a_faturar': a_faturar,
             }
@@ -287,11 +353,6 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
         ln['valido'] = True
         ln['preview_rateio'] = []
         ln['motivo_invalido'] = ''
-
-        if ln.get('a_faturar'):
-            ln['valido'] = False
-            ln['motivo_invalido'] = 'A FATURAR'
-            continue
 
         regra = _resolver_regra(empresa_id, str(ln['regra_id']), regra_cache)
         if not regra:
@@ -315,18 +376,30 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
             )
             continue
 
+        base = Decimal(ln['valor'])
         prev = preview_linhas_rateio_por_regra(
             regra.id,
-            Decimal(ln['valor']),
+            base,
             LancamentoRateio.TIPO_RECEBIMENTO,
             empresa_id=empresa_id,
         )
         ln['preview_rateio'] = prev
         ln['regra_nome'] = str(regra)
+
+        vr_plan = Decimal(ln.get('valor_rateio') or ln['valor'])
+        soma_prev = sum(Decimal(p['valor']) for p in prev)
         if not prev:
             ln['valido'] = False
             ln['motivo_invalido'] = 'Rateio zerado'
             erros.append(f"Linha {ln['linha']}: preview do rateio vazio.")
+        elif abs(soma_prev - vr_plan) > Decimal('0.05'):
+            erros.append(
+                f"Linha {ln['linha']}: VALOR DO RATEIO ({vr_plan}) difere da soma calculada ({soma_prev})."
+            )
+
+        if ln.get('a_faturar'):
+            ln['motivo_invalido'] = 'A FATURAR'
+            # Importa mesmo assim: título pendente + rateio na data do exame
 
     return linhas, erros
 
@@ -355,6 +428,7 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
         viabilidade = ln.get('viabilidade') or ''
         forma_txt = ln.get('forma_pagamento') or ''
         nf = ln.get('nf') or ''
+        a_faturar = ln.get('a_faturar', False)
 
         regra = _resolver_regra(empresa_id, str(ln['regra_id']), regra_cache)
         if not regra:
@@ -362,18 +436,31 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
             continue
 
         obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade)
-        if ContaAReceber.objects.filter(
+        dup_q = ContaAReceber.objects.filter(
             empresa_id=empresa_id,
-            data_recebimento=data,
             valor_a_receber=valor,
             observacao=obs,
-        ).exists():
+        )
+        if a_faturar:
+            dup_q = dup_q.filter(data_emissao=data, status='pendente')
+        else:
+            dup_q = dup_q.filter(data_recebimento=data, status='pago')
+        if dup_q.exists():
             ignorados += 1
             continue
 
         nota = _nota_por_numero(empresa_id, nf, nota_cache)
         cobranca = _resolver_cobranca(forma_txt, cobranca_cache)
         cliente = (viabilidade or paciente or 'Importação planilha')[:200]
+
+        if a_faturar:
+            status = 'pendente'
+            data_receb = None
+            valor_recebido = Decimal('0')
+        else:
+            status = 'pago'
+            data_receb = data
+            valor_recebido = valor
 
         car = ContaAReceber.objects.create(
             empresa_id=empresa_id,
@@ -382,10 +469,10 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
             cliente=cliente,
             data_emissao=data,
             data_vencimento=data,
-            data_recebimento=data,
+            data_recebimento=data_receb,
             valor_a_receber=valor,
-            valor_recebido=valor,
-            status='pago',
+            valor_recebido=valor_recebido,
+            status=status,
             doc=(nf or forma_txt)[:50] or None,
             observacao=obs,
             forma_pagamento=cobranca,
@@ -411,45 +498,33 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
 
 
 def gerar_modelo_receita_planilha_excel() -> HttpResponse:
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Receitas'
-    ws.append([
-        'Data',
-        'Paciente',
-        'Procedimento',
-        'Modalidade',
-        'Viabilizacao',
-        'Forma de Pagamento',
-        'Valor',
-        'Regra do rateio',
-    ])
-    ws.append([
-        '03/08/2026',
-        'ANTONIO SANTOS GOMES',
-        'US - Abdome total',
-        'US',
-        'Particular',
-        'NF 4856 - DH',
-        200.00,
-        '002 DESPESAS PARTICIPACAO US %',
-    ])
-    ws.append([
-        '03/08/2026',
-        'DEBORA ALVES ROGERI TEIXERA',
-        'US - Próstata via abdominal',
-        'US',
-        'FUNCIONAL HEALTH TECH',
-        'A FATURAR',
-        350.00,
-        '002 DESPESAS PARTICIPACAO US %',
-    ])
-    buf = BytesIO()
-    wb.save(buf)
-    buf.seek(0)
+    if MODELO_PLANILHA_PATH.is_file():
+        content = MODELO_PLANILHA_PATH.read_bytes()
+        filename = 'modelo_importar_receita.xlsx'
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Planilha1'
+        ws.append(list(COLUNAS_MODELO))
+        ws.append([
+            '01/07/2026',
+            'LUZIA BARBOSA DE ASSIS GUEDES',
+            'US - Abdome total',
+            'US',
+            'BRADESCO SAUDE S.A.',
+            'A FATURAR',
+            100,
+            '100% USG',
+            100,
+        ])
+        buf = BytesIO()
+        wb.save(buf)
+        content = buf.getvalue()
+        filename = 'modelo_importar_receita.xlsx'
+
     response = HttpResponse(
-        buf.getvalue(),
+        content,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    response['Content-Disposition'] = 'attachment; filename="modelo_receitas_rateio.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response

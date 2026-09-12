@@ -13,13 +13,14 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <p class="text-muted small">
-            Importe a planilha de exames/receitas (Data, Paciente, Procedimento, Modalidade, Viabilização,
-            Forma de Pagamento, Valor). Inclua a coluna <strong>Regra do rateio</strong> ou escolha uma regra padrão abaixo.
-            Cada linha gera um título a receber <strong>pago</strong> e os lançamentos de rateio conforme a regra (%).
+            Modelo oficial: <strong>Importar Receita MM-AAAA.xlsx</strong> com as colunas
+            Data, Paciente, Procedimento, Modalidade, Viabilizacao, Forma de Pagamento, Valor,
+            <strong>REGRA DE RATEUIO</strong> e <strong>VALOR DO RATEIO</strong>.
+            Cada linha = um exame → título a receber + lançamento(s) de rateio (ex.: «100% USG» → regra 003).
         </p>
-        <p class="small text-warning">
-            Linhas com forma de pagamento <strong>A FATURAR</strong> são ignoradas (ainda não recebidas).
-            Títulos com «NF 4856 - DH» vinculam à NFSe quando existir no cadastro.
+        <p class="small text-muted">
+            <strong>A FATURAR</strong> → título <em>pendente</em>, com rateio na data do exame.
+            Demais formas (DH, PIX, cartão…) → título <em>pago</em> na data informada.
         </p>
         <p class="mb-3">
             <a href="{{ modelo_url }}" class="btn btn-outline-success btn-sm">
