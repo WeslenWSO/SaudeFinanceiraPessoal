@@ -1038,6 +1038,7 @@ def import_receita_planilha(request):
 
         from regrarateio.import_receita_planilha import (
             parse_receita_planilha_xlsx,
+            resumo_previa_importacao,
             validar_linhas_importacao,
         )
 
@@ -1071,6 +1072,7 @@ def import_receita_planilha(request):
         request.session.modified = True
 
         tem_validas = any(ln.get('valido') for ln in linhas)
+        resumo = resumo_previa_importacao(empresa_id, linhas)
         return render(
             request,
             'import_receita_planilha_preview.html',
@@ -1085,6 +1087,7 @@ def import_receita_planilha(request):
                 'confirm_url': reverse_lazy('regrarateio:importReceitaPlanilha'),
                 'total_linhas': len(linhas),
                 'tem_linhas_validas': tem_validas,
+                'resumo': resumo,
             },
         )
 

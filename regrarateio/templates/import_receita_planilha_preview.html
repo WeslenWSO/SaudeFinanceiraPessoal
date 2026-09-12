@@ -11,6 +11,33 @@
 <h1 class="h2 mb-2">{{ titulo }}</h1>
 <p class="text-muted">Arquivo: <strong>{{ filename }}</strong> · {{ total_linhas }} linha(s)</p>
 
+{% if resumo %}
+<div class="card border-primary mb-3">
+    <div class="card-body py-2 small">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <strong>Total na planilha</strong><br>
+                {{ resumo.total_linhas_validas }} linha(s) · R$ {{ resumo.total_valor }}
+            </div>
+            <div class="col-md-4 text-success">
+                <strong>Serão importadas (novas)</strong><br>
+                {{ resumo.linhas_novas }} linha(s) · R$ {{ resumo.valor_novas }}
+            </div>
+            <div class="col-md-4 text-muted">
+                <strong>Já importadas antes</strong><br>
+                {{ resumo.linhas_ja_importadas }} linha(s) · R$ {{ resumo.valor_ja_importadas }}
+            </div>
+        </div>
+        {% if resumo.linhas_novas != resumo.total_linhas_validas %}
+        <p class="mb-0 mt-2 text-warning">
+            Parte das linhas já existe no sistema. Para bater com o total da planilha,
+            exclua a importação anterior do mês e importe de novo.
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% if avisos %}
 <div class="alert alert-warning py-2 small">
     {% for av in avisos|slice:":10" %}<div>{{ av }}</div>{% endfor %}

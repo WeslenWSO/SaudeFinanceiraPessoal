@@ -177,7 +177,14 @@ def _a_faturar(texto: str) -> bool:
     return 'A FATURAR' in t or t == 'AFATURAR'
 
 
-def _montar_observacao(paciente: str, procedimento: str, modalidade: str, viabilidade: str) -> str:
+def _montar_observacao(
+    paciente: str,
+    procedimento: str,
+    modalidade: str,
+    viabilidade: str,
+    *,
+    linha: int | None = None,
+) -> str:
     partes = []
     if paciente:
         partes.append(f'Pac:{paciente[:120]}')
@@ -187,7 +194,71 @@ def _montar_observacao(paciente: str, procedimento: str, modalidade: str, viabil
         partes.append(f'Mod:{modalidade}')
     if viabilidade:
         partes.append(f'Viab:{viabilidade}')
+    if linha is not None:
+        partes.append(f'ImpLn:{linha}')
     return '|'.join(partes)
+
+
+def _filtro_conta_importada(empresa_id: int, valor, data, a_faturar: bool) -> dict:
+    filt = {'empresa_id': empresa_id, 'valor_a_receber': valor}
+    if a_faturar:
+        filt['data_emissao'] = data
+        filt['status'] = 'pendente'
+    else:
+        filt['data_recebimento'] = data
+        filt['status'] = 'pago'
+    return filt
+
+
+def _linha_ja_importada(
+    empresa_id: int,
+    ln: dict,
+    *,
+    obs_com_linha: str | None = None,
+) -> bool:
+    """Verifica se a linha da planilha já virou título (inclui importações antigas sem ImpLn)."""
+    data = date.fromisoformat(ln['data'])
+    valor = Decimal(ln['valor'])
+    a_faturar = ln.get('a_faturar', False)
+    obs = obs_com_linha or _montar_observacao(
+        ln.get('paciente') or '',
+        ln.get('procedimento') or '',
+        ln.get('modalidade') or '',
+        ln.get('viabilidade') or '',
+        linha=ln.get('linha'),
+    )
+    base = _filtro_conta_importada(empresa_id, valor, data, a_faturar)
+    return ContaAReceber.objects.filter(**base, observacao=obs).exists()
+
+
+def resumo_previa_importacao(empresa_id: int, linhas: list[dict]) -> dict:
+    """Totais da planilha vs linhas novas / já importadas (para a tela de prévia)."""
+    total_valor = Decimal('0')
+    novo_valor = Decimal('0')
+    ja_valor = Decimal('0')
+    total = 0
+    novas = 0
+    ja = 0
+    for ln in linhas:
+        if not ln.get('valido', True):
+            continue
+        total += 1
+        v = Decimal(ln['valor'])
+        total_valor += v
+        if _linha_ja_importada(empresa_id, ln):
+            ja += 1
+            ja_valor += v
+        else:
+            novas += 1
+            novo_valor += v
+    return {
+        'total_linhas_validas': total,
+        'total_valor': total_valor,
+        'linhas_novas': novas,
+        'valor_novas': novo_valor,
+        'linhas_ja_importadas': ja,
+        'valor_ja_importadas': ja_valor,
+    }
 
 
 def _resolver_regra(empresa_id: int, texto: str, cache: dict) -> RegraRateio | None:
@@ -462,18 +533,10 @@ def _importar_linha_receita(
     if not regra:
         return 0, 0, 1, []
 
-    obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade)
-    dup_q = ContaAReceber.objects.filter(
-        empresa_id=empresa_id,
-        valor_a_receber=valor,
-        observacao=obs,
-    )
-    if a_faturar:
-        dup_q = dup_q.filter(data_emissao=data, status='pendente')
-    else:
-        dup_q = dup_q.filter(data_recebimento=data, status='pago')
-    if dup_q.exists():
+    if _linha_ja_importada(empresa_id, ln):
         return 0, 0, 1, []
+
+    obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade, linha=ln.get('linha'))
 
     nota = _nota_por_numero(empresa_id, nf, nota_cache)
     cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
