@@ -84,10 +84,13 @@
 <div class="card shadow-sm mb-4 rfr-resumo-card">
     <div class="card-header py-2">
         <h2 class="h5 mb-0">Resumo do resultado</h2>
-        <p class="small text-muted mb-0">Resultado = receitas rateadas − despesas rateadas (valores absolutos na grade).</p>
+        <p class="small text-muted mb-0">
+            Totais do período e detalhamento mês a mês (receita − despesas = resultado).
+            Informe os % abaixo para calcular a parte de cada sócio em cada mês e no total.
+        </p>
     </div>
     <div class="card-body">
-        <div class="row g-3 text-center">
+        <div class="row g-3 text-center mb-4">
             <div class="col-md-4">
                 <p class="small text-muted mb-1">Total receitas rateadas</p>
                 <p class="valor-grande text-success mb-0">R$ {{ total_receita_txt }}</p>
@@ -102,67 +105,50 @@
                    id="rfr-resultado-display">R$ {{ resultado_txt }}</p>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="card shadow-sm mb-4 no-print">
-    <div class="card-header py-2">
-        <h2 class="h5 mb-0">Distribuição do resultado entre sócios</h2>
-        <p class="small text-muted mb-0">
-            Informe a quantidade de sócios (mínimo 2), escolha o nome e o % de cada um sobre o resultado.
-            O valor é calculado automaticamente. A soma dos % não pode ultrapassar 100% nem a soma dos valores o resultado total.
-        </p>
-    </div>
-    <div class="card-body">
-        <div class="row g-2 align-items-end mb-3">
-            <div class="col-auto">
-                <label for="rfr-qtd-socios" class="form-label small mb-0">Quantidade de sócios</label>
-                <input type="number" id="rfr-qtd-socios" class="form-control form-control-sm" min="2" max="20" value="2" style="width: 5rem;">
+        <div class="no-print border rounded p-3 mb-4 bg-light">
+            <h3 class="h6 mb-2">Distribuição do resultado entre sócios</h3>
+            <p class="small text-muted mb-2">
+                Escolha os sócios e os percentuais (soma até 100%). Os valores por mês são calculados automaticamente.
+            </p>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-auto">
+                    <label for="rfr-qtd-socios" class="form-label small mb-0">Quantidade de sócios</label>
+                    <input type="number" id="rfr-qtd-socios" class="form-control form-control-sm" min="2" max="20" value="2" style="width: 5rem;">
+                </div>
+                <div class="col-auto">
+                    <button type="button" id="rfr-btn-aplicar-qtd" class="btn btn-outline-primary btn-sm">Aplicar</button>
+                </div>
             </div>
-            <div class="col-auto">
-                <button type="button" id="rfr-btn-aplicar-qtd" class="btn btn-outline-primary btn-sm">Aplicar</button>
+            <div id="rfr-alerta-limite" class="alert alert-danger py-2 small rfr-alerta-limite" role="alert"></div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 bg-white">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 14rem;">Sócio</th>
+                            <th class="text-end" style="width: 8rem;">% do resultado</th>
+                            <th class="text-end" style="width: 10rem;">Valor total (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rfr-distribuicao-corpo"></tbody>
+                    <tfoot class="table-secondary fw-semibold">
+                        <tr>
+                            <td class="text-end">Totais</td>
+                            <td class="text-end"><span id="rfr-total-pct">0,00</span> %</td>
+                            <td class="text-end">R$ <span id="rfr-total-valor">0,00</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-end small fw-normal">Restante disponível</td>
+                            <td class="text-end small fw-normal"><span id="rfr-restante-pct">100,00</span> %</td>
+                            <td class="text-end small fw-normal">R$ <span id="rfr-restante-valor">{{ resultado_txt }}</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
         </div>
 
-        <div id="rfr-alerta-limite" class="alert alert-danger py-2 small rfr-alerta-limite" role="alert"></div>
-
-        <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th style="min-width: 14rem;">Sócio</th>
-                        <th class="text-end" style="width: 8rem;">% do resultado</th>
-                        <th class="text-end" style="width: 10rem;">Valor (R$)</th>
-                    </tr>
-                </thead>
-                <tbody id="rfr-distribuicao-corpo"></tbody>
-                <tfoot class="table-secondary fw-semibold">
-                    <tr>
-                        <td class="text-end">Totais</td>
-                        <td class="text-end"><span id="rfr-total-pct">0,00</span> %</td>
-                        <td class="text-end">R$ <span id="rfr-total-valor">0,00</span></td>
-                    </tr>
-                    <tr>
-                        <td class="text-end small fw-normal">Restante disponível</td>
-                        <td class="text-end small fw-normal"><span id="rfr-restante-pct">100,00</span> %</td>
-                        <td class="text-end small fw-normal">R$ <span id="rfr-restante-valor">{{ resultado_txt }}</span></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-</div>
-
-<div class="card shadow-sm mb-4">
-    <div class="card-header py-2">
-        <h2 class="h5 mb-0">Resumo por mês do resultado</h2>
-        <p class="small text-muted mb-0">
-            Todos os meses do período filtrado: receita − despesas = resultado.
-            Os valores por sócio usam os percentuais informados acima em «Distribuição do resultado entre sócios».
-        </p>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
+        <h3 class="h6 mb-2">Resultado por mês</h3>
+        <div class="table-responsive border rounded">
             <table class="table table-sm table-hover mb-0 align-middle" id="rfr-tabela-meses">
                 <thead class="table-dark">
                     <tr>
@@ -183,7 +169,7 @@
                         <td class="text-end {% if mes.resultado_negativo %}text-danger{% else %}text-primary{% endif %}">
                             R$ {{ mes.resultado_txt }}
                         </td>
-                        <td colspan="2" class="small fw-normal text-muted">Distribuição do resultado</td>
+                        <td colspan="2" class="small fw-normal text-muted">— informe % acima —</td>
                     </tr>
                     {% empty %}
                     <tr>
