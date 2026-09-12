@@ -1196,6 +1196,27 @@ def _conta_por_ca(empresa, ca_id: str):
     return ContaBancaria.objects.filter(empresa=empresa, conta_azul_id=ca_id).first()
 
 
+def _params_busca_receitas(
+    data_de: date,
+    data_ate: date,
+    *,
+    por_recebimento: bool = False,
+) -> dict:
+    """Monta filtros da API CA. Por recebimento usa data de pagamento (regime de caixa)."""
+    params: dict = {'pagina': 1, 'tamanho_pagina': 100}
+    if por_recebimento:
+        params['data_pagamento_de'] = data_de.isoformat()
+        params['data_pagamento_ate'] = data_ate.isoformat()
+        venc_de = date(max(2000, data_de.year - 5), 1, 1)
+        venc_ate = date(data_ate.year + 1, 12, 31)
+        params['data_vencimento_de'] = venc_de.isoformat()
+        params['data_vencimento_ate'] = venc_ate.isoformat()
+    else:
+        params['data_vencimento_de'] = data_de.isoformat()
+        params['data_vencimento_ate'] = data_ate.isoformat()
+    return params
+
+
 def importar_receitas(
     empresa,
     client: ContaAzulClient,
@@ -1203,14 +1224,11 @@ def importar_receitas(
     data_de: date,
     data_ate: date,
     dry_run: bool = False,
+    por_recebimento: bool = False,
+    somente_recebidos: bool = False,
 ) -> dict:
-    stats = {'criados': 0, 'atualizados': 0, 'erros': 0}
-    params = {
-        'pagina': 1,
-        'tamanho_pagina': 100,
-        'data_vencimento_de': data_de.isoformat(),
-        'data_vencimento_ate': data_ate.isoformat(),
-    }
+    stats = {'criados': 0, 'atualizados': 0, 'erros': 0, 'ignorados_nao_recebidos': 0}
+    params = _params_busca_receitas(data_de, data_ate, por_recebimento=por_recebimento)
     try:
         itens = client.buscar_receitas(**params)
     except ContaAzulAPIError as exc:
@@ -1238,6 +1256,9 @@ def importar_receitas(
             else:
                 item = _enriquecer_item_receita(client, item, cache_parcelas)
         status_local = _map_status_receita(item)
+        if somente_recebidos and status_local != 'pago':
+            stats['ignorados_nao_recebidos'] += 1
+            continue
         cat_id = ''
         cats = item.get('categorias') or []
         if cats and isinstance(cats[0], dict):
@@ -1245,6 +1266,9 @@ def importar_receitas(
         valor = _parse_decimal(item.get('valor') or item.get('total') or item.get('valor_liquido'))
         valor_pago = _valor_pago_item(item)
         data_pg = _data_pagamento_item(item, data_de)
+        if somente_recebidos and not data_pg:
+            stats['ignorados_nao_recebidos'] += 1
+            continue
         if cat_id not in cache_categorias:
             cache_categorias[cat_id] = _categoria_por_ca(empresa, cat_id)
         conta_ca_id = _id_conta_financeira_item(item)
@@ -1599,8 +1623,10 @@ def sincronizar_conta_azul(
     data_de: date | None = None,
     data_ate: date | None = None,
     dry_run: bool = False,
-    despesas_por_pagamento: bool = False,
-    despesas_somente_pagos: bool = False,
+    receitas_por_recebimento: bool = True,
+    receitas_somente_recebidos: bool = True,
+    despesas_por_pagamento: bool = True,
+    despesas_somente_pagos: bool = True,
 ) -> dict[str, Any]:
     def _rodar() -> dict[str, Any]:
         client = ContaAzulClient.para_empresa(empresa)
@@ -1614,7 +1640,13 @@ def sincronizar_conta_azul(
         if data_de and data_ate:
             if receitas:
                 resultado['receitas'] = importar_receitas(
-                    empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
+                    empresa,
+                    client,
+                    data_de=data_de,
+                    data_ate=data_ate,
+                    dry_run=dry_run,
+                    por_recebimento=receitas_por_recebimento,
+                    somente_recebidos=receitas_somente_recebidos,
                 )
             if despesas:
                 resultado['despesas'] = importar_despesas(
@@ -1666,6 +1698,10 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["saldos_erros"]} saldos sem resposta'
         if erros_qtd:
             ok[-1] += f', {erros_qtd} ignorados'
+        if stats.get('ignorados_nao_pagos'):
+            ok[-1] += f', {stats["ignorados_nao_pagos"]} em aberto ignorados'
+        if stats.get('ignorados_nao_recebidos'):
+            ok[-1] += f', {stats["ignorados_nao_recebidos"]} em aberto ignorados'
         if stats.get('detalhes_limitados'):
             ok[-1] += f' (detalhe API limitado a {stats["detalhes_limitados"]} parcelas; rode de novo para completar NSU/cobrança)'
 

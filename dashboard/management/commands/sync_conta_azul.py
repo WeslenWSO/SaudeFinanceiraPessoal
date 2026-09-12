@@ -22,14 +22,9 @@ class Command(BaseCommand):
         parser.add_argument('--de', dest='data_de', help='YYYY-MM-DD')
         parser.add_argument('--ate', dest='data_ate', help='YYYY-MM-DD')
         parser.add_argument(
-            '--por-pagamento',
+            '--incluir-em-aberto',
             action='store_true',
-            help='Despesas: filtrar pela data de pagamento (regime de caixa).',
-        )
-        parser.add_argument(
-            '--somente-pagos',
-            action='store_true',
-            help='Despesas: importar apenas títulos já pagos.',
+            help='Importar também títulos em aberto (padrão: só pagos/recebidos).',
         )
         parser.add_argument(
             '--por-mes',
@@ -73,15 +68,7 @@ class Command(BaseCommand):
             else:
                 stats = sincronizar_conta_azul(
                     empresa,
-                    cadastros=options['cadastros'],
-                    receitas=options['receitas'],
-                    despesas=options['despesas'],
-                    transferencias=options['transferencias'],
-                    data_de=data_de,
-                    data_ate=data_ate,
-                    dry_run=options['dry_run'],
-                    despesas_por_pagamento=options['por_pagamento'],
-                    despesas_somente_pagos=options['somente_pagos'],
+                    **self._kwargs_sync(options, data_de, data_ate),
                 )
         except ContaAzulAPIError as exc:
             raise CommandError(str(exc)) from exc
@@ -105,15 +92,12 @@ class Command(BaseCommand):
             self.stdout.write(f'Sincronizando {ini.isoformat()} ate {fim.isoformat()}...')
             parcial = sincronizar_conta_azul(
                 empresa,
-                cadastros=options['cadastros'] and (ano, mes) == (data_de.year, data_de.month),
-                receitas=options['receitas'],
-                despesas=options['despesas'],
-                transferencias=options['transferencias'],
-                data_de=ini,
-                data_ate=fim,
-                dry_run=options['dry_run'],
-                despesas_por_pagamento=options['por_pagamento'],
-                despesas_somente_pagos=options['somente_pagos'],
+                **self._kwargs_sync(
+                    options,
+                    ini,
+                    fim,
+                    cadastros=options['cadastros'] and (ano, mes) == (data_de.year, data_de.month),
+                ),
             )
             for chave, val in parcial.items():
                 if not isinstance(val, dict):
@@ -133,6 +117,26 @@ class Command(BaseCommand):
             else:
                 mes += 1
         return acumulado
+
+    @staticmethod
+    def _kwargs_sync(options, data_de, data_ate, *, cadastros=None) -> dict:
+        kwargs = {
+            'cadastros': options['cadastros'] if cadastros is None else cadastros,
+            'receitas': options['receitas'],
+            'despesas': options['despesas'],
+            'transferencias': options['transferencias'],
+            'data_de': data_de,
+            'data_ate': data_ate,
+            'dry_run': options['dry_run'],
+        }
+        if options.get('incluir_em_aberto'):
+            kwargs.update(
+                receitas_por_recebimento=False,
+                receitas_somente_recebidos=False,
+                despesas_por_pagamento=False,
+                despesas_somente_pagos=False,
+            )
+        return kwargs
 
     @staticmethod
     def _parse_date(raw):
