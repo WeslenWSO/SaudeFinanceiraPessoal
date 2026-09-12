@@ -6,7 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
-from datetime import timedelta
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from SaudeFinanceira import buscajson
 from django.views.decorators.http import require_POST
@@ -88,10 +89,10 @@ def listar_contas_a_pagar(request):
     formas_pagamento = Cobranca.objects.all()
     fornecedores = Fornecedor.objects.filter(empresa_id=empresa_id)
 
-    # Definir datas padrão (últimos 12 meses)
+    # Definir datas padrão: mês corrente
     hoje = timezone.now().date()
-    data_inicio_padrao = hoje - timedelta(days=365)
-    data_fim_padrao = hoje
+    data_inicio_padrao = date(hoje.year, hoje.month, 1)
+    data_fim_padrao = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
 
     # Se não há datas selecionadas, usar as datas padrão
     if not data_inicio:
