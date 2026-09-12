@@ -39,13 +39,17 @@ class FormRecalcularRateioGrupo(forms.Form):
     def clean(self):
         cleaned = super().clean()
         regra = cleaned.get('regra_rateio')
-        if regra and regra.modo_alocacao == RegraRateio.MODO_VALOR:
-            val = cleaned.get('valor_manual')
-            if val is None:
-                self.add_error(
-                    'valor_manual',
-                    'Informe o valor para o sócio manual (regra por valor na aplicação).',
-                )
+        if regra:
+            from regrarateio.services import _regra_usa_valor_manual
+
+            itens = list(RegraRateioItem.objects.filter(regrarateio=regra))
+            if _regra_usa_valor_manual(regra, itens):
+                val = cleaned.get('valor_manual')
+                if val is None:
+                    self.add_error(
+                        'valor_manual',
+                        'Informe o valor para o sócio manual (regra por valor na aplicação).',
+                    )
         return cleaned
 
 

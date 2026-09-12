@@ -16,6 +16,7 @@ import json
 from requests import request
 from regrarateio.models import LancamentoRateio, RegraRateio, RegraRateioItem
 from regrarateio.services import (
+    _regra_usa_valor_manual,
     gerar_rateio_contas_pagar,
     gerar_rateio_contas_receber,
     query_contas_pagar_rateio_candidatas,
@@ -704,11 +705,12 @@ class LancamentoRateioGrupoEdit(View):
         if form.is_valid():
             nova = form.cleaned_data['regra_rateio']
             valores_manuais = None
-            if nova.modo_alocacao == RegraRateio.MODO_VALOR:
-                manual_item = RegraRateioItem.objects.filter(
-                    regrarateio=nova,
-                    tipo_participacao=RegraRateioItem.TIPO_MANUAL,
-                ).first()
+            itens_nova = list(RegraRateioItem.objects.filter(regrarateio=nova))
+            if _regra_usa_valor_manual(nova, itens_nova):
+                manual_item = next(
+                    (i for i in itens_nova if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL),
+                    None,
+                )
                 if manual_item:
                     valores_manuais = {
                         manual_item.socios_id: form.cleaned_data['valor_manual'],

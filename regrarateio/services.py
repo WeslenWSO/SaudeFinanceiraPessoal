@@ -73,6 +73,12 @@ def _base_valor_conta_pagar(conta):
     return conta.get_valor_total_com_ajustes()
 
 
+def _regra_usa_valor_manual(regra, itens) -> bool:
+    if regra.modo_alocacao == RegraRateio.MODO_VALOR:
+        return True
+    return any(i.tipo_participacao == RegraRateioItem.TIPO_MANUAL for i in itens)
+
+
 def _validar_estrutura_regra(regra, itens=None):
     """Valida itens da regra conforme modo de alocação."""
     if itens is None:
@@ -82,7 +88,7 @@ def _validar_estrutura_regra(regra, itens=None):
             f'A regra «{regra}» não possui sócios cadastrados. '
             'Com Rateio=SIM, clique na regra e use Cadastrar item.'
         )
-    if regra.modo_alocacao == RegraRateio.MODO_VALOR:
+    if _regra_usa_valor_manual(regra, itens):
         manual = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL]
         residual = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_RESIDUAL]
         if len(manual) != 1:
@@ -125,7 +131,7 @@ def _calcular_valores_por_socio(regra, itens, base, valores_manuais=None):
     if base <= 0:
         raise ValueError('Valor base do título deve ser maior que zero.')
 
-    if regra.modo_alocacao == RegraRateio.MODO_VALOR:
+    if _regra_usa_valor_manual(regra, itens):
         manual_itens = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL]
         residual_itens = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_RESIDUAL]
         m_item = manual_itens[0]
@@ -573,7 +579,7 @@ def gerar_rateio_contas_pagar(
         valores_manuais = None
         if valores_por_titulo and cap.pk in valores_por_titulo:
             valores_manuais = valores_por_titulo[cap.pk]
-        elif regra.modo_alocacao == RegraRateio.MODO_VALOR:
+        elif _regra_usa_valor_manual(regra, itens):
             raise ValueError(
                 f'Informe o valor manual para o título #{cap.pk} (regra «{regra}»).'
             )
@@ -706,7 +712,7 @@ def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None
         RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios')
     )
     _validar_estrutura_regra(regra, itens)
-    if regra.modo_alocacao == RegraRateio.MODO_VALOR and not valores_manuais:
+    if _regra_usa_valor_manual(regra, itens) and not valores_manuais:
         raise ValueError(
             f'A regra «{regra}» exige valor manual na aplicação. Informe quanto pertence ao sócio manual.'
         )
@@ -802,7 +808,7 @@ def gerar_rateio_contas_receber(
         valores_manuais = None
         if valores_por_titulo and car.pk in valores_por_titulo:
             valores_manuais = valores_por_titulo[car.pk]
-        elif regra.modo_alocacao == RegraRateio.MODO_VALOR:
+        elif _regra_usa_valor_manual(regra, itens):
             raise ValueError(
                 f'Informe o valor manual para o título #{car.pk} (regra «{regra}»).'
             )

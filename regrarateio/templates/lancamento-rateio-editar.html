@@ -188,9 +188,20 @@
         return regrasMeta[String(regraId)] || null;
     }
 
+    function regraUsaValor(meta) {
+        if (!meta) return false;
+        if (meta.modo === 'V') return true;
+        if (meta.itens) {
+            for (var i = 0; i < meta.itens.length; i++) {
+                if (meta.itens[i].tipo === 'M') return true;
+            }
+        }
+        return false;
+    }
+
     function toggleValorManual(regraId) {
         var meta = getMeta(regraId);
-        var show = meta && meta.modo === 'V';
+        var show = regraUsaValor(meta);
         if (wrapValor) wrapValor.classList.toggle('d-none', !show);
         if (elValorManual && meta && meta.manual) {
             elValorManual.placeholder = 'Valor para ' + meta.manual.nome;
@@ -212,7 +223,7 @@
         meta.itens.forEach(function (item) {
             var bruto = 0;
             var perc = 0;
-            if (meta.modo === 'V') {
+            if (regraUsaValor(meta)) {
                 if (item.tipo === 'M') {
                     bruto = isFinite(manualVal) ? manualVal : 0;
                 } else if (item.tipo === 'R') {

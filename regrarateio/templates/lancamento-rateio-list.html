@@ -330,8 +330,8 @@
                             <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios){% elif r.modo_alocacao == 'V' %} (valor na aplicação){% endif %}</option>
                             {% endfor %}
                         </select>
-                        <p class="form-text small mb-0 mt-1">
-                            Modo <strong>valor na aplicação</strong>: informe quanto pertence ao sócio manual (ex.: USG) em cada título selecionado.
+                        <p class="form-text small mb-0 mt-1" id="rateio-cap-pagos-ajuda-regra">
+                            Escolha a regra acima. Se for <strong>valor na aplicação</strong>, informe quanto pertence ao sócio manual em cada título.
                         </p>
                     </div>
                     <div class="table-responsive border rounded rateio-cap-pagos-tabela">
@@ -465,8 +465,30 @@
             } catch (e) { this.meta = {}; }
         },
         regra: function (id) { return id ? (this.meta[String(id)] || null) : null; },
-        isValor: function (id) { var r = this.regra(id); return !!(r && r.modo === 'V'); },
-        manual: function (id) { var r = this.regra(id); return r && r.manual ? r.manual : null; },
+        isValor: function (id) {
+            var r = this.regra(id);
+            if (!r) return false;
+            if (r.modo === 'V') return true;
+            if (r.itens) {
+                for (var i = 0; i < r.itens.length; i++) {
+                    if (r.itens[i].tipo === 'M') return true;
+                }
+            }
+            return false;
+        },
+        manual: function (id) {
+            var r = this.regra(id);
+            if (!r) return null;
+            if (r.manual) return r.manual;
+            if (r.itens) {
+                for (var j = 0; j < r.itens.length; j++) {
+                    if (r.itens[j].tipo === 'M') {
+                        return { socio_id: r.itens[j].socio_id, nome: r.itens[j].nome };
+                    }
+                }
+            }
+            return null;
+        },
         resolveRegraId: function (selectVal, rowRegraId) {
             if (selectVal) return String(selectVal);
             if (rowRegraId) return String(rowRegraId);
@@ -475,7 +497,7 @@
         buildValorCell: function (tituloId, regraId, valorBase, disabled) {
             var man = this.manual(regraId);
             if (!man) {
-                return '<td class="rateio-valor-cell d-none text-muted small">—</td>';
+                return '<td class="rateio-valor-cell"><span class="text-danger small">Configure sócio manual na regra</span></td>';
             }
             var max = parseFloat(String(valorBase).replace(',', '.')) || 0;
             return '<td class="rateio-valor-cell">' +
@@ -485,7 +507,7 @@
                 'data-max="' + max + '" title="Valor para ' + man.nome + '" ' + (disabled ? 'disabled' : '') + '>' +
                 '</td>';
         },
-        refreshValorColumn: function (modalRoot, selectEl) {
+        refreshValorColumn: function (modalRoot, selectEl, onInput) {
             var th = modalRoot.querySelector('.rateio-th-valor');
             var selVal = selectEl ? selectEl.value : '';
             var anyValor = selVal ? this.isValor(selVal) : false;
@@ -502,28 +524,37 @@
                         var tr0 = modalRoot.querySelector('tr[data-regra-id]');
                         if (tr0) man = this.manual(tr0.getAttribute('data-regra-id'));
                     }
-                    th.textContent = man ? ('Valor ' + man.nome) : 'Valor manual';
-                }
-            }
-            modalRoot.querySelectorAll('tbody tr[data-regra-id]').forEach(function (tr) {
-                var rid = RateioModal.resolveRegraId(selVal, tr.getAttribute('data-regra-id'));
-                var cell = tr.querySelector('.rateio-valor-cell');
-                if (!cell) return;
-                var show = rid && RateioModal.isValor(rid);
-                cell.classList.toggle('d-none', !show);
-                if (show && selVal && RateioModal.isValor(selVal)) {
-                    var man = RateioModal.manual(selVal);
-                    var inp = cell.querySelector('.rateio-valor-input');
-                    if (man && inp && inp.name.indexOf('_' + man.socio_id) === -1) {
-                        var tid = tr.getAttribute('data-titulo-id');
-                        var max = inp.getAttribute('data-max') || '0';
-                        inp.outerHTML = '<input type="number" step="0.01" min="0" max="' + max + '" ' +
-                            'name="valor_rateio_' + tid + '_' + man.socio_id + '" ' +
-                            'class="form-control form-control-sm rateio-valor-input" placeholder="0,00" ' +
-                            'data-max="' + max + '" title="Valor para ' + man.nome + '">';
+                    if (man) {
+                        th.textContent = 'Valor ' + man.nome;
+                    } else if (selVal && this.isValor(selVal)) {
+                        th.textContent = 'Valor manual (cadastre sócio tipo Manual na regra)';
+                    } else {
+                        th.textContent = 'Valor manual';
                     }
                 }
+            }
+            modalRoot.querySelectorAll('tbody tr[data-titulo-id]').forEach(function (tr) {
+                var tid = tr.getAttribute('data-titulo-id');
+                var rowRid = tr.getAttribute('data-regra-id');
+                var rid = RateioModal.resolveRegraId(selVal, rowRid);
+                var show = rid && RateioModal.isValor(rid);
+                var vb = tr.getAttribute('data-valor-base') || '0';
+                var cb = tr.querySelector('input[type=checkbox]');
+                var disabled = !!(cb && cb.disabled);
+                var cell = tr.querySelector('.rateio-valor-cell');
+                if (!cell) return;
+                if (show) {
+                    cell.outerHTML = RateioModal.buildValorCell(tid, rid, vb, disabled);
+                } else {
+                    cell.className = 'rateio-valor-cell d-none';
+                    cell.innerHTML = '<span class="text-muted small">—</span>';
+                }
             });
+            if (typeof onInput === 'function') {
+                modalRoot.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
+                    inp.addEventListener('input', onInput);
+                });
+            }
         },
         validateSelected: function (tbody, cbClass, selectEl) {
             var checked = tbody.querySelectorAll('input.' + cbClass + ':not(:disabled):checked');
@@ -586,7 +617,7 @@
 
     if (selRegra) {
         selRegra.addEventListener('change', function () {
-            RateioModal.refreshValorColumn(modalEl, selRegra);
+            RateioModal.refreshValorColumn(modalEl, selRegra, updateAplicarState);
             updateAplicarState();
         });
     }
@@ -636,6 +667,7 @@
                     var desabilitar = !!c.ja_gerado;
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
+                    tr.setAttribute('data-valor-base', c.valor_base);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -664,10 +696,7 @@
                 tbody.querySelectorAll('input.rateio-cap-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarState);
                 });
-                tbody.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
-                    inp.addEventListener('input', updateAplicarState);
-                });
-                RateioModal.refreshValorColumn(modalEl, selRegra);
+                RateioModal.refreshValorColumn(modalEl, selRegra, updateAplicarState);
                 updateAplicarState();
             })
             .catch(function () {
@@ -722,6 +751,22 @@
     const inpDi = document.getElementById('rateio-cap-pagos-di');
     const inpDf = document.getElementById('rateio-cap-pagos-df');
     const selRegra = document.getElementById('regra-rateio-modal-pagos');
+    const ajudaRegra = document.getElementById('rateio-cap-pagos-ajuda-regra');
+
+    function atualizarAjudaRegra() {
+        if (!ajudaRegra || !selRegra) return;
+        var rid = selRegra.value;
+        if (rid && RateioModal.isValor(rid)) {
+            var man = RateioModal.manual(rid);
+            ajudaRegra.innerHTML = man
+                ? 'Informe em cada título quanto pertence a <strong>' + man.nome + '</strong>. O restante vai para o(s) sócio(s) residual.'
+                : 'Regra por valor: cadastre um sócio com tipo <strong>Manual</strong> nos itens da regra.';
+        } else if (rid) {
+            ajudaRegra.textContent = 'Regra percentual: os % cadastrados nos itens serão aplicados automaticamente.';
+        } else {
+            ajudaRegra.textContent = 'Escolha a regra acima ou use a regra já cadastrada em cada título.';
+        }
+    }
 
     function showMsg(text) {
         msgEl.textContent = text || '';
@@ -747,7 +792,8 @@
 
     if (selRegra) {
         selRegra.addEventListener('change', function () {
-            RateioModal.refreshValorColumn(modalEl, selRegra);
+            atualizarAjudaRegra();
+            RateioModal.refreshValorColumn(modalEl, selRegra, updateAplicarState);
             updateAplicarState();
         });
     }
@@ -797,6 +843,7 @@
                     var desabilitar = !!c.ja_gerado;
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
+                    tr.setAttribute('data-valor-base', c.valor_base);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -825,10 +872,8 @@
                 tbody.querySelectorAll('input.rateio-cap-pagos-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarState);
                 });
-                tbody.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
-                    inp.addEventListener('input', updateAplicarState);
-                });
-                RateioModal.refreshValorColumn(modalEl, selRegra);
+                RateioModal.refreshValorColumn(modalEl, selRegra, updateAplicarState);
+                atualizarAjudaRegra();
                 updateAplicarState();
             })
             .catch(function () {
@@ -864,6 +909,7 @@
 
     modalEl.addEventListener('shown.bs.modal', function () {
         preencherDatasPadraoModal();
+        atualizarAjudaRegra();
     });
 })();
 </script>
@@ -908,7 +954,7 @@
 
     if (selRegraCar) {
         selRegraCar.addEventListener('change', function () {
-            RateioModal.refreshValorColumn(modalCar, selRegraCar);
+            RateioModal.refreshValorColumn(modalCar, selRegraCar, updateAplicarCar);
             updateAplicarCar();
         });
     }
@@ -958,6 +1004,7 @@
                     var desabilitar = !!c.ja_gerado;
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
+                    tr.setAttribute('data-valor-base', c.valor_base);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     var disabled = desabilitar ? 'disabled' : '';
@@ -986,10 +1033,7 @@
                 tbodyCar.querySelectorAll('input.rateio-car-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarCar);
                 });
-                tbodyCar.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
-                    inp.addEventListener('input', updateAplicarCar);
-                });
-                RateioModal.refreshValorColumn(modalCar, selRegraCar);
+                RateioModal.refreshValorColumn(modalCar, selRegraCar, updateAplicarCar);
                 updateAplicarCar();
             })
             .catch(function () {
