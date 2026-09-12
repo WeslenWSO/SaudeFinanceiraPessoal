@@ -83,10 +83,16 @@ def _regra_forcada_validada(regra_id_forcar, empresa_id=None) -> RegraRateio | N
     regra = qrf.first()
     if not regra:
         raise ValueError('Regra de rateio não encontrada para esta empresa.')
+    if regra.rateio != 'S':
+        raise ValueError(
+            f'A regra «{regra}» está com Rateio=NÃO. '
+            'Edite a regra em Cadastro > Regra do Rateio, marque Rateio=SIM, '
+            'cadastre os sócios com % e tente novamente.'
+        )
     if not RegraRateioItem.objects.filter(regrarateio=regra).exists():
         raise ValueError(
             f'A regra «{regra}» não possui sócios nem percentuais. '
-            'Abra Cadastro > Regra do Rateio e inclua os sócios com %.'
+            'Com Rateio=SIM, clique na regra e use Cadastrar item para incluir sócios e %.'
         )
     return regra
 
@@ -465,6 +471,9 @@ def gerar_rateio_contas_pagar(
 
         regra = regra_forcada if regra_forcada else cap.rateio
         if not regra:
+            ignorados += 1
+            continue
+        if regra.rateio != 'S':
             ignorados += 1
             continue
         if cap.empresa_id and regra.empresa_id != cap.empresa_id:

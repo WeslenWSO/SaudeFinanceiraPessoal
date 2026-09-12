@@ -21,12 +21,16 @@ class RegraRateio(models.Model):
     )
     codigo = models.CharField(verbose_name='Código', max_length=30, blank=True, default='')
     nomedaregra = models.CharField(verbose_name='Descrição da regra', max_length=30)
-    rateio = models.CharField(verbose_name='Rateio', max_length=1, default='S',
-                              choices=(
-                                  ('S', 'SIM'),
-                                  ('N', 'NAO'),
-                              ),
-                              )
+    rateio = models.CharField(
+        verbose_name='Rateio',
+        max_length=1,
+        default='S',
+        choices=(
+            ('S', 'SIM'),
+            ('N', 'NAO'),
+        ),
+        help_text='SIM: divide o valor entre sócios (%). NÃO: não gera lançamentos de rateio.',
+    )
 
     class Meta:
         verbose_name = 'Regra de rateio'
