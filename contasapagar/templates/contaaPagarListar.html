@@ -159,6 +159,7 @@
                                         <th>Categoria</th>
                                         <th>Centro de custo</th>
                                         <th>Forma Pgto</th>
+                                        <th>Conta / Caixa</th>
                                         <th>Data Emissão</th>
                                         <th>Data Vencimento</th>
                                         <th>Data Pagamento</th>
@@ -189,6 +190,7 @@
                                         <td>{% if conta.categoria %}{{ conta.categoria.nome }}{% else %}-{% endif %}</td>
                                         <td>{% if conta.centro_custo %}{{ conta.centro_custo.nome }}{% else %}-{% endif %}</td>
                                         <td>{% if conta.cobranca %}{{ conta.cobranca.descricao }}{% else %}-{% endif %}</td>
+                                        <td><small title="{% if conta.conta_banco %}{{ conta.conta_banco }}{% else %}-{% endif %}">{% if conta.conta_banco %}{{ conta.conta_banco|truncatechars:40 }}{% else %}-{% endif %}</small></td>
                                         <td>{{ conta.dtEmissao|date:"d/m/Y" }}</td>
                                         <td>{{ conta.dtvenc|date:"d/m/Y" }}</td>
                                         <td>{{ conta.dtPag|date:"d/m/Y"|default:"-" }}</td>
@@ -224,7 +226,7 @@
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="21" class="text-center">Nenhuma conta a pagar encontrada.</td>
+                                        <td colspan="22" class="text-center">Nenhuma conta a pagar encontrada.</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>

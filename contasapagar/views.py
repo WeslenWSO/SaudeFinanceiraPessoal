@@ -63,7 +63,14 @@ def listar_contas_a_pagar(request):
     # Para contas a pagar, filtrar por fornecedor da empresa
     contas = (
         ContasaPagar.objects.filter(empresa_id=empresa_id)
-        .select_related('fornecedor', 'categoria', 'cobranca', 'centro_custo')
+        .select_related(
+            'fornecedor',
+            'categoria',
+            'cobranca',
+            'centro_custo',
+            'conta_banco',
+            'conta_banco__banco',
+        )
         .order_by('-dtvenc')
     )
 
