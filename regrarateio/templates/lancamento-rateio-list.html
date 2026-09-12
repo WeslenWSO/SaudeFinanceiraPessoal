@@ -20,8 +20,25 @@
     #modalRateioCapPagos .rateio-cap-pagos-tabela {
         max-height: calc(98vh - 320px);
     }
+    #modalTotalConvenioViabilidade .modal-dialog.modal-relatorio-90,
+    #modalTotalObsForma .modal-dialog.modal-relatorio-90 {
+        max-width: 90vw;
+        width: 90vw;
+        max-height: 90vh;
+        height: 90vh;
+        margin: 5vh auto;
+    }
+    #modalTotalConvenioViabilidade .modal-content,
+    #modalTotalObsForma .modal-content {
+        height: 100%;
+    }
+    #modalTotalConvenioViabilidade .modal-body,
+    #modalTotalObsForma .modal-body {
+        overflow-y: auto;
+    }
     .rfr-convenio-scroll {
-        max-height: min(52vh, 480px);
+        max-height: calc(90vh - 420px);
+        min-height: 200px;
         overflow: auto;
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
@@ -51,7 +68,8 @@
         padding: 0.35rem 0.5rem;
     }
     .rfr-obs-forma-scroll {
-        max-height: min(40vh, 360px);
+        max-height: calc(90vh - 480px);
+        min-height: 180px;
         overflow: auto;
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
@@ -64,11 +82,6 @@
     }
     .rfr-obs-forma-pct {
         max-width: 5.5rem;
-    }
-    #modalTotalConvenioViabilidade .modal-dialog.modal-relatorio-90 {
-        max-width: 90vw;
-        width: 90vw;
-        margin: 1.5vh auto;
     }
 </style>
 
@@ -1312,7 +1325,7 @@
 </script>
 
 <div class="modal fade" id="modalTotalObsForma" tabindex="-1" aria-labelledby="modalTotalObsFormaLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable modal-relatorio-90">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTotalObsFormaLabel">Total por Obs. forma</h5>
