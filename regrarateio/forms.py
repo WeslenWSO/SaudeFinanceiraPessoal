@@ -12,7 +12,12 @@ class FormRecalcularRateioGrupo(forms.Form):
     regra_rateio = forms.ModelChoiceField(
         queryset=RegraRateio.objects.none(),
         label='Regra de rateio',
-        help_text='Os valores serão recalculados para todos os sócios conforme a regra escolhida.',
+        required=False,
+        empty_label='— Remover rateio (sem regra) —',
+        help_text=(
+            'Escolha uma regra para recalcular o rateio. '
+            'Deixe em branco para remover: exclui os lançamentos de rateio e limpa a regra no título.'
+        ),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
     valor_manual = forms.DecimalField(
@@ -22,6 +27,13 @@ class FormRecalcularRateioGrupo(forms.Form):
         decimal_places=2,
         label='Valor manual (sócio informado na regra)',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+    )
+    obs_rateio = forms.CharField(
+        required=False,
+        max_length=255,
+        label='Observação do rateio',
+        help_text='Texto gravado na coluna Obs. de cada linha de rateio deste título.',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'maxlength': '255', 'placeholder': 'Ex.: participação USG, ajuste manual…'}),
     )
     confirmo = forms.BooleanField(
         required=True,

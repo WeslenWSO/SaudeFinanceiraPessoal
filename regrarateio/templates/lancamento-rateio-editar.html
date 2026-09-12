@@ -69,6 +69,7 @@
                                 <tr>
                                     <th>Sócio</th>
                                     <th class="text-end">% efetivo</th>
+                                    <th>Obs.</th>
                                     <th class="text-end">Valor</th>
                                 </tr>
                             </thead>
@@ -77,10 +78,11 @@
                                 <tr>
                                     <td>{{ row.socio }}</td>
                                     <td class="text-end">{{ row.perc }}</td>
+                                    <td><small>{{ row.obs|default:"—" }}</small></td>
                                     <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor_txt }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="3" class="text-muted text-center py-3">Nenhuma linha.</td></tr>
+                                <tr><td colspan="4" class="text-muted text-center py-3">Nenhuma linha.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -89,6 +91,7 @@
                     <h6 class="text-uppercase text-muted small mb-2">Nova regra e prévia (confirmação)</h6>
                     <p class="small text-muted">
                         Regras <strong>percentuais</strong> recalculam por %. Regras <strong>valor na aplicação</strong> exigem informar quanto vai para o sócio manual; o restante fica com o(s) residual(is).
+                        Para <strong>retirar do rateio</strong>, escolha <strong>«Remover rateio (sem regra)»</strong>, confirme e grave.
                     </p>
 
                     <form method="post" novalidate id="form-recalc-rateio">
@@ -117,12 +120,24 @@
                             <div class="form-text">Informe quanto pertence ao sócio manual (ex.: USG). O restante vai para o(s) sócio(s) residual.</div>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.obs_rateio.id_for_label }}">{{ form.obs_rateio.label }}</label>
+                            {{ form.obs_rateio }}
+                            {% if form.obs_rateio.help_text %}
+                            <div class="form-text">{{ form.obs_rateio.help_text }}</div>
+                            {% endif %}
+                            {% if form.obs_rateio.errors %}
+                            <div class="text-danger small">{{ form.obs_rateio.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
                         <div class="table-responsive border rounded mb-3">
                             <table class="table table-sm table-hover mb-0">
                                 <thead class="table-primary">
                                     <tr>
                                         <th>Prévia — Sócio</th>
                                         <th class="text-end">%</th>
+                                        <th>Obs.</th>
                                         <th class="text-end">Valor após gravar</th>
                                     </tr>
                                 </thead>
@@ -143,9 +158,9 @@
 
                         <div class="d-flex flex-wrap gap-2">
                             <button type="submit" class="btn btn-primary" id="btn-gravar-rateio">
-                                <i class="fas fa-check"></i> Gravar rateio com a regra acima
+                                <i class="fas fa-check"></i> <span id="btn-gravar-rateio-text">Gravar rateio com a regra acima</span>
                             </button>
-                            <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-secondary">
+                            <a href="{{ voltar_list_url }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Voltar à lista
                             </a>
                         </div>
@@ -164,9 +179,21 @@
     var baseStr = "{{ valor_base_str }}";
     var elRegra = document.getElementById("id_regra_rateio");
     var elValorManual = document.getElementById("id_valor_manual");
+    var elObs = document.getElementById("id_obs_rateio");
     var wrapValor = document.getElementById("wrap-valor-manual");
     var tbody = document.getElementById("rateio-preview-tbody");
+    var btnGravarText = document.getElementById("btn-gravar-rateio-text");
     if (!elRegra || !tbody) return;
+
+    function escHtml(s) {
+        var d = document.createElement("div");
+        d.textContent = s == null ? "" : String(s);
+        return d.innerHTML;
+    }
+
+    function obsAtual() {
+        return elObs ? String(elObs.value || "").trim() : "";
+    }
 
     var regrasMeta = {};
     try {
@@ -213,9 +240,21 @@
         var meta = getMeta(regraId);
         tbody.innerHTML = "";
         toggleValorManual(regraId);
+        if (btnGravarText) {
+            btnGravarText.textContent = regraId
+                ? 'Gravar rateio com a regra acima'
+                : 'Remover rateio do título';
+        }
+        var obsTxt = obsAtual() || "—";
+        if (!regraId) {
+            var trRem = document.createElement("tr");
+            trRem.innerHTML = '<td colspan="4" class="text-warning text-center py-3">Serão excluídos todos os lançamentos de rateio deste título e a regra será limpa no cadastro (contas a pagar/receber).</td>';
+            tbody.appendChild(trRem);
+            return;
+        }
         if (!meta || !meta.itens || !meta.itens.length) {
             var tr0 = document.createElement("tr");
-            tr0.innerHTML = '<td colspan="3" class="text-muted text-center py-3">Sem itens nesta regra ou regra inválida.</td>';
+            tr0.innerHTML = '<td colspan="4" class="text-muted text-center py-3">Sem itens nesta regra ou regra inválida.</td>';
             tbody.appendChild(tr0);
             return;
         }
@@ -250,6 +289,7 @@
             tr.innerHTML =
                 "<td>" + (item.nome || "—") + "</td>" +
                 "<td class=\"text-end\">" + perc + "</td>" +
+                "<td><small>" + escHtml(obsTxt) + "</small></td>" +
                 "<td class=\"text-end " + cls + "\">" + fmtBr(valor) + "</td>";
             tbody.appendChild(tr);
         });
@@ -263,12 +303,18 @@
             renderPreview(elRegra.value);
         });
     }
+    if (elObs) {
+        elObs.addEventListener("input", function () {
+            renderPreview(elRegra.value);
+        });
+    }
 
     try {
         var pin = document.getElementById("preview-inicial-data");
         var arr = pin && pin.textContent ? JSON.parse(pin.textContent) : [];
         if (arr && arr.length) {
             tbody.innerHTML = "";
+            var obsIni = obsAtual() || "—";
             arr.forEach(function (row) {
                 var v = parseFloat(String(row.valor).replace(",", "."));
                 var tr = document.createElement("tr");
@@ -276,6 +322,7 @@
                 tr.innerHTML =
                     "<td>" + (row.socio_nome || "—") + "</td>" +
                     "<td class=\"text-end\">" + row.perc + "</td>" +
+                    "<td><small>" + escHtml(obsIni) + "</small></td>" +
                     "<td class=\"text-end " + cls + "\">" + String(row.valor).replace(".", ",") + "</td>";
                 tbody.appendChild(tr);
             });

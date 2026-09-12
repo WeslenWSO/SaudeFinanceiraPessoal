@@ -36,36 +36,49 @@
     #modalTotalObsForma .modal-body {
         overflow-y: auto;
     }
-    .rfr-convenio-scroll {
-        max-height: calc(90vh - 420px);
-        min-height: 200px;
-        overflow: auto;
+    .rfr-convenio-panel {
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
+        overflow: hidden;
     }
-    .rfr-convenio-scroll .table {
+    .rfr-convenio-grade {
+        table-layout: fixed;
+        width: 100%;
         margin-bottom: 0;
     }
-    .rfr-convenio-scroll thead th {
-        position: sticky;
-        top: 0;
-        z-index: 3;
+    .rfr-convenio-grade th,
+    .rfr-convenio-grade td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .rfr-convenio-grade thead,
+    .rfr-convenio-grade tbody tr,
+    .rfr-convenio-grade tfoot tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+    .rfr-convenio-grade tbody {
+        display: block;
+        max-height: calc(90vh - 480px);
+        min-height: 200px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    .rfr-convenio-grade thead th {
         background-color: #212529 !important;
-        box-shadow: 0 2px 2px rgba(0, 0, 0, 0.15);
     }
-    .rfr-convenio-totalizadores {
+    .rfr-convenio-totalizadores-head {
         background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-top: none;
-        border-radius: 0 0 0.25rem 0.25rem;
+        border-bottom: 1px solid #dee2e6;
     }
-    .rfr-convenio-totalizadores table {
-        margin-bottom: 0;
+    .rfr-convenio-grade tfoot {
+        background: #f8f9fa;
         font-size: 0.875rem;
     }
-    .rfr-convenio-totalizadores td,
-    .rfr-convenio-totalizadores th {
+    .rfr-convenio-grade tfoot td {
         padding: 0.35rem 0.5rem;
+        vertical-align: middle;
     }
     .rfr-obs-forma-scroll {
         max-height: calc(90vh - 480px);
@@ -73,6 +86,28 @@
         overflow: auto;
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
+    }
+    .rateio-modal-table th.rateio-th-sortable {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+    .rateio-modal-table th.rateio-th-sortable:hover {
+        background: rgba(0, 0, 0, 0.06);
+    }
+    .rateio-modal-table th.rateio-th-sortable::after {
+        content: ' ⇅';
+        font-size: 0.7em;
+        opacity: 0.35;
+        margin-left: 0.15rem;
+    }
+    .rateio-modal-table th.rateio-th-sorted-asc::after {
+        content: ' ▲';
+        opacity: 0.85;
+    }
+    .rateio-modal-table th.rateio-th-sorted-desc::after {
+        content: ' ▼';
+        opacity: 0.85;
     }
     .rfr-obs-forma-scroll thead th {
         position: sticky;
@@ -191,7 +226,7 @@
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-filter"></i> Filtrar
                         </button>
-                        <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                        <a href="{% url 'regrarateio:lancamentoRateioList' %}?limpar=1" class="btn btn-outline-secondary btn-sm">Limpar</a>
                         <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalTotalConvenioViabilidade"
                             title="Soma valores cuja viabilidade coincide com convênio cadastrado">
                             <i class="fas fa-hospital"></i> Total convênio (viabilidade)
@@ -252,10 +287,10 @@
                             <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor }}</td>
                             <td class="text-end text-nowrap">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <a href="{% if row.conta_pagar_id %}{% url 'regrarateio:lancamentoRateioEdit' 'cap' row.conta_pagar_id %}{% else %}{% url 'regrarateio:lancamentoRateioEdit' 'car' row.conta_receber_id %}{% endif %}" class="btn btn-outline-primary" title="Editar rateio do título">
+                                    <a href="{% if row.conta_pagar_id %}{% url 'regrarateio:lancamentoRateioEdit' 'cap' row.conta_pagar_id %}{% else %}{% url 'regrarateio:lancamentoRateioEdit' 'car' row.conta_receber_id %}{% endif %}{% if filter_query %}?{{ filter_query }}{% endif %}" class="btn btn-outline-primary" title="Editar rateio do título">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <a href="{% url 'regrarateio:lancamentoRateioDelete' row.pk %}" class="btn btn-outline-danger" title="Excluir">
+                                    <a href="{% url 'regrarateio:lancamentoRateioDelete' row.pk %}{% if filter_query %}?{{ filter_query }}{% endif %}" class="btn btn-outline-danger" title="Excluir">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </div>
@@ -352,22 +387,22 @@
                         </p>
                     </div>
                     <div class="table-responsive border rounded" style="max-height: 380px;">
-                        <table class="table table-sm table-hover mb-0">
+                        <table class="table table-sm table-hover mb-0 rateio-modal-table">
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th style="width:2.5rem;">
                                         <input type="checkbox" id="rateio-cap-check-all" class="form-check-input" title="Marcar todos disponíveis">
                                     </th>
-                                    <th>ID</th>
-                                    <th>Descrição</th>
-                                    <th>Fornecedor</th>
-                                    <th>Centro de custo</th>
-                                    <th>Emissão</th>
-                                    <th>Vencimento</th>
-                                    <th>Valor base</th>
+                                    <th data-sortable data-col="id" data-sort-type="num">ID</th>
+                                    <th data-sortable data-col="descricao" data-sort-type="text">Descrição</th>
+                                    <th data-sortable data-col="fornecedor" data-sort-type="text">Fornecedor</th>
+                                    <th data-sortable data-col="centro_custo" data-sort-type="text">Centro de custo</th>
+                                    <th data-sortable data-col="emissao" data-sort-type="date">Emissão</th>
+                                    <th data-sortable data-col="vencimento" data-sort-type="date">Vencimento</th>
+                                    <th data-sortable data-col="valor_base" data-sort-type="num">Valor base</th>
                                     <th class="rateio-th-valor d-none">Valor manual</th>
-                                    <th>Regra</th>
-                                    <th>Status</th>
+                                    <th data-sortable data-col="regra" data-sort-type="text">Regra</th>
+                                    <th data-sortable data-col="status" data-sort-type="text">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-cap-tbody">
@@ -435,22 +470,22 @@
                         </p>
                     </div>
                     <div class="table-responsive border rounded rateio-cap-pagos-tabela">
-                        <table class="table table-sm table-hover mb-0">
+                        <table class="table table-sm table-hover mb-0 rateio-modal-table">
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th style="width:2.5rem;">
                                         <input type="checkbox" id="rateio-cap-pagos-check-all" class="form-check-input" title="Marcar todos disponíveis">
                                     </th>
-                                    <th>ID</th>
-                                    <th>Descrição</th>
-                                    <th>Fornecedor</th>
-                                    <th>Centro de custo</th>
-                                    <th>Emissão</th>
-                                    <th>Pagamento</th>
-                                    <th>Valor base</th>
+                                    <th data-sortable data-col="id" data-sort-type="num">ID</th>
+                                    <th data-sortable data-col="descricao" data-sort-type="text">Descrição</th>
+                                    <th data-sortable data-col="fornecedor" data-sort-type="text">Fornecedor</th>
+                                    <th data-sortable data-col="centro_custo" data-sort-type="text">Centro de custo</th>
+                                    <th data-sortable data-col="emissao" data-sort-type="date">Emissão</th>
+                                    <th data-sortable data-col="pagamento" data-sort-type="date">Pagamento</th>
+                                    <th data-sortable data-col="valor_base" data-sort-type="num">Valor base</th>
                                     <th class="rateio-th-valor d-none">Valor manual</th>
-                                    <th>Regra</th>
-                                    <th>Status</th>
+                                    <th data-sortable data-col="regra" data-sort-type="text">Regra</th>
+                                    <th data-sortable data-col="status" data-sort-type="text">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-cap-pagos-tbody">
@@ -517,21 +552,21 @@
                         </p>
                     </div>
                     <div class="table-responsive border rounded" style="max-height: 380px;">
-                        <table class="table table-sm table-hover mb-0">
+                        <table class="table table-sm table-hover mb-0 rateio-modal-table">
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th style="width:2.5rem;">
                                         <input type="checkbox" id="rateio-car-check-all" class="form-check-input" title="Marcar todos disponíveis">
                                     </th>
-                                    <th>ID</th>
-                                    <th>Descrição</th>
-                                    <th>Cliente</th>
-                                    <th>Sócio</th>
-                                    <th>Recebimento</th>
-                                    <th>Valor base</th>
+                                    <th data-sortable data-col="id" data-sort-type="num">ID</th>
+                                    <th data-sortable data-col="descricao" data-sort-type="text">Descrição</th>
+                                    <th data-sortable data-col="cliente" data-sort-type="text">Cliente</th>
+                                    <th data-sortable data-col="socio" data-sort-type="text">Sócio</th>
+                                    <th data-sortable data-col="recebimento" data-sort-type="date">Recebimento</th>
+                                    <th data-sortable data-col="valor_base" data-sort-type="num">Valor base</th>
                                     <th class="rateio-th-valor d-none">Valor manual</th>
-                                    <th>Regra</th>
-                                    <th>Status</th>
+                                    <th data-sortable data-col="regra" data-sort-type="text">Regra</th>
+                                    <th data-sortable data-col="status" data-sort-type="text">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-car-tbody">
@@ -671,6 +706,69 @@
                 if (!isFinite(v) || v < 0 || v > max) return false;
             }
             return true;
+        },
+        setRowSortData: function (tr, data) {
+            if (!tr || !data) return;
+            Object.keys(data).forEach(function (key) {
+                var v = data[key];
+                tr.setAttribute('data-sort-' + key, v == null ? '' : String(v));
+            });
+        },
+        sortTbody: function (tbody, col, type, dir) {
+            if (!tbody || !col) return;
+            var rows = Array.from(tbody.querySelectorAll('tr[data-titulo-id]'));
+            if (rows.length < 2) return;
+            var mul = dir === 'desc' ? -1 : 1;
+            var attr = 'data-sort-' + col;
+            rows.sort(function (a, b) {
+                var av = a.getAttribute(attr) || '';
+                var bv = b.getAttribute(attr) || '';
+                if (type === 'num') {
+                    var an = parseFloat(String(av).replace(',', '.')) || 0;
+                    var bn = parseFloat(String(bv).replace(',', '.')) || 0;
+                    return mul * (an - bn);
+                }
+                if (type === 'date') {
+                    return mul * av.localeCompare(bv);
+                }
+                return mul * av.localeCompare(bv, 'pt-BR', { sensitivity: 'base', numeric: true });
+            });
+            rows.forEach(function (r) { tbody.appendChild(r); });
+        },
+        clearSortHeaders: function (table) {
+            if (!table) return;
+            table.querySelectorAll('th.rateio-th-sortable').forEach(function (th) {
+                th.classList.remove('rateio-th-sorted-asc', 'rateio-th-sorted-desc');
+            });
+        },
+        resetTableSort: function (table) {
+            if (!table) return;
+            table._rateioSortState = { col: null, dir: 'asc' };
+            this.clearSortHeaders(table);
+        },
+        initSortableTable: function (table, tbody) {
+            if (!table || !tbody || table._rateioSortInit) return;
+            table._rateioSortInit = true;
+            table._rateioSortState = { col: null, dir: 'asc' };
+            var self = this;
+            table.querySelectorAll('th[data-sortable]').forEach(function (th) {
+                th.classList.add('rateio-th-sortable');
+                th.addEventListener('click', function () {
+                    var col = th.getAttribute('data-col');
+                    if (!col) return;
+                    var type = th.getAttribute('data-sort-type') || 'text';
+                    var st = table._rateioSortState;
+                    if (st.col === col) {
+                        st.dir = st.dir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        st.col = col;
+                        st.dir = 'asc';
+                    }
+                    self.sortTbody(tbody, col, type, st.dir);
+                    self.clearSortHeaders(table);
+                    th.classList.add(st.dir === 'asc' ? 'rateio-th-sorted-asc' : 'rateio-th-sorted-desc');
+                });
+            });
         }
     };
     RateioModal.load();
@@ -692,6 +790,8 @@
     const inpDi = document.getElementById('rateio-cap-di');
     const inpDf = document.getElementById('rateio-cap-df');
     const selRegra = document.getElementById('regra-rateio-modal');
+    const tableCap = tbody ? tbody.closest('table') : null;
+    if (tableCap) RateioModal.initSortableTable(tableCap, tbody);
 
     function showMsg(text) {
         msgEl.textContent = text || '';
@@ -752,6 +852,7 @@
                 const contas = data.contas || [];
                 tbody.innerHTML = '';
                 checkAll.checked = false;
+                RateioModal.resetTableSort(tableCap);
 
                 if (contas.length === 0) {
                     const tr = document.createElement('tr');
@@ -768,6 +869,17 @@
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
                     tr.setAttribute('data-valor-base', c.valor_base);
+                    RateioModal.setRowSortData(tr, {
+                        id: c.id,
+                        descricao: (c.descricao || '').toLowerCase(),
+                        fornecedor: (c.fornecedor || '').toLowerCase(),
+                        centro_custo: (c.centro_custo || '').toLowerCase(),
+                        emissao: c.dt_emissao || '',
+                        vencimento: c.dt_venc || '',
+                        valor_base: c.valor_base,
+                        regra: (c.regra || '').toLowerCase(),
+                        status: (c.rotulo_status || (pode ? 'Pode aplicar' : '')).toLowerCase()
+                    });
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -852,6 +964,8 @@
     const inpDf = document.getElementById('rateio-cap-pagos-df');
     const selRegra = document.getElementById('regra-rateio-modal-pagos');
     const ajudaRegra = document.getElementById('rateio-cap-pagos-ajuda-regra');
+    const tablePagos = tbody ? tbody.closest('table') : null;
+    if (tablePagos) RateioModal.initSortableTable(tablePagos, tbody);
 
     function atualizarAjudaRegra() {
         if (!ajudaRegra || !selRegra) return;
@@ -928,6 +1042,7 @@
                 const contas = data.contas || [];
                 tbody.innerHTML = '';
                 checkAll.checked = false;
+                RateioModal.resetTableSort(tablePagos);
 
                 if (contas.length === 0) {
                     const tr = document.createElement('tr');
@@ -944,6 +1059,17 @@
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
                     tr.setAttribute('data-valor-base', c.valor_base);
+                    RateioModal.setRowSortData(tr, {
+                        id: c.id,
+                        descricao: (c.descricao || '').toLowerCase(),
+                        fornecedor: (c.fornecedor || '').toLowerCase(),
+                        centro_custo: (c.centro_custo || '').toLowerCase(),
+                        emissao: c.dt_emissao || '',
+                        pagamento: c.dt_pag || '',
+                        valor_base: c.valor_base,
+                        regra: (c.regra || '').toLowerCase(),
+                        status: (c.rotulo_status || (pode ? 'Pode aplicar' : '')).toLowerCase()
+                    });
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -1029,6 +1155,8 @@
     var inpDiCar = document.getElementById('rateio-car-di');
     var inpDfCar = document.getElementById('rateio-car-df');
     var selRegraCar = document.getElementById('regra-rateio-modal-car');
+    var tableCar = tbodyCar ? tbodyCar.closest('table') : null;
+    if (tableCar) RateioModal.initSortableTable(tableCar, tbodyCar);
 
     function showMsgCar(text) {
         msgCar.textContent = text || '';
@@ -1089,6 +1217,7 @@
                 var contas = data.contas || [];
                 tbodyCar.innerHTML = '';
                 checkAllCar.checked = false;
+                RateioModal.resetTableSort(tableCar);
 
                 if (contas.length === 0) {
                     var tr0 = document.createElement('tr');
@@ -1105,6 +1234,17 @@
                     if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
                     tr.setAttribute('data-titulo-id', c.id);
                     tr.setAttribute('data-valor-base', c.valor_base);
+                    var socTxtSort = c.socio_txt != null && c.socio_txt !== '' ? c.socio_txt : '';
+                    RateioModal.setRowSortData(tr, {
+                        id: c.id,
+                        descricao: (c.descricao || '').toLowerCase(),
+                        cliente: (c.cliente || '').toLowerCase(),
+                        socio: socTxtSort.toLowerCase(),
+                        recebimento: c.dt_pag || '',
+                        valor_base: c.valor_base,
+                        regra: (c.regra || '').toLowerCase(),
+                        status: (c.rotulo_status || (pode ? 'Pode aplicar' : '')).toLowerCase()
+                    });
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     var disabled = desabilitar ? 'disabled' : '';
@@ -1308,8 +1448,26 @@
                 </div>
                 {% endif %}
                 {% if totais_convenio_viabilidade.linhas %}
-                <div class="rfr-convenio-scroll mb-0">
-                    <table class="table table-sm table-striped align-middle mb-0 rfr-convenio-grade">
+                <div class="rfr-convenio-panel mb-3">
+                    <div class="rfr-convenio-totalizadores-head d-flex flex-wrap justify-content-between align-items-center gap-2 px-2 py-1">
+                        <span class="fw-semibold small text-uppercase text-muted">Totalizadores</span>
+                        <span class="badge bg-secondary">Mês: {{ convenio_periodo_label }}</span>
+                    </div>
+                    <table class="table table-sm table-striped align-middle rfr-convenio-grade">
+                        <colgroup>
+                            <col style="width: 18%">
+                            <col style="width: 4%">
+                            <col style="width: 7%">
+                            <col style="width: 6%">
+                            <col style="width: 5%">
+                            <col style="width: 6%">
+                            <col style="width: 5%">
+                            <col style="width: 6%">
+                            <col style="width: 7%">
+                            <col style="width: 7%">
+                            <col style="width: 8%">
+                            <col style="width: 15%">
+                        </colgroup>
                         <thead class="table-dark">
                             <tr>
                                 <th>Viabilidade / Convênio</th>
@@ -1322,6 +1480,7 @@
                                 <th class="text-end">IRPJ ap.</th>
                                 <th class="text-end">Impostos ap.</th>
                                 <th class="text-end">Ad. IRPJ</th>
+                                <th class="text-end">Total imposto</th>
                                 <th class="text-end">Líquido ap.</th>
                             </tr>
                         </thead>
@@ -1345,44 +1504,28 @@
                                 <td class="text-end">R$ {{ lin.irpj_ap_txt }}</td>
                                 <td class="text-end text-danger">R$ {{ lin.impostos_ap_txt }}</td>
                                 <td class="text-end text-danger">R$ {{ lin.ad_irpj_txt }}</td>
+                                <td class="text-end text-danger fw-semibold">R$ {{ lin.total_imposto_txt }}</td>
                                 <td class="text-end text-success">R$ {{ lin.liquido_ap_txt }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="fw-semibold">
+                            <tr class="table-secondary">
+                                <td>Total convênios</td>
+                                <td class="text-end">{{ totais_convenio_qtd }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_total_txt }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_iss_txt }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_pis_txt }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_cofins_txt }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_csll_txt }}</td>
+                                <td class="text-end">R$ {{ totais_convenio_irpj_txt }}</td>
+                                <td class="text-end text-danger">R$ {{ totais_convenio_impostos_txt }}</td>
+                                <td class="text-end text-danger">R$ {{ totais_convenio_ad_irpj_txt }}</td>
+                                <td class="text-end text-danger fw-bold">R$ {{ totais_convenio_total_imposto_txt }}</td>
+                                <td class="text-end text-success">R$ {{ totais_convenio_liquido_txt }}</td>
+                            </tr>
+                        </tfoot>
                     </table>
-                </div>
-                <div class="rfr-convenio-totalizadores px-2 py-2 mb-3">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <span class="fw-semibold small text-uppercase text-muted">Totalizadores</span>
-                        <span class="badge bg-secondary">Mês: {{ convenio_periodo_label }}</span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered align-middle mb-0 rfr-convenio-grade">
-                            <tbody class="fw-semibold">
-                                <tr class="table-secondary">
-                                    <td class="text-end" style="min-width: 12rem;">Total convênios</td>
-                                    <td class="text-end">{{ totais_convenio_qtd }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_total_txt }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_iss_txt }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_pis_txt }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_cofins_txt }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_csll_txt }}</td>
-                                    <td class="text-end">R$ {{ totais_convenio_irpj_txt }}</td>
-                                    <td class="text-end text-danger">R$ {{ totais_convenio_impostos_txt }}</td>
-                                    <td class="text-end text-danger">R$ {{ totais_convenio_ad_irpj_txt }}</td>
-                                    <td class="text-end text-success">R$ {{ totais_convenio_liquido_txt }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <td colspan="7" class="border-0 bg-transparent"></td>
-                                    <td colspan="3" class="text-end">
-                                        <span class="text-muted fw-normal me-2">Total IRPJ + Ad. IRPJ</span>
-                                        <span class="text-danger fw-bold">R$ {{ totais_convenio_irpj_mais_ad_txt }}</span>
-                                    </td>
-                                    <td class="border-0 bg-transparent"></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
                 {% else %}
                 <p class="text-muted mb-3">Nenhum lançamento com viabilidade igual a convênio cadastrado no filtro atual.</p>

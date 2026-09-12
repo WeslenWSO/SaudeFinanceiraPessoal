@@ -175,6 +175,7 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str
         ad = (abs(total_lin) * indice).quantize(Decimal('0.01'))
         linha['ad_irpj'] = ad
         imp = _to_dec(linha['impostos_ap'])
+        linha['total_imposto'] = imp + ad
         linha['liquido_ap'] = _liquido_com_impostos(total_lin, imp, ad)
         total_ad_irpj += ad
         total_liquido += linha['liquido_ap']
@@ -207,12 +208,14 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str
         })
 
     total_irpj_mais_ad = tot_irpj + total_ad_irpj
+    total_imposto = total_impostos + total_ad_irpj
 
     return {
         'linhas': linhas,
         'total_geral': total_geral,
         'total_impostos_ap': total_impostos,
         'total_ad_irpj': total_ad_irpj,
+        'total_imposto': total_imposto,
         'total_liquido_ap': total_liquido,
         'total_irpj_ap': tot_irpj,
         'total_irpj_mais_ad': total_irpj_mais_ad,

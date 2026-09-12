@@ -472,13 +472,14 @@ def valor_base_titulo_de_lancamento(lancamento):
     return Decimal('0')
 
 
-def _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais=None):
+def _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais=None, obs_rateio=''):
     """Cria lançamentos de rateio para uma conta a pagar. Retorna quantidade de linhas criadas."""
     base = _base_valor_conta_pagar(cap)
     _validar_estrutura_regra(regra, itens)
     valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
     data_pg = cap.dtPag or cap.dtvenc
     desc = (cap.descricao or '')[:255]
+    obs_txt = (obs_rateio or '')[:255]
     criados = 0
     for item in itens:
         bruto = valores.get(item.socios_id, Decimal('0'))
@@ -496,6 +497,7 @@ def _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais=None):
             socio=item.socios,
             valor=valor,
             origem=LancamentoRateio.ORIGEM_PAGAR,
+            obs=obs_txt,
         )
         criados += 1
     return criados
@@ -593,13 +595,14 @@ def gerar_rateio_contas_pagar(
     return criados, ignorados
 
 
-def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None):
+def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None, obs_rateio=''):
     """Cria lançamentos de rateio para uma conta a receber. Retorna quantidade de linhas criadas."""
     base = _base_valor_conta_receber(car)
     _validar_estrutura_regra(regra, itens)
     valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
     data_pg = car.data_recebimento or car.data_vencimento
     desc = (car.observacao or car.cliente or car.doc or '')[:255]
+    obs_txt = (obs_rateio or '')[:255]
     criados = 0
     for item in itens:
         bruto = valores.get(item.socios_id, Decimal('0'))
@@ -617,6 +620,7 @@ def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None):
             socio=item.socios,
             valor=valor,
             origem=LancamentoRateio.ORIGEM_RECEBER,
+            obs=obs_txt,
         )
         criados += 1
     return criados
@@ -679,7 +683,7 @@ def preview_linhas_rateio_por_regra(
 
 
 @transaction.atomic
-def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None):
+def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None, obs_rateio=''):
     """
     Remove todos os lançamentos de rateio do mesmo título (CAP ou CAR) e gera de novo
     conforme a nova regra e o valor base atual do título. Atualiza a regra no cadastro do título.
@@ -724,7 +728,7 @@ def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None
         LancamentoRateio.objects.filter(conta_pagar=cap).delete()
         cap.rateio = regra
         cap.save(update_fields=['rateio'])
-        n = _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais)
+        n = _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais, obs_rateio=obs_rateio)
         return (n,)
 
     if lanc.conta_receber_id:
@@ -732,7 +736,45 @@ def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None
         LancamentoRateio.objects.filter(conta_receber=car).delete()
         car.regra_rateio = regra
         car.save(update_fields=['regra_rateio'])
-        n = _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais)
+        n = _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais, obs_rateio=obs_rateio)
+        return (n,)
+
+    raise ValueError('Lançamento sem origem (conta a pagar/receber).')
+
+
+@transaction.atomic
+def remover_rateio_do_titulo(lancamento_id):
+    """
+    Remove todos os lançamentos de rateio do título (CAP ou CAR) e limpa a regra
+    cadastrada no título, como em contas a pagar sem código de rateio.
+
+    Retorna (n_linhas_removidas,).
+    """
+    from contasapagar.models import ContasaPagar
+    from contasareceber.models import ContaAReceber
+
+    lanc = (
+        LancamentoRateio.objects.select_related('conta_pagar', 'conta_receber')
+        .filter(pk=lancamento_id)
+        .first()
+    )
+    if not lanc:
+        raise ValueError('Lançamento não encontrado.')
+
+    if lanc.conta_pagar_id:
+        cap = ContasaPagar.objects.select_for_update().get(pk=lanc.conta_pagar_id)
+        n = LancamentoRateio.objects.filter(conta_pagar=cap).count()
+        LancamentoRateio.objects.filter(conta_pagar=cap).delete()
+        cap.rateio = None
+        cap.save(update_fields=['rateio'])
+        return (n,)
+
+    if lanc.conta_receber_id:
+        car = ContaAReceber.objects.select_for_update().get(pk=lanc.conta_receber_id)
+        n = LancamentoRateio.objects.filter(conta_receber=car).count()
+        LancamentoRateio.objects.filter(conta_receber=car).delete()
+        car.regra_rateio = None
+        car.save(update_fields=['regra_rateio'])
         return (n,)
 
     raise ValueError('Lançamento sem origem (conta a pagar/receber).')

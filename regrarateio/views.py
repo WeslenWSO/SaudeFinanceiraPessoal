@@ -2,7 +2,9 @@ import decimal
 from multiprocessing import context
 from typing import Any
 from django.db.models.query import QuerySet
+from django.http import QueryDict
 from django.urls import reverse, reverse_lazy
+from django.utils.http import urlencode
 from django.utils import timezone
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render, redirect
@@ -22,6 +24,7 @@ from regrarateio.services import (
     query_contas_pagar_rateio_candidatas,
     query_contas_receber_rateio_candidatas,
     reaplicar_regra_no_titulo,
+    remover_rateio_do_titulo,
     valor_base_titulo_de_lancamento,
     preview_linhas_rateio_por_regra,
 )
@@ -282,6 +285,48 @@ def _q_dist_lucro_com_dtpg():
     )
 
 
+_LANCAMENTO_RATEIO_FILTRO_CORE = ('data_inicio', 'data_fim', 'socio', 'tipo')
+
+
+def _session_key_lancamento_rateio_filtro(empresa_id):
+    return f'lancamento_rateio_filtro_{empresa_id or 0}'
+
+
+def _filtros_efetivos_lancamento_rateio(request):
+    """Filtros da listagem: GET quando informado; senão última pesquisa na sessão."""
+    empresa_id = request.session.get('empresa_id')
+    sk = _session_key_lancamento_rateio_filtro(empresa_id)
+
+    if any((request.GET.get(k) or '').strip() for k in _LANCAMENTO_RATEIO_FILTRO_CORE):
+        data = {k: (request.GET.get(k) or '').strip() for k in _LANCAMENTO_RATEIO_FILTRO_CORE}
+        ad = (request.GET.get('ad_irpj_periodo') or '').strip()
+        if ad:
+            data['ad_irpj_periodo'] = ad
+        request.session[sk] = data
+        request.session.modified = True
+        return data
+
+    saved = dict(request.session.get(sk) or {})
+    ad_get = (request.GET.get('ad_irpj_periodo') or '').strip()
+    if ad_get:
+        saved['ad_irpj_periodo'] = ad_get
+    return saved
+
+
+def _url_lancamento_rateio_list_com_filtro(request, extra=None):
+    filtros = _filtros_efetivos_lancamento_rateio(request)
+    params = {k: v for k, v in filtros.items() if v}
+    if extra:
+        params.update({k: v for k, v in extra.items() if v})
+    if params:
+        return reverse('regrarateio:lancamentoRateioList') + '?' + urlencode(params)
+    return reverse('regrarateio:lancamentoRateioList')
+
+
+def redirect_lancamento_rateio_list(request, extra=None):
+    return redirect(_url_lancamento_rateio_list_com_filtro(request, extra=extra))
+
+
 def _filtra_queryset_lancamento_rateio_por_periodo(qs, di, df):
     """
     Aplica filtro de data ao queryset de LancamentoRateio.
@@ -345,6 +390,37 @@ class LancamentoRateioList(ListView):
     paginate_by = 30
     template_name = 'lancamento-rateio-list.html'
 
+    def get(self, request, *args, **kwargs):
+        if request.GET.get('limpar'):
+            empresa_id = request.session.get('empresa_id')
+            sk = _session_key_lancamento_rateio_filtro(empresa_id)
+            if sk in request.session:
+                del request.session[sk]
+                request.session.modified = True
+            return redirect_lancamento_rateio_list(request)
+
+        has_core = any(
+            (request.GET.get(k) or '').strip() for k in _LANCAMENTO_RATEIO_FILTRO_CORE
+        )
+        if not has_core:
+            empresa_id = request.session.get('empresa_id')
+            saved = request.session.get(_session_key_lancamento_rateio_filtro(empresa_id)) or {}
+            if any(saved.get(k) for k in _LANCAMENTO_RATEIO_FILTRO_CORE):
+                q = QueryDict(mutable=True)
+                for k in _LANCAMENTO_RATEIO_FILTRO_CORE:
+                    if saved.get(k):
+                        q[k] = saved[k]
+                ad = (request.GET.get('ad_irpj_periodo') or saved.get('ad_irpj_periodo') or '').strip()
+                if ad:
+                    q['ad_irpj_periodo'] = ad
+                for flag in ('abrir_convenio', 'abrir_obs_forma', 'page'):
+                    v = (request.GET.get(flag) or '').strip()
+                    if v:
+                        q[flag] = v
+                return redirect(reverse('regrarateio:lancamentoRateioList') + '?' + q.urlencode())
+
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         from contasareceber.models import BaixaContaAReceber
         from django.db.models import Prefetch
@@ -378,15 +454,16 @@ class LancamentoRateioList(ListView):
         if empresa_id:
             qs = qs.filter(empresa_id=empresa_id)
 
-        di = parse_date((self.request.GET.get('data_inicio') or '').strip() or '')
-        df = parse_date((self.request.GET.get('data_fim') or '').strip() or '')
+        filtros = _filtros_efetivos_lancamento_rateio(self.request)
+        di = parse_date((filtros.get('data_inicio') or '').strip() or '')
+        df = parse_date((filtros.get('data_fim') or '').strip() or '')
         qs = _filtra_queryset_lancamento_rateio_por_periodo(qs, di, df)
 
-        socio_raw = (self.request.GET.get('socio') or '').strip()
+        socio_raw = (filtros.get('socio') or '').strip()
         if socio_raw.isdigit():
             qs = qs.filter(socio_id=int(socio_raw))
 
-        tipo = (self.request.GET.get('tipo') or '').strip()
+        tipo = (filtros.get('tipo') or '').strip()
         if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_RECEBIMENTO):
             qs = qs.filter(tipo=tipo)
 
@@ -402,16 +479,24 @@ class LancamentoRateioList(ListView):
             if empresa_id
             else Socio.objects.none()
         )
-        context['filtro_data_inicio'] = (self.request.GET.get('data_inicio') or '').strip()
-        context['filtro_data_fim'] = (self.request.GET.get('data_fim') or '').strip()
-        socio_get = (self.request.GET.get('socio') or '').strip()
+        filtros = _filtros_efetivos_lancamento_rateio(self.request)
+        context['filtro_data_inicio'] = filtros.get('data_inicio', '')
+        context['filtro_data_fim'] = filtros.get('data_fim', '')
+        socio_get = (filtros.get('socio') or '').strip()
         context['filtro_socio'] = socio_get
         context['filtro_socio_id'] = int(socio_get) if socio_get.isdigit() else None
-        context['filtro_tipo'] = (self.request.GET.get('tipo') or '').strip()
+        context['filtro_tipo'] = (filtros.get('tipo') or '').strip()
         context['tipo_choices'] = LancamentoRateio.TIPO_CHOICES
-        q = self.request.GET.copy()
-        q.pop('page', None)
+        q = QueryDict(mutable=True)
+        for k, v in filtros.items():
+            if v:
+                q[k] = v
+        for flag in ('abrir_convenio', 'abrir_obs_forma'):
+            v = (self.request.GET.get(flag) or '').strip()
+            if v:
+                q[flag] = v
         context['filter_query'] = q.urlencode()
+        context['voltar_list_url'] = _url_lancamento_rateio_list_com_filtro(self.request)
         context['regras_rateio_modal'] = (
             RegraRateio.objects.filter(empresa_id=empresa_id)
             .annotate(n_itens=Count('regrarateioitem'))
@@ -504,7 +589,7 @@ class LancamentoRateioList(ListView):
 
         from regrarateio.convenio_viabilidade import coletar_totais_por_viabilidade_convenio
 
-        periodo_ad = (self.request.GET.get('ad_irpj_periodo') or 'mensal').strip().lower()
+        periodo_ad = (filtros.get('ad_irpj_periodo') or 'mensal').strip().lower()
         if periodo_ad not in ('mensal', 'trimestral'):
             periodo_ad = 'mensal'
         tot_conv = coletar_totais_por_viabilidade_convenio(
@@ -519,6 +604,7 @@ class LancamentoRateioList(ListView):
             linha['irpj_ap_txt'] = _fmt_br_moeda(linha['irpj_ap'])
             linha['impostos_ap_txt'] = _fmt_br_moeda(linha['impostos_ap'])
             linha['ad_irpj_txt'] = _fmt_br_moeda(linha['ad_irpj'])
+            linha['total_imposto_txt'] = _fmt_br_moeda(linha.get('total_imposto'))
             linha['liquido_ap_txt'] = _fmt_br_moeda(linha['liquido_ap'])
         for out in tot_conv['outros']:
             out['total_txt'] = _fmt_br_moeda(out['total'])
@@ -528,6 +614,7 @@ class LancamentoRateioList(ListView):
         context['totais_convenio_total_txt'] = _fmt_br_moeda(tot_conv['total_geral'])
         context['totais_convenio_impostos_txt'] = _fmt_br_moeda(tot_conv['total_impostos_ap'])
         context['totais_convenio_ad_irpj_txt'] = _fmt_br_moeda(tot_conv['total_ad_irpj'])
+        context['totais_convenio_total_imposto_txt'] = _fmt_br_moeda(tot_conv['total_imposto'])
         context['totais_convenio_liquido_txt'] = _fmt_br_moeda(tot_conv['total_liquido_ap'])
         context['totais_convenio_irpj_txt'] = _fmt_br_moeda(tot_conv['total_irpj_ap'])
         context['totais_convenio_irpj_mais_ad_txt'] = _fmt_br_moeda(tot_conv['total_irpj_mais_ad'])
@@ -537,8 +624,8 @@ class LancamentoRateioList(ListView):
         context['totais_convenio_pis_txt'] = _fmt_br_moeda(cols.get('pis_ap'))
         context['totais_convenio_cofins_txt'] = _fmt_br_moeda(cols.get('cofins_ap'))
         context['totais_convenio_csll_txt'] = _fmt_br_moeda(cols.get('csll_ap'))
-        di_conv = parse_date((self.request.GET.get('data_inicio') or '').strip() or '')
-        df_conv = parse_date((self.request.GET.get('data_fim') or '').strip() or '')
+        di_conv = parse_date((filtros.get('data_inicio') or '').strip() or '')
+        df_conv = parse_date((filtros.get('data_fim') or '').strip() or '')
         meses_pt = [
             '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
@@ -707,6 +794,13 @@ def _resumo_titulo_principal(lanc):
     }
 
 
+def _obs_inicial_grupo_rateio(linhas_qs):
+    linhas = list(linhas_qs)
+    if not linhas:
+        return ''
+    return (linhas[0].obs or '').strip()[:255]
+
+
 def _linhas_atuais_com_perc(linhas_qs, valor_base, regra):
     item_map = {}
     if regra_id := (regra.pk if regra else None):
@@ -728,6 +822,7 @@ def _linhas_atuais_com_perc(linhas_qs, valor_base, regra):
                 'valor': row.valor,
                 'valor_txt': _fmt_br_decimal(row.valor),
                 'perc': perc,
+                'obs': (row.obs or '').strip(),
             }
         )
     return rows
@@ -790,7 +885,10 @@ class LancamentoRateioGrupoEdit(View):
         linhas_det = _linhas_atuais_com_perc(linhas, valor_base, regra_atual)
 
         form = FormRecalcularRateioGrupo(
-            initial={'regra_rateio': regra_atual.pk if regra_atual else None},
+            initial={
+                'regra_rateio': regra_atual.pk if regra_atual else None,
+                'obs_rateio': _obs_inicial_grupo_rateio(linhas),
+            },
             empresa_id=empresa_id,
         )
 
@@ -812,6 +910,7 @@ class LancamentoRateioGrupoEdit(View):
             'form': form,
             'regras_itens_json': _regras_itens_json_por_empresa(empresa_id),
             'preview_inicial_json': json.dumps(preview_inicial, ensure_ascii=False),
+            'voltar_list_url': _url_lancamento_rateio_list_com_filtro(request),
         }
         return render(request, self.template_name, ctx)
 
@@ -828,24 +927,34 @@ class LancamentoRateioGrupoEdit(View):
 
         if form.is_valid():
             nova = form.cleaned_data['regra_rateio']
-            valores_manuais = None
-            itens_nova = list(RegraRateioItem.objects.filter(regrarateio=nova))
-            if _regra_usa_valor_manual(nova, itens_nova):
-                manual_item = next(
-                    (i for i in itens_nova if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL),
-                    None,
-                )
-                if manual_item:
-                    valores_manuais = {
-                        manual_item.socios_id: form.cleaned_data['valor_manual'],
-                    }
             try:
-                n, = reaplicar_regra_no_titulo(lanc.pk, nova.pk, valores_manuais=valores_manuais)
-                messages.success(
-                    request,
-                    f'Rateio atualizado: {n} linha(s) gravada(s) conforme a regra «{nova}».',
-                )
-                return redirect('regrarateio:lancamentoRateioList')
+                if nova is None:
+                    n, = remover_rateio_do_titulo(lanc.pk)
+                    messages.success(
+                        request,
+                        f'Rateio removido: {n} lançamento(s) excluído(s) e regra limpa no título.',
+                    )
+                else:
+                    valores_manuais = None
+                    itens_nova = list(RegraRateioItem.objects.filter(regrarateio=nova))
+                    if _regra_usa_valor_manual(nova, itens_nova):
+                        manual_item = next(
+                            (i for i in itens_nova if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL),
+                            None,
+                        )
+                        if manual_item:
+                            valores_manuais = {
+                                manual_item.socios_id: form.cleaned_data['valor_manual'],
+                            }
+                    obs_rateio = (form.cleaned_data.get('obs_rateio') or '').strip()[:255]
+                    n, = reaplicar_regra_no_titulo(
+                        lanc.pk, nova.pk, valores_manuais=valores_manuais, obs_rateio=obs_rateio
+                    )
+                    messages.success(
+                        request,
+                        f'Rateio atualizado: {n} linha(s) gravada(s) conforme a regra «{nova}».',
+                    )
+                return redirect_lancamento_rateio_list(request)
             except ValueError as exc:
                 messages.error(request, str(exc))
 
@@ -868,6 +977,7 @@ class LancamentoRateioGrupoEdit(View):
             'form': form,
             'regras_itens_json': _regras_itens_json_por_empresa(empresa_id),
             'preview_inicial_json': json.dumps(preview_inicial, ensure_ascii=False),
+            'voltar_list_url': _url_lancamento_rateio_list_com_filtro(request),
         }
         return render(request, self.template_name, ctx)
 
@@ -882,7 +992,7 @@ def lancamento_rateio_delete(request, pk):
     if request.method == 'POST':
         lancamento.delete()
         messages.success(request, 'Lançamento de rateio excluído com sucesso.')
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     context = {
         'lancamento': lancamento,
@@ -891,6 +1001,7 @@ def lancamento_rateio_delete(request, pk):
             f'Confirma a exclusão deste lançamento? '
             f'{lancamento.get_tipo_display()} — {lancamento.socio} — valor {lancamento.valor}'
         ),
+        'voltar_list_url': _url_lancamento_rateio_list_com_filtro(request),
     }
     return render(request, 'lancamento-rateio-delete.html', context)
 
@@ -953,19 +1064,19 @@ def contas_receber_rateio_candidatas(request):
 def gerar_rateio_contas_pagar_aplicar(request):
     """POST: aplica regra de rateio nas contas a pagar selecionadas e grava lançamentos."""
     if request.method != 'POST':
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     raw_ids = request.POST.getlist('conta_pagar_id')
     ids = [int(x) for x in raw_ids if str(x).strip().isdigit()]
 
     if not ids:
         messages.error(request, 'Selecione ao menos uma conta a pagar.')
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     rid = (request.POST.get('regra_rateio') or '').strip()
     regra_id_forcar = int(rid) if rid.isdigit() else None
@@ -997,25 +1108,25 @@ def gerar_rateio_contas_pagar_aplicar(request):
     except Exception as exc:
         messages.error(request, f'Erro ao gerar rateio: {exc}')
 
-    return redirect('regrarateio:lancamentoRateioList')
+    return redirect_lancamento_rateio_list(request)
 
 
 def gerar_rateio_contas_receber_aplicar(request):
     """POST: aplica regra nas contas a receber selecionadas no modal (valores positivos no rateio)."""
     if request.method != 'POST':
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     raw_ids = request.POST.getlist('conta_receber_id')
     ids = [int(x) for x in raw_ids if str(x).strip().isdigit()]
 
     if not ids:
         messages.error(request, 'Selecione ao menos uma conta a receber.')
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     rid = (request.POST.get('regra_rateio') or '').strip()
     regra_id_forcar = int(rid) if rid.isdigit() else None
@@ -1045,7 +1156,7 @@ def gerar_rateio_contas_receber_aplicar(request):
     except Exception as exc:
         messages.error(request, f'Erro ao gerar rateio: {exc}')
 
-    return redirect('regrarateio:lancamentoRateioList')
+    return redirect_lancamento_rateio_list(request)
 
 
 def import_receita_planilha_modelo(request):
@@ -1178,7 +1289,7 @@ def import_receita_planilha(request):
         messages.success(request, msg)
         for err in acum['erros'][:10]:
             messages.warning(request, err)
-        return redirect('regrarateio:lancamentoRateioList')
+        return redirect_lancamento_rateio_list(request)
 
     if request.method == 'POST':
         regra_raw = (request.POST.get('regra_padrao_id') or '').strip()
