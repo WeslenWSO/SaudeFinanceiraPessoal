@@ -349,6 +349,8 @@ def parse_receita_planilha_xlsx(
 def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list[dict], list[str]]:
     erros = []
     regra_cache: dict = {}
+    itens_cache: dict = {}
+    preview_cache: dict = {}
     for ln in linhas:
         ln['valido'] = True
         ln['preview_rateio'] = []
@@ -361,7 +363,11 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
             erros.append(f"Linha {ln['linha']}: regra de rateio inválida.")
             continue
 
-        itens = list(RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios'))
+        if regra.id not in itens_cache:
+            itens_cache[regra.id] = list(
+                RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios')
+            )
+        itens = itens_cache[regra.id]
         if not itens:
             ln['valido'] = False
             ln['motivo_invalido'] = 'Regra sem sócios'
@@ -377,12 +383,15 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
             continue
 
         base = Decimal(ln['valor'])
-        prev = preview_linhas_rateio_por_regra(
-            regra.id,
-            base,
-            LancamentoRateio.TIPO_RECEBIMENTO,
-            empresa_id=empresa_id,
-        )
+        prev_key = (regra.id, str(base))
+        if prev_key not in preview_cache:
+            preview_cache[prev_key] = preview_linhas_rateio_por_regra(
+                regra.id,
+                base,
+                LancamentoRateio.TIPO_RECEBIMENTO,
+                empresa_id=empresa_id,
+            )
+        prev = preview_cache[prev_key]
         ln['preview_rateio'] = prev
         ln['regra_nome'] = str(regra)
 

@@ -53,7 +53,7 @@
                 <td>{{ ln.viabilidade|default:"—" }}</td>
                 <td><small>{{ ln.forma_pagamento|default:"—" }}</small></td>
                 <td class="text-end">R$ {{ ln.valor }}</td>
-                <td><small>{{ ln.regra_txt|default:ln.regra_nome|default:"—" }}</small></td>
+                <td><small>{% firstof ln.regra_txt ln.regra_nome "—" %}</small></td>
                 <td class="text-end">R$ {{ ln.valor_rateio|default:ln.valor }}</td>
                 <td>
                     {% if ln.preview_rateio %}
