@@ -544,6 +544,26 @@ class LancamentoRateioList(ListView):
         indice = ad.get('indice') or Decimal('0')
         context['ad_irpj_indice_txt'] = f'{indice:.10f}'.replace('.', ',')
 
+        from regrarateio.obs_forma_totalizadores import coletar_totais_obs_forma
+
+        obs_forma_data = coletar_totais_obs_forma(qs_filtro)
+        context['empresa_id'] = empresa_id
+        context['obs_forma_totalizadores_json'] = json.dumps(
+            {
+                'por_obs_forma': [
+                    {
+                        'obs_forma': row['obs_forma'],
+                        'valor': str(row['valor'].quantize(Decimal('0.01'))),
+                        'qtd': row['qtd'],
+                    }
+                    for row in obs_forma_data['por_obs_forma']
+                ],
+                'celulas': obs_forma_data['celulas'],
+            },
+            ensure_ascii=False,
+        )
+        context['convenio_periodo_label_obs'] = context.get('convenio_periodo_label', 'Período do filtro')
+
         return context
 
 
