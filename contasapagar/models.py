@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.db import models
-from categoria.models import Categoria
+from categoria.models import Categoria, CentroCusto
 from cobranca.models import Cobranca
 from empresa.models import Empresa
 from extrato.models import ContaBancaria
@@ -19,6 +19,13 @@ class ContasaPagar(models.Model):
     numdoc = models.CharField(verbose_name='Numero do Documento', max_length=15 )
     valorDoc = models.DecimalField(verbose_name='Valor do Documento', max_digits=12, decimal_places=2)
     categoria = models.ForeignKey(Categoria, verbose_name='Categoria', on_delete=models.DO_NOTHING)
+    centro_custo = models.ForeignKey(
+        CentroCusto,
+        verbose_name='Centro de custo',
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+    )
     parcela = models.CharField(verbose_name='Numero de Parcela', max_length=2 )
    
     

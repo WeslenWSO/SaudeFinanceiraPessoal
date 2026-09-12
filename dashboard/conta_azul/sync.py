@@ -1149,6 +1149,47 @@ def _categoria_por_ca(empresa, ca_id: str):
     return Categoria.objects.filter(empresa=empresa, conta_azul_id__iexact=ca_id.strip()).first()
 
 
+def _centro_custo_por_ca(empresa, ca_id: str):
+    if not ca_id:
+        return None
+    cc = CentroCusto.objects.filter(empresa=empresa, conta_azul_id=ca_id).first()
+    if cc:
+        return cc
+    return CentroCusto.objects.filter(empresa=empresa, conta_azul_id__iexact=ca_id.strip()).first()
+
+
+def _centro_custo_de_item(
+    empresa,
+    item: dict,
+    cache: dict[str, CentroCusto | None],
+) -> CentroCusto | None:
+    """Primeiro centro de custo do item CA (campo ``centros_de_custo``)."""
+    centros = item.get('centros_de_custo') or item.get('centro_de_custo') or []
+    if isinstance(centros, dict):
+        centros = [centros]
+    if not centros or not isinstance(centros[0], dict):
+        return None
+    cc_raw = centros[0]
+    ca_id = str(cc_raw.get('id') or '').strip()
+    if not ca_id:
+        return None
+    if ca_id not in cache:
+        cc = _centro_custo_por_ca(empresa, ca_id)
+        if not cc:
+            nome = str(cc_raw.get('nome') or 'Centro de custo')[:200]
+            cc, _ = CentroCusto.objects.get_or_create(
+                empresa=empresa,
+                conta_azul_id=ca_id,
+                defaults={
+                    'nome': nome,
+                    'ativo': True,
+                    'codigo': str(cc_raw.get('codigo') or '')[:60],
+                },
+            )
+        cache[ca_id] = cc
+    return cache[ca_id]
+
+
 def _conta_por_ca(empresa, ca_id: str):
     if not ca_id:
         return None
@@ -1326,6 +1367,7 @@ def importar_despesas(
     cache_contas: dict[str, ContaBancaria | None] = {}
     cache_cobranca: dict[str, Cobranca] = {}
     cache_fornecedores: dict[str, Fornecedor | None] = {}
+    cache_centros: dict[str, CentroCusto | None] = {}
     cache_parcelas: dict[str, dict] = {}
     chamadas_detalhe = 0
     preparados: list[tuple[str, dict]] = []
@@ -1402,6 +1444,7 @@ def importar_despesas(
             continue
         cobranca = _cobranca_de_item(item, cache_cobranca) or cobranca_padrao
         numdoc = _documento_despesa_item(item)
+        centro_custo = _centro_custo_de_item(empresa, item, cache_centros)
         preparados.append((
             parcela_id,
             {
@@ -1410,6 +1453,7 @@ def importar_despesas(
                 'numdoc': numdoc[:15],
                 'valorDoc': valor,
                 'categoria': categoria,
+                'centro_custo': centro_custo,
                 'parcela': '1',
                 'dtvenc': _parse_data(item.get('data_vencimento')) or data_de,
                 'dtEmissao': _parse_data(item.get('data_competencia')) or data_de,
@@ -1437,7 +1481,7 @@ def importar_despesas(
             )
         }
         campos_update = (
-            'fornecedor', 'descricao', 'numdoc', 'valorDoc', 'categoria', 'parcela',
+            'fornecedor', 'descricao', 'numdoc', 'valorDoc', 'categoria', 'centro_custo', 'parcela',
             'dtvenc', 'dtEmissao', 'cobranca', 'conta_banco', 'dtPag', 'valorPago',
             'juros', 'multa', 'desconto', 'status', 'obs', 'nossonumero', 'nsu',
         )
@@ -1464,7 +1508,7 @@ def importar_despesas(
                 stats['atualizados'] += len(atualizar)
         except IntegrityError:
             stats['erros'] += len(preparados)
-    if chamadas_detalhe >= LIMITE_DETALHE_PARCELA_SYNC:
+    if chamadas_detalhe >= limite_detalhe:
         stats['detalhes_limitados'] = chamadas_detalhe
     return stats
 

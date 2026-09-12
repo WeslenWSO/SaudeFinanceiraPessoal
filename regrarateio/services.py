@@ -192,7 +192,7 @@ def query_contas_pagar_rateio_candidatas(
         .filter(sem_pagamento_q)
         .filter(_empresa_contas_pagar_q(empresa_id))
         .filter(periodo_q)
-        .select_related('rateio', 'fornecedor', 'categoria')
+        .select_related('rateio', 'fornecedor', 'categoria', 'centro_custo')
         .order_by('-dtEmissao', '-dtvenc', '-id')
     )
 
@@ -246,6 +246,7 @@ def query_contas_pagar_rateio_candidatas(
                 'id': cap.id,
                 'descricao': (cap.descricao or '')[:120],
                 'fornecedor': str(cap.fornecedor) if cap.fornecedor_id else '',
+                'centro_custo': str(cap.centro_custo) if cap.centro_custo_id else '—',
                 'dt_emissao': cap.dtEmissao.isoformat() if cap.dtEmissao else None,
                 'dt_pag': cap.dtPag.isoformat() if cap.dtPag else None,
                 'dt_venc': cap.dtvenc.isoformat() if cap.dtvenc else None,
