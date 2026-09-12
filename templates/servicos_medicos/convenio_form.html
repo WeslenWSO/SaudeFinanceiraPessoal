@@ -4,40 +4,66 @@
    {% include 'parcial/_nav.html' %}
 {%endblock%}
 
-	 {%block conteudo%}
+{%block conteudo%}
 
+<form method="post" novalidate class="card">
+    {% csrf_token %}
+    {% if messages %}
+        {% include 'parcial/_messages.html' %}
+    {% endif %}
 
-	   <form method="post" novalidate class="card">
-		{%csrf_token %}
-		{% if messages %}
-		   {% include 'parcial/_messages.html' %}
-		{% endif %}
-	   {% for field in form %}
-		   {% if field.name == 'completed' %}
-			   <p>
-				   {{ field.label_tag }}
-				   {{ field }}
-			   </p>
-			   {% if field.errors %}
-				   <small class="error">{{ field.errors|striptags  }}</small>
-			   {% endif %}
-		   {% else %}
-			   {{ field.label_tag }}
-			   {{ field }}
-			   {% if field.errors %}
-				   <small class="error" style="color:red">{{ field.errors|striptags  }}</small>
-			   {% endif %}
-		   {% endif %}
-	   {% endfor %}
+    <div class="card-body">
+        <h5 class="mb-3">Dados do convênio</h5>
+        {% for field in form %}
+            {% if field.name != 'completed' %}
+                {% if field.name == 'empresa' or field.name == 'nome' or field.name == 'dia_fechamento' or field.name == 'dia_abertura' or field.name == 'observacao' %}
+                <div class="mb-3">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.errors %}
+                        <small class="error" style="color:red">{{ field.errors|striptags }}</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
 
-	   <div class="form-buttons">
-		   <input type="submit" value="Save" class="btn btn-primary"/>
-		   <a href="{%url 'servicos_medicos:convenio_list'%}" class="btn btn-cancel btn-outline">Cancel</a>
-	   </div>
+        <hr>
+        <h5 class="mb-3">Alíquotas de apuração (%)</h5>
+        <p class="small text-muted">Usadas na soma por viabilidade/convênio nos lançamentos de rateio.</p>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="id_aliquota_iss_ap">{{ form.aliquota_iss_ap.label }}</label>
+                {{ form.aliquota_iss_ap }}
+            </div>
+            <div class="col-md-4">
+                <label for="id_aliquota_pis_ap">{{ form.aliquota_pis_ap.label }}</label>
+                {{ form.aliquota_pis_ap }}
+            </div>
+            <div class="col-md-4">
+                <label for="id_aliquota_cofins_ap">{{ form.aliquota_cofins_ap.label }}</label>
+                {{ form.aliquota_cofins_ap }}
+            </div>
+            <div class="col-md-4">
+                <label for="id_aliquota_csll_ap">{{ form.aliquota_csll_ap.label }}</label>
+                {{ form.aliquota_csll_ap }}
+            </div>
+            <div class="col-md-4">
+                <label for="id_aliquota_irpj_ap">{{ form.aliquota_irpj_ap.label }}</label>
+                {{ form.aliquota_irpj_ap }}
+            </div>
+        </div>
+        {% for field in form %}
+            {% if field.name|slice:"-3:" == "_ap" and field.errors %}
+                <small class="error d-block mt-2" style="color:red">{{ field.label }}: {{ field.errors|striptags }}</small>
+            {% endif %}
+        {% endfor %}
+    </div>
 
-
-    </form>
-
-
+    <div class="card-footer form-buttons">
+        <input type="submit" value="Salvar" class="btn btn-primary"/>
+        <a href="{% url 'servicos_medicos:convenio_list' %}" class="btn btn-cancel btn-outline">Cancelar</a>
+    </div>
+</form>
 
 {%endblock%}

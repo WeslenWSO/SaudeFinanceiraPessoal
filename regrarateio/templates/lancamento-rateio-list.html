@@ -126,6 +126,10 @@
                             <i class="fas fa-filter"></i> Filtrar
                         </button>
                         <a href="{% url 'regrarateio:lancamentoRateioList' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                        <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalTotalConvenioViabilidade"
+                            title="Soma valores cuja viabilidade coincide com convênio cadastrado">
+                            <i class="fas fa-hospital"></i> Total convênio (viabilidade)
+                        </button>
                     </div>
                 </div>
                 <p class="small text-muted mb-0 mt-2">
@@ -1096,5 +1100,110 @@
     });
 })();
 </script>
+
+<div class="modal fade" id="modalTotalConvenioViabilidade" tabindex="-1" aria-labelledby="modalTotalConvenioViabilidadeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTotalConvenioViabilidadeLabel">Total por convênio (viabilidade)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">
+                    Soma dos lançamentos do filtro atual cuja coluna <strong>Viabilidade</strong> coincide com o
+                    <strong>nome do convênio</strong> cadastrado (ex.: PM, GEAP).
+                    Impostos de apuração usam as alíquotas do cadastro de convênio.
+                </p>
+                {% if not totais_convenio_viabilidade.tem_convenio_cadastrado %}
+                <div class="alert alert-warning py-2 small">
+                    Nenhum convênio cadastrado para esta empresa.
+                    <a href="{% url 'servicos_medicos:convenio_list' %}">Cadastrar convênios</a>
+                </div>
+                {% endif %}
+                {% if totais_convenio_viabilidade.linhas %}
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-striped align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Viabilidade / Convênio</th>
+                                <th class="text-end">Qtd.</th>
+                                <th class="text-end">Total (R$)</th>
+                                <th class="text-end">ISS ap.</th>
+                                <th class="text-end">PIS ap.</th>
+                                <th class="text-end">COFINS ap.</th>
+                                <th class="text-end">CSLL ap.</th>
+                                <th class="text-end">IRPJ ap.</th>
+                                <th class="text-end">Impostos ap.</th>
+                                <th class="text-end">Líquido ap.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lin in totais_convenio_viabilidade.linhas %}
+                            <tr>
+                                <td>
+                                    {{ lin.viabilidade }}
+                                    {% if lin.sem_aliquota %}
+                                    <span class="badge bg-secondary">sem alíquota</span>
+                                    {% elif lin.convenio_id %}
+                                    <a href="{% url 'servicos_medicos:convenio_update' lin.convenio_id %}" class="small ms-1" title="Editar alíquotas">editar</a>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ lin.qtd }}</td>
+                                <td class="text-end fw-semibold">R$ {{ lin.total_txt }}</td>
+                                <td class="text-end">R$ {{ lin.iss_ap_txt }}</td>
+                                <td class="text-end">R$ {{ lin.pis_ap_txt }}</td>
+                                <td class="text-end">R$ {{ lin.cofins_ap_txt }}</td>
+                                <td class="text-end">R$ {{ lin.csll_ap_txt }}</td>
+                                <td class="text-end">R$ {{ lin.irpj_ap_txt }}</td>
+                                <td class="text-end text-danger">R$ {{ lin.impostos_ap_txt }}</td>
+                                <td class="text-end text-success">R$ {{ lin.liquido_ap_txt }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary fw-semibold">
+                            <tr>
+                                <td colspan="2" class="text-end">Total convênios</td>
+                                <td class="text-end">R$ {{ totais_convenio_total_txt }}</td>
+                                <td colspan="6"></td>
+                                <td class="text-end text-danger">R$ {{ totais_convenio_impostos_txt }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-3">Nenhum lançamento com viabilidade igual a convênio cadastrado no filtro atual.</p>
+                {% endif %}
+
+                {% if totais_convenio_viabilidade.outros %}
+                <h6 class="small text-uppercase text-muted">Outras viabilidades (sem convênio cadastrado)</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead>
+                            <tr>
+                                <th>Viabilidade</th>
+                                <th class="text-end">Qtd.</th>
+                                <th class="text-end">Total (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for out in totais_convenio_viabilidade.outros %}
+                            <tr>
+                                <td>{{ out.viabilidade }}</td>
+                                <td class="text-end">{{ out.qtd }}</td>
+                                <td class="text-end">R$ {{ out.total_txt }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

@@ -484,6 +484,24 @@ class LancamentoRateioList(ListView):
             c.pop('_sort_pg', None)
         context['cards_socios'] = cards_socios
 
+        from regrarateio.convenio_viabilidade import coletar_totais_por_viabilidade_convenio
+
+        tot_conv = coletar_totais_por_viabilidade_convenio(empresa_id, qs_filtro)
+        for linha in tot_conv['linhas']:
+            linha['total_txt'] = _fmt_br_moeda(linha['total'])
+            linha['iss_ap_txt'] = _fmt_br_moeda(linha['iss_ap'])
+            linha['pis_ap_txt'] = _fmt_br_moeda(linha['pis_ap'])
+            linha['cofins_ap_txt'] = _fmt_br_moeda(linha['cofins_ap'])
+            linha['csll_ap_txt'] = _fmt_br_moeda(linha['csll_ap'])
+            linha['irpj_ap_txt'] = _fmt_br_moeda(linha['irpj_ap'])
+            linha['impostos_ap_txt'] = _fmt_br_moeda(linha['impostos_ap'])
+            linha['liquido_ap_txt'] = _fmt_br_moeda(linha['liquido_ap'])
+        for out in tot_conv['outros']:
+            out['total_txt'] = _fmt_br_moeda(out['total'])
+        context['totais_convenio_viabilidade'] = tot_conv
+        context['totais_convenio_total_txt'] = _fmt_br_moeda(tot_conv['total_geral'])
+        context['totais_convenio_impostos_txt'] = _fmt_br_moeda(tot_conv['total_impostos_ap'])
+
         return context
 
 

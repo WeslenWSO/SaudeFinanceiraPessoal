@@ -25,6 +25,36 @@ class Convenio(models.Model):
         default='',
         help_text='Particularidades e regras específicas deste convênio.',
     )
+    aliquota_iss_ap = models.DecimalField(
+        verbose_name='ISS apuração (%)',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+    )
+    aliquota_pis_ap = models.DecimalField(
+        verbose_name='PIS apuração (%)',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+    )
+    aliquota_cofins_ap = models.DecimalField(
+        verbose_name='COFINS apuração (%)',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+    )
+    aliquota_csll_ap = models.DecimalField(
+        verbose_name='CSLL apuração (%)',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+    )
+    aliquota_irpj_ap = models.DecimalField(
+        verbose_name='IRPJ apuração (%)',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+    )
 
     class Meta:
         verbose_name = 'Convênio'

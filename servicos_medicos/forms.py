@@ -4,11 +4,27 @@ from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 class ConvenioForm(forms.ModelForm):
     class Meta:
         model = Convenio
-        fields = ['empresa', 'nome', 'dia_fechamento', 'dia_abertura', 'observacao']
+        fields = [
+            'empresa',
+            'nome',
+            'dia_fechamento',
+            'dia_abertura',
+            'observacao',
+            'aliquota_iss_ap',
+            'aliquota_pis_ap',
+            'aliquota_cofins_ap',
+            'aliquota_csll_ap',
+            'aliquota_irpj_ap',
+        ]
         widgets = {
             'dia_fechamento': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
             'dia_abertura': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
             'observacao': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'aliquota_iss_ap': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'aliquota_pis_ap': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'aliquota_cofins_ap': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'aliquota_csll_ap': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'aliquota_irpj_ap': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -17,6 +33,14 @@ class ConvenioForm(forms.ModelForm):
         self.fields['dia_fechamento'].label = 'Dia para fechamento'
         self.fields['dia_abertura'].label = 'Dia para abertura'
         self.fields['observacao'].label = 'Observação (particularidades do convênio)'
+        for name in (
+            'aliquota_iss_ap',
+            'aliquota_pis_ap',
+            'aliquota_cofins_ap',
+            'aliquota_csll_ap',
+            'aliquota_irpj_ap',
+        ):
+            self.fields[name].label = self.fields[name].label.replace(' apuração', ' (apuração)')
 
 class ServicosMedicosForm(forms.ModelForm):
     class Meta:
