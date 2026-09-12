@@ -181,23 +181,29 @@ def _parse_codigo_ordenacao(texto: str) -> tuple[int, ...] | None:
         return None
 
 
+def _codigo_tupla_ordenacao(cod: tuple[int, ...] | None, *, fallback: int = 999) -> tuple[int, int, int]:
+    """Normaliza códigos 4 / 4.03 / 4.03.01 em tupla fixa (evita str vs int no sort)."""
+    if not cod:
+        return (fallback, 0, 0)
+    partes = list(cod) + [0, 0, 0]
+    return (partes[0], partes[1], partes[2])
+
+
 def _chave_ordenacao_grupo(nome_grupo: str) -> tuple:
     """Ordena grupos pelo código do plano de contas (4.01, 4.02, 4.03…)."""
     nome = (nome_grupo or 'Outros').strip()
     if nome.lower() == 'outros':
         # Categorias sem grupo CA — após 4.03, antes de 4.04+
-        return (4, 3, 1)
+        return (4, 3, 1, '')
     cod = _parse_codigo_ordenacao(nome)
     if cod:
-        return (*cod, 0)
-    return (999, 999, nome.lower())
+        return (*_codigo_tupla_ordenacao(cod), '')
+    return (999, 999, 0, nome.lower())
 
 
 def _chave_ordenacao_categoria(cat: Categoria) -> tuple:
     cod = _parse_codigo_ordenacao(cat.classificacao or '')
-    if cod:
-        return (*cod, (cat.nome or '').lower())
-    return (999, (cat.nome or '').lower())
+    return (*_codigo_tupla_ordenacao(cod), (cat.nome or '').lower())
 
 
 def _ordenar_grupos(categorias: list[Categoria]) -> list[tuple[str, list[Categoria]]]:
