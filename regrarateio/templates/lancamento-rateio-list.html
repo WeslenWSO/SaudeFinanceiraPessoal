@@ -35,48 +35,61 @@
     #modalTotalConvenioViabilidade .modal-body,
     #modalTotalObsForma .modal-body {
         overflow-y: auto;
+        width: 100%;
     }
     .rfr-convenio-panel {
         border: 1px solid #dee2e6;
         border-radius: 0.25rem;
         overflow: hidden;
+        width: 100%;
+    }
+    .rfr-convenio-scroll {
+        width: 100%;
+        max-height: calc(90vh - 480px);
+        min-height: 200px;
+        overflow: auto;
     }
     .rfr-convenio-grade {
-        table-layout: fixed;
         width: 100%;
+        min-width: 100%;
         margin-bottom: 0;
+        table-layout: auto;
     }
     .rfr-convenio-grade th,
     .rfr-convenio-grade td {
+        vertical-align: middle;
+    }
+    .rfr-convenio-grade thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background-color: #212529 !important;
+        white-space: nowrap;
+    }
+    .rfr-convenio-grade th:first-child,
+    .rfr-convenio-grade td:first-child {
+        min-width: 11rem;
+        max-width: 20rem;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .rfr-convenio-grade thead,
-    .rfr-convenio-grade tbody tr,
-    .rfr-convenio-grade tfoot tr {
-        display: table;
-        width: 100%;
-        table-layout: fixed;
-    }
-    .rfr-convenio-grade tbody {
-        display: block;
-        max-height: calc(90vh - 480px);
-        min-height: 200px;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-    .rfr-convenio-grade thead th {
-        background-color: #212529 !important;
+    .rfr-convenio-grade th.text-end,
+    .rfr-convenio-grade td.text-end {
+        white-space: nowrap;
     }
     .rfr-convenio-totalizadores-head {
         background: #f8f9fa;
         border-bottom: 1px solid #dee2e6;
     }
-    .rfr-convenio-grade tfoot {
-        background: #f8f9fa;
-        font-size: 0.875rem;
-    }
     .rfr-convenio-grade tfoot td {
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
+        background: #f8f9fa;
+        box-shadow: 0 -1px 0 #dee2e6;
+        font-size: 0.875rem;
+        font-weight: 600;
         padding: 0.35rem 0.5rem;
         vertical-align: middle;
     }
@@ -1381,23 +1394,6 @@
         preencherDatasPadraoModalCar();
     });
 
-    if (new URLSearchParams(window.location.search).get('abrir_convenio') === '1') {
-        var modalConv = document.getElementById('modalTotalConvenioViabilidade');
-        if (modalConv && window.bootstrap && bootstrap.Modal) {
-            bootstrap.Modal.getOrCreateInstance(modalConv).show();
-        }
-    }
-
-    var modalConvenioViab = document.getElementById('modalTotalConvenioViabilidade');
-    if (modalConvenioViab && window.RateioModal) {
-        modalConvenioViab.addEventListener('shown.bs.modal', function () {
-            var tblConv = modalConvenioViab.querySelector('.rfr-convenio-grade');
-            if (!tblConv) return;
-            var tbodyConv = tblConv.querySelector('tbody');
-            if (!tbodyConv || !tbodyConv.querySelector('tr[data-sort-row]')) return;
-            RateioModal.initSortableTable(tblConv, tbodyConv, 'tr[data-sort-row]');
-        });
-    }
 })();
 </script>
 
@@ -1534,35 +1530,22 @@
                         <span class="fw-semibold small text-uppercase text-muted">Totalizadores</span>
                         <span class="badge bg-secondary">Mês: {{ convenio_periodo_label }}</span>
                     </div>
-                    <table class="table table-sm table-striped align-middle rfr-convenio-grade">
-                        <colgroup>
-                            <col style="width: 18%">
-                            <col style="width: 4%">
-                            <col style="width: 7%">
-                            <col style="width: 6%">
-                            <col style="width: 5%">
-                            <col style="width: 6%">
-                            <col style="width: 5%">
-                            <col style="width: 6%">
-                            <col style="width: 7%">
-                            <col style="width: 7%">
-                            <col style="width: 8%">
-                            <col style="width: 15%">
-                        </colgroup>
+                    <div class="rfr-convenio-scroll">
+                    <table class="table table-sm table-striped align-middle rfr-convenio-grade w-100 mb-0">
                         <thead class="table-dark">
                             <tr>
-                                <th data-sortable data-col="viabilidade" data-sort-type="text">Viabilidade / Convênio</th>
-                                <th class="text-end" data-sortable data-col="qtd" data-sort-type="num">Qtd.</th>
-                                <th class="text-end" data-sortable data-col="total" data-sort-type="num">Total (R$)</th>
-                                <th class="text-end" data-sortable data-col="iss_ap" data-sort-type="num">ISS ap.</th>
-                                <th class="text-end" data-sortable data-col="pis_ap" data-sort-type="num">PIS ap.</th>
-                                <th class="text-end" data-sortable data-col="cofins_ap" data-sort-type="num">COFINS ap.</th>
-                                <th class="text-end" data-sortable data-col="csll_ap" data-sort-type="num">CSLL ap.</th>
-                                <th class="text-end" data-sortable data-col="irpj_ap" data-sort-type="num">IRPJ ap.</th>
-                                <th class="text-end" data-sortable data-col="impostos_ap" data-sort-type="num">Impostos ap.</th>
-                                <th class="text-end" data-sortable data-col="ad_irpj" data-sort-type="num">Ad. IRPJ</th>
-                                <th class="text-end" data-sortable data-col="total_imposto" data-sort-type="num">Total imposto</th>
-                                <th class="text-end" data-sortable data-col="liquido_ap" data-sort-type="num">Líquido ap.</th>
+                                <th data-sortable data-col="viabilidade" data-sort-type="text" title="Clique para ordenar">Viabilidade / Convênio</th>
+                                <th class="text-end" data-sortable data-col="qtd" data-sort-type="num" title="Clique para ordenar">Qtd.</th>
+                                <th class="text-end" data-sortable data-col="total" data-sort-type="num" title="Clique para ordenar">Total (R$)</th>
+                                <th class="text-end" data-sortable data-col="iss_ap" data-sort-type="num" title="Clique para ordenar">ISS ap.</th>
+                                <th class="text-end" data-sortable data-col="pis_ap" data-sort-type="num" title="Clique para ordenar">PIS ap.</th>
+                                <th class="text-end" data-sortable data-col="cofins_ap" data-sort-type="num" title="Clique para ordenar">COFINS ap.</th>
+                                <th class="text-end" data-sortable data-col="csll_ap" data-sort-type="num" title="Clique para ordenar">CSLL ap.</th>
+                                <th class="text-end" data-sortable data-col="irpj_ap" data-sort-type="num" title="Clique para ordenar">IRPJ ap.</th>
+                                <th class="text-end" data-sortable data-col="impostos_ap" data-sort-type="num" title="Clique para ordenar">Impostos ap.</th>
+                                <th class="text-end" data-sortable data-col="ad_irpj" data-sort-type="num" title="Clique para ordenar">Ad. IRPJ</th>
+                                <th class="text-end" data-sortable data-col="total_imposto" data-sort-type="num" title="Clique para ordenar">Total imposto</th>
+                                <th class="text-end" data-sortable data-col="liquido_ap" data-sort-type="num" title="Clique para ordenar">Líquido ap.</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1619,6 +1602,7 @@
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                 </div>
                 {% else %}
                 <p class="text-muted mb-3">Nenhum lançamento com viabilidade igual a convênio cadastrado no filtro atual.</p>
@@ -1654,6 +1638,29 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var modalConvenioViab = document.getElementById('modalTotalConvenioViabilidade');
+    if (!modalConvenioViab) return;
+
+    if (new URLSearchParams(window.location.search).get('abrir_convenio') === '1') {
+        if (window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalConvenioViab).show();
+        }
+    }
+
+    if (window.RateioModal) {
+        modalConvenioViab.addEventListener('shown.bs.modal', function () {
+            var tblConv = modalConvenioViab.querySelector('.rfr-convenio-grade');
+            if (!tblConv) return;
+            var tbodyConv = tblConv.querySelector('tbody');
+            if (!tbodyConv || !tbodyConv.querySelector('tr[data-sort-row]')) return;
+            RateioModal.initSortableTable(tblConv, tbodyConv, 'tr[data-sort-row]');
+        });
+    }
+})();
+</script>
 
 {{ obs_forma_totalizadores_json|json_script:"obs-forma-dados" }}
 <script>
