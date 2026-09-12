@@ -119,11 +119,6 @@
         content: ' ▼';
         opacity: 0.85;
     }
-    .table-lr-list th.lr-th-sortable a {
-        color: inherit;
-        text-decoration: none;
-        display: inline-block;
-    }
     .rfr-obs-forma-scroll thead th {
         position: sticky;
         top: 0;
@@ -237,6 +232,8 @@
                             {% endfor %}
                         </select>
                     </div>
+                    {% if sort_col %}<input type="hidden" name="sort" value="{{ sort_col }}">{% endif %}
+                    {% if sort_col %}<input type="hidden" name="dir" value="{{ sort_dir }}">{% endif %}
                     <div class="col-12 col-lg-auto d-flex flex-wrap gap-2 ms-lg-auto">
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-filter"></i> Filtrar
@@ -260,29 +257,43 @@
                 <table class="table table-striped table-hover table-sm table-lr-list">
                     <thead class="table-dark">
                         <tr>
-                            <th class="lr-th-sortable{% if sort_col == 'id' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.id }}">ID</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'origem' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.origem }}">Origem</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'titulo' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.titulo }}">ID título</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'modalidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.modalidade }}">Modalidade</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'viabilidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.viabilidade }}">Viabilidade</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'obs_forma' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.obs_forma }}">Obs. forma</a></th>
+                            <th class="lr-th-sortable{% if sort_col == 'id' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="id" data-sort-type="num" data-sort-url="{{ sort_urls.id }}" title="Clique para ordenar">ID</th>
+                            <th class="lr-th-sortable{% if sort_col == 'origem' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="origem" data-sort-type="text" data-sort-url="{{ sort_urls.origem }}" title="Clique para ordenar">Origem</th>
+                            <th class="lr-th-sortable{% if sort_col == 'titulo' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="titulo" data-sort-type="num" data-sort-url="{{ sort_urls.titulo }}" title="Clique para ordenar">ID título</th>
+                            <th class="lr-th-sortable{% if sort_col == 'modalidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="modalidade" data-sort-type="text" data-sort-url="{{ sort_urls.modalidade }}" title="Clique para ordenar">Modalidade</th>
+                            <th class="lr-th-sortable{% if sort_col == 'viabilidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="viabilidade" data-sort-type="text" data-sort-url="{{ sort_urls.viabilidade }}" title="Clique para ordenar">Viabilidade</th>
+                            <th class="lr-th-sortable{% if sort_col == 'obs_forma' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="obs_forma" data-sort-type="text" data-sort-url="{{ sort_urls.obs_forma }}" title="Clique para ordenar">Obs. forma</th>
                             <th>Nota</th>
                             <th>Cobrança</th>
                             <th>Conta / Caixa</th>
-                            <th class="text-end lr-th-sortable{% if sort_col == 'valor_bruto' %} lr-th-sorted-{{ sort_dir }}{% endif %}" title="Valor do documento (CAP) ou valor da parcela (CAR)"><a href="{{ sort_urls.valor_bruto }}">Valor bruto título</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'data' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.data }}">Data</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'tipo' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.tipo }}">Tipo</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'descricao' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.descricao }}">Descrição</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'regra' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.regra }}">Regra</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'socio' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.socio }}">Sócio</a></th>
-                            <th class="lr-th-sortable{% if sort_col == 'obs_rateio' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.obs_rateio }}">Obs. rateio</a></th>
-                            <th class="text-end lr-th-sortable{% if sort_col == 'valor' %} lr-th-sorted-{{ sort_dir }}{% endif %}"><a href="{{ sort_urls.valor }}">Valor</a></th>
+                            <th class="text-end lr-th-sortable{% if sort_col == 'valor_bruto' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="valor_bruto" data-sort-type="num" data-sort-url="{{ sort_urls.valor_bruto }}" title="Valor do documento (CAP) ou valor da parcela (CAR). Clique para ordenar">Valor bruto título</th>
+                            <th class="lr-th-sortable{% if sort_col == 'data' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="data" data-sort-type="date" data-sort-url="{{ sort_urls.data }}" title="Clique para ordenar">Data</th>
+                            <th class="lr-th-sortable{% if sort_col == 'tipo' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="tipo" data-sort-type="text" data-sort-url="{{ sort_urls.tipo }}" title="Clique para ordenar">Tipo</th>
+                            <th class="lr-th-sortable{% if sort_col == 'descricao' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="descricao" data-sort-type="text" data-sort-url="{{ sort_urls.descricao }}" title="Clique para ordenar">Descrição</th>
+                            <th class="lr-th-sortable{% if sort_col == 'regra' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="regra" data-sort-type="text" data-sort-url="{{ sort_urls.regra }}" title="Clique para ordenar">Regra</th>
+                            <th class="lr-th-sortable{% if sort_col == 'socio' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="socio" data-sort-type="text" data-sort-url="{{ sort_urls.socio }}" title="Clique para ordenar">Sócio</th>
+                            <th class="lr-th-sortable{% if sort_col == 'obs_rateio' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="obs_rateio" data-sort-type="text" data-sort-url="{{ sort_urls.obs_rateio }}" title="Clique para ordenar">Obs. rateio</th>
+                            <th class="text-end lr-th-sortable{% if sort_col == 'valor' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="valor" data-sort-type="num" data-sort-url="{{ sort_urls.valor }}" title="Clique para ordenar">Valor</th>
                             <th class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in object_list %}
-                        <tr>
+                        <tr data-sort-row
+                            data-sort-id="{{ row.id }}"
+                            data-sort-origem="{{ row.origem_exibicao|escape }}"
+                            data-sort-titulo="{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}"
+                            data-sort-modalidade="{{ row.modalidade_exibicao|escape }}"
+                            data-sort-viabilidade="{{ row.viabilidade_exibicao|escape }}"
+                            data-sort-obs_forma="{{ row.obs_forma_exibicao|escape }}"
+                            data-sort-valor_bruto="{% if row.conta_pagar_id %}{{ row.conta_pagar.valorDoc }}{% else %}{{ row.conta_receber.valor_a_receber }}{% endif %}"
+                            data-sort-data="{{ row.data_pagamento|date:'Y-m-d' }}"
+                            data-sort-tipo="{{ row.tipo }}"
+                            data-sort-descricao="{{ row.descricao|escape }}"
+                            data-sort-regra="{{ row.regra_rateio|escape }}"
+                            data-sort-socio="{{ row.socio|escape }}"
+                            data-sort-obs_rateio="{{ row.obs_rateio_exibicao|escape }}"
+                            data-sort-valor="{{ row.valor }}">
                             <td>{{ row.id }}</td>
                             <td>{{ row.origem_exibicao }}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
@@ -753,8 +764,11 @@
         },
         clearSortHeaders: function (table) {
             if (!table) return;
-            table.querySelectorAll('th.rateio-th-sortable').forEach(function (th) {
-                th.classList.remove('rateio-th-sorted-asc', 'rateio-th-sorted-desc');
+            table.querySelectorAll('th.rateio-th-sortable, th.lr-th-sortable').forEach(function (th) {
+                th.classList.remove(
+                    'rateio-th-sorted-asc', 'rateio-th-sorted-desc',
+                    'lr-th-sorted-asc', 'lr-th-sorted-desc'
+                );
             });
         },
         resetTableSort: function (table) {
@@ -789,6 +803,45 @@
     };
     RateioModal.load();
     window.RateioModal = RateioModal;
+
+    (function initListaLancamentoSort() {
+        var tbl = document.querySelector('.table-lr-list');
+        if (!tbl) return;
+        var tbody = tbl.querySelector('tbody');
+        tbl.querySelectorAll('th[data-sortable]').forEach(function (th) {
+            th.setAttribute('role', 'button');
+            th.setAttribute('tabindex', '0');
+            function ordenar() {
+                var url = (th.getAttribute('data-sort-url') || '').trim();
+                if (url && url.indexOf('sort=') >= 0) {
+                    window.location.href = url;
+                    return;
+                }
+                if (!tbody) return;
+                var col = th.getAttribute('data-col');
+                var type = th.getAttribute('data-sort-type') || 'text';
+                if (!col) return;
+                if (!tbl._lrListSortState) tbl._lrListSortState = { col: null, dir: 'asc' };
+                var st = tbl._lrListSortState;
+                if (st.col === col) {
+                    st.dir = st.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    st.col = col;
+                    st.dir = 'asc';
+                }
+                RateioModal.clearSortHeaders(tbl);
+                RateioModal.sortTbody(tbody, col, type, st.dir, 'tr[data-sort-row]');
+                th.classList.add(st.dir === 'asc' ? 'lr-th-sorted-asc' : 'lr-th-sorted-desc');
+            }
+            th.addEventListener('click', ordenar);
+            th.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    ordenar();
+                }
+            });
+        });
+    })();
 })();
 </script>
 
