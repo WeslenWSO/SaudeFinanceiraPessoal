@@ -219,6 +219,7 @@
                             <th>Obs. forma</th>
                             <th>Nota</th>
                             <th>Cobrança</th>
+                            <th>Conta / Caixa</th>
                             <th class="text-end" title="Valor do documento (CAP) ou valor da parcela (CAR)">Valor bruto título</th>
                             <th>Data</th>
                             <th>Tipo</th>
@@ -241,6 +242,7 @@
                             <td><small>{{ row.obs_forma_exibicao|truncatechars:30 }}</small></td>
                             <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar.cobranca }}{% elif row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento }}{% else %}—{% endif %}</td>
+                            <td><small title="{{ row.conta_bancaria_exibicao }}">{{ row.conta_bancaria_exibicao|truncatechars:40 }}</small></td>
                             <td class="text-end text-nowrap">{% if row.conta_pagar_id %}R$ {{ row.conta_pagar.valorDoc|floatformat:2 }}{% else %}R$ {{ row.conta_receber.valor_a_receber|floatformat:2 }}{% endif %}</td>
                             <td>{{ row.data_pagamento|date:"d/m/Y"|default:"—" }}</td>
                             <td>{{ row.get_tipo_display }}</td>
@@ -261,7 +263,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="17" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
+                            <td colspan="18" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

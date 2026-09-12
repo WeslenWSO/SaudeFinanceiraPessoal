@@ -236,6 +236,39 @@ class LancamentoRateio(models.Model):
             return self.conta_receber.doc
         return '—'
 
+    def conta_bancaria_exibicao(self) -> str:
+        """Conta bancária ou caixa em que o título foi pago ou recebido."""
+        if self.conta_pagar_id:
+            cap = self.conta_pagar
+            if cap and cap.conta_banco_id:
+                return str(cap.conta_banco)
+            return '—'
+        if self.conta_receber_id:
+            car = self.conta_receber
+            if car and car.conta_banco_id:
+                return str(car.conta_banco)
+            baixas = getattr(car, 'baixas_ordenadas', None) if car else None
+            if baixas is not None:
+                for baixa in baixas:
+                    if baixa.conta_banco_id:
+                        return str(baixa.conta_banco)
+            elif car:
+                from contasareceber.models import BaixaContaAReceber
+
+                baixa = (
+                    BaixaContaAReceber.objects.filter(
+                        conta_a_receber_id=car.pk,
+                        conta_banco__isnull=False,
+                    )
+                    .select_related('conta_banco', 'conta_banco__banco')
+                    .order_by('-data_recebimento', '-id')
+                    .first()
+                )
+                if baixa and baixa.conta_banco_id:
+                    return str(baixa.conta_banco)
+            return '—'
+        return '—'
+
     def __str__(self):
         origem = self.conta_pagar_id or self.conta_receber_id
         return f'{self.get_tipo_display()} #{origem} — {self.socio} — {self.valor}'

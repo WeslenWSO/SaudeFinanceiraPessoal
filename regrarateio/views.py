@@ -346,15 +346,33 @@ class LancamentoRateioList(ListView):
     template_name = 'lancamento-rateio-list.html'
 
     def get_queryset(self):
+        from contasareceber.models import BaixaContaAReceber
+        from django.db.models import Prefetch
+
+        baixas_qs = BaixaContaAReceber.objects.select_related(
+            'conta_banco',
+            'conta_banco__banco',
+        ).order_by('-data_recebimento', '-id')
+
         qs = LancamentoRateio.objects.select_related(
             'regra_rateio',
             'socio',
             'conta_pagar',
             'conta_pagar__categoria',
             'conta_pagar__cobranca',
+            'conta_pagar__conta_banco',
+            'conta_pagar__conta_banco__banco',
             'conta_receber',
             'conta_receber__nota',
             'conta_receber__forma_pagamento',
+            'conta_receber__conta_banco',
+            'conta_receber__conta_banco__banco',
+        ).prefetch_related(
+            Prefetch(
+                'conta_receber__baixas',
+                queryset=baixas_qs,
+                to_attr='baixas_ordenadas',
+            ),
         )
         empresa_id = self.request.session.get('empresa_id')
         if empresa_id:
