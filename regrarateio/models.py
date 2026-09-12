@@ -229,6 +229,19 @@ class LancamentoRateio(models.Model):
         meta = self._meta_car()
         return meta.get('procedimento') or meta.get('paciente') or '—'
 
+    def obs_rateio_exibicao(self) -> str:
+        """Observação informada na edição do rateio; recebimentos importados não usam este campo."""
+        obs = (self.obs or '').strip()
+        if not obs or self.tipo != self.TIPO_RECEBIMENTO:
+            return obs
+        if self.origem == self.ORIGEM_IMPORTACAO:
+            meta = self._meta_car()
+            proc = (meta.get('procedimento') or '').strip()
+            pac = (meta.get('paciente') or '').strip()
+            if obs == proc or obs == pac:
+                return ''
+        return obs
+
     def obs_forma_exibicao(self) -> str:
         if self.obs_forma:
             return self.obs_forma

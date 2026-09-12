@@ -628,12 +628,10 @@ def _importar_linha_receita(
         car.delete()
         return 0, 0, 0, [f"Linha {ln['linha']}: {exc}"]
 
-    obs_resumo = (procedimento or paciente)[:255]
     LancamentoRateio.objects.filter(conta_receber=car).update(
         origem=LancamentoRateio.ORIGEM_IMPORTACAO,
         modalidade=modalidade[:30],
         viabilidade=viabilidade[:120],
-        obs=obs_resumo,
         obs_forma=obs_forma[:120],
     )
 

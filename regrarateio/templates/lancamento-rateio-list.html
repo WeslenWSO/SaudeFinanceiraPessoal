@@ -250,7 +250,6 @@
                             <th>ID título</th>
                             <th>Modalidade</th>
                             <th>Viabilidade</th>
-                            <th>Obs.</th>
                             <th>Obs. forma</th>
                             <th>Nota</th>
                             <th>Cobrança</th>
@@ -274,7 +273,6 @@
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
                             <td>{{ row.modalidade_exibicao }}</td>
                             <td><small>{{ row.viabilidade_exibicao|truncatechars:40 }}</small></td>
-                            <td><small>{{ row.obs_exibicao|truncatechars:40 }}</small></td>
                             <td><small>{{ row.obs_forma_exibicao|truncatechars:30 }}</small></td>
                             <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar.cobranca }}{% elif row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento }}{% else %}—{% endif %}</td>
@@ -285,7 +283,7 @@
                             <td>{{ row.descricao|truncatechars:40 }}</td>
                             <td>{{ row.regra_rateio }}</td>
                             <td>{{ row.socio }}</td>
-                            <td><small title="{{ row.obs }}">{% if row.obs %}{{ row.obs|truncatechars:40 }}{% else %}—{% endif %}</small></td>
+                            <td><small title="{{ row.obs_rateio_exibicao }}">{% if row.obs_rateio_exibicao %}{{ row.obs_rateio_exibicao|truncatechars:40 }}{% else %}—{% endif %}</small></td>
                             <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor }}</td>
                             <td class="text-end text-nowrap">
                                 <div class="btn-group btn-group-sm" role="group">
@@ -300,7 +298,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="19" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
+                            <td colspan="18" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -798,7 +798,7 @@ def _obs_inicial_grupo_rateio(linhas_qs):
     linhas = list(linhas_qs)
     if not linhas:
         return ''
-    return (linhas[0].obs or '').strip()[:255]
+    return linhas[0].obs_rateio_exibicao()[:255]
 
 
 def _linhas_atuais_com_perc(linhas_qs, valor_base, regra):
@@ -822,7 +822,7 @@ def _linhas_atuais_com_perc(linhas_qs, valor_base, regra):
                 'valor': row.valor,
                 'valor_txt': _fmt_br_decimal(row.valor),
                 'perc': perc,
-                'obs': (row.obs or '').strip(),
+                'obs': row.obs_rateio_exibicao(),
             }
         )
     return rows
