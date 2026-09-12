@@ -478,18 +478,33 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-2 mb-3 align-items-end">
-                    <div class="col-md-4">
+                <div class="row g-2 mb-2 align-items-end">
+                    <div class="col-md-3 col-lg-2">
                         <label for="rateio-cap-pagos-di" class="form-label">Data inicial</label>
                         <input type="date" id="rateio-cap-pagos-di" class="form-control form-control-sm" required
                                value="{{ filtro_data_inicio }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3 col-lg-2">
                         <label for="rateio-cap-pagos-df" class="form-label">Data final</label>
                         <input type="date" id="rateio-cap-pagos-df" class="form-control form-control-sm" required
                                value="{{ filtro_data_fim }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 col-lg-3">
+                        <label for="rateio-cap-pagos-centro-custo" class="form-label">Centro de custo</label>
+                        <input type="text" id="rateio-cap-pagos-centro-custo" class="form-control form-control-sm"
+                               placeholder="Contém…" autocomplete="off">
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="rateio-cap-pagos-descricao" class="form-label">Descrição</label>
+                        <input type="text" id="rateio-cap-pagos-descricao" class="form-control form-control-sm"
+                               placeholder="Contém…" autocomplete="off">
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="rateio-cap-pagos-fornecedor" class="form-label">Fornecedor</label>
+                        <input type="text" id="rateio-cap-pagos-fornecedor" class="form-control form-control-sm"
+                               placeholder="Contém…" autocomplete="off">
+                    </div>
+                    <div class="col-md-4 col-lg-2">
                         <button type="button" class="btn btn-outline-success btn-sm w-100" id="btn-buscar-cap-pagos-rateio">
                             <i class="fas fa-search"></i> Buscar contas pagas
                         </button>
@@ -1050,6 +1065,9 @@
     const checkAll = document.getElementById('rateio-cap-pagos-check-all');
     const inpDi = document.getElementById('rateio-cap-pagos-di');
     const inpDf = document.getElementById('rateio-cap-pagos-df');
+    const inpCentro = document.getElementById('rateio-cap-pagos-centro-custo');
+    const inpDescricao = document.getElementById('rateio-cap-pagos-descricao');
+    const inpFornecedor = document.getElementById('rateio-cap-pagos-fornecedor');
     const selRegra = document.getElementById('regra-rateio-modal-pagos');
     const ajudaRegra = document.getElementById('rateio-cap-pagos-ajuda-regra');
     const tablePagos = tbody ? tbody.closest('table') : null;
@@ -1111,7 +1129,14 @@
         loadingEl.classList.remove('d-none');
         btnBuscar.disabled = true;
 
-        const fetchUrl = urlBase + '?data_inicio=' + encodeURIComponent(di) + '&data_fim=' + encodeURIComponent(df) + '&somente_pagos=1';
+        var params = new URLSearchParams();
+        params.set('data_inicio', di);
+        params.set('data_fim', df);
+        params.set('somente_pagos', '1');
+        if (inpCentro && inpCentro.value.trim()) params.set('centro_custo', inpCentro.value.trim());
+        if (inpDescricao && inpDescricao.value.trim()) params.set('descricao', inpDescricao.value.trim());
+        if (inpFornecedor && inpFornecedor.value.trim()) params.set('fornecedor', inpFornecedor.value.trim());
+        const fetchUrl = urlBase + '?' + params.toString();
 
         fetch(fetchUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })

@@ -1097,6 +1097,9 @@ def contas_pagar_rateio_candidatas(request):
         return JsonResponse({'erro': 'A data inicial não pode ser maior que a final.'}, status=400)
 
     somente_pagos = (request.GET.get('somente_pagos') or '').strip() == '1'
+    filtro_descricao = (request.GET.get('descricao') or '').strip()
+    filtro_fornecedor = (request.GET.get('fornecedor') or '').strip()
+    filtro_centro_custo = (request.GET.get('centro_custo') or '').strip()
 
     try:
         contas = query_contas_pagar_rateio_candidatas(
@@ -1104,6 +1107,9 @@ def contas_pagar_rateio_candidatas(request):
             di,
             df,
             alinhado_grade_resumo=somente_pagos,
+            filtro_descricao=filtro_descricao,
+            filtro_fornecedor=filtro_fornecedor,
+            filtro_centro_custo=filtro_centro_custo,
         )
     except Exception as exc:
         return JsonResponse({'erro': str(exc)}, status=500)

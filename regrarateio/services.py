@@ -272,6 +272,9 @@ def query_contas_pagar_rateio_candidatas(
     socio_ids=None,
     *,
     alinhado_grade_resumo=False,
+    filtro_descricao=None,
+    filtro_fornecedor=None,
+    filtro_centro_custo=None,
 ):
     """
     Lista despesas sem pagamento no período para a empresa (inclui sem regra),
@@ -312,6 +315,16 @@ def query_contas_pagar_rateio_candidatas(
             .distinct()
         )
         qs = qs.filter(rateio_id__in=regra_ids_com_socio)
+
+    desc_f = (filtro_descricao or '').strip()
+    if desc_f:
+        qs = qs.filter(descricao__icontains=desc_f)
+    forn_f = (filtro_fornecedor or '').strip()
+    if forn_f:
+        qs = qs.filter(fornecedor__razao__icontains=forn_f)
+    cc_f = (filtro_centro_custo or '').strip()
+    if cc_f:
+        qs = qs.filter(centro_custo__nome__icontains=cc_f)
 
     caps = list(qs)
     ids = [c.id for c in caps]
