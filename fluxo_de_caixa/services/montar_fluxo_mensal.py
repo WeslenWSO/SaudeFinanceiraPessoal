@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
@@ -166,17 +167,44 @@ def _plan_soma(mapa_plan, categorias, mes: int) -> Decimal:
     return sum(_plan_cat(mapa_plan, c.id, mes) for c in categorias)
 
 
+def _parse_codigo_ordenacao(texto: str) -> tuple[int, ...] | None:
+    """Extrai tupla numérica de '4.03 DESPESAS...' ou '4.05.01'."""
+    if not texto:
+        return None
+    token = texto.strip().replace('-', ' ').split()[0]
+    m = re.match(r'^(\d+(?:\.\d+)*)', token)
+    if not m:
+        return None
+    try:
+        return tuple(int(p) for p in m.group(1).split('.'))
+    except ValueError:
+        return None
+
+
+def _chave_ordenacao_grupo(nome_grupo: str) -> tuple:
+    """Ordena grupos pelo código do plano de contas (4.01, 4.02, 4.03…)."""
+    nome = (nome_grupo or 'Outros').strip()
+    if nome.lower() == 'outros':
+        # Categorias sem grupo CA — após 4.03, antes de 4.04+
+        return (4, 3, 1)
+    cod = _parse_codigo_ordenacao(nome)
+    if cod:
+        return (*cod, 0)
+    return (999, 999, nome.lower())
+
+
+def _chave_ordenacao_categoria(cat: Categoria) -> tuple:
+    cod = _parse_codigo_ordenacao(cat.classificacao or '')
+    if cod:
+        return (*cod, (cat.nome or '').lower())
+    return (999, (cat.nome or '').lower())
+
+
 def _ordenar_grupos(categorias: list[Categoria]) -> list[tuple[str, list[Categoria]]]:
     buckets: dict[str, list[Categoria]] = defaultdict(list)
     for cat in categorias:
         buckets[cat.grupo or 'Outros'].append(cat)
-    return sorted(
-        buckets.items(),
-        key=lambda item: (
-            min(c.classificacao or 'z' for c in item[1]),
-            item[0].lower(),
-        ),
-    )
+    return sorted(buckets.items(), key=lambda item: _chave_ordenacao_grupo(item[0]))
 
 
 def _titulo_grupo(nome: str) -> str:
@@ -219,7 +247,7 @@ def _bloco_categorias_planilha(
 ) -> list[dict]:
     linhas: list[dict] = []
     for _idx, (nome_grupo, cats) in enumerate(_ordenar_grupos(categorias), 1):
-        cats_ord = sorted(cats, key=lambda c: (c.classificacao or '', c.nome))
+        cats_ord = sorted(cats, key=_chave_ordenacao_categoria)
         itens: list[dict] = []
         vals_grupo = _zeros(len(list(meses)))
         for cat in cats_ord:
@@ -694,7 +722,9 @@ def montar_dados_completos(empresa, ano: int) -> tuple[list[dict], dict]:
             dados.append(total)
 
         for idx, (nome_grupo, cats_grupo) in enumerate(_ordenar_grupos(cats), 1):
-            cats_analiticas = [c for c in sorted(cats_grupo, key=lambda c: (c.classificacao, c.nome)) if c.sintetico != 'S']
+            cats_analiticas = [
+                c for c in sorted(cats_grupo, key=_chave_ordenacao_categoria) if c.sintetico != 'S'
+            ]
             vals_grupo = _zeros(12)
             linhas_cat = []
             for cat in cats_analiticas:
