@@ -35,7 +35,7 @@ class ContaAzulClient:
     def _garantir_token(self, *, forcar_renovacao: bool = False) -> str:
         from django.utils import timezone
 
-        from dashboard.conta_azul.oauth import renovar_access_token
+        from dashboard.conta_azul.oauth import ContaAzulOAuthError, renovar_access_token
 
         token = self.creds.access_token
         expira = self.creds.token_expira_em
