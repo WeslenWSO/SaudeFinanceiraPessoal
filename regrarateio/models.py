@@ -87,6 +87,24 @@ class RegraRateioItem(models.Model):
         return str(self.regrarateio.nomedaregra) or ''
 
 
+def _meta_observacao_importacao(observacao: str) -> dict[str, str]:
+    """Extrai metadados gravados na observação do CAR na importação (registros antigos)."""
+    out = {'paciente': '', 'procedimento': '', 'modalidade': '', 'viabilidade': ''}
+    if not observacao:
+        return out
+    for part in observacao.split('|'):
+        p = part.strip()
+        if p.startswith('Pac:'):
+            out['paciente'] = p[4:].strip()
+        elif p.startswith('Proc:'):
+            out['procedimento'] = p[5:].strip()
+        elif p.startswith('Mod:'):
+            out['modalidade'] = p[4:].strip()
+        elif p.startswith('Viab:'):
+            out['viabilidade'] = p[5:].strip()
+    return out
+
+
 class LancamentoRateio(models.Model):
     """Linha de rateio gerada a partir de contas a pagar (PGTO, valor negativo) ou a receber (RECEBIMENTO, valor positivo)."""
 
@@ -96,6 +114,15 @@ class LancamentoRateio(models.Model):
         (TIPO_PGTO, 'Pagamento'),
         (TIPO_RECEBIMENTO, 'Recebimento'),
     ]
+
+    ORIGEM_PAGAR = 'PAGAR'
+    ORIGEM_RECEBER = 'RECEBER'
+    ORIGEM_IMPORTACAO = 'IMPORTACAO'
+    ORIGEM_CHOICES = (
+        (ORIGEM_PAGAR, 'Pagar'),
+        (ORIGEM_RECEBER, 'Receber'),
+        (ORIGEM_IMPORTACAO, 'IMPORTACAO'),
+    )
 
     empresa = models.ForeignKey(
         'empresa.Empresa',
@@ -130,6 +157,17 @@ class LancamentoRateio(models.Model):
     )
     socio = models.ForeignKey(Socio, on_delete=models.PROTECT, verbose_name='Sócio')
     valor = models.DecimalField(verbose_name='Valor', max_digits=14, decimal_places=2)
+    origem = models.CharField(
+        verbose_name='Origem',
+        max_length=12,
+        blank=True,
+        default='',
+        choices=ORIGEM_CHOICES,
+    )
+    modalidade = models.CharField(verbose_name='Modalidade', max_length=30, blank=True, default='')
+    viabilidade = models.CharField(verbose_name='Viabilidade', max_length=120, blank=True, default='')
+    obs = models.CharField(verbose_name='Obs.', max_length=255, blank=True, default='')
+    obs_forma = models.CharField(verbose_name='Obs. forma', max_length=120, blank=True, default='')
     data_criacao = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
 
     class Meta:
@@ -152,6 +190,51 @@ class LancamentoRateio(models.Model):
             models.Index(fields=['conta_pagar']),
             models.Index(fields=['conta_receber']),
         ]
+
+    def _meta_car(self) -> dict[str, str]:
+        if not self.conta_receber_id:
+            return _meta_observacao_importacao('')
+        return _meta_observacao_importacao(self.conta_receber.observacao or '')
+
+    def origem_exibicao(self) -> str:
+        if self.origem:
+            return self.get_origem_display()
+        if self.conta_pagar_id:
+            return 'Pagar'
+        if self.conta_receber_id:
+            meta = self._meta_car()
+            if meta['paciente'] or meta['procedimento']:
+                return 'IMPORTACAO'
+            return 'Receber'
+        return '—'
+
+    def modalidade_exibicao(self) -> str:
+        if self.modalidade:
+            return self.modalidade
+        return self._meta_car().get('modalidade') or '—'
+
+    def viabilidade_exibicao(self) -> str:
+        if self.viabilidade:
+            return self.viabilidade
+        meta = self._meta_car()
+        if meta.get('viabilidade'):
+            return meta['viabilidade']
+        if self.conta_receber_id and self.conta_receber.cliente:
+            return self.conta_receber.cliente[:120]
+        return '—'
+
+    def obs_exibicao(self) -> str:
+        if self.obs:
+            return self.obs
+        meta = self._meta_car()
+        return meta.get('procedimento') or meta.get('paciente') or '—'
+
+    def obs_forma_exibicao(self) -> str:
+        if self.obs_forma:
+            return self.obs_forma
+        if self.conta_receber_id and self.conta_receber.doc:
+            return self.conta_receber.doc
+        return '—'
 
     def __str__(self):
         origem = self.conta_pagar_id or self.conta_receber_id

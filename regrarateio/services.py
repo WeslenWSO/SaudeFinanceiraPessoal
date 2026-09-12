@@ -495,6 +495,7 @@ def _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais=None):
             regra_rateio=regra,
             socio=item.socios,
             valor=valor,
+            origem=LancamentoRateio.ORIGEM_PAGAR,
         )
         criados += 1
     return criados
@@ -615,6 +616,7 @@ def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None):
             regra_rateio=regra,
             socio=item.socios,
             valor=valor,
+            origem=LancamentoRateio.ORIGEM_RECEBER,
         )
         criados += 1
     return criados

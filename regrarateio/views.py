@@ -430,7 +430,7 @@ class LancamentoRateioList(ListView):
         context['total_pgto_txt'] = f'{v_pg:.2f}'.replace('.', ',')
         context['total_recebimento_txt'] = f'{v_rec:.2f}'.replace('.', ',')
 
-        # Cards por sócio: soma PGTO para exibir "Valor pago" (recebimento só entra para listar sócios extras com movimento).
+        # Cards por sócio: totais de recebimento (receita) e pagamento (despesa) no filtro.
         raw_pg = {}
         raw_rec = {}
         for sid, tipo, valor in qs_filtro.values_list('socio_id', 'tipo', 'valor'):
@@ -442,12 +442,19 @@ class LancamentoRateioList(ListView):
             elif tipo == LancamentoRateio.TIPO_RECEBIMENTO:
                 raw_rec[sid] = raw_rec.get(sid, Decimal('0')) + v
 
-        def _card_socio_dict(nome, extra, pg):
+        def _card_socio_dict(nome, extra, pg, rec):
             pg_abs = abs(pg)
+            saldo = rec + pg
             return {
                 'nome': nome,
                 'extra': extra,
                 'pgto_abs_txt': _fmt_br_moeda(pg_abs),
+                'recebimento_txt': _fmt_br_moeda(rec),
+                'saldo_txt': _fmt_br_moeda(saldo),
+                'tem_pgto': pg_abs > 0,
+                'tem_recebimento': rec > 0,
+                '_sort_rec': rec,
+                '_sort_pg': pg_abs,
             }
 
         ids_empresa = {s.id for s in context['socios']}
@@ -455,16 +462,26 @@ class LancamentoRateioList(ListView):
         cards_socios = []
         for s in context['socios']:
             pg = raw_pg.get(s.id, Decimal('0'))
-            cards_socios.append(_card_socio_dict(str(s), False, pg))
+            rec = raw_rec.get(s.id, Decimal('0'))
+            if pg == 0 and rec == 0:
+                continue
+            cards_socios.append(_card_socio_dict(str(s), False, pg, rec))
         extras_ids = sorted(sids_com_movimento - ids_empresa)
         for sid in extras_ids:
             pg = raw_pg.get(sid, Decimal('0'))
+            rec = raw_rec.get(sid, Decimal('0'))
+            if pg == 0 and rec == 0:
+                continue
             try:
                 s_obj = Socio.objects.get(pk=sid)
                 nome = str(s_obj)
             except Socio.DoesNotExist:
                 nome = f'Sócio #{sid} (cadastro não encontrado)'
-            cards_socios.append(_card_socio_dict(nome, True, pg))
+            cards_socios.append(_card_socio_dict(nome, True, pg, rec))
+        cards_socios.sort(key=lambda c: (c['_sort_rec'], c['_sort_pg']), reverse=True)
+        for c in cards_socios:
+            c.pop('_sort_rec', None)
+            c.pop('_sort_pg', None)
         context['cards_socios'] = cards_socios
 
         return context

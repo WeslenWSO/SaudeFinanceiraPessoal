@@ -60,16 +60,28 @@
             {% if cards_socios %}
             <div class="mb-3">
                 <h6 class="text-muted small text-uppercase mb-2">Resumo por sócio <span class="fw-normal">(conforme filtros abaixo)</span></h6>
-                <p class="small text-muted mb-2">Totais por <strong>sócio em cada lançamento</strong> (não por regra de rateio). Sócios com movimento fora do cadastro da empresa atual aparecem ao final com aviso.</p>
+                <p class="small text-muted mb-2">Totais por <strong>sócio em cada lançamento</strong> (não por regra de rateio), conforme o filtro de datas/tipo. Sócios sem movimento no período não aparecem.</p>
                 <div class="row g-2">
                     {% for c in cards_socios %}
                     <div class="col-12 col-sm-6 col-md-4 col-xl-3">
                         <div class="card h-100 border shadow-sm overflow-visible{% if c.extra %} border-warning{% endif %}">
                             <div class="card-body py-2 px-3 overflow-visible">
                                 <div class="fw-semibold text-truncate mb-2" title="{{ c.nome }}">{{ c.nome }}{% if c.extra %} <span class="badge bg-warning text-dark">outro cadastro</span>{% endif %}</div>
+                                {% if c.tem_recebimento %}
                                 <div class="small mb-2">
-                                    <div class="text-muted">Valor pago</div>
+                                    <div class="text-muted">Receita (recebimento)</div>
+                                    <div class="text-success fw-semibold text-break" title="R$ {{ c.recebimento_txt }}">R$ {{ c.recebimento_txt }}</div>
+                                </div>
+                                {% endif %}
+                                {% if c.tem_pgto %}
+                                <div class="small mb-2">
+                                    <div class="text-muted">Despesa (pagamento)</div>
                                     <div class="text-danger fw-semibold text-break" title="R$ {{ c.pgto_abs_txt }}">R$ {{ c.pgto_abs_txt }}</div>
+                                </div>
+                                {% endif %}
+                                <div class="small border-top pt-2">
+                                    <div class="text-muted">Saldo no período</div>
+                                    <div class="fw-semibold text-break" title="R$ {{ c.saldo_txt }}">R$ {{ c.saldo_txt }}</div>
                                 </div>
                             </div>
                         </div>
@@ -127,6 +139,10 @@
                             <th>ID</th>
                             <th>Origem</th>
                             <th>ID título</th>
+                            <th>Modalidade</th>
+                            <th>Viabilidade</th>
+                            <th>Obs.</th>
+                            <th>Obs. forma</th>
                             <th>Nota</th>
                             <th>Cobrança</th>
                             <th class="text-end" title="Valor do documento (CAP) ou valor da parcela (CAR)">Valor bruto título</th>
@@ -143,8 +159,12 @@
                         {% for row in object_list %}
                         <tr>
                             <td>{{ row.id }}</td>
-                            <td>{% if row.conta_pagar_id %}Pagar{% else %}Receber{% endif %}</td>
+                            <td>{{ row.origem_exibicao }}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
+                            <td>{{ row.modalidade_exibicao }}</td>
+                            <td><small>{{ row.viabilidade_exibicao|truncatechars:40 }}</small></td>
+                            <td><small>{{ row.obs_exibicao|truncatechars:40 }}</small></td>
+                            <td><small>{{ row.obs_forma_exibicao|truncatechars:30 }}</small></td>
                             <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar.cobranca }}{% elif row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento }}{% else %}—{% endif %}</td>
                             <td class="text-end text-nowrap">{% if row.conta_pagar_id %}R$ {{ row.conta_pagar.valorDoc|floatformat:2 }}{% else %}R$ {{ row.conta_receber.valor_a_receber|floatformat:2 }}{% endif %}</td>
@@ -167,7 +187,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="13" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
+                            <td colspan="17" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

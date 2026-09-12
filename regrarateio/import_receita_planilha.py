@@ -48,6 +48,7 @@ COLUNAS_MODELO = (
     'Modalidade',
     'Viabilizacao',
     'Forma de Pagamento',
+    'OBS FORMA',
     'Valor',
     'REGRA DE RATEUIO',
     'VALOR DO RATEIO',
@@ -116,6 +117,7 @@ def _map_colunas(headers: list) -> dict[str, int | None]:
         'modalidade': None,
         'viabilidade': None,
         'forma_pagamento': None,
+        'obs_forma': None,
         'valor': None,
         'valor_rateio': None,
         'regra': None,
@@ -132,6 +134,8 @@ def _map_colunas(headers: list) -> dict[str, int | None]:
             col['modalidade'] = col['modalidade'] if col['modalidade'] is not None else i
         elif h in ('viabilizacao', 'viabilidade'):
             col['viabilidade'] = i
+        elif h == 'obs forma' or (h.startswith('obs') and 'forma' in h):
+            col['obs_forma'] = i
         elif 'forma' in h and 'pag' in h:
             col['forma_pagamento'] = i
         elif h == 'valor do rateio' or h == 'valor rateio':
@@ -313,6 +317,7 @@ def parse_receita_planilha_xlsx(
         modalidade = str(_cel(row, col_map, 'modalidade') or '').strip()
         viabilidade = str(_cel(row, col_map, 'viabilidade') or '').strip()
         forma_pg = str(_cel(row, col_map, 'forma_pagamento') or '').strip()
+        obs_forma = str(_cel(row, col_map, 'obs_forma') or '').strip()
         regra_txt = str(_cel(row, col_map, 'regra') or '').strip()
 
         regra_id = regra_padrao_id
@@ -334,8 +339,8 @@ def parse_receita_planilha_xlsx(
             avisos.append(f'Linha {num}: sem regra de rateio — ignorada.')
             continue
 
-        nf = _extrair_nf_forma_pagamento(forma_pg)
-        a_faturar = _a_faturar(forma_pg)
+        nf = _extrair_nf_forma_pagamento(forma_pg) or _extrair_nf_forma_pagamento(obs_forma)
+        a_faturar = _a_faturar(forma_pg) or _a_faturar(obs_forma)
 
         linhas.append(
             {
@@ -346,6 +351,7 @@ def parse_receita_planilha_xlsx(
                 'modalidade': modalidade,
                 'viabilidade': viabilidade,
                 'forma_pagamento': forma_pg,
+                'obs_forma': obs_forma,
                 'nf': nf,
                 'valor': str(valor),
                 'valor_rateio': str(valor_rateio),
@@ -448,6 +454,7 @@ def _importar_linha_receita(
     modalidade = ln.get('modalidade') or ''
     viabilidade = ln.get('viabilidade') or ''
     forma_txt = ln.get('forma_pagamento') or ''
+    obs_forma = ln.get('obs_forma') or ''
     nf = ln.get('nf') or ''
     a_faturar = ln.get('a_faturar', False)
 
@@ -469,7 +476,7 @@ def _importar_linha_receita(
         return 0, 0, 1, []
 
     nota = _nota_por_numero(empresa_id, nf, nota_cache)
-    cobranca = _resolver_cobranca(forma_txt, cobranca_cache)
+    cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
     cliente = (viabilidade or paciente or 'Importação planilha')[:200]
 
     if a_faturar:
@@ -498,7 +505,7 @@ def _importar_linha_receita(
         valor_a_receber=valor,
         valor_recebido=valor_recebido,
         status=status,
-        doc=(nf or forma_txt)[:50] or None,
+        doc=(obs_forma or nf or forma_txt)[:50] or None,
         observacao=obs,
         forma_pagamento=cobranca,
         regra_rateio=regra,
@@ -509,6 +516,15 @@ def _importar_linha_receita(
     except ValueError as exc:
         car.delete()
         return 0, 0, 0, [f"Linha {ln['linha']}: {exc}"]
+
+    obs_resumo = (procedimento or paciente)[:255]
+    LancamentoRateio.objects.filter(conta_receber=car).update(
+        origem=LancamentoRateio.ORIGEM_IMPORTACAO,
+        modalidade=modalidade[:30],
+        viabilidade=viabilidade[:120],
+        obs=obs_resumo,
+        obs_forma=obs_forma[:120],
+    )
 
     return 1, n, 0, []
 
@@ -591,6 +607,7 @@ def gerar_modelo_receita_planilha_excel() -> HttpResponse:
             'US',
             'BRADESCO SAUDE S.A.',
             'A FATURAR',
+            '',
             100,
             '100% USG',
             100,
