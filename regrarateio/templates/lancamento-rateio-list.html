@@ -4,6 +4,23 @@
 {% include 'parcial/_nav.html' %}
 {% endblock %}
 {% block conteudo %}
+<style>
+    #modalRateioCapPagos .modal-rateio-pagos-98 {
+        max-width: 98vw;
+        width: 98vw;
+        height: 98vh;
+        margin: 1vh auto;
+    }
+    #modalRateioCapPagos .modal-content {
+        height: 100%;
+    }
+    #modalRateioCapPagos .modal-body {
+        overflow-y: auto;
+    }
+    #modalRateioCapPagos .rateio-cap-pagos-tabela {
+        max-height: calc(98vh - 320px);
+    }
+</style>
 
 <div class="container-fluid">
     <div class="card mb-4">
@@ -272,7 +289,7 @@
 <!-- Modal: rateio a partir de contas a pagar já pagas -->
 <div class="modal fade" id="modalRateioCapPagos" tabindex="-1" aria-labelledby="modalRateioCapPagosLabel" aria-hidden="true"
      data-candidatas-url="{% url 'regrarateio:contasPagarRateioCandidatas' %}">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable modal-rateio-pagos-98">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalRateioCapPagosLabel">Gerar rateio — contas já pagas</h5>
@@ -315,7 +332,7 @@
                             A regra precisa ter sócios e percentuais em <b>Cadastro → Regra do Rateio</b>.
                         </p>
                     </div>
-                    <div class="table-responsive border rounded" style="max-height: 380px;">
+                    <div class="table-responsive border rounded rateio-cap-pagos-tabela">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light sticky-top">
                                 <tr>

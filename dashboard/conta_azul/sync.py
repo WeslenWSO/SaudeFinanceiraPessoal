@@ -116,10 +116,59 @@ def _status_api_item(item: dict) -> str:
     ).upper().strip()
 
 
-def _valor_pago_item(item: dict) -> Decimal:
+def _composicao_dict(raw) -> dict:
+    return raw if isinstance(raw, dict) else {}
+
+
+def _composicao_valores_item(item: dict) -> dict[str, Decimal]:
+    """
+    Agrega juros, multa, desconto e valor bruto/líquido das baixas (ou do item).
+    Alinha com «Total pago» do Conta Azul: bruto + juros + multa - desconto.
+    """
+    juros = multa = desconto = valor_bruto = valor_liquido = Decimal('0')
+    baixas = [b for b in (item.get('baixas') or []) if isinstance(b, dict)]
+    fontes = baixas if baixas else [item]
+    for src in fontes:
+        comp = _composicao_dict(
+            src.get('valor_composicao') or src.get('composicao_valor'),
+        )
+        juros += _parse_decimal(comp.get('juros'))
+        multa += _parse_decimal(comp.get('multa'))
+        desconto += _parse_decimal(comp.get('desconto'))
+        valor_bruto += _parse_decimal(comp.get('valor_bruto'))
+        vl = _parse_decimal(comp.get('valor_liquido'))
+        if vl > 0:
+            valor_liquido += vl
+    return {
+        'juros': juros,
+        'multa': multa,
+        'desconto': desconto,
+        'valor_bruto': valor_bruto,
+        'valor_liquido': valor_liquido,
+    }
+
+
+def _tem_composicao_baixa(item: dict) -> bool:
+    for baixa in item.get('baixas') or []:
+        if not isinstance(baixa, dict):
+            continue
+        comp = baixa.get('valor_composicao') or baixa.get('composicao_valor')
+        if isinstance(comp, dict) and any(comp.get(k) for k in ('juros', 'multa', 'desconto', 'valor_liquido')):
+            return True
+    comp = item.get('valor_composicao') or item.get('composicao_valor')
+    return isinstance(comp, dict) and any(
+        comp.get(k) for k in ('juros', 'multa', 'desconto', 'valor_liquido')
+    )
+
+
+def _valor_bruto_pago_item(item: dict) -> Decimal:
+    """Valor da parcela / bruto antes de desconto (campo «pago» resumido da API)."""
     pago = _parse_decimal(item.get('pago') or item.get('valor_pago') or item.get('valorPago'))
     if pago > 0:
         return pago
+    comp = _composicao_valores_item(item)
+    if comp['valor_bruto'] > 0:
+        return comp['valor_bruto']
     status = _status_api_item(item)
     if status in ('RECEBIDO', 'PAGO', 'ACQUITTED', 'QUITADO'):
         return _parse_decimal(item.get('total') or item.get('valor') or item.get('valor_liquido'))
@@ -128,6 +177,28 @@ def _valor_pago_item(item: dict) -> Decimal:
     if total > 0 and nao_pago == 0:
         return total
     return Decimal('0')
+
+
+def _total_pago_liquido_item(item: dict) -> Decimal:
+    """Total efetivamente pago (regime de caixa), como «Total pago» no Conta Azul."""
+    comp = _composicao_valores_item(item)
+    if comp['valor_liquido'] > 0:
+        return comp['valor_liquido']
+    vtl = _parse_decimal(item.get('valor_total_liquido'))
+    if vtl > 0:
+        return vtl
+    bruto = comp['valor_bruto'] if comp['valor_bruto'] > 0 else _valor_bruto_pago_item(item)
+    liquido = bruto + comp['juros'] + comp['multa'] - comp['desconto']
+    if liquido > 0:
+        return liquido
+    return _valor_bruto_pago_item(item)
+
+
+def _valor_pago_item(item: dict) -> Decimal:
+    """Compatível com código existente: retorna total líquido pago quando baixado."""
+    if _item_financeiro_pago(item):
+        return _total_pago_liquido_item(item)
+    return _valor_bruto_pago_item(item)
 
 
 def _map_status_receita(item: dict) -> str:
@@ -163,11 +234,21 @@ def _data_pagamento_de_baixas(item: dict) -> date | None:
 
 
 def _item_financeiro_pago(item: dict) -> bool:
-    if _valor_pago_item(item) > 0:
-        return True
-    return _status_api_item(item) in (
+    """Indica título quitado/parcial sem chamar _valor_pago_item (evita recursão)."""
+    if _status_api_item(item) in (
         'RECEBIDO', 'PAGO', 'ACQUITTED', 'QUITADO', 'RECEBIDO_PARCIAL', 'PAGO_PARCIAL',
-    )
+    ):
+        return True
+    if _parse_decimal(item.get('pago') or item.get('valor_pago') or item.get('valorPago')) > 0:
+        return True
+    comp = _composicao_valores_item(item)
+    if comp['valor_liquido'] > 0:
+        return True
+    if comp['valor_bruto'] > 0 and item.get('baixas'):
+        return True
+    if _data_pagamento_de_baixas(item):
+        return True
+    return False
 
 
 def _data_pagamento_item(item: dict, fallback: date) -> date | None:
@@ -368,14 +449,14 @@ def _precisa_detalhe_parcela(item: dict) -> bool:
 
 
 def _precisa_detalhe_parcela_despesa(item: dict) -> bool:
-    """Detalhe da parcela traz baixas com data_pagamento real (busca resumida não traz)."""
+    """Detalhe da parcela traz baixas com data_pagamento, desconto e juros reais."""
     if not _item_financeiro_pago(item):
         return False
-    if _parse_data(item.get('data_pagamento') or item.get('data_baixa')):
-        return False
-    if _data_pagamento_de_baixas(item):
-        return False
-    return True
+    if not _parse_data(item.get('data_pagamento') or item.get('data_baixa')) and not _data_pagamento_de_baixas(item):
+        return True
+    if not _tem_composicao_baixa(item):
+        return True
+    return False
 
 
 def _mesclar_item_receita(item_busca: dict, item_detalhe: dict) -> dict:
@@ -1184,7 +1265,7 @@ def importar_receitas(
                 stats['atualizados'] += len(atualizar)
         except IntegrityError:
             stats['erros'] += len(preparados)
-    if chamadas_detalhe >= LIMITE_DETALHE_PARCELA_SYNC:
+    if chamadas_detalhe >= limite_detalhe:
         stats['detalhes_limitados'] = chamadas_detalhe
     return stats
 
@@ -1227,6 +1308,17 @@ def importar_despesas(
         itens = client.buscar_despesas(**params)
     except ContaAzulAPIError as exc:
         return {**stats, 'erro': str(exc)}
+
+    # Baixas com desconto/juros só vêm no detalhe da parcela; priorizar títulos pagos.
+    if somente_pagos:
+        itens = sorted(
+            itens,
+            key=lambda it: (
+                0 if _precisa_detalhe_parcela_despesa(it) else 1,
+                0 if not _documento_despesa_item(it) else 1,
+            ),
+        )
+    limite_detalhe = len(itens) if somente_pagos else LIMITE_DETALHE_PARCELA_SYNC
 
     categoria_fallback = Categoria.objects.filter(empresa=empresa, tipo='D').first()
     conta_fallback = ContaBancaria.objects.filter(empresa=empresa).first()
@@ -1292,7 +1384,7 @@ def importar_despesas(
         )
         if precisa_detalhe:
             if parcela_id not in cache_parcelas:
-                if chamadas_detalhe < LIMITE_DETALHE_PARCELA_SYNC:
+                if chamadas_detalhe < limite_detalhe:
                     chamadas_detalhe += 1
                     item = _enriquecer_item_receita(client, item, cache_parcelas)
             else:
@@ -1302,7 +1394,8 @@ def importar_despesas(
             stats['ignorados_nao_pagos'] += 1
             continue
         valor = _parse_decimal(item.get('valor') or item.get('total'))
-        valor_pago = _valor_pago_item(item)
+        composicao = _composicao_valores_item(item)
+        valor_pago = _total_pago_liquido_item(item) if status_local == 'pago' else Decimal('0')
         data_pg = _data_pagamento_item(item, data_de)
         if somente_pagos and not data_pg:
             stats['ignorados_nao_pagos'] += 1
@@ -1323,7 +1416,10 @@ def importar_despesas(
                 'cobranca': cobranca,
                 'conta_banco': conta,
                 'dtPag': data_pg,
-                'valorPago': valor_pago if status_local == 'pago' else Decimal('0'),
+                'valorPago': valor_pago,
+                'juros': composicao['juros'],
+                'multa': composicao['multa'],
+                'desconto': composicao['desconto'],
                 'status': status_local,
                 'obs': 'Importado Conta Azul',
                 'nossonumero': '',
@@ -1343,7 +1439,7 @@ def importar_despesas(
         campos_update = (
             'fornecedor', 'descricao', 'numdoc', 'valorDoc', 'categoria', 'parcela',
             'dtvenc', 'dtEmissao', 'cobranca', 'conta_banco', 'dtPag', 'valorPago',
-            'status', 'obs', 'nossonumero', 'nsu',
+            'juros', 'multa', 'desconto', 'status', 'obs', 'nossonumero', 'nsu',
         )
         criar: list[ContasaPagar] = []
         atualizar: list[ContasaPagar] = []
