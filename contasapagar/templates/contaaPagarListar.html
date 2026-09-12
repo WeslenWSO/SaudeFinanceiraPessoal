@@ -98,6 +98,14 @@
                                         </select>
                                     </div>
                                     <div>
+                                        <label for="filtro_data">Filtrar por</label>
+                                        <select id="filtro_data" name="filtro_data" title="Campo de data usado no período">
+                                            <option value="pagamento" {% if filtros.filtro_data == 'pagamento' %}selected{% endif %}>Data de pagamento</option>
+                                            <option value="vencimento" {% if filtros.filtro_data == 'vencimento' %}selected{% endif %}>Data de vencimento</option>
+                                            <option value="emissao" {% if filtros.filtro_data == 'emissao' %}selected{% endif %}>Data de emissão</option>
+                                        </select>
+                                    </div>
+                                    <div>
                                         <label for="data_inicio">Data Início</label>
                                         <input type="date" id="data_inicio" name="data_inicio" value="{{ filtros.data_inicio }}">
                                     </div>

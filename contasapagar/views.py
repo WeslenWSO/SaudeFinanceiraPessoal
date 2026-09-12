@@ -74,6 +74,14 @@ def listar_contas_a_pagar(request):
     forma_pagamento = (request.GET.get('forma_pagamento') or '').strip()
     data_inicio = (request.GET.get('data_inicio') or '').strip()
     data_fim = (request.GET.get('data_fim') or '').strip()
+    filtro_data = (request.GET.get('filtro_data') or 'pagamento').strip()
+    if filtro_data not in ('pagamento', 'vencimento', 'emissao'):
+        filtro_data = 'pagamento'
+    campo_data = {
+        'pagamento': 'dtPag',
+        'vencimento': 'dtvenc',
+        'emissao': 'dtEmissao',
+    }[filtro_data]
 
     # Paginação
     per_page = request.GET.get('per_page', '25')
@@ -120,9 +128,11 @@ def listar_contas_a_pagar(request):
     if forma_pagamento:
         contas = contas.filter(cobranca_id=forma_pagamento)
 
-    # Sempre aplicar filtro de data (usando datas padrão se não selecionadas)
-    contas = contas.filter(dtEmissao__gte=data_inicio)
-    contas = contas.filter(dtEmissao__lte=data_fim)
+    # Filtro de período pelo campo escolhido (pagamento / vencimento / emissão)
+    contas = contas.filter(**{
+        f'{campo_data}__gte': data_inicio,
+        f'{campo_data}__lte': data_fim,
+    })
 
     # Estatísticas baseadas no queryset filtrado (antes da paginação)
     contas_filtradas = list(contas)  # Converter para lista para calcular estatísticas
@@ -160,6 +170,7 @@ def listar_contas_a_pagar(request):
             'status': status,
             'categoria': categoria,
             'forma_pagamento': forma_pagamento,
+            'filtro_data': filtro_data,
             'data_inicio': data_inicio,
             'data_fim': data_fim,
             'per_page': per_page,
