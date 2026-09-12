@@ -236,38 +236,46 @@ class LancamentoRateio(models.Model):
             return self.conta_receber.doc
         return '—'
 
-    def conta_bancaria_exibicao(self) -> str:
-        """Conta bancária ou caixa em que o título foi pago ou recebido."""
-        if self.conta_pagar_id:
-            cap = self.conta_pagar
-            if cap and cap.conta_banco_id:
-                return str(cap.conta_banco)
-            return '—'
-        if self.conta_receber_id:
+    def _conta_bancaria_obj(self):
+        if self.conta_pagar_id and self.conta_pagar and self.conta_pagar.conta_banco_id:
+            return self.conta_pagar.conta_banco
+        if self.conta_receber_id and self.conta_receber:
             car = self.conta_receber
-            if car and car.conta_banco_id:
-                return str(car.conta_banco)
-            baixas = getattr(car, 'baixas_ordenadas', None) if car else None
+            if car.conta_banco_id:
+                return car.conta_banco
+            baixas = getattr(car, 'baixas_ordenadas', None)
             if baixas is not None:
                 for baixa in baixas:
                     if baixa.conta_banco_id:
-                        return str(baixa.conta_banco)
-            elif car:
-                from contasareceber.models import BaixaContaAReceber
+                        return baixa.conta_banco
+            from contasareceber.models import BaixaContaAReceber
 
-                baixa = (
-                    BaixaContaAReceber.objects.filter(
-                        conta_a_receber_id=car.pk,
-                        conta_banco__isnull=False,
-                    )
-                    .select_related('conta_banco', 'conta_banco__banco')
-                    .order_by('-data_recebimento', '-id')
-                    .first()
+            baixa = (
+                BaixaContaAReceber.objects.filter(
+                    conta_a_receber_id=car.pk,
+                    conta_banco__isnull=False,
                 )
-                if baixa and baixa.conta_banco_id:
-                    return str(baixa.conta_banco)
+                .select_related('conta_banco', 'conta_banco__banco')
+                .order_by('-data_recebimento', '-id')
+                .first()
+            )
+            if baixa and baixa.conta_banco_id:
+                return baixa.conta_banco
+        return None
+
+    def conta_bancaria_exibicao(self) -> str:
+        """Nome curto da conta/caixa (ex.: STONE, BRADESCO)."""
+        conta = self._conta_bancaria_obj()
+        if not conta:
             return '—'
-        return '—'
+        return conta.nome_curto()
+
+    def conta_bancaria_completa(self) -> str:
+        """Descrição completa da conta (tooltip)."""
+        conta = self._conta_bancaria_obj()
+        if not conta:
+            return '—'
+        return str(conta)
 
     def __str__(self):
         origem = self.conta_pagar_id or self.conta_receber_id

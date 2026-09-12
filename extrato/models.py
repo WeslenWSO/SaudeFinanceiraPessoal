@@ -91,6 +91,29 @@ class ContaBancaria(models.Model):
         base = f"{self.banco} {self.descricao} - {self.agencia}/{self.conta}".strip()
         return f"{self.get_tipo_display()} - {base}"
 
+    def nome_curto(self) -> str:
+        """Nome resumido para listagens (ex.: STONE, BRADESCO, SICOOB, CAIXA)."""
+        desc = (self.descricao or '').strip()
+        if desc:
+            token = desc.split()[0]
+            if token:
+                return token.upper()
+
+        nome_banco = ((self.banco.nome if self.banco_id else '') or '').strip()
+        if not nome_banco:
+            return 'CAIXA' if self.tipo == 'CAIXA' else '—'
+
+        ignorar = {
+            'BANCO', 'BCO', 'COOPERATIVA', 'COOP', 'CREDITO', 'CRÉDITO',
+            'DE', 'DA', 'DO', 'E', 'EM',
+        }
+        for parte in nome_banco.upper().split():
+            if parte in ignorar or parte.isdigit() or len(parte) < 2:
+                continue
+            return parte
+        partes = nome_banco.upper().split()
+        return partes[0] if partes else '—'
+
 class Conciliacao(models.Model):
     """Agrupador lógico para marcação de conciliado."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

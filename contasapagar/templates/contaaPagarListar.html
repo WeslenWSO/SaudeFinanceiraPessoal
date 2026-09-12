@@ -190,7 +190,7 @@
                                         <td>{% if conta.categoria %}{{ conta.categoria.nome }}{% else %}-{% endif %}</td>
                                         <td>{% if conta.centro_custo %}{{ conta.centro_custo.nome }}{% else %}-{% endif %}</td>
                                         <td>{% if conta.cobranca %}{{ conta.cobranca.descricao }}{% else %}-{% endif %}</td>
-                                        <td><small title="{% if conta.conta_banco %}{{ conta.conta_banco }}{% else %}-{% endif %}">{% if conta.conta_banco %}{{ conta.conta_banco|truncatechars:40 }}{% else %}-{% endif %}</small></td>
+                                        <td><small title="{% if conta.conta_banco %}{{ conta.conta_banco }}{% else %}-{% endif %}">{% if conta.conta_banco %}{{ conta.conta_banco.nome_curto }}{% else %}-{% endif %}</small></td>
                                         <td>{{ conta.dtEmissao|date:"d/m/Y" }}</td>
                                         <td>{{ conta.dtvenc|date:"d/m/Y" }}</td>
                                         <td>{{ conta.dtPag|date:"d/m/Y"|default:"-" }}</td>
