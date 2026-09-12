@@ -1,4 +1,5 @@
 """Exportação do resumo fechamento por resultado para Excel (.xlsx)."""
+from decimal import Decimal
 from io import BytesIO
 
 from django.http import HttpResponse
@@ -38,6 +39,41 @@ def _linhas_grade(linhas, *, com_receita_extra=False):
     return rows
 
 
+def _decimal_mes(val) -> Decimal:
+    if isinstance(val, Decimal):
+        return val
+    if val is None:
+        return Decimal('0')
+    return Decimal(str(val))
+
+
+def _linhas_resumo_mensal(ctx) -> list[list]:
+    """Monta linhas mês a mês + distribuição por sócio (% informados na tela)."""
+    meses = ctx.get('resumo_mensal') or []
+    dist = ctx.get('distribuicao_resultado') or []
+    rows: list[list] = []
+    for mes in meses:
+        receita = _decimal_mes(mes.get('receita'))
+        despesa = _decimal_mes(mes.get('despesa'))
+        resultado = _decimal_mes(mes.get('resultado'))
+        rows.append([
+            mes.get('label') or '—',
+            float(receita),
+            float(despesa),
+            float(resultado),
+            '',
+            '',
+        ])
+        for item in dist:
+            pct = Decimal(str(item.get('pct') or 0))
+            nome = (item.get('nome') or '').strip()
+            if not nome or pct <= 0:
+                continue
+            valor_soc = (resultado * pct / Decimal('100')).quantize(Decimal('0.01'))
+            rows.append(['', '', '', '', nome, float(valor_soc)])
+    return rows
+
+
 def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
     st = _estilos()
     wb = Workbook()
@@ -45,7 +81,7 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
 
     # --- Aba: Resumo ---
     ws_res = wb.create_sheet('Resumo')
-    row = _cabecalho_ws(ws_res, ctx, 'Resumo do resultado', 2, st)
+    row = _cabecalho_ws(ws_res, ctx, 'Resumo do resultado', 6, st)
     resumo_rows = [
         ['Total receitas rateadas', _parse_moeda_br_txt(ctx.get('total_receita_txt'))],
         ['Total despesas rateadas', _parse_moeda_br_txt(ctx.get('total_despesa_txt'))],
@@ -55,7 +91,14 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
     cell_res = ws_res.cell(row=row - 1, column=1)
     cell_res.font = Font(bold=True)
     ws_res.cell(row=row - 1, column=2).font = Font(bold=True)
-    _auto_largura(ws_res, 2)
+
+    row += 1
+    ws_res.cell(row=row, column=1, value='Resultado por mês').font = st['section_font']
+    row += 1
+    mes_headers = ['Mês', 'Receita (R$)', 'Despesas (R$)', 'Resultado (R$)', 'Sócio', 'Valor (R$)']
+    mes_rows = _linhas_resumo_mensal(ctx)
+    row = _escrever_tabela(ws_res, row, mes_headers, mes_rows, st, money_cols={2, 3, 4, 6})
+    _auto_largura(ws_res, 6)
 
     grade_headers_desp = [
         'Data',

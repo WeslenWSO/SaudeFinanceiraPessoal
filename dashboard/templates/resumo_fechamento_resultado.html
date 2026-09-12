@@ -44,7 +44,7 @@
         </p>
     </div>
     <div class="d-flex flex-wrap gap-2 no-print">
-        <a href="{{ export_excel_url }}" id="btn-export-excel-rfr" class="btn btn-success btn-sm" title="Exportar receitas, despesas e resumo para Excel">
+        <a href="{{ export_excel_url }}" id="btn-export-excel-rfr" data-export-base="{{ export_excel_url }}" class="btn btn-success btn-sm" title="Exportar receitas, despesas e resumo por mês para Excel">
             <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
         </a>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()" title="Imprimir">
@@ -409,6 +409,19 @@
         return out;
     }
 
+    function atualizarLinkExport() {
+        var btn = document.getElementById('btn-export-excel-rfr');
+        if (!btn) return;
+        var base = btn.getAttribute('data-export-base') || btn.href;
+        var dist = lerDistribuicaoAtual();
+        var url = base;
+        if (dist.length) {
+            var sep = url.indexOf('?') >= 0 ? '&' : '?';
+            url += sep + 'distribuicao=' + encodeURIComponent(JSON.stringify(dist));
+        }
+        btn.href = url;
+    }
+
     function atualizarResumoMensal() {
         document.querySelectorAll('.rfr-mes-socio-linha').forEach(function (el) {
             el.remove();
@@ -488,6 +501,7 @@
             alerta.textContent = '';
         }
         atualizarResumoMensal();
+        atualizarLinkExport();
     }
 
     document.getElementById('rfr-btn-aplicar-qtd').addEventListener('click', function () {
@@ -506,6 +520,7 @@
     });
 
     renderLinhas(2);
+    atualizarLinkExport();
 })();
 </script>
 {% endblock %}

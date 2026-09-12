@@ -980,6 +980,15 @@ def resumo_fechamento_por_resultado(request):
             gerar_resumo_fechamento_resultado_excel,
         )
 
+        dist_raw = (request.GET.get('distribuicao') or '').strip()
+        if dist_raw:
+            try:
+                contexto['distribuicao_resultado'] = json.loads(dist_raw)
+            except json.JSONDecodeError:
+                contexto['distribuicao_resultado'] = []
+        else:
+            contexto['distribuicao_resultado'] = []
+
         return gerar_resumo_fechamento_resultado_excel(contexto)
 
     return render(request, 'resumo_fechamento_resultado.html', contexto)
