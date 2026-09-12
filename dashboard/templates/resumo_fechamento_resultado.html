@@ -44,9 +44,19 @@
         </p>
     </div>
     <div class="d-flex flex-wrap gap-2 no-print">
-        <a href="{{ export_excel_url }}" id="btn-export-excel-rfr" data-export-base="{{ export_excel_url }}" class="btn btn-success btn-sm" title="Exportar receitas, despesas e resumo por mês para Excel">
-            <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
-        </a>
+        <form id="form-export-excel-rfr" method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="export" value="excel">
+            <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
+            <input type="hidden" name="data_fim" value="{{ data_fim }}">
+            {% for sid in filtro_socio_ids %}
+            <input type="hidden" name="socio" value="{{ sid }}">
+            {% endfor %}
+            <input type="hidden" name="distribuicao" id="rfr-export-distribuicao" value="">
+            <button type="submit" class="btn btn-success btn-sm" title="Exportar receitas, despesas e resumo por mês para Excel">
+                <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
+            </button>
+        </form>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()" title="Imprimir">
             <i class="fas fa-print" aria-hidden="true"></i> Imprimir
         </button>
@@ -409,17 +419,11 @@
         return out;
     }
 
-    function atualizarLinkExport() {
-        var btn = document.getElementById('btn-export-excel-rfr');
-        if (!btn) return;
-        var base = btn.getAttribute('data-export-base') || btn.href;
-        var dist = lerDistribuicaoAtual();
-        var url = base;
-        if (dist.length) {
-            var sep = url.indexOf('?') >= 0 ? '&' : '?';
-            url += sep + 'distribuicao=' + encodeURIComponent(JSON.stringify(dist));
+    function syncExportDistribuicao() {
+        var el = document.getElementById('rfr-export-distribuicao');
+        if (el) {
+            el.value = JSON.stringify(lerDistribuicaoAtual());
         }
-        btn.href = url;
     }
 
     function atualizarResumoMensal() {
@@ -501,7 +505,14 @@
             alerta.textContent = '';
         }
         atualizarResumoMensal();
-        atualizarLinkExport();
+        syncExportDistribuicao();
+    }
+
+    var formExport = document.getElementById('form-export-excel-rfr');
+    if (formExport) {
+        formExport.addEventListener('submit', function () {
+            syncExportDistribuicao();
+        });
     }
 
     document.getElementById('rfr-btn-aplicar-qtd').addEventListener('click', function () {
@@ -520,7 +531,7 @@
     });
 
     renderLinhas(2);
-    atualizarLinkExport();
+    syncExportDistribuicao();
 })();
 </script>
 {% endblock %}

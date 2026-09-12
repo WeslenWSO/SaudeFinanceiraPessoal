@@ -859,7 +859,14 @@ def resumo_fechamento_por_resultado(request):
     from dashboard.resumo_fechamento_resultado import (
         coletar_dados_resumo_resultado,
         coletar_resumo_mensal_resultado,
+        parse_distribuicao_resultado,
     )
+
+    export_post = (
+        request.method == 'POST'
+        and (request.POST.get('export') or '').strip().lower() == 'excel'
+    )
+    params = request.POST if export_post else request.GET
 
     empresa_ctx = Empresa.objects.filter(pk=empresa_id).first()
     empresa_razao_social = (empresa_ctx.razao or '').strip() if empresa_ctx else ''
@@ -885,8 +892,8 @@ def resumo_fechamento_por_resultado(request):
     primeiro = date(hoje.year, hoje.month, 1)
     ultimo = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
 
-    di_str = (request.GET.get('data_inicio') or '').strip()
-    df_str = (request.GET.get('data_fim') or '').strip()
+    di_str = (params.get('data_inicio') or '').strip()
+    df_str = (params.get('data_fim') or '').strip()
     data_inicio = parse_date(di_str) if di_str else primeiro
     data_fim = parse_date(df_str) if df_str else ultimo
     if not data_inicio:
@@ -898,7 +905,7 @@ def resumo_fechamento_por_resultado(request):
 
     filtro_socio_ids = []
     _seen_socio = set()
-    for raw in request.GET.getlist('socio'):
+    for raw in params.getlist('socio'):
         r = (raw or '').strip()
         if not r.isdigit():
             continue
@@ -967,27 +974,25 @@ def resumo_fechamento_por_resultado(request):
         'resultado_txt': dados['resultado_txt'],
         'resultado_negativo': dados['resultado_negativo'],
         'resultado_valor': str(dados['resultado'].quantize(Decimal('0.01'))),
+        'resultado_decimal': dados['resultado'],
         'resumo_mensal': resumo_mensal,
         'resumo_mensal_json': resumo_mensal_json,
     }
 
-    export_qs = request.GET.copy()
-    export_qs['export'] = 'excel'
-    contexto['export_excel_url'] = request.path + '?' + export_qs.urlencode()
-
-    if (request.GET.get('export') or '').strip().lower() == 'excel':
+    export_via_get = (
+        request.method == 'GET'
+        and (request.GET.get('export') or '').strip().lower() == 'excel'
+    )
+    if export_post or export_via_get:
         from dashboard.resumo_fechamento_resultado_excel import (
             gerar_resumo_fechamento_resultado_excel,
         )
 
-        dist_raw = (request.GET.get('distribuicao') or '').strip()
-        if dist_raw:
-            try:
-                contexto['distribuicao_resultado'] = json.loads(dist_raw)
-            except json.JSONDecodeError:
-                contexto['distribuicao_resultado'] = []
+        if export_post:
+            dist_raw = (request.POST.get('distribuicao') or '').strip()
         else:
-            contexto['distribuicao_resultado'] = []
+            dist_raw = (request.GET.get('distribuicao') or '').strip()
+        contexto['distribuicao_resultado'] = parse_distribuicao_resultado(dist_raw)
 
         return gerar_resumo_fechamento_resultado_excel(contexto)
 

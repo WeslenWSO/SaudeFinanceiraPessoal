@@ -139,6 +139,35 @@ def _label_mes(ano: int, mes: int) -> str:
     return f'{nome}/{ano}'
 
 
+def parse_distribuicao_resultado(raw: str) -> list[dict]:
+    """Interpreta JSON enviado pela tela (% por sócio) para exportação Excel."""
+    import json
+
+    if not (raw or '').strip():
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        nome = (item.get('nome') or '').strip()
+        if not nome:
+            continue
+        try:
+            pct = Decimal(str(item.get('pct') or '0').replace(',', '.'))
+        except Exception:
+            pct = Decimal('0')
+        if pct <= 0:
+            continue
+        out.append({'nome': nome, 'pct': pct})
+    return out
+
+
 def coletar_resumo_mensal_resultado(empresa_id, data_inicio, data_fim, filtro_socio_ids):
     """Totais mês a mês (receita, despesa, resultado) para todos os meses do filtro."""
     base = LancamentoRateio.objects.filter(empresa_id=empresa_id)

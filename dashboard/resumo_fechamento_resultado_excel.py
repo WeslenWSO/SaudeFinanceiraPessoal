@@ -71,6 +71,22 @@ def _linhas_resumo_mensal(ctx) -> list[list]:
                 continue
             valor_soc = (resultado * pct / Decimal('100')).quantize(Decimal('0.01'))
             rows.append(['', '', '', '', nome, float(valor_soc)])
+    if not rows and meses:
+        rows.append(['—', 0, 0, 0, '(configure % na tela)', 0])
+    return rows
+
+
+def _linhas_distribuicao_periodo(ctx) -> list[list]:
+    dist = ctx.get('distribuicao_resultado') or []
+    resultado = _decimal_mes(ctx.get('resultado_decimal'))
+    rows = []
+    for item in dist:
+        pct = _decimal_mes(item.get('pct'))
+        nome = (item.get('nome') or '').strip()
+        if not nome or pct <= 0:
+            continue
+        val = (resultado * pct / Decimal('100')).quantize(Decimal('0.01'))
+        rows.append([nome, float(pct), float(val)])
     return rows
 
 
@@ -91,6 +107,20 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
     cell_res = ws_res.cell(row=row - 1, column=1)
     cell_res.font = Font(bold=True)
     ws_res.cell(row=row - 1, column=2).font = Font(bold=True)
+
+    dist_rows = _linhas_distribuicao_periodo(ctx)
+    if dist_rows:
+        row += 1
+        ws_res.cell(row=row, column=1, value='Distribuição do resultado (período)').font = st['section_font']
+        row += 1
+        row = _escrever_tabela(
+            ws_res,
+            row,
+            ['Sócio', '% do resultado', 'Valor (R$)'],
+            dist_rows,
+            st,
+            money_cols={3},
+        )
 
     row += 1
     ws_res.cell(row=row, column=1, value='Resultado por mês').font = st['section_font']
