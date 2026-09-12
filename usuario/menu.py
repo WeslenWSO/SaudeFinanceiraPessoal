@@ -119,6 +119,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('planejamento', 'Planejamento orçamentário', 'fa-chart-pie', 'relatorios', url_name='planejamento_orcamentario:dashboard'),
     MenuItemDef('relatorio_mensal', 'Relatório mensal (12 meses)', 'fa-calendar-alt', 'relatorios', url_name='dashboard:relatorio_mensal'),
     MenuItemDef('resumo_fechamento', 'Resumo fechamento', 'fa-file-signature', 'relatorios', url_name='dashboard:resumo_fechamento'),
+    MenuItemDef(
+        'resumo_fechamento_resultado',
+        'Resumo fechamento por resultado',
+        'fa-chart-pie',
+        'relatorios',
+        url_name='dashboard:resumo_fechamento_por_resultado',
+    ),
     MenuItemDef('lancamentos_rateio', 'Lançamentos de rateio', 'fa-table-list', 'relatorios', url_name='regrarateio:lancamentoRateioList'),
     MenuItemDef('cr_relatorio', 'Contas a Receber/Recebido', 'fa-receipt', 'relatorios', url_name='contasareceber:crlistar'),
     MenuItemDef('cp_relatorio', 'Contas a Pagar/Pagas', 'fa-file-invoice', 'relatorios', url_hash='#'),

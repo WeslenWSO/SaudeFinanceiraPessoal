@@ -1,0 +1,423 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<style>
+    .rfr-resumo-card .valor-grande {
+        font-size: 1.35rem;
+        font-weight: 600;
+    }
+    .rfr-linha-invalida {
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .rfr-alerta-limite {
+        display: none;
+    }
+    .rfr-alerta-limite.visivel {
+        display: block;
+    }
+</style>
+
+<div class="rfr-relatorio">
+{% if empresa_razao_social %}
+<div class="border-bottom pb-2 mb-3">
+    <p class="mb-0 text-uppercase small text-muted">Razão social</p>
+    <p class="mb-1 fw-semibold fs-5">{{ empresa_razao_social }}</p>
+    {% if empresa_cnpj_fmt %}
+    <p class="mb-0 small"><span class="text-muted">CNPJ</span> {{ empresa_cnpj_fmt }}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="mb-3 d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div>
+        <h1 class="h2 mb-1">{{ titulo }}</h1>
+        <p class="h5 text-primary mb-0">{{ periodo_titulo }}</p>
+        {% if filtro_socio_nome %}
+        <p class="small mb-0">
+            <span class="badge bg-secondary">{% if filtro_socio_ids|length > 1 %}Sócios{% else %}Sócio{% endif %}</span>
+            {{ filtro_socio_nome }}
+        </p>
+        {% endif %}
+        <p class="text-muted small mb-0">
+            Despesas e receitas com <strong>lançamento de rateio</strong> no período
+            (mesma regra de datas do resumo de fechamento). O filtro de sócio(s) restringe as grades e o cálculo do resultado.
+        </p>
+    </div>
+    <div class="no-print">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()" title="Imprimir">
+            <i class="fas fa-print" aria-hidden="true"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+<form method="get" class="card card-body py-3 mb-3 border no-print">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-6 col-lg-3">
+            <label for="rfr-di" class="form-label small mb-0">Data inicial</label>
+            <input type="date" name="data_inicio" id="rfr-di" class="form-control form-control-sm" value="{{ data_inicio }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <label for="rfr-df" class="form-label small mb-0">Data final</label>
+            <input type="date" name="data_fim" id="rfr-df" class="form-control form-control-sm" value="{{ data_fim }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-5">
+            <label for="rfr-socio" class="form-label small mb-0">Sócio(s)</label>
+            <select name="socio" id="rfr-socio" class="form-select form-select-sm" multiple size="6"
+                    title="Ctrl ou Cmd + clique para selecionar vários">
+                {% for s in socios %}
+                <option value="{{ s.id }}" {% if s.id in filtro_socio_ids %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+            <p class="form-text small mb-0">Nenhuma seleção = <strong>todos</strong> os sócios.</p>
+        </div>
+        <div class="col-12 col-md-6 col-lg-1 d-flex">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm mb-4 rfr-resumo-card">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Resumo do resultado</h2>
+        <p class="small text-muted mb-0">Resultado = receitas rateadas − despesas rateadas (valores absolutos na grade).</p>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 text-center">
+            <div class="col-md-4">
+                <p class="small text-muted mb-1">Total receitas rateadas</p>
+                <p class="valor-grande text-success mb-0">R$ {{ total_receita_txt }}</p>
+            </div>
+            <div class="col-md-4">
+                <p class="small text-muted mb-1">Total despesas rateadas</p>
+                <p class="valor-grande text-danger mb-0">R$ {{ total_despesa_txt }}</p>
+            </div>
+            <div class="col-md-4">
+                <p class="small text-muted mb-1">Resultado</p>
+                <p class="valor-grande mb-0 {% if resultado_negativo %}text-danger{% else %}text-primary{% endif %}"
+                   id="rfr-resultado-display">R$ {{ resultado_txt }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Receitas rateadas</h2>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                <thead class="table-dark text-nowrap">
+                    <tr>
+                        <th>Data</th>
+                        <th>Emissão</th>
+                        <th>NF</th>
+                        <th>Descrição</th>
+                        <th>Sócio</th>
+                        <th class="text-end">Valor título</th>
+                        <th class="text-end">Valor rateio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_receita %}
+                        {% for row in linhas_receita %}
+                        <tr>
+                            <td>{{ row.data_txt }}</td>
+                            <td>{{ row.emissao_txt }}</td>
+                            <td>{{ row.nota_txt }}</td>
+                            <td>{{ row.descricao }}</td>
+                            <td>{{ row.socio_nome }}</td>
+                            <td class="text-end">R$ {{ row.titulo_valor_txt }}</td>
+                            <td class="text-end text-success">R$ {{ row.valor_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Nenhuma receita rateada no período.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_receita %}
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td colspan="6" class="text-end">Total receitas rateadas</td>
+                        <td class="text-end text-success">R$ {{ total_receita_txt }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Despesas rateadas</h2>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                <thead class="table-dark text-nowrap">
+                    <tr>
+                        <th>Data pgto</th>
+                        <th>Emissão</th>
+                        <th>NF</th>
+                        <th>Descrição</th>
+                        <th>Sócio</th>
+                        <th class="text-end">Valor título</th>
+                        <th class="text-end">Valor rateio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tem_despesa %}
+                        {% for row in linhas_despesa %}
+                        <tr>
+                            <td>{{ row.data_txt }}</td>
+                            <td>{{ row.emissao_txt }}</td>
+                            <td>{{ row.nota_txt }}</td>
+                            <td>{{ row.descricao }}</td>
+                            <td>{{ row.socio_nome }}</td>
+                            <td class="text-end">R$ {{ row.titulo_valor_txt }}</td>
+                            <td class="text-end text-danger">R$ {{ row.valor_txt }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Nenhuma despesa rateada no período.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                {% if tem_despesa %}
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td colspan="6" class="text-end">Total despesas rateadas</td>
+                        <td class="text-end text-danger">R$ {{ total_despesa_txt }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 no-print">
+    <div class="card-header py-2">
+        <h2 class="h5 mb-0">Distribuição do resultado entre sócios</h2>
+        <p class="small text-muted mb-0">
+            Informe a quantidade de sócios (mínimo 2), escolha o nome e o % de cada um sobre o resultado.
+            O valor é calculado automaticamente. A soma dos % não pode ultrapassar 100% nem a soma dos valores o resultado total.
+        </p>
+    </div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+                <label for="rfr-qtd-socios" class="form-label small mb-0">Quantidade de sócios</label>
+                <input type="number" id="rfr-qtd-socios" class="form-control form-control-sm" min="2" max="20" value="2" style="width: 5rem;">
+            </div>
+            <div class="col-auto">
+                <button type="button" id="rfr-btn-aplicar-qtd" class="btn btn-outline-primary btn-sm">Aplicar</button>
+            </div>
+        </div>
+
+        <div id="rfr-alerta-limite" class="alert alert-danger py-2 small rfr-alerta-limite" role="alert"></div>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width: 14rem;">Sócio</th>
+                        <th class="text-end" style="width: 8rem;">% do resultado</th>
+                        <th class="text-end" style="width: 10rem;">Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody id="rfr-distribuicao-corpo"></tbody>
+                <tfoot class="table-secondary fw-semibold">
+                    <tr>
+                        <td class="text-end">Totais</td>
+                        <td class="text-end"><span id="rfr-total-pct">0,00</span> %</td>
+                        <td class="text-end">R$ <span id="rfr-total-valor">0,00</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-end small fw-normal">Restante disponível</td>
+                        <td class="text-end small fw-normal"><span id="rfr-restante-pct">100,00</span> %</td>
+                        <td class="text-end small fw-normal">R$ <span id="rfr-restante-valor">{{ resultado_txt }}</span></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+(function () {
+    var SOCIOS = {{ socios_json|safe }};
+    var RESULTADO = parseFloat('{{ resultado_valor }}') || 0;
+
+    function fmtMoeda(n) {
+        var neg = n < 0;
+        var a = Math.abs(n);
+        var s = a.toFixed(2).replace('.', ',');
+        var parts = s.split(',');
+        var intPart = parts[0];
+        var out = [];
+        while (intPart.length > 3) {
+            out.unshift(intPart.slice(-3));
+            intPart = intPart.slice(0, -3);
+        }
+        out.unshift(intPart);
+        return (neg ? '-' : '') + out.join('.') + ',' + parts[1];
+    }
+
+    function parsePct(str) {
+        if (!str) return 0;
+        var s = String(str).replace(/\s/g, '').replace(',', '.');
+        var n = parseFloat(s);
+        return isNaN(n) ? 0 : Math.max(0, n);
+    }
+
+    function clampPctInput(input, maxAllowed) {
+        var v = parsePct(input.value);
+        if (v > maxAllowed) {
+            v = maxAllowed;
+            input.value = v.toFixed(2).replace('.', ',');
+        }
+        return v;
+    }
+
+    function buildSocioSelect(idx, selectedId) {
+        var sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm rfr-socio-select';
+        sel.dataset.idx = String(idx);
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = '— Selecione —';
+        sel.appendChild(opt0);
+        SOCIOS.forEach(function (s) {
+            var opt = document.createElement('option');
+            opt.value = String(s.id);
+            opt.textContent = s.nome;
+            if (selectedId && String(selectedId) === String(s.id)) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+        return sel;
+    }
+
+    function renderLinhas(qtd) {
+        var corpo = document.getElementById('rfr-distribuicao-corpo');
+        var prev = [];
+        corpo.querySelectorAll('tr').forEach(function (tr, i) {
+            var soc = tr.querySelector('.rfr-socio-select');
+            var pct = tr.querySelector('.rfr-pct-input');
+            prev.push({
+                socio: soc ? soc.value : '',
+                pct: pct ? pct.value : ''
+            });
+        });
+
+        corpo.innerHTML = '';
+        qtd = Math.max(2, Math.min(20, qtd || 2));
+
+        for (var i = 0; i < qtd; i++) {
+            var tr = document.createElement('tr');
+            tr.dataset.idx = String(i);
+
+            var tdSoc = document.createElement('td');
+            tdSoc.appendChild(buildSocioSelect(i, prev[i] ? prev[i].socio : ''));
+
+            var tdPct = document.createElement('td');
+            tdPct.className = 'text-end';
+            var inpPct = document.createElement('input');
+            inpPct.type = 'text';
+            inpPct.className = 'form-control form-control-sm text-end rfr-pct-input';
+            inpPct.inputMode = 'decimal';
+            inpPct.placeholder = '0,00';
+            inpPct.value = prev[i] ? prev[i].pct : '';
+            tdPct.appendChild(inpPct);
+
+            var tdVal = document.createElement('td');
+            tdVal.className = 'text-end rfr-valor-cell';
+            tdVal.textContent = 'R$ 0,00';
+
+            tr.appendChild(tdSoc);
+            tr.appendChild(tdPct);
+            tr.appendChild(tdVal);
+            corpo.appendChild(tr);
+
+            inpPct.addEventListener('input', recalcular);
+            inpPct.addEventListener('blur', recalcular);
+        }
+        recalcular();
+    }
+
+    function recalcular() {
+        var linhas = document.querySelectorAll('#rfr-distribuicao-corpo tr');
+        var totalPct = 0;
+        var totalValor = 0;
+        var alerta = document.getElementById('rfr-alerta-limite');
+        var msgs = [];
+
+        linhas.forEach(function (tr) {
+            tr.classList.remove('rfr-linha-invalida');
+            var inp = tr.querySelector('.rfr-pct-input');
+            var cellVal = tr.querySelector('.rfr-valor-cell');
+            if (!inp || !cellVal) return;
+
+            var outros = 0;
+            linhas.forEach(function (tr2) {
+                if (tr2 !== tr) {
+                    outros += parsePct(tr2.querySelector('.rfr-pct-input').value);
+                }
+            });
+            var maxPct = Math.max(0, 100 - outros);
+            var pct = clampPctInput(inp, maxPct);
+            var valor = RESULTADO * pct / 100;
+            cellVal.textContent = 'R$ ' + fmtMoeda(valor);
+            totalPct += pct;
+            totalValor += valor;
+        });
+
+        var restantePct = Math.max(0, 100 - totalPct);
+        var restanteValor = RESULTADO - totalValor;
+
+        document.getElementById('rfr-total-pct').textContent = fmtMoeda(totalPct);
+        document.getElementById('rfr-total-valor').textContent = fmtMoeda(totalValor);
+        document.getElementById('rfr-restante-pct').textContent = fmtMoeda(restantePct);
+        document.getElementById('rfr-restante-valor').textContent = fmtMoeda(restanteValor);
+
+        if (totalPct > 100.001) {
+            msgs.push('A soma dos percentuais ultrapassa 100%.');
+        }
+        if (Math.abs(totalValor) > Math.abs(RESULTADO) + 0.01) {
+            msgs.push('A soma dos valores ultrapassa o resultado total.');
+        }
+
+        if (msgs.length) {
+            alerta.textContent = msgs.join(' ');
+            alerta.classList.add('visivel');
+            linhas.forEach(function (tr) {
+                tr.classList.add('rfr-linha-invalida');
+            });
+        } else {
+            alerta.classList.remove('visivel');
+            alerta.textContent = '';
+        }
+    }
+
+    document.getElementById('rfr-btn-aplicar-qtd').addEventListener('click', function () {
+        var qtd = parseInt(document.getElementById('rfr-qtd-socios').value, 10) || 2;
+        renderLinhas(qtd);
+    });
+
+    document.getElementById('rfr-qtd-socios').addEventListener('change', function () {
+        renderLinhas(parseInt(this.value, 10) || 2);
+    });
+
+    renderLinhas(2);
+})();
+</script>
+{% endblock %}

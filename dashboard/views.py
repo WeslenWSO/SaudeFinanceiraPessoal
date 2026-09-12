@@ -848,3 +848,109 @@ def resumo_fechamento(request):
         return gerar_resumo_fechamento_excel(contexto)
 
     return render(request, 'resumo_fechamento.html', contexto)
+
+
+def resumo_fechamento_por_resultado(request):
+    """Receitas e despesas rateadas no período, resultado líquido e distribuição por % entre sócios."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return redirect('empresa:lista')
+
+    from dashboard.resumo_fechamento_resultado import coletar_dados_resumo_resultado
+
+    empresa_ctx = Empresa.objects.filter(pk=empresa_id).first()
+    empresa_razao_social = (empresa_ctx.razao or '').strip() if empresa_ctx else ''
+    empresa_cnpj_fmt = _fmt_cnpj_br(empresa_ctx.cnpj) if empresa_ctx else ''
+
+    meses_pt = [
+        '',
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+    ]
+
+    hoje = date.today()
+    primeiro = date(hoje.year, hoje.month, 1)
+    ultimo = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
+
+    di_str = (request.GET.get('data_inicio') or '').strip()
+    df_str = (request.GET.get('data_fim') or '').strip()
+    data_inicio = parse_date(di_str) if di_str else primeiro
+    data_fim = parse_date(df_str) if df_str else ultimo
+    if not data_inicio:
+        data_inicio = primeiro
+    if not data_fim:
+        data_fim = ultimo
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+
+    filtro_socio_ids = []
+    _seen_socio = set()
+    for raw in request.GET.getlist('socio'):
+        r = (raw or '').strip()
+        if not r.isdigit():
+            continue
+        sid = int(r)
+        if sid in _seen_socio:
+            continue
+        if Socio.objects.filter(pk=sid, empresa_id=empresa_id).exists():
+            filtro_socio_ids.append(sid)
+            _seen_socio.add(sid)
+
+    socios = Socio.objects.filter(empresa_id=empresa_id).order_by('socio', 'lastname')
+
+    if data_inicio.year == data_fim.year and data_inicio.month == data_fim.month:
+        periodo_titulo = f'{meses_pt[data_inicio.month]} de {data_inicio.year}'
+    else:
+        periodo_titulo = (
+            f'{data_inicio.strftime("%d/%m/%Y")} a {data_fim.strftime("%d/%m/%Y")}'
+        )
+
+    dados = coletar_dados_resumo_resultado(
+        empresa_id, data_inicio, data_fim, filtro_socio_ids
+    )
+
+    filtro_socio_nome = None
+    if filtro_socio_ids:
+        id_to_str = {
+            s.id: str(s)
+            for s in Socio.objects.filter(pk__in=filtro_socio_ids, empresa_id=empresa_id)
+        }
+        filtro_socio_nome = ', '.join(
+            id_to_str[i] for i in filtro_socio_ids if i in id_to_str
+        )
+
+    socios_json = json.dumps([{'id': s.id, 'nome': str(s)} for s in socios])
+
+    contexto = {
+        'titulo': 'Resumo fechamento por resultado',
+        'empresa_razao_social': empresa_razao_social,
+        'empresa_cnpj_fmt': empresa_cnpj_fmt,
+        'periodo_titulo': periodo_titulo,
+        'data_inicio': data_inicio.isoformat(),
+        'data_fim': data_fim.isoformat(),
+        'socios': socios,
+        'socios_json': socios_json,
+        'filtro_socio_ids': filtro_socio_ids,
+        'filtro_socio_nome': filtro_socio_nome,
+        'linhas_despesa': dados['linhas_despesa'],
+        'linhas_receita': dados['linhas_receita'],
+        'tem_despesa': bool(dados['linhas_despesa']),
+        'tem_receita': bool(dados['linhas_receita']),
+        'total_despesa_txt': dados['total_despesa_txt'],
+        'total_receita_txt': dados['total_receita_txt'],
+        'resultado_txt': dados['resultado_txt'],
+        'resultado_negativo': dados['resultado_negativo'],
+        'resultado_valor': str(dados['resultado'].quantize(Decimal('0.01'))),
+    }
+
+    return render(request, 'resumo_fechamento_resultado.html', contexto)

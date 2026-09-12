@@ -13,6 +13,11 @@ app_name = 'dashboard'
 
 urlpatterns = [
     url(r'^resumo-fechamento/?$', views.resumo_fechamento, name='resumo_fechamento'),
+    url(
+        r'^resumo-fechamento-por-resultado/?$',
+        views.resumo_fechamento_por_resultado,
+        name='resumo_fechamento_por_resultado',
+    ),
     url(r'^relatorio-mensal/?$', views.relatorio_mensal, name='relatorio_mensal'),
     url(r'^por-tipo/?$', conta_azul_dashboard_por_tipo, name='por_tipo'),
     url(r'^conta-azul/sincronizar-rapido/?$', conta_azul_sincronizar_dashboard, name='conta_azul_sync_rapido'),
