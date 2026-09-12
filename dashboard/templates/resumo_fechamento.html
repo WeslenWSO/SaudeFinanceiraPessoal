@@ -140,9 +140,14 @@
         {% endif %}
         <p class="text-muted small mb-0">Faturamento por <strong>sócio responsável</strong> nas NFSe (data de emissão no período; notas canceladas excluídas). O filtro de sócio(s) restringe NFSe, grade de faturamento e rateio.</p>
     </div>
-    <button type="button" class="btn btn-outline-secondary btn-sm no-print" onclick="window.print()" title="Imprimir este relatório">
-        <i class="fas fa-print" aria-hidden="true"></i> Imprimir relatório
-    </button>
+    <div class="d-flex flex-wrap gap-2 no-print">
+        <a href="{{ export_excel_url }}" id="btn-export-excel-resumo" class="btn btn-success btn-sm" title="Exportar todas as grades do resumo para Excel">
+            <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()" title="Imprimir este relatório">
+            <i class="fas fa-print" aria-hidden="true"></i> Imprimir relatório
+        </button>
+    </div>
 </div>
 
 <form method="get" class="card card-body py-3 mb-3 border no-print">
@@ -561,4 +566,19 @@
     </div>
 </div>
 </div>
+
+<script>
+(function () {
+    var btn = document.getElementById('btn-export-excel-resumo');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var params = new URLSearchParams(window.location.search);
+        params.set('export', 'excel');
+        document.querySelectorAll('input[name^="pl_"]').forEach(function (inp) {
+            if (inp.name) params.set(inp.name, inp.value || '');
+        });
+        btn.href = window.location.pathname + '?' + params.toString();
+    });
+})();
+</script>
 {% endblock %}

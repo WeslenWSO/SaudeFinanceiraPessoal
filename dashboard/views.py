@@ -808,35 +808,43 @@ def resumo_fechamento(request):
             }
         )
 
-    return render(
-        request,
-        'resumo_fechamento.html',
-        {
-            'titulo': 'Resumo fechamento',
-            'empresa_razao_social': empresa_razao_social,
-            'empresa_cnpj_fmt': empresa_cnpj_fmt,
-            'periodo_titulo': periodo_titulo,
-            'data_inicio': data_inicio.isoformat(),
-            'data_fim': data_fim.isoformat(),
-            'socios': socios,
-            'filtro_socio_ids': filtro_socio_ids,
-            'filtro_socio_nome': filtro_socio_nome,
-            'grade_linhas': linhas,
-            'totais_linha': totais_linha,
-            'tem_linhas': bool(linhas),
-            'grade_rateio_pagamento': grade_rateio_pagamento,
-            'tem_grade_rateio_pg': bool(grade_rateio_pagamento),
-            'rateio_pg_total_txt': _fmt_moeda_br(total_rateio_pg),
-            'resumo_consolidado_linhas': resumo_consolidado_linhas,
-            'totais_consolidado': totais_consolidado,
-            'tem_resumo_consolidado': bool(resumo_consolidado_linhas),
-            'grade_prolabore_linhas': grade_prolabore_linhas,
-            'tem_grade_prolabore': bool(grade_prolabore_linhas),
-            'totais_prolabore': totais_prolabore,
-            'pagamentos_sem_rateio_pagar': pagamentos_sem_rateio_pagar,
-            'tem_sem_rateio_pagar': bool(pagamentos_sem_rateio_pagar),
-            'contas_recebidas_periodo': contas_recebidas_periodo,
-            'tem_contas_recebidas_periodo': bool(contas_recebidas_periodo),
-            'contas_recebidas_total_txt': _fmt_moeda_br(soma_cr_valor),
-        },
-    )
+    export_qs = request.GET.copy()
+    export_qs['export'] = 'excel'
+    export_excel_url = request.path + '?' + export_qs.urlencode()
+
+    contexto = {
+        'titulo': 'Resumo fechamento',
+        'empresa_razao_social': empresa_razao_social,
+        'empresa_cnpj_fmt': empresa_cnpj_fmt,
+        'periodo_titulo': periodo_titulo,
+        'data_inicio': data_inicio.isoformat(),
+        'data_fim': data_fim.isoformat(),
+        'socios': socios,
+        'filtro_socio_ids': filtro_socio_ids,
+        'filtro_socio_nome': filtro_socio_nome,
+        'grade_linhas': linhas,
+        'totais_linha': totais_linha,
+        'tem_linhas': bool(linhas),
+        'grade_rateio_pagamento': grade_rateio_pagamento,
+        'tem_grade_rateio_pg': bool(grade_rateio_pagamento),
+        'rateio_pg_total_txt': _fmt_moeda_br(total_rateio_pg),
+        'resumo_consolidado_linhas': resumo_consolidado_linhas,
+        'totais_consolidado': totais_consolidado,
+        'tem_resumo_consolidado': bool(resumo_consolidado_linhas),
+        'grade_prolabore_linhas': grade_prolabore_linhas,
+        'tem_grade_prolabore': bool(grade_prolabore_linhas),
+        'totais_prolabore': totais_prolabore,
+        'pagamentos_sem_rateio_pagar': pagamentos_sem_rateio_pagar,
+        'tem_sem_rateio_pagar': bool(pagamentos_sem_rateio_pagar),
+        'contas_recebidas_periodo': contas_recebidas_periodo,
+        'tem_contas_recebidas_periodo': bool(contas_recebidas_periodo),
+        'contas_recebidas_total_txt': _fmt_moeda_br(soma_cr_valor),
+        'export_excel_url': export_excel_url,
+    }
+
+    if (request.GET.get('export') or '').strip().lower() == 'excel':
+        from dashboard.resumo_fechamento_excel import gerar_resumo_fechamento_excel
+
+        return gerar_resumo_fechamento_excel(contexto)
+
+    return render(request, 'resumo_fechamento.html', contexto)
