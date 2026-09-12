@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<div class="container-fluid py-4">
+    <h1 class="h4 mb-3">{{ titulo }}</h1>
+    <p class="text-muted mb-2">Arquivo: <strong>{{ filename }}</strong></p>
+    <p class="mb-3">
+        Processando <strong>{{ processadas_ate }}</strong> de <strong>{{ total_validas }}</strong> linha(s)…
+        <span class="text-muted">({{ percentual }}%)</span>
+    </p>
+    <div class="progress mb-4" style="height: 1.25rem;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+             style="width: {{ percentual }}%;" aria-valuenow="{{ percentual }}" aria-valuemin="0" aria-valuemax="100">
+            {{ percentual }}%
+        </div>
+    </div>
+    <p class="small text-muted mb-0">Não feche esta página — o próximo lote continua automaticamente.</p>
+
+    <form id="form-continuar-import" method="post" action="{{ confirm_url }}" class="d-none">
+        {% csrf_token %}
+        <input type="hidden" name="confirm_import" value="1">
+    </form>
+</div>
+<script>
+(function () {
+    setTimeout(function () {
+        document.getElementById('form-continuar-import').submit();
+    }, 400);
+})();
+</script>
+{% endblock %}

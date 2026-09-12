@@ -945,26 +945,65 @@ def import_receita_planilha(request):
             messages.error(request, 'Prévia expirada. Envie a planilha novamente.')
             return redirect('regrarateio:importReceitaPlanilha')
 
-        from regrarateio.import_receita_planilha import importar_receitas_planilha
+        linhas = payload.get('linhas')
+        if not linhas:
+            messages.error(request, 'Dados da importação não encontrados. Envie a planilha novamente.')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        from regrarateio.import_receita_planilha import importar_receitas_planilha_lote
+
+        offset = int(payload.get('offset') or 0)
+        acum = payload.get('totais') or {
+            'criados_car': 0,
+            'criados_lr': 0,
+            'ignorados': 0,
+            'erros': [],
+        }
 
         try:
-            resultado = importar_receitas_planilha(empresa_id, payload['linhas'])
+            resultado = importar_receitas_planilha_lote(empresa_id, linhas, offset=offset)
         except Exception as exc:
             messages.error(request, f'Erro ao importar: {exc}')
             return redirect('regrarateio:importReceitaPlanilha')
+
+        acum['criados_car'] += resultado['criados_car']
+        acum['criados_lr'] += resultado['criados_lr']
+        acum['ignorados'] += resultado['ignorados']
+        acum['erros'].extend(resultado.get('erros') or [])
+
+        if resultado.get('next_offset') is not None:
+            payload['offset'] = resultado['next_offset']
+            payload['totais'] = acum
+            request.session['rateio_import_preview'] = payload
+            request.session.modified = True
+            pct = 0
+            if resultado.get('total_validas'):
+                pct = int(resultado['processadas_ate'] * 100 / resultado['total_validas'])
+            return render(
+                request,
+                'import_receita_planilha_progress.html',
+                {
+                    'titulo': 'Importando planilha…',
+                    'filename': payload.get('filename', ''),
+                    'processadas_ate': resultado['processadas_ate'],
+                    'total_validas': resultado['total_validas'],
+                    'percentual': pct,
+                    'confirm_url': reverse_lazy('regrarateio:importReceitaPlanilha'),
+                },
+            )
 
         if 'rateio_import_preview' in request.session:
             del request.session['rateio_import_preview']
             request.session.modified = True
 
         msg = (
-            f"Importação concluída: {resultado['criados_lr']} lançamento(s) de rateio "
-            f"em {resultado['criados_car']} título(s) a receber."
+            f"Importação concluída: {acum['criados_lr']} lançamento(s) de rateio "
+            f"em {acum['criados_car']} título(s) a receber."
         )
-        if resultado['ignorados']:
-            msg += f" Ignorados: {resultado['ignorados']}."
+        if acum['ignorados']:
+            msg += f" Ignorados (duplicados/inválidos): {acum['ignorados']}."
         messages.success(request, msg)
-        for err in resultado['erros'][:10]:
+        for err in acum['erros'][:10]:
             messages.warning(request, err)
         return redirect('regrarateio:lancamentoRateioList')
 
@@ -1003,10 +1042,14 @@ def import_receita_planilha(request):
 
         linhas, erros = validar_linhas_importacao(empresa_id, linhas)
 
+        from regrarateio.import_receita_planilha import preparar_linhas_para_sessao
+
         request.session['rateio_import_preview'] = {
             'empresa_id': empresa_id,
             'filename': arquivo.name,
-            'linhas': linhas,
+            'linhas': preparar_linhas_para_sessao(linhas),
+            'offset': 0,
+            'totais': None,
         }
         request.session.modified = True
 

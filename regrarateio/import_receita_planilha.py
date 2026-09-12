@@ -7,7 +7,6 @@ from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 
-from django.db import transaction
 from django.http import HttpResponse
 from openpyxl import Workbook, load_workbook
 
@@ -24,6 +23,22 @@ from regrarateio.services import (
 MODELO_PLANILHA_PATH = (
     Path(__file__).resolve().parent / 'static' / 'modelos' / 'importar_receita_modelo.xlsx'
 )
+
+# Lotes pequenos evitam timeout (ex.: Render ~30s por requisição).
+IMPORTACAO_LOTE_TAMANHO = 35
+
+
+def preparar_linhas_para_sessao(linhas: list[dict]) -> list[dict]:
+    """Remove dados de prévia (grandes) antes de gravar na sessão."""
+    out = []
+    for ln in linhas:
+        slim = {k: v for k, v in ln.items() if k != 'preview_rateio'}
+        out.append(slim)
+    return out
+
+
+def linhas_validas_para_importacao(linhas: list[dict]) -> list[dict]:
+    return [ln for ln in linhas if ln.get('valido', True)]
 
 # Cabeçalhos oficiais do modelo «Importar Receita MM-AAAA.xlsx»
 COLUNAS_MODELO = (
@@ -413,9 +428,103 @@ def validar_linhas_importacao(empresa_id: int, linhas: list[dict]) -> tuple[list
     return linhas, erros
 
 
-@transaction.atomic
-def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
+def _importar_linha_receita(
+    empresa_id: int,
+    ln: dict,
+    *,
+    regra_cache: dict,
+    itens_cache: dict,
+    cobranca_cache: dict,
+    nota_cache: dict,
+) -> tuple[int, int, int, list[str]]:
+    """Importa uma linha. Retorna (car_criados, lr_criados, ignorados, erros)."""
+    if not ln.get('valido', True):
+        return 0, 0, 1, []
+
+    data = date.fromisoformat(ln['data'])
+    valor = Decimal(ln['valor'])
+    paciente = ln.get('paciente') or ''
+    procedimento = ln.get('procedimento') or ''
+    modalidade = ln.get('modalidade') or ''
+    viabilidade = ln.get('viabilidade') or ''
+    forma_txt = ln.get('forma_pagamento') or ''
+    nf = ln.get('nf') or ''
+    a_faturar = ln.get('a_faturar', False)
+
+    regra = _resolver_regra(empresa_id, str(ln['regra_id']), regra_cache)
+    if not regra:
+        return 0, 0, 1, []
+
+    obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade)
+    dup_q = ContaAReceber.objects.filter(
+        empresa_id=empresa_id,
+        valor_a_receber=valor,
+        observacao=obs,
+    )
+    if a_faturar:
+        dup_q = dup_q.filter(data_emissao=data, status='pendente')
+    else:
+        dup_q = dup_q.filter(data_recebimento=data, status='pago')
+    if dup_q.exists():
+        return 0, 0, 1, []
+
+    nota = _nota_por_numero(empresa_id, nf, nota_cache)
+    cobranca = _resolver_cobranca(forma_txt, cobranca_cache)
+    cliente = (viabilidade or paciente or 'Importação planilha')[:200]
+
+    if a_faturar:
+        status = 'pendente'
+        data_receb = None
+        valor_recebido = Decimal('0')
+    else:
+        status = 'pago'
+        data_receb = data
+        valor_recebido = valor
+
+    if regra.id not in itens_cache:
+        itens_cache[regra.id] = list(
+            RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios')
+        )
+    itens = itens_cache[regra.id]
+
+    car = ContaAReceber.objects.create(
+        empresa_id=empresa_id,
+        nota=nota,
+        socio=nota.socio if nota and nota.socio_id else None,
+        cliente=cliente,
+        data_emissao=data,
+        data_vencimento=data,
+        data_recebimento=data_receb,
+        valor_a_receber=valor,
+        valor_recebido=valor_recebido,
+        status=status,
+        doc=(nf or forma_txt)[:50] or None,
+        observacao=obs,
+        forma_pagamento=cobranca,
+        regra_rateio=regra,
+    )
+
+    try:
+        n = _gerar_linhas_rateio_conta_receber(car, regra, itens)
+    except ValueError as exc:
+        car.delete()
+        return 0, 0, 0, [f"Linha {ln['linha']}: {exc}"]
+
+    return 1, n, 0, []
+
+
+def importar_receitas_planilha_lote(
+    empresa_id: int,
+    linhas: list[dict],
+    offset: int = 0,
+    batch_size: int = IMPORTACAO_LOTE_TAMANHO,
+) -> dict:
+    """Importa um lote de linhas válidas (para evitar timeout HTTP)."""
+    valid = linhas_validas_para_importacao(linhas)
+    batch = valid[offset : offset + batch_size]
+
     regra_cache: dict = {}
+    itens_cache: dict = {}
     cobranca_cache: dict = {}
     nota_cache: dict = {}
 
@@ -424,86 +533,46 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
     ignorados = 0
     erros: list[str] = []
 
-    for ln in linhas:
-        if not ln.get('valido', True):
-            ignorados += 1
-            continue
-
-        data = date.fromisoformat(ln['data'])
-        valor = Decimal(ln['valor'])
-        paciente = ln.get('paciente') or ''
-        procedimento = ln.get('procedimento') or ''
-        modalidade = ln.get('modalidade') or ''
-        viabilidade = ln.get('viabilidade') or ''
-        forma_txt = ln.get('forma_pagamento') or ''
-        nf = ln.get('nf') or ''
-        a_faturar = ln.get('a_faturar', False)
-
-        regra = _resolver_regra(empresa_id, str(ln['regra_id']), regra_cache)
-        if not regra:
-            ignorados += 1
-            continue
-
-        obs = _montar_observacao(paciente, procedimento, modalidade, viabilidade)
-        dup_q = ContaAReceber.objects.filter(
-            empresa_id=empresa_id,
-            valor_a_receber=valor,
-            observacao=obs,
+    for ln in batch:
+        c_car, c_lr, ign, errs = _importar_linha_receita(
+            empresa_id,
+            ln,
+            regra_cache=regra_cache,
+            itens_cache=itens_cache,
+            cobranca_cache=cobranca_cache,
+            nota_cache=nota_cache,
         )
-        if a_faturar:
-            dup_q = dup_q.filter(data_emissao=data, status='pendente')
-        else:
-            dup_q = dup_q.filter(data_recebimento=data, status='pago')
-        if dup_q.exists():
-            ignorados += 1
-            continue
+        criados_car += c_car
+        criados_lr += c_lr
+        ignorados += ign
+        erros.extend(errs)
 
-        nota = _nota_por_numero(empresa_id, nf, nota_cache)
-        cobranca = _resolver_cobranca(forma_txt, cobranca_cache)
-        cliente = (viabilidade or paciente or 'Importação planilha')[:200]
-
-        if a_faturar:
-            status = 'pendente'
-            data_receb = None
-            valor_recebido = Decimal('0')
-        else:
-            status = 'pago'
-            data_receb = data
-            valor_recebido = valor
-
-        car = ContaAReceber.objects.create(
-            empresa_id=empresa_id,
-            nota=nota,
-            socio=nota.socio if nota and nota.socio_id else None,
-            cliente=cliente,
-            data_emissao=data,
-            data_vencimento=data,
-            data_recebimento=data_receb,
-            valor_a_receber=valor,
-            valor_recebido=valor_recebido,
-            status=status,
-            doc=(nf or forma_txt)[:50] or None,
-            observacao=obs,
-            forma_pagamento=cobranca,
-            regra_rateio=regra,
-        )
-        criados_car += 1
-
-        itens = list(RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios'))
-        try:
-            n = _gerar_linhas_rateio_conta_receber(car, regra, itens)
-            criados_lr += n
-        except ValueError as exc:
-            car.delete()
-            criados_car -= 1
-            erros.append(f"Linha {ln['linha']}: {exc}")
-
+    next_offset = offset + batch_size if offset + batch_size < len(valid) else None
     return {
         'criados_car': criados_car,
         'criados_lr': criados_lr,
         'ignorados': ignorados,
         'erros': erros,
+        'next_offset': next_offset,
+        'total_validas': len(valid),
+        'processadas_ate': min(offset + batch_size, len(valid)),
     }
+
+
+def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
+    """Importa todas as linhas em lotes (uso local / testes)."""
+    offset = 0
+    totais = {'criados_car': 0, 'criados_lr': 0, 'ignorados': 0, 'erros': []}
+    while True:
+        lote = importar_receitas_planilha_lote(empresa_id, linhas, offset=offset)
+        totais['criados_car'] += lote['criados_car']
+        totais['criados_lr'] += lote['criados_lr']
+        totais['ignorados'] += lote['ignorados']
+        totais['erros'].extend(lote['erros'])
+        if lote['next_offset'] is None:
+            break
+        offset = lote['next_offset']
+    return totais
 
 
 def gerar_modelo_receita_planilha_excel() -> HttpResponse:
