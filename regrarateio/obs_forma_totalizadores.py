@@ -25,20 +25,14 @@ def _to_dec(x) -> Decimal:
     return x if isinstance(x, Decimal) else Decimal(str(x))
 
 
-def _obs_forma_de_lancamento(lr) -> str:
-    if (lr.obs_forma or '').strip():
-        return lr.obs_forma.strip()
-    if lr.conta_receber_id and lr.conta_receber and (lr.conta_receber.doc or '').strip():
-        return lr.conta_receber.doc.strip()
-    return '—'
-
-
 def coletar_totais_obs_forma(qs) -> dict:
     por_obs: dict[str, dict] = defaultdict(lambda: {'valor': Decimal('0'), 'qtd': 0})
     celulas = []
 
-    for lr in qs.select_related('conta_receber'):
-        obs = _obs_forma_de_lancamento(lr)
+    for lr in qs.select_related('conta_receber', 'conta_receber__forma_pagamento'):
+        obs = lr.obs_forma_exibicao()
+        if obs == '—':
+            obs = '(sem obs. forma)'
         valor = _to_dec(lr.valor)
         por_obs[obs]['valor'] += valor
         por_obs[obs]['qtd'] += 1

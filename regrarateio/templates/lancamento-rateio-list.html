@@ -81,7 +81,10 @@
         background-color: #212529 !important;
     }
     .rfr-obs-forma-pct {
-        max-width: 5.5rem;
+        width: 5.5rem;
+        min-width: 5rem;
+        background-color: #fff !important;
+        border: 1px solid #86b7fe !important;
     }
 </style>
 
@@ -1174,156 +1177,6 @@
     }
 })();
 
-(function () {
-    var EMPRESA_ID = {{ empresa_id|default:"null" }};
-    var DADOS = {{ obs_forma_totalizadores_json|safe }};
-    var LS_KEY = 'rfr_obs_forma_aliquota_' + (EMPRESA_ID || '0');
-
-    function fmtMoeda(n) {
-        var neg = n < 0;
-        var a = Math.abs(n);
-        var s = a.toFixed(2).replace('.', ',');
-        var parts = s.split(',');
-        var intPart = parts[0];
-        var out = [];
-        while (intPart.length > 3) {
-            out.unshift(intPart.slice(-3));
-            intPart = intPart.slice(0, -3);
-        }
-        out.unshift(intPart);
-        return (neg ? '-' : '') + out.join('.') + ',' + parts[1];
-    }
-
-    function parsePct(str) {
-        if (!str) return 0;
-        var n = parseFloat(String(str).replace(/\s/g, '').replace(',', '.'));
-        return isNaN(n) ? 0 : Math.max(0, n);
-    }
-
-    function carregarAliquotas() {
-        try {
-            return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {};
-        } catch (e) {
-            return {};
-        }
-    }
-
-    function salvarAliquotas(map) {
-        try {
-            localStorage.setItem(LS_KEY, JSON.stringify(map));
-        } catch (e) { /* ignore */ }
-    }
-
-    function impostoDeValor(valor, pct) {
-        return Math.abs(valor) * pct / 100;
-    }
-
-    function liquidoDeValor(valor, imposto) {
-        return valor >= 0 ? valor - imposto : valor + imposto;
-    }
-
-    function recalcularObsForma() {
-        var corpo = document.getElementById('rfr-obs-forma-corpo');
-        var corpoMes = document.getElementById('rfr-obs-forma-mes-corpo');
-        if (!corpo || !corpoMes) return;
-
-        var aliqMap = carregarAliquotas();
-        var totalValor = 0;
-        var totalImposto = 0;
-        var totalLiquido = 0;
-
-        corpo.querySelectorAll('tr').forEach(function (tr) {
-            var obs = tr.dataset.obsForma || '';
-            var valor = parseFloat(tr.dataset.valor) || 0;
-            var inp = tr.querySelector('.rfr-obs-forma-pct-input');
-            var pct = inp ? parsePct(inp.value) : parsePct(aliqMap[obs]);
-            if (inp) aliqMap[obs] = pct;
-            var imp = impostoDeValor(valor, pct);
-            var liq = liquidoDeValor(valor, imp);
-            tr.querySelector('.rfr-obs-forma-imposto').textContent = 'R$ ' + fmtMoeda(imp);
-            tr.querySelector('.rfr-obs-forma-liquido').textContent = 'R$ ' + fmtMoeda(liq);
-            totalValor += valor;
-            totalImposto += imp;
-            totalLiquido += liq;
-        });
-        salvarAliquotas(aliqMap);
-
-        var porMes = {};
-        (DADOS.celulas || []).forEach(function (c) {
-            var v = parseFloat(c.valor) || 0;
-            var pct = parsePct(aliqMap[c.obs_forma]);
-            var imp = impostoDeValor(v, pct);
-            var liq = liquidoDeValor(v, imp);
-            if (!porMes[c.mes]) {
-                porMes[c.mes] = { label: c.mes_label, valor: 0, imposto: 0, liquido: 0 };
-            }
-            porMes[c.mes].valor += v;
-            porMes[c.mes].imposto += imp;
-            porMes[c.mes].liquido += liq;
-        });
-
-        corpoMes.innerHTML = '';
-        Object.keys(porMes).sort().forEach(function (mes) {
-            var m = porMes[mes];
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td>' + m.label + '</td>' +
-                '<td class="text-end fw-semibold">R$ ' + fmtMoeda(m.valor) + '</td>' +
-                '<td class="text-end text-danger">R$ ' + fmtMoeda(m.imposto) + '</td>' +
-                '<td class="text-end text-success">R$ ' + fmtMoeda(m.liquido) + '</td>';
-            corpoMes.appendChild(tr);
-        });
-
-        document.getElementById('rfr-obs-forma-total-valor').textContent = 'R$ ' + fmtMoeda(totalValor);
-        document.getElementById('rfr-obs-forma-total-imposto').textContent = 'R$ ' + fmtMoeda(totalImposto);
-        document.getElementById('rfr-obs-forma-total-liquido').textContent = 'R$ ' + fmtMoeda(totalLiquido);
-    }
-
-    function montarTabelaObsForma() {
-        var corpo = document.getElementById('rfr-obs-forma-corpo');
-        if (!corpo) return;
-        corpo.innerHTML = '';
-        var aliqMap = carregarAliquotas();
-        var linhas = DADOS.por_obs_forma || [];
-        if (!linhas.length) {
-            corpo.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum lançamento no filtro atual.</td></tr>';
-            document.getElementById('rfr-obs-forma-mes-corpo').innerHTML = '';
-            return;
-        }
-        linhas.forEach(function (row) {
-            var tr = document.createElement('tr');
-            tr.dataset.obsForma = row.obs_forma;
-            tr.dataset.valor = row.valor;
-            var pctVal = aliqMap[row.obs_forma];
-            if (pctVal === undefined || pctVal === null) pctVal = '';
-            else pctVal = String(pctVal).replace('.', ',');
-            tr.innerHTML =
-                '<td>' + row.obs_forma + ' <span class="text-muted small">(' + row.qtd + ')</span></td>' +
-                '<td class="text-end fw-semibold">R$ ' + fmtMoeda(parseFloat(row.valor) || 0) + '</td>' +
-                '<td class="text-end"><input type="text" class="form-control form-control-sm text-end rfr-obs-forma-pct-input rfr-obs-forma-pct" inputmode="decimal" placeholder="0,00" value="' + pctVal + '"></td>' +
-                '<td class="text-end text-danger rfr-obs-forma-imposto">R$ 0,00</td>' +
-                '<td class="text-end text-success rfr-obs-forma-liquido">R$ 0,00</td>';
-            corpo.appendChild(tr);
-        });
-        corpo.querySelectorAll('.rfr-obs-forma-pct-input').forEach(function (inp) {
-            inp.addEventListener('input', recalcularObsForma);
-            inp.addEventListener('blur', recalcularObsForma);
-        });
-        recalcularObsForma();
-    }
-
-    var modalObs = document.getElementById('modalTotalObsForma');
-    if (modalObs) {
-        modalObs.addEventListener('shown.bs.modal', montarTabelaObsForma);
-    }
-    if (new URLSearchParams(window.location.search).get('abrir_obs_forma') === '1') {
-        if (modalObs && window.bootstrap && bootstrap.Modal) {
-            bootstrap.Modal.getOrCreateInstance(modalObs).show();
-        }
-    }
-})();
-</script>
-
 <div class="modal fade" id="modalTotalObsForma" tabindex="-1" aria-labelledby="modalTotalObsFormaLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-relatorio-90">
         <div class="modal-content">
@@ -1352,7 +1205,28 @@
                                 <th class="text-end">Valor líquido (R$)</th>
                             </tr>
                         </thead>
-                        <tbody id="rfr-obs-forma-corpo"></tbody>
+                        <tbody id="rfr-obs-forma-corpo">
+                            {% for lin in obs_forma_linhas %}
+                            <tr data-obs-forma="{{ lin.obs_forma }}" data-valor="{{ lin.valor }}">
+                                <td>{{ lin.obs_forma }} <span class="text-muted small">({{ lin.qtd }})</span></td>
+                                <td class="text-end fw-semibold">R$ {{ lin.valor_txt }}</td>
+                                <td class="text-end">
+                                    <input type="text"
+                                           class="form-control form-control-sm text-end rfr-obs-forma-pct-input rfr-obs-forma-pct"
+                                           inputmode="decimal"
+                                           placeholder="0,00"
+                                           aria-label="Alíquota {{ lin.obs_forma }}"
+                                           autocomplete="off">
+                                </td>
+                                <td class="text-end text-danger rfr-obs-forma-imposto">R$ 0,00</td>
+                                <td class="text-end text-success rfr-obs-forma-liquido">R$ 0,00</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">Nenhum lançamento no filtro atual.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
                         <tfoot class="table-secondary fw-semibold">
                             <tr>
                                 <td class="text-end">Total</td>
@@ -1541,5 +1415,143 @@
         </div>
     </div>
 </div>
+
+{{ obs_forma_totalizadores_json|json_script:"obs-forma-dados" }}
+<script>
+(function () {
+    var elDados = document.getElementById('obs-forma-dados');
+    var DADOS = elDados ? JSON.parse(elDados.textContent) : { por_obs_forma: [], celulas: [] };
+    var EMPRESA_ID = {{ empresa_id|default:"null" }};
+    var LS_KEY = 'rfr_obs_forma_aliquota_' + (EMPRESA_ID || '0');
+
+    function fmtMoeda(n) {
+        var neg = n < 0;
+        var a = Math.abs(n);
+        var s = a.toFixed(2).replace('.', ',');
+        var parts = s.split(',');
+        var intPart = parts[0];
+        var out = [];
+        while (intPart.length > 3) {
+            out.unshift(intPart.slice(-3));
+            intPart = intPart.slice(0, -3);
+        }
+        out.unshift(intPart);
+        return (neg ? '-' : '') + out.join('.') + ',' + parts[1];
+    }
+
+    function parsePct(str) {
+        if (!str) return 0;
+        var n = parseFloat(String(str).replace(/\s/g, '').replace(',', '.'));
+        return isNaN(n) ? 0 : Math.max(0, n);
+    }
+
+    function carregarAliquotas() {
+        try {
+            return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function salvarAliquotas(map) {
+        try {
+            localStorage.setItem(LS_KEY, JSON.stringify(map));
+        } catch (e) { /* ignore */ }
+    }
+
+    function impostoDeValor(valor, pct) {
+        return Math.abs(valor) * pct / 100;
+    }
+
+    function liquidoDeValor(valor, imposto) {
+        return valor >= 0 ? valor - imposto : valor + imposto;
+    }
+
+    function recalcularObsForma() {
+        var corpo = document.getElementById('rfr-obs-forma-corpo');
+        var corpoMes = document.getElementById('rfr-obs-forma-mes-corpo');
+        if (!corpo || !corpoMes) return;
+
+        var aliqMap = carregarAliquotas();
+        var totalValor = 0;
+        var totalImposto = 0;
+        var totalLiquido = 0;
+
+        corpo.querySelectorAll('tr[data-obs-forma]').forEach(function (tr) {
+            var obs = tr.dataset.obsForma || '';
+            var valor = parseFloat(tr.dataset.valor) || 0;
+            var inp = tr.querySelector('.rfr-obs-forma-pct-input');
+            var pct = inp ? parsePct(inp.value) : parsePct(aliqMap[obs]);
+            if (inp) aliqMap[obs] = pct;
+            var imp = impostoDeValor(valor, pct);
+            var liq = liquidoDeValor(valor, imp);
+            tr.querySelector('.rfr-obs-forma-imposto').textContent = 'R$ ' + fmtMoeda(imp);
+            tr.querySelector('.rfr-obs-forma-liquido').textContent = 'R$ ' + fmtMoeda(liq);
+            totalValor += valor;
+            totalImposto += imp;
+            totalLiquido += liq;
+        });
+        salvarAliquotas(aliqMap);
+
+        var porMes = {};
+        (DADOS.celulas || []).forEach(function (c) {
+            var v = parseFloat(c.valor) || 0;
+            var pct = parsePct(aliqMap[c.obs_forma]);
+            var imp = impostoDeValor(v, pct);
+            var liq = liquidoDeValor(v, imp);
+            if (!porMes[c.mes]) {
+                porMes[c.mes] = { label: c.mes_label, valor: 0, imposto: 0, liquido: 0 };
+            }
+            porMes[c.mes].valor += v;
+            porMes[c.mes].imposto += imp;
+            porMes[c.mes].liquido += liq;
+        });
+
+        corpoMes.innerHTML = '';
+        Object.keys(porMes).sort().forEach(function (mes) {
+            var m = porMes[mes];
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + m.label + '</td>' +
+                '<td class="text-end fw-semibold">R$ ' + fmtMoeda(m.valor) + '</td>' +
+                '<td class="text-end text-danger">R$ ' + fmtMoeda(m.imposto) + '</td>' +
+                '<td class="text-end text-success">R$ ' + fmtMoeda(m.liquido) + '</td>';
+            corpoMes.appendChild(tr);
+        });
+
+        var elTotalValor = document.getElementById('rfr-obs-forma-total-valor');
+        var elTotalImposto = document.getElementById('rfr-obs-forma-total-imposto');
+        var elTotalLiquido = document.getElementById('rfr-obs-forma-total-liquido');
+        if (elTotalValor) elTotalValor.textContent = 'R$ ' + fmtMoeda(totalValor);
+        if (elTotalImposto) elTotalImposto.textContent = 'R$ ' + fmtMoeda(totalImposto);
+        if (elTotalLiquido) elTotalLiquido.textContent = 'R$ ' + fmtMoeda(totalLiquido);
+    }
+
+    function initObsFormaModal() {
+        var aliqMap = carregarAliquotas();
+        document.querySelectorAll('#rfr-obs-forma-corpo tr[data-obs-forma]').forEach(function (tr) {
+            var obs = tr.dataset.obsForma || '';
+            var inp = tr.querySelector('.rfr-obs-forma-pct-input');
+            if (!inp) return;
+            if (aliqMap[obs] !== undefined && aliqMap[obs] !== null && aliqMap[obs] !== '') {
+                inp.value = String(aliqMap[obs]).replace('.', ',');
+            }
+            inp.addEventListener('input', recalcularObsForma);
+            inp.addEventListener('blur', recalcularObsForma);
+        });
+        recalcularObsForma();
+    }
+
+    var modalObs = document.getElementById('modalTotalObsForma');
+    if (modalObs) {
+        modalObs.addEventListener('shown.bs.modal', initObsFormaModal);
+    }
+    if (new URLSearchParams(window.location.search).get('abrir_obs_forma') === '1') {
+        if (modalObs && window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalObs).show();
+        }
+    }
+})();
+</script>
 
 {% endblock %}

@@ -548,6 +548,15 @@ class LancamentoRateioList(ListView):
 
         obs_forma_data = coletar_totais_obs_forma(qs_filtro)
         context['empresa_id'] = empresa_id
+        obs_forma_linhas = []
+        for row in obs_forma_data['por_obs_forma']:
+            obs_forma_linhas.append({
+                'obs_forma': row['obs_forma'],
+                'valor': row['valor'],
+                'qtd': row['qtd'],
+                'valor_txt': _fmt_br_moeda(row['valor']),
+            })
+        context['obs_forma_linhas'] = obs_forma_linhas
         context['obs_forma_totalizadores_json'] = json.dumps(
             {
                 'por_obs_forma': [
