@@ -42,5 +42,15 @@ urlpatterns = [
     ),
     path("lancamentos/gerar/cap/", views.gerar_rateio_contas_pagar_aplicar, name="gerarRateioCap"),
     path("lancamentos/gerar/car/", views.gerar_rateio_contas_receber_aplicar, name="gerarRateioCar"),
+    path(
+        "lancamentos/importar-planilha/",
+        views.import_receita_planilha,
+        name="importReceitaPlanilha",
+    ),
+    path(
+        "lancamentos/importar-planilha/modelo/",
+        views.import_receita_planilha_modelo,
+        name="importReceitaPlanilhaModelo",
+    ),
         ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

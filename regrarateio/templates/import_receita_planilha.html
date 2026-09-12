@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<div class="container-fluid">
+<div class="mb-3">
+    <a href="{{ voltar_url }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Voltar aos lançamentos de rateio
+    </a>
+</div>
+
+<h1 class="h2 mb-3">{{ titulo }}</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <p class="text-muted small">
+            Importe a planilha de exames/receitas (Data, Paciente, Procedimento, Modalidade, Viabilização,
+            Forma de Pagamento, Valor). Inclua a coluna <strong>Regra do rateio</strong> ou escolha uma regra padrão abaixo.
+            Cada linha gera um título a receber <strong>pago</strong> e os lançamentos de rateio conforme a regra (%).
+        </p>
+        <p class="small text-warning">
+            Linhas com forma de pagamento <strong>A FATURAR</strong> são ignoradas (ainda não recebidas).
+            Títulos com «NF 4856 - DH» vinculam à NFSe quando existir no cadastro.
+        </p>
+        <p class="mb-3">
+            <a href="{{ modelo_url }}" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-download"></i> Baixar modelo Excel
+            </a>
+        </p>
+
+        <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <div class="col-12 col-md-5">
+                <label for="regra_padrao_id" class="form-label">Regra padrão <span class="text-muted fw-normal">(opcional se houver coluna na planilha)</span></label>
+                <select name="regra_padrao_id" id="regra_padrao_id" class="form-select">
+                    <option value="">— Usar coluna «Regra do rateio» —</option>
+                    {% for r in regras %}
+                    <option value="{{ r.id }}">{{ r }}</option>
+                    {% empty %}
+                    <option value="" disabled>Nenhuma regra ativa</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="arquivo" class="form-label">Planilha (.xlsx)</label>
+                <input type="file" name="arquivo" id="arquivo" class="form-control" accept=".xlsx,.xlsm" required>
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search"></i> Prévia
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+{% endblock %}

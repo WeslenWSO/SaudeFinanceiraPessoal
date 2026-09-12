@@ -43,7 +43,10 @@
             (mesma regra de datas do resumo de fechamento). O filtro de sócio(s) restringe as grades e o cálculo do resultado.
         </p>
     </div>
-    <div class="no-print">
+    <div class="d-flex flex-wrap gap-2 no-print">
+        <a href="{{ export_excel_url }}" id="btn-export-excel-rfr" class="btn btn-success btn-sm" title="Exportar receitas, despesas e resumo para Excel">
+            <i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel
+        </a>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()" title="Imprimir">
             <i class="fas fa-print" aria-hidden="true"></i> Imprimir
         </button>
@@ -116,6 +119,9 @@
                         <th>NF</th>
                         <th>Descrição</th>
                         <th>Sócio</th>
+                        <th>Modalidade</th>
+                        <th>Forma de pagamento</th>
+                        <th>Viabilidade</th>
                         <th class="text-end">Valor título</th>
                         <th class="text-end">Valor rateio</th>
                     </tr>
@@ -129,20 +135,23 @@
                             <td>{{ row.nota_txt }}</td>
                             <td>{{ row.descricao }}</td>
                             <td>{{ row.socio_nome }}</td>
+                            <td>{{ row.modalidade_txt }}</td>
+                            <td>{{ row.forma_pagamento_txt }}</td>
+                            <td>{{ row.viabilidade_txt }}</td>
                             <td class="text-end">R$ {{ row.titulo_valor_txt }}</td>
                             <td class="text-end text-success">R$ {{ row.valor_txt }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Nenhuma receita rateada no período.</td>
+                            <td colspan="10" class="text-center text-muted py-4">Nenhuma receita rateada no período.</td>
                         </tr>
                     {% endif %}
                 </tbody>
                 {% if tem_receita %}
                 <tfoot class="table-secondary fw-semibold">
                     <tr>
-                        <td colspan="6" class="text-end">Total receitas rateadas</td>
+                        <td colspan="9" class="text-end">Total receitas rateadas</td>
                         <td class="text-end text-success">R$ {{ total_receita_txt }}</td>
                     </tr>
                 </tfoot>

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block conteudo %}
+<div class="container-fluid">
+<div class="mb-3">
+    <a href="{{ voltar_url }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Cancelar
+    </a>
+</div>
+
+<h1 class="h2 mb-2">{{ titulo }}</h1>
+<p class="text-muted">Arquivo: <strong>{{ filename }}</strong> · {{ total_linhas }} linha(s)</p>
+
+{% if avisos %}
+<div class="alert alert-warning py-2 small">
+    {% for av in avisos|slice:":10" %}<div>{{ av }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if erros %}
+<div class="alert alert-danger py-2 small">
+    <strong>Ajuste antes de confirmar:</strong>
+    {% for err in erros|slice:":15" %}<div>{{ err }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="table-responsive mb-3">
+    <table class="table table-sm table-striped align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Linha</th>
+                <th>Data</th>
+                <th>Paciente</th>
+                <th>Procedimento</th>
+                <th>Mod.</th>
+                <th>Viabilização</th>
+                <th>Forma pgto</th>
+                <th class="text-end">Valor</th>
+                <th>Regra</th>
+                <th>Rateio previsto</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ln in linhas %}
+            <tr class="{% if not ln.valido %}table-danger{% endif %}">
+                <td>{{ ln.linha }}</td>
+                <td>{{ ln.data }}</td>
+                <td>{{ ln.paciente|default:"—" }}</td>
+                <td><small>{{ ln.procedimento|default:"—" }}</small></td>
+                <td>{{ ln.modalidade|default:"—" }}</td>
+                <td>{{ ln.viabilidade|default:"—" }}</td>
+                <td><small>{{ ln.forma_pagamento|default:"—" }}</small></td>
+                <td class="text-end">R$ {{ ln.valor }}</td>
+                <td><small>{{ ln.regra_nome|default:"—" }}</small></td>
+                <td>
+                    {% if ln.preview_rateio %}
+                        {% for p in ln.preview_rateio %}
+                        <div class="small">{{ p.socio_nome }}: R$ {{ p.valor }} ({{ p.perc }}%)</div>
+                        {% endfor %}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if ln.valido %}
+                    <span class="badge bg-success">OK</span>
+                    {% else %}
+                    <span class="badge bg-danger">{{ ln.motivo_invalido|default:"Inválido" }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<form method="post" action="{{ confirm_url }}">
+    {% csrf_token %}
+    <input type="hidden" name="confirm_import" value="1">
+    <button type="submit" class="btn btn-success" {% if not tem_linhas_validas %}disabled{% endif %}>
+        <i class="fas fa-check"></i> Confirmar importação
+    </button>
+    <a href="{{ voltar_url }}" class="btn btn-outline-secondary ms-2">Cancelar</a>
+</form>
+</div>
+{% endblock %}

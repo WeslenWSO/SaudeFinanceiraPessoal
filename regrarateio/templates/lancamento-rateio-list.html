@@ -39,6 +39,10 @@
                     title="Período, contas a receber pagas e regra — lançamentos com valor positivo">
                     <i class="fas fa-calculator"></i> Gerar a partir de contas a receber
                 </button>
+                <a href="{% url 'regrarateio:importReceitaPlanilha' %}" class="btn btn-info btn-sm text-white"
+                    title="Importar planilha Excel de exames/receitas e gerar rateio automaticamente">
+                    <i class="fas fa-file-upload"></i> Importar planilha Excel
+                </a>
                 <a href="{% url 'regrarateio:regraList' %}" class="btn btn-secondary btn-sm">
                     <i class="fas fa-share-nodes"></i> Regras de rateio
                 </a>

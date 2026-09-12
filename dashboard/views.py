@@ -953,4 +953,15 @@ def resumo_fechamento_por_resultado(request):
         'resultado_valor': str(dados['resultado'].quantize(Decimal('0.01'))),
     }
 
+    export_qs = request.GET.copy()
+    export_qs['export'] = 'excel'
+    contexto['export_excel_url'] = request.path + '?' + export_qs.urlencode()
+
+    if (request.GET.get('export') or '').strip().lower() == 'excel':
+        from dashboard.resumo_fechamento_resultado_excel import (
+            gerar_resumo_fechamento_resultado_excel,
+        )
+
+        return gerar_resumo_fechamento_resultado_excel(contexto)
+
     return render(request, 'resumo_fechamento_resultado.html', contexto)

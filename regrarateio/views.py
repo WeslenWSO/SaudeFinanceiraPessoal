@@ -922,3 +922,119 @@ def gerar_rateio_contas_receber_aplicar(request):
         messages.error(request, f'Erro ao gerar rateio: {exc}')
 
     return redirect('regrarateio:lancamentoRateioList')
+
+
+def import_receita_planilha_modelo(request):
+    from regrarateio.import_receita_planilha import gerar_modelo_receita_planilha_excel
+
+    return gerar_modelo_receita_planilha_excel()
+
+
+def import_receita_planilha(request):
+    """Importa receitas de planilha Excel (exames) e gera rateio pela regra informada."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return redirect('empresa:lista')
+
+    regras = RegraRateio.objects.filter(empresa_id=empresa_id, rateio='S').order_by('codigo', 'nomedaregra')
+    voltar_url = reverse_lazy('regrarateio:lancamentoRateioList')
+
+    if request.method == 'POST' and request.POST.get('confirm_import') == '1':
+        payload = request.session.get('rateio_import_preview')
+        if not payload or payload.get('empresa_id') != empresa_id:
+            messages.error(request, 'Prévia expirada. Envie a planilha novamente.')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        from regrarateio.import_receita_planilha import importar_receitas_planilha
+
+        try:
+            resultado = importar_receitas_planilha(empresa_id, payload['linhas'])
+        except Exception as exc:
+            messages.error(request, f'Erro ao importar: {exc}')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        if 'rateio_import_preview' in request.session:
+            del request.session['rateio_import_preview']
+            request.session.modified = True
+
+        msg = (
+            f"Importação concluída: {resultado['criados_lr']} lançamento(s) de rateio "
+            f"em {resultado['criados_car']} título(s) a receber."
+        )
+        if resultado['ignorados']:
+            msg += f" Ignorados: {resultado['ignorados']}."
+        messages.success(request, msg)
+        for err in resultado['erros'][:10]:
+            messages.warning(request, err)
+        return redirect('regrarateio:lancamentoRateioList')
+
+    if request.method == 'POST':
+        regra_raw = (request.POST.get('regra_padrao_id') or '').strip()
+        arquivo = request.FILES.get('arquivo')
+        regra_padrao_id = int(regra_raw) if regra_raw.isdigit() else None
+
+        if not arquivo:
+            messages.error(request, 'Selecione um arquivo Excel (.xlsx).')
+            return redirect('regrarateio:importReceitaPlanilha')
+        if not arquivo.name.lower().endswith(('.xlsx', '.xlsm')):
+            messages.error(request, 'O arquivo deve ser .xlsx.')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        from regrarateio.import_receita_planilha import (
+            parse_receita_planilha_xlsx,
+            validar_linhas_importacao,
+        )
+
+        try:
+            linhas, avisos = parse_receita_planilha_xlsx(
+                arquivo.read(),
+                regra_padrao_id=regra_padrao_id,
+                empresa_id=empresa_id,
+            )
+        except Exception as exc:
+            messages.error(request, f'Erro ao ler planilha: {exc}')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        if not linhas:
+            for av in avisos[:8]:
+                messages.warning(request, av)
+            messages.error(request, 'Nenhuma linha válida para importar.')
+            return redirect('regrarateio:importReceitaPlanilha')
+
+        linhas, erros = validar_linhas_importacao(empresa_id, linhas)
+
+        request.session['rateio_import_preview'] = {
+            'empresa_id': empresa_id,
+            'filename': arquivo.name,
+            'linhas': linhas,
+        }
+        request.session.modified = True
+
+        tem_validas = any(ln.get('valido') for ln in linhas)
+        return render(
+            request,
+            'import_receita_planilha_preview.html',
+            {
+                'titulo': 'Prévia — importar receitas da planilha',
+                'filename': arquivo.name,
+                'linhas': linhas,
+                'avisos': avisos,
+                'erros': erros,
+                'regras': regras,
+                'voltar_url': voltar_url,
+                'confirm_url': reverse_lazy('regrarateio:importReceitaPlanilha'),
+                'total_linhas': len(linhas),
+                'tem_linhas_validas': tem_validas,
+            },
+        )
+
+    return render(
+        request,
+        'import_receita_planilha.html',
+        {
+            'titulo': 'Importar receitas — planilha Excel',
+            'regras': regras,
+            'voltar_url': voltar_url,
+            'modelo_url': reverse_lazy('regrarateio:importReceitaPlanilhaModelo'),
+        },
+    )
