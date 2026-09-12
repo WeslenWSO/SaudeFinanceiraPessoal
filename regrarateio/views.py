@@ -511,6 +511,32 @@ class LancamentoRateioList(ListView):
         context['totais_convenio_impostos_txt'] = _fmt_br_moeda(tot_conv['total_impostos_ap'])
         context['totais_convenio_ad_irpj_txt'] = _fmt_br_moeda(tot_conv['total_ad_irpj'])
         context['totais_convenio_liquido_txt'] = _fmt_br_moeda(tot_conv['total_liquido_ap'])
+        context['totais_convenio_irpj_txt'] = _fmt_br_moeda(tot_conv['total_irpj_ap'])
+        context['totais_convenio_irpj_mais_ad_txt'] = _fmt_br_moeda(tot_conv['total_irpj_mais_ad'])
+        cols = tot_conv.get('totais_colunas') or {}
+        context['totais_convenio_qtd'] = cols.get('qtd', 0)
+        context['totais_convenio_iss_txt'] = _fmt_br_moeda(cols.get('iss_ap'))
+        context['totais_convenio_pis_txt'] = _fmt_br_moeda(cols.get('pis_ap'))
+        context['totais_convenio_cofins_txt'] = _fmt_br_moeda(cols.get('cofins_ap'))
+        context['totais_convenio_csll_txt'] = _fmt_br_moeda(cols.get('csll_ap'))
+        di_conv = parse_date((self.request.GET.get('data_inicio') or '').strip() or '')
+        df_conv = parse_date((self.request.GET.get('data_fim') or '').strip() or '')
+        meses_pt = [
+            '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+        ]
+        if di_conv and df_conv and di_conv.year == df_conv.year and di_conv.month == df_conv.month:
+            context['convenio_periodo_label'] = f'{meses_pt[di_conv.month]}/{di_conv.year}'
+        elif di_conv and df_conv:
+            context['convenio_periodo_label'] = (
+                f'{di_conv.strftime("%d/%m/%Y")} a {df_conv.strftime("%d/%m/%Y")}'
+            )
+        elif di_conv:
+            context['convenio_periodo_label'] = f'A partir de {di_conv.strftime("%d/%m/%Y")}'
+        elif df_conv:
+            context['convenio_periodo_label'] = f'Até {df_conv.strftime("%d/%m/%Y")}'
+        else:
+            context['convenio_periodo_label'] = 'Período do filtro'
         context['ad_irpj_base_lucro_txt'] = _fmt_br_moeda(ad.get('base_lucro'))
         context['ad_irpj_excedente_txt'] = _fmt_br_moeda(ad.get('excedente'))
         context['ad_irpj_total_txt'] = _fmt_br_moeda(ad.get('ad_irpj_total'))

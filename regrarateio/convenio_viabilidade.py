@@ -168,6 +168,8 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str
     indice = ad_info['indice']
     total_ad_irpj = Decimal('0')
     total_liquido = Decimal('0')
+    tot_iss = tot_pis = tot_cofins = tot_csll = tot_irpj = Decimal('0')
+    tot_qtd = 0
     for linha in linhas:
         total_lin = _to_dec(linha['total'])
         ad = (abs(total_lin) * indice).quantize(Decimal('0.01'))
@@ -176,6 +178,12 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str
         linha['liquido_ap'] = _liquido_com_impostos(total_lin, imp, ad)
         total_ad_irpj += ad
         total_liquido += linha['liquido_ap']
+        tot_iss += _to_dec(linha['iss_ap'])
+        tot_pis += _to_dec(linha['pis_ap'])
+        tot_cofins += _to_dec(linha['cofins_ap'])
+        tot_csll += _to_dec(linha['csll_ap'])
+        tot_irpj += _to_dec(linha['irpj_ap'])
+        tot_qtd += int(linha.get('qtd') or 0)
 
     # Outras viabilidades no filtro que não batem com cadastro
     outros_qs = qs.exclude(viabilidade='').exclude(viabilidade__isnull=True)
@@ -198,12 +206,24 @@ def coletar_totais_por_viabilidade_convenio(empresa_id, qs, periodo_ad_irpj: str
             'total': _to_dec(row['total']),
         })
 
+    total_irpj_mais_ad = tot_irpj + total_ad_irpj
+
     return {
         'linhas': linhas,
         'total_geral': total_geral,
         'total_impostos_ap': total_impostos,
         'total_ad_irpj': total_ad_irpj,
         'total_liquido_ap': total_liquido,
+        'total_irpj_ap': tot_irpj,
+        'total_irpj_mais_ad': total_irpj_mais_ad,
+        'totais_colunas': {
+            'qtd': tot_qtd,
+            'iss_ap': tot_iss,
+            'pis_ap': tot_pis,
+            'cofins_ap': tot_cofins,
+            'csll_ap': tot_csll,
+            'irpj_ap': tot_irpj,
+        },
         'ad_irpj': ad_info,
         'outros': outros,
         'tem_convenio_cadastrado': bool(convenios),
