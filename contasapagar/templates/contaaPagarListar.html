@@ -149,6 +149,7 @@
                                         <th>Fornecedor</th>
                                         <th>CPF/CNPJ</th>
                                         <th>Categoria</th>
+                                        <th>Centro de custo</th>
                                         <th>Forma Pgto</th>
                                         <th>Data Emissão</th>
                                         <th>Data Vencimento</th>
@@ -178,6 +179,7 @@
                                         <td>{% if conta.fornecedor %}{{ conta.fornecedor.razao }}{% else %}-{% endif %}</td>
                                         <td>{{ conta.cpf_cnpj|default:"-" }}</td>
                                         <td>{% if conta.categoria %}{{ conta.categoria.nome }}{% else %}-{% endif %}</td>
+                                        <td>{% if conta.centro_custo %}{{ conta.centro_custo.nome }}{% else %}-{% endif %}</td>
                                         <td>{% if conta.cobranca %}{{ conta.cobranca.descricao }}{% else %}-{% endif %}</td>
                                         <td>{{ conta.dtEmissao|date:"d/m/Y" }}</td>
                                         <td>{{ conta.dtvenc|date:"d/m/Y" }}</td>
@@ -214,7 +216,7 @@
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="18" class="text-center">Nenhuma conta a pagar encontrada.</td>
+                                        <td colspan="21" class="text-center">Nenhuma conta a pagar encontrada.</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
