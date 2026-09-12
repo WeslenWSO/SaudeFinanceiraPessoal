@@ -49,7 +49,8 @@
                 Pagamentos (PGTO) ficam com valor negativo; recebimentos com valor positivo.
                 Use <strong>Gerar a partir de contas a pagar</strong> para despesas <strong>sem pagamento</strong> (emissão e vencimento no período).
                 Use <strong>Contas já pagas</strong> para títulos <strong>pagos</strong> pela <strong>data de pagamento</strong> (regime de caixa).
-                Só dá para aplicar rateio com <strong>regra no título</strong> (ou regra escolhida no modal) e <strong>sócios/% na regra</strong>. Linhas em amarelo mostram o que falta cadastrar.
+                Só dá para aplicar rateio com <strong>regra no título</strong> (ou regra escolhida no modal) e <strong>sócios na regra</strong>.
+                Regras em modo <strong>valor na aplicação</strong> exigem informar quanto vai para o sócio manual (ex.: USG) em cada título.
             </p>
 
             {% if cards_socios %}
@@ -242,12 +243,12 @@
                         <select name="regra_rateio" id="regra-rateio-modal" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
+                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios){% elif r.modo_alocacao == 'V' %} (valor na aplicação){% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">
                             Se o título está <strong>sem regra</strong>, escolha uma regra aqui antes de gravar.
-                            A regra precisa ter sócios e percentuais em <b>Cadastro → Regra do Rateio</b>.
+                            Modo <strong>valor na aplicação</strong>: informe quanto pertence ao sócio manual em cada linha.
                         </p>
                     </div>
                     <div class="table-responsive border rounded" style="max-height: 380px;">
@@ -264,13 +265,14 @@
                                     <th>Emissão</th>
                                     <th>Vencimento</th>
                                     <th>Valor base</th>
+                                    <th class="rateio-th-valor d-none">Valor manual</th>
                                     <th>Regra</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-cap-tbody">
                                 <tr id="rateio-cap-empty">
-                                    <td colspan="10" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
+                                    <td colspan="11" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -325,12 +327,11 @@
                         <select name="regra_rateio" id="regra-rateio-modal-pagos" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
+                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios){% elif r.modo_alocacao == 'V' %} (valor na aplicação){% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">
-                            Se o título está <strong>sem regra</strong>, escolha uma regra aqui antes de gravar.
-                            A regra precisa ter sócios e percentuais em <b>Cadastro → Regra do Rateio</b>.
+                            Modo <strong>valor na aplicação</strong>: informe quanto pertence ao sócio manual (ex.: USG) em cada título selecionado.
                         </p>
                     </div>
                     <div class="table-responsive border rounded rateio-cap-pagos-tabela">
@@ -347,13 +348,14 @@
                                     <th>Emissão</th>
                                     <th>Pagamento</th>
                                     <th>Valor base</th>
+                                    <th class="rateio-th-valor d-none">Valor manual</th>
                                     <th>Regra</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-cap-pagos-tbody">
                                 <tr id="rateio-cap-pagos-empty">
-                                    <td colspan="10" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas pagas</strong>.</td>
+                                    <td colspan="11" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas pagas</strong>.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -407,11 +409,11 @@
                         <select name="regra_rateio" id="regra-rateio-modal-car" class="form-select form-select-sm">
                             <option value="">— Usar a regra já cadastrada em cada título (se houver) —</option>
                             {% for r in regras_rateio_modal %}
-                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios/%) {% endif %}</option>
+                            <option value="{{ r.id }}" {% if r.rateio != 'S' or r.n_itens == 0 %}disabled{% endif %}>{% if r.codigo %}{{ r.codigo }} — {% endif %}{{ r.nomedaregra }}{% if r.rateio != 'S' %} (rateio=NÃO){% elif r.n_itens == 0 %} (sem sócios){% elif r.modo_alocacao == 'V' %} (valor na aplicação){% endif %}</option>
                             {% endfor %}
                         </select>
                         <p class="form-text small mb-0 mt-1">
-                            Se o título está <strong>sem regra</strong>, escolha uma regra aqui. A regra precisa ter sócios e percentuais cadastrados.
+                            Modo <strong>valor na aplicação</strong>: informe o valor manual por título quando aplicável.
                         </p>
                     </div>
                     <div class="table-responsive border rounded" style="max-height: 380px;">
@@ -427,13 +429,14 @@
                                     <th>Sócio</th>
                                     <th>Recebimento</th>
                                     <th>Valor base</th>
+                                    <th class="rateio-th-valor d-none">Valor manual</th>
                                     <th>Regra</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rateio-car-tbody">
                                 <tr id="rateio-car-empty">
-                                    <td colspan="9" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
+                                    <td colspan="10" class="text-muted text-center py-4">Informe o período e clique em <strong>Buscar contas</strong>.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -450,6 +453,99 @@
     </div>
 </div>
 
+<script type="application/json" id="regras-rateio-meta">{{ regras_rateio_meta_json|safe }}</script>
+<script>
+(function () {
+    window.RateioModal = {
+        meta: {},
+        load: function () {
+            try {
+                var el = document.getElementById('regras-rateio-meta');
+                if (el && el.textContent) this.meta = JSON.parse(el.textContent);
+            } catch (e) { this.meta = {}; }
+        },
+        regra: function (id) { return id ? (this.meta[String(id)] || null) : null; },
+        isValor: function (id) { var r = this.regra(id); return !!(r && r.modo === 'V'); },
+        manual: function (id) { var r = this.regra(id); return r && r.manual ? r.manual : null; },
+        resolveRegraId: function (selectVal, rowRegraId) {
+            if (selectVal) return String(selectVal);
+            if (rowRegraId) return String(rowRegraId);
+            return '';
+        },
+        buildValorCell: function (tituloId, regraId, valorBase, disabled) {
+            var man = this.manual(regraId);
+            if (!man) {
+                return '<td class="rateio-valor-cell d-none text-muted small">—</td>';
+            }
+            var max = parseFloat(String(valorBase).replace(',', '.')) || 0;
+            return '<td class="rateio-valor-cell">' +
+                '<input type="number" step="0.01" min="0" max="' + max + '" ' +
+                'name="valor_rateio_' + tituloId + '_' + man.socio_id + '" ' +
+                'class="form-control form-control-sm rateio-valor-input" placeholder="0,00" ' +
+                'data-max="' + max + '" title="Valor para ' + man.nome + '" ' + (disabled ? 'disabled' : '') + '>' +
+                '</td>';
+        },
+        refreshValorColumn: function (modalRoot, selectEl) {
+            var th = modalRoot.querySelector('.rateio-th-valor');
+            var selVal = selectEl ? selectEl.value : '';
+            var anyValor = selVal ? this.isValor(selVal) : false;
+            if (!anyValor) {
+                modalRoot.querySelectorAll('tr[data-regra-id]').forEach(function (tr) {
+                    if (RateioModal.isValor(tr.getAttribute('data-regra-id'))) anyValor = true;
+                });
+            }
+            if (th) {
+                th.classList.toggle('d-none', !anyValor);
+                if (anyValor) {
+                    var man = this.manual(selVal);
+                    if (!man) {
+                        var tr0 = modalRoot.querySelector('tr[data-regra-id]');
+                        if (tr0) man = this.manual(tr0.getAttribute('data-regra-id'));
+                    }
+                    th.textContent = man ? ('Valor ' + man.nome) : 'Valor manual';
+                }
+            }
+            modalRoot.querySelectorAll('tbody tr[data-regra-id]').forEach(function (tr) {
+                var rid = RateioModal.resolveRegraId(selVal, tr.getAttribute('data-regra-id'));
+                var cell = tr.querySelector('.rateio-valor-cell');
+                if (!cell) return;
+                var show = rid && RateioModal.isValor(rid);
+                cell.classList.toggle('d-none', !show);
+                if (show && selVal && RateioModal.isValor(selVal)) {
+                    var man = RateioModal.manual(selVal);
+                    var inp = cell.querySelector('.rateio-valor-input');
+                    if (man && inp && inp.name.indexOf('_' + man.socio_id) === -1) {
+                        var tid = tr.getAttribute('data-titulo-id');
+                        var max = inp.getAttribute('data-max') || '0';
+                        inp.outerHTML = '<input type="number" step="0.01" min="0" max="' + max + '" ' +
+                            'name="valor_rateio_' + tid + '_' + man.socio_id + '" ' +
+                            'class="form-control form-control-sm rateio-valor-input" placeholder="0,00" ' +
+                            'data-max="' + max + '" title="Valor para ' + man.nome + '">';
+                    }
+                }
+            });
+        },
+        validateSelected: function (tbody, cbClass, selectEl) {
+            var checked = tbody.querySelectorAll('input.' + cbClass + ':not(:disabled):checked');
+            if (!checked.length) return false;
+            for (var i = 0; i < checked.length; i++) {
+                var tr = checked[i].closest('tr');
+                if (!tr) continue;
+                var rid = this.resolveRegraId(selectEl ? selectEl.value : '', tr.getAttribute('data-regra-id'));
+                if (!this.isValor(rid)) continue;
+                var inp = tr.querySelector('.rateio-valor-input:not(:disabled)');
+                if (!inp) return false;
+                var v = parseFloat(inp.value);
+                var max = parseFloat(inp.getAttribute('data-max')) || 0;
+                if (!isFinite(v) || v < 0 || v > max) return false;
+            }
+            return true;
+        }
+    };
+    RateioModal.load();
+})();
+</script>
+
 <script>
 (function () {
     const modalEl = document.getElementById('modalRateioCap');
@@ -464,6 +560,7 @@
     const checkAll = document.getElementById('rateio-cap-check-all');
     const inpDi = document.getElementById('rateio-cap-di');
     const inpDf = document.getElementById('rateio-cap-df');
+    const selRegra = document.getElementById('regra-rateio-modal');
 
     function showMsg(text) {
         msgEl.textContent = text || '';
@@ -484,8 +581,14 @@
     }
 
     function updateAplicarState() {
-        const enabled = tbody.querySelectorAll('input.rateio-cap-cb:not(:disabled):checked');
-        btnAplicar.disabled = enabled.length === 0;
+        btnAplicar.disabled = !RateioModal.validateSelected(tbody, 'rateio-cap-cb', selRegra);
+    }
+
+    if (selRegra) {
+        selRegra.addEventListener('change', function () {
+            RateioModal.refreshValorColumn(modalEl, selRegra);
+            updateAplicarState();
+        });
     }
 
     btnBuscar.addEventListener('click', function () {
@@ -521,7 +624,7 @@
 
                 if (contas.length === 0) {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = '<td colspan="10" class="text-center text-muted py-4">Nenhuma despesa <strong>sem pagamento</strong> encontrada com emissão e vencimento no período informado.</td>';
+                    tr.innerHTML = '<td colspan="11" class="text-center text-muted py-4">Nenhuma despesa <strong>sem pagamento</strong> encontrada com emissão e vencimento no período informado.</td>';
                     tbody.appendChild(tr);
                     btnAplicar.disabled = true;
                     return;
@@ -530,9 +633,9 @@
                 contas.forEach(function (c) {
                     const tr = document.createElement('tr');
                     const pode = !!c.pode_aplicar;
-                    // Só bloqueia quem já tem rateio gravado. Sem regra no título: pode marcar —
-                    // ao aplicar, é preciso ter regra e itens cadastrados ou nada será gerado.
                     var desabilitar = !!c.ja_gerado;
+                    if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
+                    tr.setAttribute('data-titulo-id', c.id);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -541,6 +644,8 @@
                     else if (!pode) badgeClass = 'bg-warning text-dark';
                     const rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
                     const status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
+                    var rid = RateioModal.resolveRegraId(selRegra ? selRegra.value : '', c.regra_id);
+                    var valorCell = RateioModal.buildValorCell(c.id, rid, c.valor_base, desabilitar);
                     tr.innerHTML =
                         '<td><input type="checkbox" name="conta_pagar_id" value="' + esc(c.id) + '" class="form-check-input rateio-cap-cb" ' + disabled + '></td>' +
                         '<td>' + esc(c.id) + '</td>' +
@@ -550,6 +655,7 @@
                         '<td>' + fmtIso(c.dt_emissao) + '</td>' +
                         '<td>' + fmtIso(c.dt_venc) + '</td>' +
                         '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        valorCell +
                         '<td><small>' + esc(c.regra) + '</small></td>' +
                         '<td>' + status + '</td>';
                     tbody.appendChild(tr);
@@ -558,6 +664,10 @@
                 tbody.querySelectorAll('input.rateio-cap-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarState);
                 });
+                tbody.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
+                    inp.addEventListener('input', updateAplicarState);
+                });
+                RateioModal.refreshValorColumn(modalEl, selRegra);
                 updateAplicarState();
             })
             .catch(function () {
@@ -611,6 +721,7 @@
     const checkAll = document.getElementById('rateio-cap-pagos-check-all');
     const inpDi = document.getElementById('rateio-cap-pagos-di');
     const inpDf = document.getElementById('rateio-cap-pagos-df');
+    const selRegra = document.getElementById('regra-rateio-modal-pagos');
 
     function showMsg(text) {
         msgEl.textContent = text || '';
@@ -631,8 +742,14 @@
     }
 
     function updateAplicarState() {
-        const enabled = tbody.querySelectorAll('input.rateio-cap-pagos-cb:not(:disabled):checked');
-        btnAplicar.disabled = enabled.length === 0;
+        btnAplicar.disabled = !RateioModal.validateSelected(tbody, 'rateio-cap-pagos-cb', selRegra);
+    }
+
+    if (selRegra) {
+        selRegra.addEventListener('change', function () {
+            RateioModal.refreshValorColumn(modalEl, selRegra);
+            updateAplicarState();
+        });
     }
 
     btnBuscar.addEventListener('click', function () {
@@ -668,7 +785,7 @@
 
                 if (contas.length === 0) {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = '<td colspan="10" class="text-center text-muted py-4">Nenhuma conta <strong>paga</strong> encontrada com data de pagamento no período informado.</td>';
+                    tr.innerHTML = '<td colspan="11" class="text-center text-muted py-4">Nenhuma conta <strong>paga</strong> encontrada com data de pagamento no período informado.</td>';
                     tbody.appendChild(tr);
                     btnAplicar.disabled = true;
                     return;
@@ -678,6 +795,8 @@
                     const tr = document.createElement('tr');
                     const pode = !!c.pode_aplicar;
                     var desabilitar = !!c.ja_gerado;
+                    if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
+                    tr.setAttribute('data-titulo-id', c.id);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     const disabled = desabilitar ? 'disabled' : '';
@@ -686,6 +805,8 @@
                     else if (!pode) badgeClass = 'bg-warning text-dark';
                     const rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
                     const status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
+                    var rid = RateioModal.resolveRegraId(selRegra ? selRegra.value : '', c.regra_id);
+                    var valorCell = RateioModal.buildValorCell(c.id, rid, c.valor_base, desabilitar);
                     tr.innerHTML =
                         '<td><input type="checkbox" name="conta_pagar_id" value="' + esc(c.id) + '" class="form-check-input rateio-cap-pagos-cb" ' + disabled + '></td>' +
                         '<td>' + esc(c.id) + '</td>' +
@@ -695,6 +816,7 @@
                         '<td>' + fmtIso(c.dt_emissao) + '</td>' +
                         '<td>' + fmtIso(c.dt_pag) + '</td>' +
                         '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        valorCell +
                         '<td><small>' + esc(c.regra) + '</small></td>' +
                         '<td>' + status + '</td>';
                     tbody.appendChild(tr);
@@ -703,6 +825,10 @@
                 tbody.querySelectorAll('input.rateio-cap-pagos-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarState);
                 });
+                tbody.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
+                    inp.addEventListener('input', updateAplicarState);
+                });
+                RateioModal.refreshValorColumn(modalEl, selRegra);
                 updateAplicarState();
             })
             .catch(function () {
@@ -756,6 +882,7 @@
     var checkAllCar = document.getElementById('rateio-car-check-all');
     var inpDiCar = document.getElementById('rateio-car-di');
     var inpDfCar = document.getElementById('rateio-car-df');
+    var selRegraCar = document.getElementById('regra-rateio-modal-car');
 
     function showMsgCar(text) {
         msgCar.textContent = text || '';
@@ -776,8 +903,14 @@
     }
 
     function updateAplicarCar() {
-        var enabled = tbodyCar.querySelectorAll('input.rateio-car-cb:not(:disabled):checked');
-        btnAplicarCar.disabled = enabled.length === 0;
+        btnAplicarCar.disabled = !RateioModal.validateSelected(tbodyCar, 'rateio-car-cb', selRegraCar);
+    }
+
+    if (selRegraCar) {
+        selRegraCar.addEventListener('change', function () {
+            RateioModal.refreshValorColumn(modalCar, selRegraCar);
+            updateAplicarCar();
+        });
     }
 
     btnBuscarCar.addEventListener('click', function () {
@@ -813,7 +946,7 @@
 
                 if (contas.length === 0) {
                     var tr0 = document.createElement('tr');
-                    tr0.innerHTML = '<td colspan="9" class="text-center text-muted py-4">Nenhuma conta a receber <strong>paga</strong> no período para esta empresa. Ajuste as datas ou verifique a empresa da sessão.</td>';
+                    tr0.innerHTML = '<td colspan="10" class="text-center text-muted py-4">Nenhuma conta a receber <strong>paga</strong> no período para esta empresa. Ajuste as datas ou verifique a empresa da sessão.</td>';
                     tbodyCar.appendChild(tr0);
                     btnAplicarCar.disabled = true;
                     return;
@@ -823,6 +956,8 @@
                     var tr = document.createElement('tr');
                     var pode = !!c.pode_aplicar;
                     var desabilitar = !!c.ja_gerado;
+                    if (c.regra_id) tr.setAttribute('data-regra-id', c.regra_id);
+                    tr.setAttribute('data-titulo-id', c.id);
                     if (c.ja_gerado) tr.classList.add('table-secondary');
                     else if (!pode) tr.classList.add('table-warning');
                     var disabled = desabilitar ? 'disabled' : '';
@@ -832,6 +967,8 @@
                     var rotulo = c.rotulo_status || (pode ? 'Pode aplicar' : '—');
                     var status = '<span class="badge ' + badgeClass + '">' + esc(rotulo) + '</span>';
                     var socTxt = c.socio_txt != null && c.socio_txt !== '' ? c.socio_txt : '—';
+                    var rid = RateioModal.resolveRegraId(selRegraCar ? selRegraCar.value : '', c.regra_id);
+                    var valorCell = RateioModal.buildValorCell(c.id, rid, c.valor_base, desabilitar);
                     tr.innerHTML =
                         '<td><input type="checkbox" name="conta_receber_id" value="' + esc(c.id) + '" class="form-check-input rateio-car-cb" ' + disabled + '></td>' +
                         '<td>' + esc(c.id) + '</td>' +
@@ -840,6 +977,7 @@
                         '<td><small class="text-break">' + esc(socTxt) + '</small></td>' +
                         '<td>' + fmtIso(c.dt_pag) + '</td>' +
                         '<td class="text-end">' + esc(c.valor_base) + '</td>' +
+                        valorCell +
                         '<td><small>' + esc(c.regra) + '</small></td>' +
                         '<td>' + status + '</td>';
                     tbodyCar.appendChild(tr);
@@ -848,6 +986,10 @@
                 tbodyCar.querySelectorAll('input.rateio-car-cb').forEach(function (cb) {
                     cb.addEventListener('change', updateAplicarCar);
                 });
+                tbodyCar.querySelectorAll('.rateio-valor-input').forEach(function (inp) {
+                    inp.addEventListener('input', updateAplicarCar);
+                });
+                RateioModal.refreshValorColumn(modalCar, selRegraCar);
                 updateAplicarCar();
             })
             .catch(function () {

@@ -68,7 +68,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Sócio</th>
-                                    <th class="text-end">% na regra</th>
+                                    <th class="text-end">% efetivo</th>
                                     <th class="text-end">Valor</th>
                                 </tr>
                             </thead>
@@ -88,8 +88,7 @@
 
                     <h6 class="text-uppercase text-muted small mb-2">Nova regra e prévia (confirmação)</h6>
                     <p class="small text-muted">
-                        Ao escolher outra regra, os valores são recalculados <strong>proporcionalmente</strong> para todos os sócios da regra.
-                        A soma das parcelas acompanha o valor base do título (com arredondamento em cada linha).
+                        Regras <strong>percentuais</strong> recalculam por %. Regras <strong>valor na aplicação</strong> exigem informar quanto vai para o sócio manual; o restante fica com o(s) residual(is).
                     </p>
 
                     <form method="post" novalidate id="form-recalc-rateio">
@@ -107,6 +106,15 @@
                             {% if form.regra_rateio.errors %}
                             <div class="text-danger small">{{ form.regra_rateio.errors|striptags }}</div>
                             {% endif %}
+                        </div>
+
+                        <div class="mb-3 d-none" id="wrap-valor-manual">
+                            <label class="form-label" for="{{ form.valor_manual.id_for_label }}">{{ form.valor_manual.label }}</label>
+                            {{ form.valor_manual }}
+                            {% if form.valor_manual.errors %}
+                            <div class="text-danger small">{{ form.valor_manual.errors|striptags }}</div>
+                            {% endif %}
+                            <div class="form-text">Informe quanto pertence ao sócio manual (ex.: USG). O restante vai para o(s) sócio(s) residual.</div>
                         </div>
 
                         <div class="table-responsive border rounded mb-3">
@@ -155,14 +163,16 @@
     var tipoLanc = "{{ tipo_lanc|escapejs }}";
     var baseStr = "{{ valor_base_str }}";
     var elRegra = document.getElementById("id_regra_rateio");
+    var elValorManual = document.getElementById("id_valor_manual");
+    var wrapValor = document.getElementById("wrap-valor-manual");
     var tbody = document.getElementById("rateio-preview-tbody");
     if (!elRegra || !tbody) return;
 
-    var regrasItens = {};
+    var regrasMeta = {};
     try {
         var raw = document.getElementById("regras-itens-data");
-        if (raw && raw.textContent) regrasItens = JSON.parse(raw.textContent);
-    } catch (e) { regrasItens = {}; }
+        if (raw && raw.textContent) regrasMeta = JSON.parse(raw.textContent);
+    } catch (e) { regrasMeta = {}; }
 
     function parseBase() {
         var x = parseFloat(baseStr.replace(",", "."));
@@ -171,25 +181,59 @@
 
     function fmtBr(num) {
         var n = Math.round(num * 100) / 100;
-        var s = n.toFixed(2).replace(".", ",");
-        if (n < 0) return s;
-        return s;
+        return n.toFixed(2).replace(".", ",");
+    }
+
+    function getMeta(regraId) {
+        return regrasMeta[String(regraId)] || null;
+    }
+
+    function toggleValorManual(regraId) {
+        var meta = getMeta(regraId);
+        var show = meta && meta.modo === 'V';
+        if (wrapValor) wrapValor.classList.toggle('d-none', !show);
+        if (elValorManual && meta && meta.manual) {
+            elValorManual.placeholder = 'Valor para ' + meta.manual.nome;
+        }
     }
 
     function renderPreview(regraId) {
         var base = parseBase();
-        var itens = regrasItens[String(regraId)];
+        var meta = getMeta(regraId);
         tbody.innerHTML = "";
-        if (!itens || !itens.length) {
+        toggleValorManual(regraId);
+        if (!meta || !meta.itens || !meta.itens.length) {
             var tr0 = document.createElement("tr");
             tr0.innerHTML = '<td colspan="3" class="text-muted text-center py-3">Sem itens nesta regra ou regra inválida.</td>';
             tbody.appendChild(tr0);
             return;
         }
-        itens.forEach(function (item) {
-            var perc = parseFloat(String(item.perc).replace(",", ".")) || 0;
-            var bruto = base * perc / 100;
+        var manualVal = elValorManual ? parseFloat(String(elValorManual.value).replace(",", ".")) : NaN;
+        meta.itens.forEach(function (item) {
+            var bruto = 0;
+            var perc = 0;
+            if (meta.modo === 'V') {
+                if (item.tipo === 'M') {
+                    bruto = isFinite(manualVal) ? manualVal : 0;
+                } else if (item.tipo === 'R') {
+                    bruto = isFinite(manualVal) ? Math.max(0, base - manualVal) : base;
+                    if (meta.itens.filter(function (i) { return i.tipo === 'R'; }).length > 1) {
+                        bruto = 0;
+                    }
+                }
+            } else {
+                perc = parseFloat(String(item.perc).replace(",", ".")) || 0;
+                bruto = base * perc / 100;
+            }
+            if (base > 0 && bruto > 0) {
+                perc = Math.round((bruto / base) * 10000) / 100;
+            }
             var valor = tipoLanc === "PGTO" ? -Math.round(bruto * 100) / 100 : Math.round(bruto * 100) / 100;
+            if (bruto <= 0 && meta.modo === 'V' && item.tipo === 'R' && isFinite(manualVal)) {
+                bruto = Math.max(0, base - manualVal);
+                valor = tipoLanc === "PGTO" ? -bruto : bruto;
+                perc = base > 0 ? Math.round((bruto / base) * 10000) / 100 : 0;
+            }
             var tr = document.createElement("tr");
             var cls = valor < 0 ? "text-danger" : "text-success";
             tr.innerHTML =
@@ -203,6 +247,11 @@
     elRegra.addEventListener("change", function () {
         renderPreview(elRegra.value);
     });
+    if (elValorManual) {
+        elValorManual.addEventListener("input", function () {
+            renderPreview(elRegra.value);
+        });
+    }
 
     try {
         var pin = document.getElementById("preview-inicial-data");
@@ -219,6 +268,7 @@
                     "<td class=\"text-end " + cls + "\">" + String(row.valor).replace(".", ",") + "</td>";
                 tbody.appendChild(tr);
             });
+            toggleValorManual(elRegra.value);
         } else {
             renderPreview(elRegra.value);
         }

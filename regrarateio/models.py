@@ -13,6 +13,13 @@ from socio.models import Socio
 
 
 class RegraRateio(models.Model):
+    MODO_PERCENTUAL = 'P'
+    MODO_VALOR = 'V'
+    MODO_ALOCACAO_CHOICES = (
+        (MODO_PERCENTUAL, 'Percentual fixo'),
+        (MODO_VALOR, 'Valor na aplicação'),
+    )
+
     empresa = models.ForeignKey(
         'empresa.Empresa',
         on_delete=models.CASCADE,
@@ -29,7 +36,17 @@ class RegraRateio(models.Model):
             ('S', 'SIM'),
             ('N', 'NAO'),
         ),
-        help_text='SIM: divide o valor entre sócios (%). NÃO: não gera lançamentos de rateio.',
+        help_text='SIM: divide o valor entre sócios. NÃO: não gera lançamentos de rateio.',
+    )
+    modo_alocacao = models.CharField(
+        verbose_name='Modo de alocação',
+        max_length=1,
+        default=MODO_PERCENTUAL,
+        choices=MODO_ALOCACAO_CHOICES,
+        help_text=(
+            'Percentual fixo: usa % cadastrados nos itens. '
+            'Valor na aplicação: informe quanto vai para o sócio manual em cada título; o restante fica com o(s) sócio(s) residual.'
+        ),
     )
 
     class Meta:
@@ -47,9 +64,24 @@ class RegraRateio(models.Model):
 
 
 class RegraRateioItem(models.Model):
+    TIPO_PERCENTUAL = 'P'
+    TIPO_MANUAL = 'M'
+    TIPO_RESIDUAL = 'R'
+    TIPO_PARTICIPACAO_CHOICES = (
+        (TIPO_PERCENTUAL, 'Percentual fixo'),
+        (TIPO_MANUAL, 'Valor manual na aplicação'),
+        (TIPO_RESIDUAL, 'Residual (restante)'),
+    )
+
     regrarateio = models.ForeignKey(RegraRateio, on_delete=models.DO_NOTHING)
     socios = models.ForeignKey(Socio, on_delete=models.DO_NOTHING)
     percRateio = models.DecimalField(default=0.00, verbose_name="Percentual Rateio", null=False, max_digits=5, decimal_places=2)
+    tipo_participacao = models.CharField(
+        verbose_name='Tipo de participação',
+        max_length=1,
+        default=TIPO_PERCENTUAL,
+        choices=TIPO_PARTICIPACAO_CHOICES,
+    )
 
     def __str__(self):
         return str(self.regrarateio.nomedaregra) or ''

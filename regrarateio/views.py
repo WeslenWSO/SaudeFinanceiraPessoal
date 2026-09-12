@@ -35,7 +35,7 @@ from .forms import FormRecalcularRateioGrupo, FormRegraItem, FormRegraRateio
 
 class RegraCreate(CreateView):
     model = RegraRateio
-    fields = ['codigo', 'nomedaregra', 'rateio']
+    form_class = FormRegraRateio
     template_name = 'regra-add-alterar.html'
 
     success_url = reverse_lazy('regrarateio:regraList')
@@ -143,12 +143,14 @@ class RegraIList(ListView):
         nomeregra = get_object_or_404(RegraRateio, pk=self.kwargs['pk'], empresa_id=empresa_id)
         context['socios'] = Socio.objects.filter(empresa_id=empresa_id) if empresa_id else Socio.objects.none()
         
+        context['regra'] = nomeregra
         if nomeregra.rateio == 'N':
             pass
-        else:
-         for i in RegraRateioItem.objects.filter(regrarateio=nomeregra):
-          context["tot"] = RegraRateioItem.objects.filter(regrarateio=nomeregra).aggregate(Sum('percRateio'))
-          
+        elif nomeregra.modo_alocacao == RegraRateio.MODO_PERCENTUAL:
+            context['tot'] = RegraRateioItem.objects.filter(regrarateio=nomeregra).aggregate(
+                Sum('percRateio')
+            )
+
         context["descricao"] = f'Lista de Regra Rateio Item -  {nomeregra.nomedaregra}'
         context["table"] = "table table-light table-striped table-sm"
         
@@ -183,7 +185,7 @@ class RegraList(ListView):
 
 class RegraUpdate(UpdateView):
     model = RegraRateio
-    fields = ['codigo', 'nomedaregra', 'rateio']
+    form_class = FormRegraRateio
     template_name = 'regra-add-alterar.html'
     success_url = reverse_lazy('regrarateio:regraList')
 
@@ -398,6 +400,7 @@ class LancamentoRateioList(ListView):
             if empresa_id
             else RegraRateio.objects.none()
         )
+        context['regras_rateio_meta_json'] = _regras_itens_json_por_empresa(empresa_id)
 
         # Totais do conjunto filtrado (todas as páginas), não só da página atual
         qs_filtro = self.get_queryset()
@@ -503,11 +506,51 @@ def _regras_itens_json_por_empresa(empresa_id):
             .select_related('socios')
             .order_by('socios_id')
         )
-        out[str(r.pk)] = [
-            {'socio_id': i.socios_id, 'nome': str(i.socios), 'perc': str(i.percRateio or 0)}
-            for i in itens
-        ]
+        manual = None
+        item_rows = []
+        for i in itens:
+            if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL:
+                manual = {'socio_id': i.socios_id, 'nome': str(i.socios)}
+            item_rows.append(
+                {
+                    'socio_id': i.socios_id,
+                    'nome': str(i.socios),
+                    'perc': str(i.percRateio or 0),
+                    'tipo': i.tipo_participacao,
+                }
+            )
+        out[str(r.pk)] = {
+            'modo': r.modo_alocacao,
+            'manual': manual,
+            'itens': item_rows,
+        }
     return json.dumps(out, ensure_ascii=False)
+
+
+def _parse_valores_rateio_post(request, titulo_ids):
+    """Lê campos ``valor_rateio_{titulo_id}_{socio_id}`` do POST."""
+    out = {}
+    titulo_set = set(int(x) for x in titulo_ids)
+    prefix = 'valor_rateio_'
+    for key in request.POST:
+        if not key.startswith(prefix):
+            continue
+        rest = key[len(prefix) :]
+        parts = rest.split('_', 1)
+        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            continue
+        tid, sid = int(parts[0]), int(parts[1])
+        if tid not in titulo_set:
+            continue
+        raw = (request.POST.get(key) or '').strip().replace(',', '.')
+        if not raw:
+            continue
+        try:
+            val = Decimal(raw)
+        except Exception:
+            continue
+        out.setdefault(tid, {})[sid] = val
+    return out
 
 
 def _resumo_titulo_principal(lanc):
@@ -660,8 +703,18 @@ class LancamentoRateioGrupoEdit(View):
 
         if form.is_valid():
             nova = form.cleaned_data['regra_rateio']
+            valores_manuais = None
+            if nova.modo_alocacao == RegraRateio.MODO_VALOR:
+                manual_item = RegraRateioItem.objects.filter(
+                    regrarateio=nova,
+                    tipo_participacao=RegraRateioItem.TIPO_MANUAL,
+                ).first()
+                if manual_item:
+                    valores_manuais = {
+                        manual_item.socios_id: form.cleaned_data['valor_manual'],
+                    }
             try:
-                n, = reaplicar_regra_no_titulo(lanc.pk, nova.pk)
+                n, = reaplicar_regra_no_titulo(lanc.pk, nova.pk, valores_manuais=valores_manuais)
                 messages.success(
                     request,
                     f'Rateio atualizado: {n} linha(s) gravada(s) conforme a regra «{nova}».',
@@ -792,12 +845,15 @@ def gerar_rateio_contas_pagar_aplicar(request):
     regra_id_forcar = int(rid) if rid.isdigit() else None
     origem_pagos = (request.POST.get('origem_pagos') or '').strip() == '1'
 
+    valores_por_titulo = _parse_valores_rateio_post(request, ids)
+
     try:
         criados, ignorados = gerar_rateio_contas_pagar(
             empresa_id=empresa_id,
             conta_pagar_ids=ids,
             regra_id_forcar=regra_id_forcar,
             origem_pagos=origem_pagos,
+            valores_por_titulo=valores_por_titulo or None,
         )
         if criados > 0:
             messages.success(
@@ -838,11 +894,14 @@ def gerar_rateio_contas_receber_aplicar(request):
     rid = (request.POST.get('regra_rateio') or '').strip()
     regra_id_forcar = int(rid) if rid.isdigit() else None
 
+    valores_por_titulo = _parse_valores_rateio_post(request, ids)
+
     try:
         criados, ignorados = gerar_rateio_contas_receber(
             empresa_id=empresa_id,
             conta_receber_ids=ids,
             regra_id_forcar=regra_id_forcar,
+            valores_por_titulo=valores_por_titulo or None,
         )
         if criados > 0:
             messages.success(

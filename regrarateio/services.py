@@ -73,8 +73,32 @@ def _base_valor_conta_pagar(conta):
     return conta.get_valor_total_com_ajustes()
 
 
+def _validar_estrutura_regra(regra, itens=None):
+    """Valida itens da regra conforme modo de alocação."""
+    if itens is None:
+        itens = list(RegraRateioItem.objects.filter(regrarateio=regra))
+    if not itens:
+        raise ValueError(
+            f'A regra «{regra}» não possui sócios cadastrados. '
+            'Com Rateio=SIM, clique na regra e use Cadastrar item.'
+        )
+    if regra.modo_alocacao == RegraRateio.MODO_VALOR:
+        manual = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL]
+        residual = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_RESIDUAL]
+        if len(manual) != 1:
+            raise ValueError(
+                f'A regra «{regra}» (modo valor) precisa de exatamente 1 sócio com tipo '
+                '«Valor manual na aplicação».'
+            )
+        if not residual:
+            raise ValueError(
+                f'A regra «{regra}» (modo valor) precisa de ao menos 1 sócio com tipo «Residual (restante)».'
+            )
+        return
+
+
 def _regra_forcada_validada(regra_id_forcar, empresa_id=None) -> RegraRateio | None:
-    """Retorna a regra escolhida no modal ou None; exige sócios/% cadastrados."""
+    """Retorna a regra escolhida no modal ou None; exige sócios e estrutura válida."""
     if not regra_id_forcar:
         return None
     qrf = RegraRateio.objects.filter(pk=regra_id_forcar)
@@ -87,14 +111,69 @@ def _regra_forcada_validada(regra_id_forcar, empresa_id=None) -> RegraRateio | N
         raise ValueError(
             f'A regra «{regra}» está com Rateio=NÃO. '
             'Edite a regra em Cadastro > Regra do Rateio, marque Rateio=SIM, '
-            'cadastre os sócios com % e tente novamente.'
+            'cadastre os sócios e tente novamente.'
         )
-    if not RegraRateioItem.objects.filter(regrarateio=regra).exists():
-        raise ValueError(
-            f'A regra «{regra}» não possui sócios nem percentuais. '
-            'Com Rateio=SIM, clique na regra e use Cadastrar item para incluir sócios e %.'
-        )
+    _validar_estrutura_regra(regra)
     return regra
+
+
+def _calcular_valores_por_socio(regra, itens, base, valores_manuais=None):
+    """
+    Retorna dict ``{socio_id: Decimal}`` com valores positivos (antes do sinal PGTO/REC).
+    """
+    base = base if isinstance(base, Decimal) else Decimal(str(base))
+    if base <= 0:
+        raise ValueError('Valor base do título deve ser maior que zero.')
+
+    if regra.modo_alocacao == RegraRateio.MODO_VALOR:
+        manual_itens = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_MANUAL]
+        residual_itens = [i for i in itens if i.tipo_participacao == RegraRateioItem.TIPO_RESIDUAL]
+        m_item = manual_itens[0]
+        if not valores_manuais or m_item.socios_id not in valores_manuais:
+            raise ValueError(
+                f'Informe o valor para {m_item.socios} na aplicação do rateio '
+                f'(regra «{regra}»).'
+            )
+        manual_val = valores_manuais[m_item.socios_id]
+        if not isinstance(manual_val, Decimal):
+            manual_val = Decimal(str(manual_val))
+        manual_val = manual_val.quantize(Decimal('0.01'))
+        if manual_val < 0 or manual_val > base:
+            raise ValueError(
+                f'Valor informado para {m_item.socios} (R$ {manual_val}) deve estar entre '
+                f'R$ 0,00 e R$ {base.quantize(Decimal("0.01"))}.'
+            )
+        restante = (base - manual_val).quantize(Decimal('0.01'))
+        out = {m_item.socios_id: manual_val}
+        if len(residual_itens) == 1:
+            out[residual_itens[0].socios_id] = restante
+        else:
+            soma_perc = sum((i.percRateio or Decimal('0')) for i in residual_itens)
+            if soma_perc <= 0:
+                partes = [restante / len(residual_itens)] * len(residual_itens)
+            else:
+                partes = [
+                    (restante * (i.percRateio or Decimal('0')) / soma_perc).quantize(Decimal('0.01'))
+                    for i in residual_itens
+                ]
+            diff = restante - sum(partes)
+            if diff != 0 and partes:
+                partes[-1] = (partes[-1] + diff).quantize(Decimal('0.01'))
+            for i, val in zip(residual_itens, partes):
+                out[i.socios_id] = val
+        return out
+
+    out = {}
+    for item in itens:
+        if item.tipo_participacao != RegraRateioItem.TIPO_PERCENTUAL:
+            continue
+        perc = item.percRateio or Decimal('0')
+        out[item.socios_id] = (base * perc / Decimal('100')).quantize(Decimal('0.01'))
+    if not out:
+        for item in itens:
+            perc = item.percRateio or Decimal('0')
+            out[item.socios_id] = (base * perc / Decimal('100')).quantize(Decimal('0.01'))
+    return out
 
 
 def query_contas_pagar_sem_lancamento_rateio_resumo(
@@ -276,6 +355,7 @@ def query_contas_pagar_rateio_candidatas(
                 'dt_venc': cap.dtvenc.isoformat() if cap.dtvenc else None,
                 'valor_base': format(base, '.2f'),
                 'regra': str(cap.rateio) if cap.rateio_id else '—',
+                'regra_id': cap.rateio_id,
                 'ja_gerado': ja,
                 'tem_regra': tem_regra,
                 'pode_aplicar': pode_aplicar,
@@ -360,6 +440,7 @@ def query_contas_receber_rateio_candidatas(empresa_id, data_inicio, data_fim):
                 'dt_venc': car.data_vencimento.isoformat() if car.data_vencimento else None,
                 'valor_base': format(base, '.2f'),
                 'regra': str(car.regra_rateio) if car.regra_rateio_id else '—',
+                'regra_id': car.regra_rateio_id,
                 'socio_txt': socio_txt,
                 'ja_gerado': ja,
                 'tem_regra': tem_regra,
@@ -385,15 +466,18 @@ def valor_base_titulo_de_lancamento(lancamento):
     return Decimal('0')
 
 
-def _gerar_linhas_rateio_conta_pagar(cap, regra, itens):
+def _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais=None):
     """Cria lançamentos de rateio para uma conta a pagar. Retorna quantidade de linhas criadas."""
     base = _base_valor_conta_pagar(cap)
+    _validar_estrutura_regra(regra, itens)
+    valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
     data_pg = cap.dtPag or cap.dtvenc
     desc = (cap.descricao or '')[:255]
     criados = 0
     for item in itens:
-        perc = item.percRateio or Decimal('0')
-        bruto = (base * perc) / Decimal('100')
+        bruto = valores.get(item.socios_id, Decimal('0'))
+        if bruto <= 0:
+            continue
         valor = -bruto.quantize(Decimal('0.01'))
         LancamentoRateio.objects.create(
             empresa_id=cap.empresa_id,
@@ -417,6 +501,7 @@ def gerar_rateio_contas_pagar(
     regra_id_forcar=None,
     *,
     origem_pagos=False,
+    valores_por_titulo=None,
 ):
     """
     Para cada conta a pagar paga: gera lançamentos por item da regra (valor negativo).
@@ -485,20 +570,34 @@ def gerar_rateio_contas_pagar(
             ignorados += 1
             continue
 
-        criados += _gerar_linhas_rateio_conta_pagar(cap, regra, itens)
+        valores_manuais = None
+        if valores_por_titulo and cap.pk in valores_por_titulo:
+            valores_manuais = valores_por_titulo[cap.pk]
+        elif regra.modo_alocacao == RegraRateio.MODO_VALOR:
+            raise ValueError(
+                f'Informe o valor manual para o título #{cap.pk} (regra «{regra}»).'
+            )
+
+        try:
+            criados += _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais)
+        except ValueError:
+            raise
 
     return criados, ignorados
 
 
-def _gerar_linhas_rateio_conta_receber(car, regra, itens):
+def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None):
     """Cria lançamentos de rateio para uma conta a receber. Retorna quantidade de linhas criadas."""
     base = _base_valor_conta_receber(car)
+    _validar_estrutura_regra(regra, itens)
+    valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
     data_pg = car.data_recebimento or car.data_vencimento
     desc = (car.observacao or car.cliente or car.doc or '')[:255]
     criados = 0
     for item in itens:
-        perc = item.percRateio or Decimal('0')
-        bruto = (base * perc) / Decimal('100')
+        bruto = valores.get(item.socios_id, Decimal('0'))
+        if bruto <= 0:
+            continue
         valor = bruto.quantize(Decimal('0.01'))
         LancamentoRateio.objects.create(
             empresa_id=car.empresa_id,
@@ -515,9 +614,15 @@ def _gerar_linhas_rateio_conta_receber(car, regra, itens):
     return criados
 
 
-def preview_linhas_rateio_por_regra(regra_id, valor_base, tipo_lancamento, empresa_id=None):
+def preview_linhas_rateio_por_regra(
+    regra_id,
+    valor_base,
+    tipo_lancamento,
+    empresa_id=None,
+    valores_manuais=None,
+):
     """
-    Retorna lista de dicts {socio_id, socio_nome, perc, valor} para exibição/JSON.
+    Retorna lista de dicts {socio_id, socio_nome, perc, valor, tipo} para exibição/JSON.
     tipo_lancamento: LancamentoRateio.TIPO_PGTO ou TIPO_RECEBIMENTO
     """
     q = RegraRateio.objects.filter(pk=regra_id)
@@ -532,28 +637,41 @@ def preview_linhas_rateio_por_regra(regra_id, valor_base, tipo_lancamento, empre
         .order_by('socios_id')
     )
     base = valor_base if isinstance(valor_base, Decimal) else Decimal(str(valor_base))
+    if base <= 0:
+        return []
+    try:
+        valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
+    except ValueError:
+        return []
     out = []
     for item in itens:
-        perc = item.percRateio or Decimal('0')
-        bruto = (base * perc) / Decimal('100')
+        bruto = valores.get(item.socios_id, Decimal('0'))
+        if bruto <= 0:
+            continue
         if tipo_lancamento == LancamentoRateio.TIPO_PGTO:
             valor = -bruto.quantize(Decimal('0.01'))
         else:
             valor = bruto.quantize(Decimal('0.01'))
+        perc = item.percRateio or Decimal('0')
+        if base > 0:
+            perc_calc = (bruto * Decimal('100') / base).quantize(Decimal('0.01'))
+        else:
+            perc_calc = perc
         nome = str(item.socios) if item.socios_id else ''
         out.append(
             {
                 'socio_id': item.socios_id,
                 'socio_nome': nome,
-                'perc': str(perc),
+                'perc': str(perc_calc),
                 'valor': str(valor),
+                'tipo': item.tipo_participacao,
             }
         )
     return out
 
 
 @transaction.atomic
-def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id):
+def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id, valores_manuais=None):
     """
     Remove todos os lançamentos de rateio do mesmo título (CAP ou CAR) e gera de novo
     conforme a nova regra e o valor base atual do título. Atualiza a regra no cadastro do título.
@@ -587,15 +705,18 @@ def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id):
     itens = list(
         RegraRateioItem.objects.filter(regrarateio=regra).select_related('socios')
     )
-    if not itens:
-        raise ValueError('A regra selecionada não possui sócios e percentuais cadastrados.')
+    _validar_estrutura_regra(regra, itens)
+    if regra.modo_alocacao == RegraRateio.MODO_VALOR and not valores_manuais:
+        raise ValueError(
+            f'A regra «{regra}» exige valor manual na aplicação. Informe quanto pertence ao sócio manual.'
+        )
 
     if lanc.conta_pagar_id:
         cap = ContasaPagar.objects.select_for_update().get(pk=lanc.conta_pagar_id)
         LancamentoRateio.objects.filter(conta_pagar=cap).delete()
         cap.rateio = regra
         cap.save(update_fields=['rateio'])
-        n = _gerar_linhas_rateio_conta_pagar(cap, regra, itens)
+        n = _gerar_linhas_rateio_conta_pagar(cap, regra, itens, valores_manuais)
         return (n,)
 
     if lanc.conta_receber_id:
@@ -603,14 +724,20 @@ def reaplicar_regra_no_titulo(lancamento_id, nova_regra_id):
         LancamentoRateio.objects.filter(conta_receber=car).delete()
         car.regra_rateio = regra
         car.save(update_fields=['regra_rateio'])
-        n = _gerar_linhas_rateio_conta_receber(car, regra, itens)
+        n = _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais)
         return (n,)
 
     raise ValueError('Lançamento sem origem (conta a pagar/receber).')
 
 
 @transaction.atomic
-def gerar_rateio_contas_receber(empresa_id=None, conta_receber_ids=None, regra_id_forcar=None):
+def gerar_rateio_contas_receber(
+    empresa_id=None,
+    conta_receber_ids=None,
+    regra_id_forcar=None,
+    *,
+    valores_por_titulo=None,
+):
     """
     Gera lançamentos de rateio a partir de contas a receber **pagas** (valores positivos).
 
@@ -672,6 +799,17 @@ def gerar_rateio_contas_receber(empresa_id=None, conta_receber_ids=None, regra_i
             ignorados += 1
             continue
 
-        criados += _gerar_linhas_rateio_conta_receber(car, regra, itens)
+        valores_manuais = None
+        if valores_por_titulo and car.pk in valores_por_titulo:
+            valores_manuais = valores_por_titulo[car.pk]
+        elif regra.modo_alocacao == RegraRateio.MODO_VALOR:
+            raise ValueError(
+                f'Informe o valor manual para o título #{car.pk} (regra «{regra}»).'
+            )
+
+        try:
+            criados += _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais)
+        except ValueError:
+            raise
 
     return criados, ignorados

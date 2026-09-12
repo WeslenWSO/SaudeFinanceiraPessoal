@@ -4,6 +4,7 @@
         <tr>
             <th>ID</th>
             <th>Sócio</th>
+            <th>Tipo</th>
             <th>Percentual Rateio</th>
             <th>Ações</th>
         </tr>
@@ -20,7 +21,10 @@
         {{reg.socios}}
       </td>
       <td>
-         {{reg.percRateio}}%
+        {{ reg.get_tipo_participacao_display }}
+      </td>
+      <td>
+         {% if regra.modo_alocacao == 'V' and reg.tipo_participacao != 'P' %}—{% else %}{{reg.percRateio}}%{% endif %}
       </td>
       <td>
         <div class="btn-group btn-group-sm">
@@ -42,7 +46,11 @@
 
   </table>
   <div class="mt-2">
-    <strong>Total: {{tot}}%</strong>
+    {% if regra.modo_alocacao == 'V' %}
+    <strong>Modo:</strong> valor na aplicação — informe o valor manual ao gerar o rateio; o(s) sócio(s) residual recebe(m) o restante.
+    {% elif tot %}
+    <strong>Total: {{ tot.percRateio__sum }}%</strong>
+    {% endif %}
   </div>
 {% else %}
   <div class="text-center text-muted">
