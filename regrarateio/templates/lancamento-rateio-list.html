@@ -211,14 +211,20 @@
                                 <div class="fw-semibold text-truncate mb-2" title="{{ c.nome }}">{{ c.nome }}{% if c.extra %} <span class="badge bg-warning text-dark">outro cadastro</span>{% endif %}</div>
                                 {% if c.tem_recebimento %}
                                 <div class="small mb-2">
-                                    <div class="text-muted">Receita (recebimento)</div>
+                                    <div class="text-muted">(+) Receitas</div>
                                     <div class="text-success fw-semibold text-break" title="R$ {{ c.recebimento_txt }}">R$ {{ c.recebimento_txt }}</div>
                                 </div>
                                 {% endif %}
-                                {% if c.tem_pgto %}
+                                {% if c.tem_deducao %}
                                 <div class="small mb-2">
-                                    <div class="text-muted">Despesa (pagamento)</div>
-                                    <div class="text-danger fw-semibold text-break" title="R$ {{ c.pgto_abs_txt }}">R$ {{ c.pgto_abs_txt }}</div>
+                                    <div class="text-muted">(−) Dedução da Receita</div>
+                                    <div class="text-danger fw-semibold text-break" title="R$ {{ c.deducao_abs_txt }}">R$ {{ c.deducao_abs_txt }}</div>
+                                </div>
+                                {% endif %}
+                                {% if c.tem_despesa %}
+                                <div class="small mb-2">
+                                    <div class="text-muted">(−) Despesas</div>
+                                    <div class="text-danger fw-semibold text-break" title="R$ {{ c.despesa_abs_txt }}">R$ {{ c.despesa_abs_txt }}</div>
                                 </div>
                                 {% endif %}
                                 <div class="small border-top pt-2">
@@ -377,11 +383,14 @@
                             <strong>Total no filtro:</strong> {{ total_qtd }} lançamento{{ total_qtd|pluralize }}
                         </div>
                         <div class="col-md-8">
-                            <span class="text-danger me-3" title="Pagamentos (valores negativos)">
-                                Pagamento: <strong>R$ {{ total_pgto_txt }}</strong>
-                            </span>
                             <span class="text-success me-3" title="Recebimentos (valores positivos)">
-                                Recebimento: <strong>R$ {{ total_recebimento_txt }}</strong>
+                                (+) Receitas: <strong>R$ {{ total_recebimento_txt }}</strong>
+                            </span>
+                            <span class="text-danger me-3" title="Deduções da receita (impostos etc.)">
+                                (−) Dedução da Receita: <strong>R$ {{ total_deducao_receita_txt }}</strong>
+                            </span>
+                            <span class="text-danger me-3" title="Pagamentos (valores negativos)">
+                                (−) Despesas: <strong>R$ {{ total_pgto_txt }}</strong>
                             </span>
                             <span class="text-dark" title="Soma algébrica de todos os valores">
                                 Soma geral: <strong>R$ {{ total_valor_txt }}</strong>
@@ -1772,7 +1781,7 @@
             <div class="border-top px-3 pt-3 pb-2">
                 <h6 class="small text-uppercase text-muted mb-2">Lançar impostos no rateio</h6>
                 <p class="small text-muted mb-2">
-                    Gera lançamentos <strong>DEDUCAO DA RECEITA</strong> com origem <strong>TOTAL CONVENIO</strong>
+                    Gera lançamentos <strong>Dedução da Receita</strong> com origem <strong>Total Receita USG</strong>
                     para ISS, PIS, COFINS, CSLL e IRPJ (IRPJ ap. + Ad. IRPJ) conforme totais acima.
                     Descrição: <em>REF A ISS COMP MM/AAAA</em> (ex.: REF A ISS COMP 06/2026).
                     Cada imposto só pode ser lançado <strong>uma vez por mês</strong>.

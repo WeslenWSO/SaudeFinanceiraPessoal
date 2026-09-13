@@ -596,9 +596,8 @@ class LancamentoRateioList(ListView):
             total_qtd=Count('id'),
             total_valor=Sum('valor'),
         )
-        tot_pg = qs_filtro.filter(
-            tipo__in=(LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_DEDUCAO_RECEITA)
-        ).aggregate(s=Sum('valor'))
+        tot_pg = qs_filtro.filter(tipo=LancamentoRateio.TIPO_PGTO).aggregate(s=Sum('valor'))
+        tot_ded = qs_filtro.filter(tipo=LancamentoRateio.TIPO_DEDUCAO_RECEITA).aggregate(s=Sum('valor'))
         tot_rec = qs_filtro.filter(tipo=LancamentoRateio.TIPO_RECEBIMENTO).aggregate(s=Sum('valor'))
 
         def _to_dec(x):
@@ -608,65 +607,76 @@ class LancamentoRateioList(ListView):
 
         v_total = _to_dec(agg['total_valor'])
         v_pg = _to_dec(tot_pg.get('s'))
+        v_ded = _to_dec(tot_ded.get('s'))
         v_rec = _to_dec(tot_rec.get('s'))
 
         context['total_qtd'] = int(agg['total_qtd'] or 0)
         context['total_valor'] = v_total
         context['total_pgto'] = v_pg
+        context['total_deducao_receita'] = v_ded
         context['total_recebimento'] = v_rec
         # Texto já formatado (evita branco no template com Decimal/floatformat em alguns ambientes)
         context['total_valor_txt'] = f'{v_total:.2f}'.replace('.', ',')
-        context['total_pgto_txt'] = f'{v_pg:.2f}'.replace('.', ',')
+        context['total_pgto_txt'] = f'{abs(v_pg):.2f}'.replace('.', ',')
+        context['total_deducao_receita_txt'] = f'{abs(v_ded):.2f}'.replace('.', ',')
         context['total_recebimento_txt'] = f'{v_rec:.2f}'.replace('.', ',')
 
-        # Cards por sócio: totais de recebimento (receita) e pagamento (despesa) no filtro.
-        raw_pg = {}
+        # Cards por sócio: receita (+), dedução da receita (-) e despesa (-).
+        raw_despesa = {}
+        raw_deducao = {}
         raw_rec = {}
         for sid, tipo, valor in qs_filtro.values_list('socio_id', 'tipo', 'valor'):
             if sid is None:
                 continue
             v = _to_dec(valor)
-            if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_DEDUCAO_RECEITA):
-                raw_pg[sid] = raw_pg.get(sid, Decimal('0')) + v
+            if tipo == LancamentoRateio.TIPO_PGTO:
+                raw_despesa[sid] = raw_despesa.get(sid, Decimal('0')) + v
+            elif tipo == LancamentoRateio.TIPO_DEDUCAO_RECEITA:
+                raw_deducao[sid] = raw_deducao.get(sid, Decimal('0')) + v
             elif tipo == LancamentoRateio.TIPO_RECEBIMENTO:
                 raw_rec[sid] = raw_rec.get(sid, Decimal('0')) + v
 
-        def _card_socio_dict(nome, extra, pg, rec):
-            pg_abs = abs(pg)
-            saldo = rec + pg
+        def _card_socio_dict(nome, extra, despesa, deducao, rec):
+            desp_abs = abs(despesa)
+            ded_abs = abs(deducao)
+            saldo = rec + deducao + despesa
             return {
                 'nome': nome,
                 'extra': extra,
-                'pgto_abs_txt': _fmt_br_moeda(pg_abs),
+                'despesa_abs_txt': _fmt_br_moeda(desp_abs),
+                'deducao_abs_txt': _fmt_br_moeda(ded_abs),
                 'recebimento_txt': _fmt_br_moeda(rec),
                 'saldo_txt': _fmt_br_moeda(saldo),
-                'tem_pgto': pg_abs > 0,
+                'tem_despesa': desp_abs > 0,
+                'tem_deducao': ded_abs > 0,
                 'tem_recebimento': rec > 0,
                 '_sort_rec': rec,
-                '_sort_pg': pg_abs,
+                '_sort_pg': desp_abs + ded_abs,
             }
 
         ids_empresa = {s.id for s in context['socios']}
-        sids_com_movimento = set(raw_pg) | set(raw_rec)
+        sids_com_movimento = set(raw_despesa) | set(raw_deducao) | set(raw_rec)
         cards_socios = []
         for s in context['socios']:
-            pg = raw_pg.get(s.id, Decimal('0'))
+            desp = raw_despesa.get(s.id, Decimal('0'))
+            ded = raw_deducao.get(s.id, Decimal('0'))
             rec = raw_rec.get(s.id, Decimal('0'))
-            if pg == 0 and rec == 0:
+            if desp == 0 and ded == 0 and rec == 0:
                 continue
-            cards_socios.append(_card_socio_dict(str(s), False, pg, rec))
+            cards_socios.append(_card_socio_dict(str(s), False, desp, ded, rec))
         extras_ids = sorted(sids_com_movimento - ids_empresa)
         for sid in extras_ids:
-            pg = raw_pg.get(sid, Decimal('0'))
+            desp = raw_despesa.get(sid, Decimal('0'))
+            ded = raw_deducao.get(sid, Decimal('0'))
             rec = raw_rec.get(sid, Decimal('0'))
-            if pg == 0 and rec == 0:
+            if desp == 0 and ded == 0 and rec == 0:
                 continue
             try:
                 s_obj = Socio.objects.get(pk=sid)
                 nome = str(s_obj)
             except Socio.DoesNotExist:
                 nome = f'Sócio #{sid} (cadastro não encontrado)'
-            cards_socios.append(_card_socio_dict(nome, True, pg, rec))
+            cards_socios.append(_card_socio_dict(nome, True, desp, ded, rec))
         cards_socios.sort(key=lambda c: (c['_sort_rec'], c['_sort_pg']), reverse=True)
         for c in cards_socios:
             c.pop('_sort_rec', None)

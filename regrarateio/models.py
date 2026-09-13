@@ -132,18 +132,18 @@ class LancamentoRateio(models.Model):
     TIPO_CHOICES = [
         (TIPO_PGTO, 'Pagamento'),
         (TIPO_RECEBIMENTO, 'Recebimento'),
-        (TIPO_DEDUCAO_RECEITA, 'DEDUCAO DA RECEITA'),
+        (TIPO_DEDUCAO_RECEITA, 'Dedução da Receita'),
     ]
 
     ORIGEM_PAGAR = 'PAGAR'
     ORIGEM_RECEBER = 'RECEBER'
     ORIGEM_IMPORTACAO = 'IMPORTACAO'
-    ORIGEM_TOTAL_CONVENIO = 'TOTAL CONVENIO'
+    ORIGEM_TOTAL_CONVENIO = 'Total Receita USG'
     ORIGEM_CHOICES = (
         (ORIGEM_PAGAR, 'Pagar'),
         (ORIGEM_RECEBER, 'Receber'),
         (ORIGEM_IMPORTACAO, 'IMPORTACAO'),
-        (ORIGEM_TOTAL_CONVENIO, 'TOTAL CONVENIO'),
+        (ORIGEM_TOTAL_CONVENIO, 'Total Receita USG'),
     )
 
     empresa = models.ForeignKey(
@@ -205,7 +205,7 @@ class LancamentoRateio(models.Model):
                         | Q(
                             conta_pagar__isnull=True,
                             conta_receber__isnull=True,
-                            origem='TOTAL CONVENIO',
+                            origem='Total Receita USG',
                         )
                     )
                 },
