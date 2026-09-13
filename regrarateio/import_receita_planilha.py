@@ -13,7 +13,14 @@ from openpyxl import Workbook, load_workbook
 from cobranca.models import Cobranca
 from contasareceber.models import ContaAReceber
 from notasfiscais.models import NotaFiscalServico
-from regrarateio.models import LancamentoRateio, RegraRateio, RegraRateioItem
+from regrarateio.models import (
+    LancamentoRateio,
+    RegraRateio,
+    RegraRateioItem,
+    _meta_observacao_importacao,
+    descricao_rateio_importacao,
+    observacao_importacao_com_procedimento,
+)
 from regrarateio.services import (
     _gerar_linhas_rateio_conta_receber,
     _regra_usa_valor_manual,
@@ -130,7 +137,9 @@ def _map_colunas(headers: list) -> dict[str, int | None]:
             col['data'] = i
         elif h == 'paciente':
             col['paciente'] = i
-        elif h == 'procedimento':
+        elif h == 'procedimento' or h == 'procedimento realizado' or (
+            h.startswith('proced') and 'realiz' in h
+        ):
             col['procedimento'] = i
         elif h == 'modalidade' or h.startswith('moda'):
             col['modalidade'] = col['modalidade'] if col['modalidade'] is not None else i
@@ -157,6 +166,11 @@ def _map_colunas(headers: list) -> dict[str, int | None]:
         for i, h in enumerate(norm):
             if 'regra' in h:
                 col['regra'] = i
+                break
+    if col['procedimento'] is None:
+        for i, h in enumerate(norm):
+            if h.startswith('proced'):
+                col['procedimento'] = i
                 break
 
     return col
@@ -742,6 +756,134 @@ def importar_receitas_planilha(empresa_id: int, linhas: list[dict]) -> dict:
             break
         offset = lote['next_offset']
     return totais
+
+
+def _chave_linha_planilha(ln: dict) -> tuple:
+    return (
+        (ln.get('paciente') or '').strip().upper(),
+        ln.get('data') or '',
+        str(ln.get('valor') or ''),
+        int(ln.get('linha') or 0),
+    )
+
+
+def _indice_linhas_planilha(linhas: list[dict]) -> dict[tuple, dict]:
+    idx: dict[tuple, dict] = {}
+    for ln in linhas:
+        if not ln.get('valido', True):
+            continue
+        chave = _chave_linha_planilha(ln)
+        if chave[3]:
+            idx[chave] = ln
+    return idx
+
+
+def corrigir_descricoes_recebimento_por_planilha(
+    empresa_id: int,
+    file_bytes: bytes,
+    *,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Atualiza observação do CAR e descrição do rateio (Recebimento) com Proc:|ImpLn:
+    a partir da planilha original (ex.: jan/2026 com coluna «Procedimento Realizado»).
+    """
+    linhas, avisos = parse_receita_planilha_xlsx(file_bytes, empresa_id=empresa_id)
+    indice = _indice_linhas_planilha(linhas)
+
+    from django.db.models import Q
+
+    cars = ContaAReceber.objects.filter(
+        empresa_id=empresa_id,
+        observacao__contains='Pac:',
+    ).filter(~Q(observacao__contains='Proc:'))
+    total_candidatos = cars.count()
+
+    atualizados_car = 0
+    atualizados_lr = 0
+    sem_match = 0
+    sem_proc = 0
+
+    for car in cars.iterator(chunk_size=300):
+        meta = _meta_observacao_importacao(car.observacao or '')
+        imp = (meta.get('imp_ln') or '').strip()
+        if not imp.isdigit():
+            sem_match += 1
+            continue
+        chave = (
+            meta['paciente'].strip().upper(),
+            car.data_emissao.isoformat() if car.data_emissao else '',
+            str(car.valor_a_receber),
+            int(imp),
+        )
+        ln = indice.get(chave)
+        if not ln:
+            sem_match += 1
+            continue
+        procedimento = (ln.get('procedimento') or '').strip()
+        if not procedimento:
+            sem_proc += 1
+            continue
+        nova_obs = observacao_importacao_com_procedimento(car.observacao or '', procedimento)
+        nova_desc = descricao_rateio_importacao(nova_obs)[:255]
+        if not nova_desc or nova_obs == (car.observacao or ''):
+            continue
+        if dry_run:
+            atualizados_car += 1
+            atualizados_lr += LancamentoRateio.objects.filter(
+                conta_receber=car, tipo=LancamentoRateio.TIPO_RECEBIMENTO
+            ).count()
+            continue
+        car.observacao = nova_obs
+        car.save(update_fields=['observacao'])
+        atualizados_car += 1
+        n = LancamentoRateio.objects.filter(
+            conta_receber=car,
+            tipo=LancamentoRateio.TIPO_RECEBIMENTO,
+        ).update(descricao=nova_desc)
+        atualizados_lr += n
+
+    return {
+        'linhas_planilha': len(linhas),
+        'avisos_planilha': avisos,
+        'cars_candidatos': total_candidatos,
+        'atualizados_car': atualizados_car,
+        'atualizados_lr': atualizados_lr,
+        'sem_match': sem_match,
+        'sem_proc_planilha': sem_proc,
+        'dry_run': dry_run,
+    }
+
+
+def regravar_descricoes_recebimento_importacao(
+    empresa_id: int | None = None,
+    *,
+    dry_run: bool = False,
+) -> dict:
+    """Regrava descrição dos recebimentos importados a partir da observação do CAR."""
+    from django.db.models import Q
+
+    qs = LancamentoRateio.objects.filter(
+        conta_receber_id__isnull=False,
+        tipo=LancamentoRateio.TIPO_RECEBIMENTO,
+    ).select_related('conta_receber')
+    if empresa_id:
+        qs = qs.filter(empresa_id=empresa_id)
+
+    atualizados = 0
+    for lr in qs.iterator(chunk_size=500):
+        car = lr.conta_receber
+        obs = (car.observacao or '').strip()
+        if not obs or 'Pac:' not in obs:
+            continue
+        nova = descricao_rateio_importacao(obs)[:255]
+        if not nova or nova == lr.descricao:
+            continue
+        if not dry_run:
+            lr.descricao = nova
+            lr.save(update_fields=['descricao'])
+        atualizados += 1
+    return {'atualizados_lr': atualizados, 'dry_run': dry_run}
 
 
 def gerar_modelo_receita_planilha_excel() -> HttpResponse:

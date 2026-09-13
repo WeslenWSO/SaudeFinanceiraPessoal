@@ -107,6 +107,26 @@ def _meta_observacao_importacao(observacao: str) -> dict[str, str]:
     return out
 
 
+def observacao_importacao_com_procedimento(observacao: str, procedimento: str) -> str:
+    """Recompõe observação do CAR incluindo Proc: (importações antigas sem procedimento)."""
+    obs = (observacao or '').strip()
+    proc = (procedimento or '').strip()
+    if not obs or not proc or 'Proc:' in obs:
+        return obs
+    meta = _meta_observacao_importacao(obs)
+    parts = []
+    if meta['paciente']:
+        parts.append(f"Pac:{meta['paciente']}")
+    parts.append(f"Proc:{proc[:160]}")
+    if meta['modalidade']:
+        parts.append(f"Mod:{meta['modalidade']}")
+    if meta['viabilidade']:
+        parts.append(f"Viab:{meta['viabilidade']}")
+    if meta['imp_ln']:
+        parts.append(f"ImpLn:{meta['imp_ln']}")
+    return '|'.join(parts)
+
+
 def descricao_rateio_importacao(texto: str) -> str:
     """
     Descrição do rateio importado: Proc + ImpLn.
