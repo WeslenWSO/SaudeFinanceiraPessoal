@@ -109,6 +109,10 @@ def _data_pagamento_imposto(imposto: str, ano: int, mes: int) -> date:
     return date(ano, mes, min(dia, ultimo))
 
 
+def _descricao_imposto(imposto: str, ano: int, mes: int) -> str:
+    return f'REF A {imposto} COMP {mes:02d}/{ano}'
+
+
 def _gerar_linhas_imposto(
     *,
     empresa_id,
@@ -118,7 +122,8 @@ def _gerar_linhas_imposto(
     base: Decimal,
     data_pg: date,
     chave_periodo: str,
-    rotulo_periodo: str,
+    ano: int,
+    mes: int,
 ) -> int:
     if base <= 0:
         return 0
@@ -129,7 +134,7 @@ def _gerar_linhas_imposto(
     ).exists():
         return 0
     valores = _calcular_valores_por_socio(regra, itens, base)
-    desc = f'{imposto} ap. convênios — {rotulo_periodo}'[:255]
+    desc = _descricao_imposto(imposto, ano, mes)[:255]
     obs = _obs_marcador(chave_periodo, imposto)
     criados = 0
     for item in itens:
@@ -142,7 +147,7 @@ def _gerar_linhas_imposto(
             conta_pagar=None,
             conta_receber=None,
             data_pagamento=data_pg,
-            tipo=LancamentoRateio.TIPO_PGTO,
+            tipo=LancamentoRateio.TIPO_DEDUCAO_RECEITA,
             descricao=desc,
             regra_rateio=regra,
             socio=item.socios,
@@ -214,7 +219,8 @@ def gerar_rateio_impostos_total_convenio(
             base=base,
             data_pg=data_pg,
             chave_periodo=chave,
-            rotulo_periodo=rotulo,
+            ano=ano,
+            mes=mes,
         )
         if n:
             criados += n

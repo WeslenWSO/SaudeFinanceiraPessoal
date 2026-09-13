@@ -100,7 +100,7 @@ class FormLancamentoRateio(ModelForm):
         tipo = cleaned_data.get('tipo')
         valor = cleaned_data.get('valor')
         if valor is not None and tipo:
-            if tipo == LancamentoRateio.TIPO_PGTO and valor > 0:
+            if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_DEDUCAO_RECEITA) and valor > 0:
                 cleaned_data['valor'] = -abs(valor)
             elif tipo == LancamentoRateio.TIPO_RECEBIMENTO and valor < 0:
                 cleaned_data['valor'] = abs(valor)

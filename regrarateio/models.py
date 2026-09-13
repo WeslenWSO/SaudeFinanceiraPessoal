@@ -110,9 +110,11 @@ class LancamentoRateio(models.Model):
 
     TIPO_PGTO = 'PGTO'
     TIPO_RECEBIMENTO = 'RECEBIMENTO'
+    TIPO_DEDUCAO_RECEITA = 'DEDUCAO_RECEITA'
     TIPO_CHOICES = [
         (TIPO_PGTO, 'Pagamento'),
         (TIPO_RECEBIMENTO, 'Recebimento'),
+        (TIPO_DEDUCAO_RECEITA, 'DEDUCAO DA RECEITA'),
     ]
 
     ORIGEM_PAGAR = 'PAGAR'
@@ -219,6 +221,15 @@ class LancamentoRateio(models.Model):
         if self.modalidade:
             return self.modalidade
         return self._meta_car().get('modalidade') or '—'
+
+    def cliente_exibicao(self) -> str:
+        meta = self._meta_car()
+        paciente = (meta.get('paciente') or '').strip()
+        if not paciente and self.descricao and 'Pac:' in self.descricao:
+            paciente = _meta_observacao_importacao(self.descricao).get('paciente', '')
+        if not paciente and self.conta_receber_id and self.conta_receber.cliente:
+            paciente = (self.conta_receber.cliente or '').strip()
+        return paciente or '—'
 
     def viabilidade_exibicao(self) -> str:
         if self.viabilidade:

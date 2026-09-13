@@ -293,6 +293,7 @@ _LANCAMENTO_RATEIO_SORT_FIELDS = {
     'origem': ['origem'],
     'titulo': ['titulo_id_sort'],
     'modalidade': ['modalidade'],
+    'cliente': ['conta_receber__cliente'],
     'viabilidade': ['viabilidade'],
     'obs_forma': ['obs_forma'],
     'valor_bruto': ['valor_bruto_sort'],
@@ -539,7 +540,11 @@ class LancamentoRateioList(ListView):
             qs = qs.filter(socio_id=int(socio_raw))
 
         tipo = (filtros.get('tipo') or '').strip()
-        if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_RECEBIMENTO):
+        if tipo in (
+            LancamentoRateio.TIPO_PGTO,
+            LancamentoRateio.TIPO_RECEBIMENTO,
+            LancamentoRateio.TIPO_DEDUCAO_RECEITA,
+        ):
             qs = qs.filter(tipo=tipo)
 
         return _ordenar_queryset_lancamento_rateio(qs, self.request)
@@ -586,7 +591,9 @@ class LancamentoRateioList(ListView):
             total_qtd=Count('id'),
             total_valor=Sum('valor'),
         )
-        tot_pg = qs_filtro.filter(tipo=LancamentoRateio.TIPO_PGTO).aggregate(s=Sum('valor'))
+        tot_pg = qs_filtro.filter(
+            tipo__in=(LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_DEDUCAO_RECEITA)
+        ).aggregate(s=Sum('valor'))
         tot_rec = qs_filtro.filter(tipo=LancamentoRateio.TIPO_RECEBIMENTO).aggregate(s=Sum('valor'))
 
         def _to_dec(x):
@@ -614,7 +621,7 @@ class LancamentoRateioList(ListView):
             if sid is None:
                 continue
             v = _to_dec(valor)
-            if tipo == LancamentoRateio.TIPO_PGTO:
+            if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_DEDUCAO_RECEITA):
                 raw_pg[sid] = raw_pg.get(sid, Decimal('0')) + v
             elif tipo == LancamentoRateio.TIPO_RECEBIMENTO:
                 raw_rec[sid] = raw_rec.get(sid, Decimal('0')) + v
@@ -1320,7 +1327,11 @@ def gerar_rateio_impostos_convenio_aplicar(request):
     if socio_raw.isdigit():
         qs = qs.filter(socio_id=int(socio_raw))
     tipo = (request.POST.get('tipo') or '').strip()
-    if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_RECEBIMENTO):
+    if tipo in (
+        LancamentoRateio.TIPO_PGTO,
+        LancamentoRateio.TIPO_RECEBIMENTO,
+        LancamentoRateio.TIPO_DEDUCAO_RECEITA,
+    ):
         qs = qs.filter(tipo=tipo)
 
     from regrarateio.convenio_imposto_rateio import gerar_rateio_impostos_total_convenio

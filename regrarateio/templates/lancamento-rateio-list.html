@@ -296,6 +296,7 @@
                             <th class="lr-th-sortable{% if sort_col == 'origem' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="origem" data-sort-type="text" data-sort-url="{{ sort_urls.origem }}" title="Clique para ordenar">Origem</th>
                             <th class="lr-th-sortable{% if sort_col == 'titulo' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="titulo" data-sort-type="num" data-sort-url="{{ sort_urls.titulo }}" title="Clique para ordenar">ID título</th>
                             <th class="lr-th-sortable{% if sort_col == 'modalidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="modalidade" data-sort-type="text" data-sort-url="{{ sort_urls.modalidade }}" title="Clique para ordenar">Modalidade</th>
+                            <th class="lr-th-sortable{% if sort_col == 'cliente' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="cliente" data-sort-type="text" data-sort-url="{{ sort_urls.cliente }}" title="Clique para ordenar">Cliente</th>
                             <th class="lr-th-sortable{% if sort_col == 'viabilidade' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="viabilidade" data-sort-type="text" data-sort-url="{{ sort_urls.viabilidade }}" title="Clique para ordenar">Viabilidade</th>
                             <th class="lr-th-sortable{% if sort_col == 'obs_forma' %} lr-th-sorted-{{ sort_dir }}{% endif %}" data-sortable data-col="obs_forma" data-sort-type="text" data-sort-url="{{ sort_urls.obs_forma }}" title="Clique para ordenar">Obs. forma</th>
                             <th>Nota</th>
@@ -319,6 +320,7 @@
                             data-sort-origem="{{ row.origem_exibicao|escape }}"
                             data-sort-titulo="{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}"
                             data-sort-modalidade="{{ row.modalidade_exibicao|escape }}"
+                            data-sort-cliente="{{ row.cliente_exibicao|escape }}"
                             data-sort-viabilidade="{{ row.viabilidade_exibicao|escape }}"
                             data-sort-obs_forma="{{ row.obs_forma_exibicao|escape }}"
                             data-sort-valor_bruto="{% if row.conta_pagar_id %}{{ row.conta_pagar.valorDoc }}{% else %}{{ row.conta_receber.valor_a_receber }}{% endif %}"
@@ -333,6 +335,7 @@
                             <td>{{ row.origem_exibicao }}</td>
                             <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
                             <td>{{ row.modalidade_exibicao }}</td>
+                            <td><small title="{{ row.cliente_exibicao }}">{{ row.cliente_exibicao|truncatechars:40 }}</small></td>
                             <td><small>{{ row.viabilidade_exibicao|truncatechars:40 }}</small></td>
                             <td><small>{{ row.obs_forma_exibicao|truncatechars:30 }}</small></td>
                             <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
@@ -359,7 +362,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="18" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
+                            <td colspan="19" class="text-center text-muted py-4">Nenhum lançamento de rateio. Use os botões acima para gerar.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -1767,8 +1770,9 @@
             <div class="border-top px-3 pt-3 pb-2">
                 <h6 class="small text-uppercase text-muted mb-2">Lançar impostos no rateio</h6>
                 <p class="small text-muted mb-2">
-                    Gera lançamentos <strong>PGTO</strong> com origem <strong>TOTAL CONVENIO</strong>
+                    Gera lançamentos <strong>DEDUCAO DA RECEITA</strong> com origem <strong>TOTAL CONVENIO</strong>
                     para ISS, PIS, COFINS, CSLL e IRPJ (IRPJ ap. + Ad. IRPJ) conforme totais acima.
+                    Descrição: <em>REF A ISS COMP MM/AAAA</em> (ex.: REF A ISS COMP 06/2026).
                     Cada imposto só pode ser lançado <strong>uma vez por mês</strong>.
                 </p>
                 {% if not convenio_mes_unico %}
