@@ -723,6 +723,32 @@ class LancamentoRateioList(ListView):
         indice = ad.get('indice') or Decimal('0')
         context['ad_irpj_indice_txt'] = f'{indice:.10f}'.replace('.', ',')
 
+        from regrarateio.convenio_imposto_rateio import (
+            IMPOSTO_DIA_PAGAMENTO,
+            _chave_periodo,
+            impostos_convenio_ja_lancados,
+            impostos_pendentes_lancamento,
+            mes_referencia_unico,
+        )
+
+        chave_conv = _chave_periodo(di_conv, df_conv)
+        ja_imp = (
+            impostos_convenio_ja_lancados(empresa_id, chave_conv)
+            if empresa_id and tot_conv.get('linhas')
+            else []
+        )
+        mes_unico = mes_referencia_unico(di_conv, df_conv) is not None
+        pendentes = (
+            impostos_pendentes_lancamento(tot_conv, ja_imp)
+            if tot_conv.get('linhas')
+            else []
+        )
+        context['convenio_mes_unico'] = mes_unico
+        context['convenio_impostos_ja_lancados'] = ja_imp
+        context['convenio_impostos_pendentes'] = pendentes
+        context['convenio_impostos_todos_lancados'] = mes_unico and bool(ja_imp) and not pendentes
+        context['convenio_imposto_dias_pagamento'] = IMPOSTO_DIA_PAGAMENTO
+
         from regrarateio.obs_forma_totalizadores import coletar_totais_obs_forma
 
         obs_forma_data = coletar_totais_obs_forma(qs_filtro)
@@ -1265,6 +1291,58 @@ def gerar_rateio_contas_receber_aplicar(request):
         messages.error(request, f'Erro ao gerar rateio: {exc}')
 
     return redirect_lancamento_rateio_list(request)
+
+
+def gerar_rateio_impostos_convenio_aplicar(request):
+    """POST: lança ISS, PIS, COFINS, CSLL e IRPJ (ap.+ Ad.) como PGTO origem TOTAL CONVENIO."""
+    if request.method != 'POST':
+        return redirect_lancamento_rateio_list(request)
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect_lancamento_rateio_list(request)
+
+    rid = (request.POST.get('regra_rateio') or '').strip()
+    regra_id = int(rid) if rid.isdigit() else None
+    if not regra_id:
+        messages.error(request, 'Selecione a regra de rateio para os impostos.')
+        return redirect_lancamento_rateio_list(request, extra={'abrir_convenio': '1'})
+
+    di = parse_date((request.POST.get('data_inicio') or '').strip() or '')
+    df = parse_date((request.POST.get('data_fim') or '').strip() or '')
+    periodo_ad = (request.POST.get('ad_irpj_periodo') or 'mensal').strip().lower()
+    if periodo_ad not in ('mensal', 'trimestral'):
+        periodo_ad = 'mensal'
+    qs = LancamentoRateio.objects.filter(empresa_id=empresa_id)
+    qs = _filtra_queryset_lancamento_rateio_por_periodo(qs, di, df)
+    socio_raw = (request.POST.get('socio') or '').strip()
+    if socio_raw.isdigit():
+        qs = qs.filter(socio_id=int(socio_raw))
+    tipo = (request.POST.get('tipo') or '').strip()
+    if tipo in (LancamentoRateio.TIPO_PGTO, LancamentoRateio.TIPO_RECEBIMENTO):
+        qs = qs.filter(tipo=tipo)
+
+    from regrarateio.convenio_imposto_rateio import gerar_rateio_impostos_total_convenio
+
+    try:
+        criados, lancados, ignorados = gerar_rateio_impostos_total_convenio(
+            empresa_id=empresa_id,
+            regra_id=regra_id,
+            qs_filtro=qs,
+            data_inicio=di,
+            data_fim=df,
+            periodo_ad_irpj=periodo_ad,
+        )
+        if lancados:
+            msg = f'{criados} lançamento(s) gravado(s): {", ".join(lancados)}.'
+            if ignorados:
+                msg += f' Já existiam no mês (não duplicados): {", ".join(ignorados)}.'
+            messages.success(request, msg)
+    except Exception as exc:
+        messages.error(request, f'Erro ao lançar impostos: {exc}')
+
+    return redirect_lancamento_rateio_list(request, extra={'abrir_convenio': '1'})
 
 
 def import_receita_planilha_modelo(request):

@@ -118,10 +118,12 @@ class LancamentoRateio(models.Model):
     ORIGEM_PAGAR = 'PAGAR'
     ORIGEM_RECEBER = 'RECEBER'
     ORIGEM_IMPORTACAO = 'IMPORTACAO'
+    ORIGEM_TOTAL_CONVENIO = 'TOTAL CONVENIO'
     ORIGEM_CHOICES = (
         (ORIGEM_PAGAR, 'Pagar'),
         (ORIGEM_RECEBER, 'Receber'),
         (ORIGEM_IMPORTACAO, 'IMPORTACAO'),
+        (ORIGEM_TOTAL_CONVENIO, 'TOTAL CONVENIO'),
     )
 
     empresa = models.ForeignKey(
@@ -159,7 +161,7 @@ class LancamentoRateio(models.Model):
     valor = models.DecimalField(verbose_name='Valor', max_digits=14, decimal_places=2)
     origem = models.CharField(
         verbose_name='Origem',
-        max_length=12,
+        max_length=20,
         blank=True,
         default='',
         choices=ORIGEM_CHOICES,
@@ -180,6 +182,11 @@ class LancamentoRateio(models.Model):
                     _cc_kw: (
                         Q(conta_pagar__isnull=False, conta_receber__isnull=True)
                         | Q(conta_pagar__isnull=True, conta_receber__isnull=False)
+                        | Q(
+                            conta_pagar__isnull=True,
+                            conta_receber__isnull=True,
+                            origem='TOTAL CONVENIO',
+                        )
                     )
                 },
                 name='lancamento_rateio_cap_ou_car',

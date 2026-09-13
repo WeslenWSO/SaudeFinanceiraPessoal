@@ -192,6 +192,7 @@ _CONVENIO_A_FATURAR_TOKENS = (
     'geap',
     'cassi',
     'fusex',
+    'centerlab',
 )
 
 

@@ -1763,6 +1763,64 @@
                 </div>
                 {% endif %}
             </div>
+            {% if totais_convenio_viabilidade.linhas %}
+            <div class="border-top px-3 pt-3 pb-2">
+                <h6 class="small text-uppercase text-muted mb-2">Lançar impostos no rateio</h6>
+                <p class="small text-muted mb-2">
+                    Gera lançamentos <strong>PGTO</strong> com origem <strong>TOTAL CONVENIO</strong>
+                    para ISS, PIS, COFINS, CSLL e IRPJ (IRPJ ap. + Ad. IRPJ) conforme totais acima.
+                    Cada imposto só pode ser lançado <strong>uma vez por mês</strong>.
+                </p>
+                {% if not convenio_mes_unico %}
+                <div class="alert alert-warning py-2 small mb-2">
+                    Filtre um <strong>único mês</strong> (ex.: 01/06/2026 a 30/06/2026) para lançar impostos.
+                </div>
+                {% elif convenio_impostos_ja_lancados %}
+                <div class="alert alert-warning py-2 small mb-2">
+                    Impostos já lançados neste mês: <strong>{{ convenio_impostos_ja_lancados|join:", " }}</strong>.
+                    {% if convenio_impostos_pendentes %}
+                    Pendentes: <strong>{{ convenio_impostos_pendentes|join:", " }}</strong>.
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if convenio_impostos_todos_lancados %}
+                <div class="alert alert-info py-2 small mb-2">
+                    Todos os impostos deste mês já foram lançados.
+                </div>
+                {% endif %}
+                <form method="post" action="{% url 'regrarateio:gerarRateioImpostosConvenio' %}" class="row g-2 align-items-end">
+                    {% csrf_token %}
+                    {% if filtro_data_inicio %}<input type="hidden" name="data_inicio" value="{{ filtro_data_inicio }}">{% endif %}
+                    {% if filtro_data_fim %}<input type="hidden" name="data_fim" value="{{ filtro_data_fim }}">{% endif %}
+                    {% if filtro_socio %}<input type="hidden" name="socio" value="{{ filtro_socio }}">{% endif %}
+                    {% if filtro_tipo %}<input type="hidden" name="tipo" value="{{ filtro_tipo }}">{% endif %}
+                    <input type="hidden" name="ad_irpj_periodo" value="{{ filtro_ad_irpj_periodo|default:'mensal' }}">
+                    <div class="col-md-8">
+                        <label for="regra-impostos-convenio" class="form-label small mb-0">Regra de rateio</label>
+                        <select name="regra_rateio" id="regra-impostos-convenio" class="form-select form-select-sm" required
+                            {% if not convenio_mes_unico or convenio_impostos_todos_lancados %}disabled{% endif %}>
+                            <option value="">— escolha a regra —</option>
+                            {% for r in regras_rateio_modal %}
+                            <option value="{{ r.pk }}">{{ r.codigo }} — {{ r.nomedaregra }} ({{ r.n_itens }} sócio(s))</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <button type="submit" class="btn btn-sm btn-primary w-100"
+                            {% if not convenio_mes_unico or convenio_impostos_todos_lancados %}disabled{% endif %}>
+                            Lançar impostos
+                        </button>
+                    </div>
+                </form>
+                <ul class="small text-muted mb-0 mt-2">
+                    <li>ISS (dia {{ convenio_imposto_dias_pagamento.ISS }}): R$ {{ totais_convenio_iss_txt }}</li>
+                    <li>PIS (dia {{ convenio_imposto_dias_pagamento.PIS }}): R$ {{ totais_convenio_pis_txt }}</li>
+                    <li>COFINS (dia {{ convenio_imposto_dias_pagamento.COFINS }}): R$ {{ totais_convenio_cofins_txt }}</li>
+                    <li>CSLL (dia {{ convenio_imposto_dias_pagamento.CSLL }}): R$ {{ totais_convenio_csll_txt }}</li>
+                    <li>IRPJ (dia {{ convenio_imposto_dias_pagamento.IRPJ }}, ap. + Ad.): R$ {{ totais_convenio_irpj_mais_ad_txt }}</li>
+                </ul>
+            </div>
+            {% endif %}
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
             </div>

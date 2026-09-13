@@ -43,6 +43,11 @@ urlpatterns = [
     path("lancamentos/gerar/cap/", views.gerar_rateio_contas_pagar_aplicar, name="gerarRateioCap"),
     path("lancamentos/gerar/car/", views.gerar_rateio_contas_receber_aplicar, name="gerarRateioCar"),
     path(
+        "lancamentos/gerar/impostos-convenio/",
+        views.gerar_rateio_impostos_convenio_aplicar,
+        name="gerarRateioImpostosConvenio",
+    ),
+    path(
         "lancamentos/importar-planilha/",
         views.import_receita_planilha,
         name="importReceitaPlanilha",
