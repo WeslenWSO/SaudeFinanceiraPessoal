@@ -326,34 +326,36 @@
                             data-sort-valor_bruto="{% if row.conta_pagar_id %}{{ row.conta_pagar.valorDoc }}{% else %}{{ row.conta_receber.valor_a_receber }}{% endif %}"
                             data-sort-data="{{ row.data_pagamento|date:'Y-m-d' }}"
                             data-sort-tipo="{{ row.tipo }}"
-                            data-sort-descricao="{{ row.descricao|escape }}"
+                            data-sort-descricao="{{ row.descricao_exibicao|escape }}"
                             data-sort-regra="{{ row.regra_rateio|escape }}"
                             data-sort-socio="{{ row.socio|escape }}"
                             data-sort-obs_rateio="{{ row.obs_rateio_exibicao|escape }}"
                             data-sort-valor="{{ row.valor }}">
                             <td>{{ row.id }}</td>
                             <td>{{ row.origem_exibicao }}</td>
-                            <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% else %}{{ row.conta_receber_id }}{% endif %}</td>
+                            <td>{% if row.conta_pagar_id %}{{ row.conta_pagar_id }}{% elif row.conta_receber_id %}{{ row.conta_receber_id }}{% else %}—{% endif %}</td>
                             <td>{{ row.modalidade_exibicao }}</td>
                             <td><small title="{{ row.cliente_exibicao }}">{{ row.cliente_exibicao|truncatechars:40 }}</small></td>
                             <td><small>{{ row.viabilidade_exibicao|truncatechars:40 }}</small></td>
                             <td><small>{{ row.obs_forma_exibicao|truncatechars:30 }}</small></td>
                             <td class="text-nowrap">{% if row.conta_receber_id and row.conta_receber.nota %}{{ row.conta_receber.nota.numero_nota }}{% else %}—{% endif %}</td>
-                            <td>{% if row.conta_pagar_id and row.conta_pagar.cobranca %}{{ row.conta_pagar.cobranca.descricao }}{% elif row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento.descricao }}{% else %}—{% endif %}</td>
+                            <td>{% if row.conta_pagar_id and row.conta_pagar.cobranca %}{{ row.conta_pagar.cobranca.descricao }}{% elif row.conta_receber_id and row.conta_receber.forma_pagamento %}{{ row.conta_receber.forma_pagamento.descricao }}{% else %}—{% endif %}</td>
                             <td><small title="{{ row.conta_bancaria_completa }}">{{ row.conta_bancaria_exibicao }}</small></td>
-                            <td class="text-end text-nowrap">{% if row.conta_pagar_id %}R$ {{ row.conta_pagar.valorDoc|floatformat:2 }}{% else %}R$ {{ row.conta_receber.valor_a_receber|floatformat:2 }}{% endif %}</td>
+                            <td class="text-end text-nowrap">{% if row.conta_pagar_id %}R$ {{ row.conta_pagar.valorDoc|floatformat:2 }}{% elif row.conta_receber_id %}R$ {{ row.conta_receber.valor_a_receber|floatformat:2 }}{% else %}—{% endif %}</td>
                             <td>{{ row.data_pagamento|date:"d/m/Y"|default:"—" }}</td>
                             <td>{{ row.get_tipo_display }}</td>
-                            <td>{{ row.descricao|truncatechars:40 }}</td>
+                            <td><small title="{{ row.descricao_exibicao }}">{{ row.descricao_exibicao|truncatechars:40 }}</small></td>
                             <td>{{ row.regra_rateio }}</td>
                             <td>{{ row.socio }}</td>
                             <td><small title="{{ row.obs_rateio_exibicao }}">{% if row.obs_rateio_exibicao %}{{ row.obs_rateio_exibicao|truncatechars:40 }}{% else %}—{% endif %}</small></td>
                             <td class="text-end {% if row.valor < 0 %}text-danger{% else %}text-success{% endif %}">{{ row.valor }}</td>
                             <td class="text-end text-nowrap">
                                 <div class="btn-group btn-group-sm" role="group">
+                                    {% if row.conta_pagar_id or row.conta_receber_id %}
                                     <a href="{% if row.conta_pagar_id %}{% url 'regrarateio:lancamentoRateioEdit' 'cap' row.conta_pagar_id %}{% else %}{% url 'regrarateio:lancamentoRateioEdit' 'car' row.conta_receber_id %}{% endif %}{% if filter_query %}?{{ filter_query }}{% endif %}" class="btn btn-outline-primary" title="Editar rateio do título">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    {% endif %}
                                     <a href="{% url 'regrarateio:lancamentoRateioDelete' row.pk %}{% if filter_query %}?{{ filter_query }}{% endif %}" class="btn btn-outline-danger" title="Excluir">
                                         <i class="fas fa-trash"></i>
                                     </a>

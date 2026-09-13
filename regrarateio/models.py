@@ -105,6 +105,24 @@ def _meta_observacao_importacao(observacao: str) -> dict[str, str]:
     return out
 
 
+def descricao_sem_meta_importacao(texto: str) -> str:
+    """Remove Pac, Mod e Viab — já exibidos nas colunas Cliente, Modalidade e Viabilidade."""
+    t = (texto or '').strip()
+    if not t:
+        return ''
+    if 'Pac:' not in t and 'Mod:' not in t and 'Viab:' not in t:
+        return t
+    parts = []
+    for part in t.split('|'):
+        p = part.strip()
+        if not p:
+            continue
+        if p.startswith('Pac:') or p.startswith('Mod:') or p.startswith('Viab:'):
+            continue
+        parts.append(p)
+    return '|'.join(parts)
+
+
 class LancamentoRateio(models.Model):
     """Linha de rateio gerada a partir de contas a pagar (PGTO, valor negativo) ou a receber (RECEBIMENTO, valor positivo)."""
 
@@ -221,6 +239,16 @@ class LancamentoRateio(models.Model):
         if self.modalidade:
             return self.modalidade
         return self._meta_car().get('modalidade') or '—'
+
+    def descricao_exibicao(self) -> str:
+        raw = (self.descricao or '').strip()
+        if not raw and self.conta_receber_id:
+            car = self.conta_receber
+            raw = (car.observacao or car.doc or '').strip()
+        if not raw and self.conta_pagar_id:
+            return (self.conta_pagar.descricao or '').strip() or '—'
+        cleaned = descricao_sem_meta_importacao(raw)
+        return cleaned or raw or '—'
 
     def cliente_exibicao(self) -> str:
         meta = self._meta_car()

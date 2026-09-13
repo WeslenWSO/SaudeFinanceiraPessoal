@@ -4,7 +4,12 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
 
-from regrarateio.models import LancamentoRateio, RegraRateio, RegraRateioItem
+from regrarateio.models import (
+    LancamentoRateio,
+    RegraRateio,
+    RegraRateioItem,
+    descricao_sem_meta_importacao,
+)
 
 
 def _periodo_contas_pagar_q(data_inicio, data_fim):
@@ -452,7 +457,9 @@ def query_contas_receber_rateio_candidatas(empresa_id, data_inicio, data_fim):
         resultado.append(
             {
                 'id': car.id,
-                'descricao': (car.observacao or car.doc or car.cliente or '')[:120],
+                'descricao': descricao_sem_meta_importacao(
+                    car.observacao or car.doc or car.cliente or ''
+                )[:120],
                 'cliente': (car.cliente or '')[:120],
                 'dt_emissao': car.data_emissao.isoformat() if car.data_emissao else None,
                 'dt_pag': car.data_recebimento.isoformat() if car.data_recebimento else None,
@@ -614,7 +621,9 @@ def _gerar_linhas_rateio_conta_receber(car, regra, itens, valores_manuais=None, 
     _validar_estrutura_regra(regra, itens)
     valores = _calcular_valores_por_socio(regra, itens, base, valores_manuais)
     data_pg = car.data_recebimento or car.data_vencimento
-    desc = (car.observacao or car.cliente or car.doc or '')[:255]
+    desc = descricao_sem_meta_importacao(
+        car.observacao or car.doc or car.cliente or ''
+    )[:255]
     obs_txt = (obs_rateio or '')[:255]
     criados = 0
     for item in itens:

@@ -16,7 +16,12 @@ from django.views.generic.edit import CreateView
 from django.views import View
 import json
 from requests import request
-from regrarateio.models import LancamentoRateio, RegraRateio, RegraRateioItem
+from regrarateio.models import (
+    LancamentoRateio,
+    RegraRateio,
+    RegraRateioItem,
+    descricao_sem_meta_importacao,
+)
 from regrarateio.services import (
     _regra_usa_valor_manual,
     gerar_rateio_contas_pagar,
@@ -900,6 +905,12 @@ def _parse_valores_rateio_post(request, titulo_ids):
     return out
 
 
+def _descricao_titulo_receber(car) -> str:
+    raw = (car.observacao or car.doc or car.cliente or '').strip()
+    cleaned = descricao_sem_meta_importacao(raw)
+    return (cleaned or raw)[:255]
+
+
 def _resumo_titulo_principal(lanc):
     base = valor_base_titulo_de_lancamento(lanc)
     if lanc.conta_pagar_id:
@@ -919,7 +930,7 @@ def _resumo_titulo_principal(lanc):
     return {
         'tipo_origem': 'receber',
         'titulo_id': car.id,
-        'descricao': (car.observacao or car.doc or '')[:255] or car.cliente or '',
+        'descricao': _descricao_titulo_receber(car),
         'parceiro': car.cliente or '',
         'valor_base': base,
         'valor_base_txt': _fmt_br_decimal(base),
