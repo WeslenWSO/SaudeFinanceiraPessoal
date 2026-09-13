@@ -89,7 +89,7 @@ class RegraRateioItem(models.Model):
 
 def _meta_observacao_importacao(observacao: str) -> dict[str, str]:
     """Extrai metadados gravados na observação do CAR na importação (registros antigos)."""
-    out = {'paciente': '', 'procedimento': '', 'modalidade': '', 'viabilidade': ''}
+    out = {'paciente': '', 'procedimento': '', 'modalidade': '', 'viabilidade': '', 'imp_ln': ''}
     if not observacao:
         return out
     for part in observacao.split('|'):
@@ -102,25 +102,42 @@ def _meta_observacao_importacao(observacao: str) -> dict[str, str]:
             out['modalidade'] = p[4:].strip()
         elif p.startswith('Viab:'):
             out['viabilidade'] = p[5:].strip()
+        elif p.startswith('ImpLn:') or p.startswith('ImplLn:'):
+            out['imp_ln'] = p.split(':', 1)[1].strip()
     return out
 
 
-def descricao_sem_meta_importacao(texto: str) -> str:
-    """Remove Pac, Mod e Viab — já exibidos nas colunas Cliente, Modalidade e Viabilidade."""
+def descricao_rateio_importacao(texto: str) -> str:
+    """
+    Descrição do rateio importado: Proc + ImpLn.
+    Remove Pac, Mod e Viab (já nas colunas Cliente, Modalidade e Viabilidade).
+    """
     t = (texto or '').strip()
     if not t:
         return ''
+    meta = _meta_observacao_importacao(t)
+    parts = []
+    if meta['procedimento']:
+        parts.append(f"Proc:{meta['procedimento']}")
+    if meta['imp_ln']:
+        parts.append(f"ImpLn:{meta['imp_ln']}")
+    if parts:
+        return '|'.join(parts)
+    # Texto sem Proc/ImpLn: remove só Pac, Mod e Viab.
     if 'Pac:' not in t and 'Mod:' not in t and 'Viab:' not in t:
         return t
-    parts = []
+    rest = []
     for part in t.split('|'):
         p = part.strip()
-        if not p:
+        if not p or p.startswith('Pac:') or p.startswith('Mod:') or p.startswith('Viab:'):
             continue
-        if p.startswith('Pac:') or p.startswith('Mod:') or p.startswith('Viab:'):
-            continue
-        parts.append(p)
-    return '|'.join(parts)
+        rest.append(p)
+    return '|'.join(rest)
+
+
+def descricao_sem_meta_importacao(texto: str) -> str:
+    """Alias — preferir descricao_rateio_importacao."""
+    return descricao_rateio_importacao(texto)
 
 
 class LancamentoRateio(models.Model):
@@ -241,14 +258,21 @@ class LancamentoRateio(models.Model):
         return self._meta_car().get('modalidade') or '—'
 
     def descricao_exibicao(self) -> str:
+        if self.conta_receber_id:
+            car_obs = (self.conta_receber.observacao or '').strip()
+            if car_obs and any(tok in car_obs for tok in ('Pac:', 'Proc:', 'ImpLn:', 'ImplLn:')):
+                built = descricao_rateio_importacao(car_obs)
+                if built:
+                    return built
         raw = (self.descricao or '').strip()
         if not raw and self.conta_receber_id:
-            car = self.conta_receber
-            raw = (car.observacao or car.doc or '').strip()
+            raw = (self.conta_receber.doc or '').strip()
         if not raw and self.conta_pagar_id:
             return (self.conta_pagar.descricao or '').strip() or '—'
-        cleaned = descricao_sem_meta_importacao(raw)
-        return cleaned or raw or '—'
+        if any(tok in raw for tok in ('Pac:', 'Proc:', 'ImpLn:', 'ImplLn:', 'Mod:', 'Viab:')):
+            built = descricao_rateio_importacao(raw)
+            return built or raw or '—'
+        return raw or '—'
 
     def cliente_exibicao(self) -> str:
         meta = self._meta_car()

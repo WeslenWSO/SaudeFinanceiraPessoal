@@ -95,21 +95,25 @@
     <div class="card-header py-2">
         <h2 class="h5 mb-0">Resumo do resultado</h2>
         <p class="small text-muted mb-0">
-            Totais do período e detalhamento mês a mês (receita − despesas = resultado).
+            Totais do período e detalhamento mês a mês (receitas − deduções − despesas = resultado).
             Informe os % abaixo para calcular a parte de cada sócio em cada mês e no total.
         </p>
     </div>
     <div class="card-body">
         <div class="row g-3 text-center mb-4">
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
                 <p class="small text-muted mb-1">Total receitas rateadas</p>
                 <p class="valor-grande text-success mb-0">R$ {{ total_receita_txt }}</p>
             </div>
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
+                <p class="small text-muted mb-1">Total deduções rateadas</p>
+                <p class="valor-grande text-danger mb-0">R$ {{ total_deducao_txt }}</p>
+            </div>
+            <div class="col-6 col-md-3">
                 <p class="small text-muted mb-1">Total despesas rateadas</p>
                 <p class="valor-grande text-danger mb-0">R$ {{ total_despesa_txt }}</p>
             </div>
-            <div class="col-md-4">
+            <div class="col-6 col-md-3">
                 <p class="small text-muted mb-1">Resultado</p>
                 <p class="valor-grande mb-0 {% if resultado_negativo %}text-danger{% else %}text-primary{% endif %}"
                    id="rfr-resultado-display">R$ {{ resultado_txt }}</p>
@@ -164,6 +168,7 @@
                     <tr>
                         <th>Mês</th>
                         <th class="text-end">Receita</th>
+                        <th class="text-end">Deduções</th>
                         <th class="text-end">Despesas</th>
                         <th class="text-end">Resultado</th>
                         <th>Sócio</th>
@@ -175,6 +180,7 @@
                     <tr class="table-secondary fw-semibold rfr-mes-cabecalho" data-mes-idx="{{ forloop.counter0 }}">
                         <td>{{ mes.label }}</td>
                         <td class="text-end text-success">R$ {{ mes.receita_txt }}</td>
+                        <td class="text-end text-danger">R$ {{ mes.deducao_txt }}</td>
                         <td class="text-end text-danger">R$ {{ mes.despesa_txt }}</td>
                         <td class="text-end {% if mes.resultado_negativo %}text-danger{% else %}text-primary{% endif %}">
                             R$ {{ mes.resultado_txt }}
@@ -183,7 +189,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-3">Nenhum mês no período.</td>
+                        <td colspan="7" class="text-center text-muted py-3">Nenhum mês no período.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

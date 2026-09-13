@@ -58,11 +58,13 @@ def _linhas_resumo_mensal(ctx) -> list[list]:
     rows: list[list] = []
     for mes in meses:
         receita = _decimal_mes(mes.get('receita'))
+        deducao = _decimal_mes(mes.get('deducao'))
         despesa = _decimal_mes(mes.get('despesa'))
         resultado = _decimal_mes(mes.get('resultado'))
         rows.append([
             mes.get('label') or '—',
             float(receita),
+            float(deducao),
             float(despesa),
             float(resultado),
             '',
@@ -74,9 +76,9 @@ def _linhas_resumo_mensal(ctx) -> list[list]:
             if not nome or pct <= 0:
                 continue
             valor_soc = (resultado * pct / Decimal('100')).quantize(Decimal('0.01'))
-            rows.append(['', '', '', '', nome, float(valor_soc)])
+            rows.append(['', '', '', '', '', nome, float(valor_soc)])
     if not rows and meses:
-        rows.append(['—', 0, 0, 0, '(configure % na tela)', 0])
+        rows.append(['—', 0, 0, 0, 0, '(configure % na tela)', 0])
     return rows
 
 
@@ -104,6 +106,7 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
     row = _cabecalho_ws(ws_res, ctx, 'Resumo do resultado', 6, st)
     resumo_rows = [
         ['Total receitas rateadas', _parse_moeda_br_txt(ctx.get('total_receita_txt'))],
+        ['Total deduções rateadas', _parse_moeda_br_txt(ctx.get('total_deducao_txt'))],
         ['Total despesas rateadas', _parse_moeda_br_txt(ctx.get('total_despesa_txt'))],
         ['Resultado', _parse_moeda_br_txt(ctx.get('resultado_txt'))],
     ]
@@ -129,10 +132,12 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
     row += 1
     ws_res.cell(row=row, column=1, value='Resultado por mês').font = st['section_font']
     row += 1
-    mes_headers = ['Mês', 'Receita (R$)', 'Despesas (R$)', 'Resultado (R$)', 'Sócio', 'Valor (R$)']
+    mes_headers = [
+        'Mês', 'Receita (R$)', 'Deduções (R$)', 'Despesas (R$)', 'Resultado (R$)', 'Sócio', 'Valor (R$)',
+    ]
     mes_rows = _linhas_resumo_mensal(ctx)
-    row = _escrever_tabela(ws_res, row, mes_headers, mes_rows, st, money_cols={2, 3, 4, 6})
-    _auto_largura(ws_res, 6)
+    row = _escrever_tabela(ws_res, row, mes_headers, mes_rows, st, money_cols={2, 3, 4, 5, 7})
+    _auto_largura(ws_res, 7)
 
     grade_headers_desp = [
         'Data',

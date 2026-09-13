@@ -180,7 +180,7 @@ def coletar_resumo_mensal_resultado(empresa_id, data_inicio, data_fim, filtro_so
         qs = qs.filter(socio_id__in=filtro_socio_ids)
 
     agg: dict[tuple[int, int], dict] = defaultdict(
-        lambda: {'receita': Decimal('0'), 'despesa': Decimal('0')}
+        lambda: {'receita': Decimal('0'), 'deducao': Decimal('0'), 'despesa': Decimal('0')}
     )
     for lr in qs.values_list('data_pagamento', 'tipo', 'valor'):
         data_pg, tipo, valor = lr
@@ -190,24 +190,29 @@ def coletar_resumo_mensal_resultado(empresa_id, data_inicio, data_fim, filtro_so
         v = valor if valor is not None else Decimal('0')
         if tipo == LancamentoRateio.TIPO_RECEBIMENTO:
             agg[chave]['receita'] += abs(v)
+        elif tipo == LancamentoRateio.TIPO_DEDUCAO_RECEITA:
+            agg[chave]['deducao'] += abs(v)
         elif tipo == LancamentoRateio.TIPO_PGTO:
             agg[chave]['despesa'] += abs(v)
 
     resumo = []
     for ano, mes in _iter_chaves_mes(data_inicio, data_fim):
-        tot = agg.get((ano, mes), {'receita': Decimal('0'), 'despesa': Decimal('0')})
+        tot = agg.get((ano, mes), {'receita': Decimal('0'), 'deducao': Decimal('0'), 'despesa': Decimal('0')})
         receita = tot['receita']
+        deducao = tot['deducao']
         despesa = tot['despesa']
-        resultado = receita - despesa
+        resultado = receita - deducao - despesa
         resumo.append(
             {
                 'ano': ano,
                 'mes': mes,
                 'label': _label_mes(ano, mes),
                 'receita': receita,
+                'deducao': deducao,
                 'despesa': despesa,
                 'resultado': resultado,
                 'receita_txt': _fmt_moeda_br(receita),
+                'deducao_txt': _fmt_moeda_br(deducao),
                 'despesa_txt': _fmt_moeda_br(despesa),
                 'resultado_txt': _fmt_moeda_br(resultado),
                 'resultado_negativo': resultado < 0,
@@ -243,21 +248,30 @@ def coletar_dados_resumo_resultado(empresa_id, data_inicio, data_fim, filtro_soc
         .distinct()
         .order_by('-data_pagamento', '-id')
     )
+    qs_ded = (
+        qs.filter(tipo=LancamentoRateio.TIPO_DEDUCAO_RECEITA)
+        .distinct()
+        .order_by('-data_pagamento', '-id')
+    )
 
     linhas_despesa, soma_pg = _grade_linhas_rateio(qs_pg)
     linhas_receita, soma_rec = _grade_linhas_rateio(qs_rec)
+    _, soma_ded = _grade_linhas_rateio(qs_ded)
 
     total_despesa = abs(soma_pg)
+    total_deducao = abs(soma_ded)
     total_receita = abs(soma_rec)
-    resultado = soma_rec + soma_pg
+    resultado = soma_rec + soma_ded + soma_pg
 
     return {
         'linhas_despesa': linhas_despesa,
         'linhas_receita': linhas_receita,
         'total_despesa': total_despesa,
+        'total_deducao': total_deducao,
         'total_receita': total_receita,
         'resultado': resultado,
         'total_despesa_txt': _fmt_moeda_br(total_despesa),
+        'total_deducao_txt': _fmt_moeda_br(total_deducao),
         'total_receita_txt': _fmt_moeda_br(total_receita),
         'resultado_txt': _fmt_moeda_br(resultado),
         'resultado_negativo': resultado < 0,

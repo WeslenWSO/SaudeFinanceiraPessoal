@@ -970,6 +970,7 @@ def resumo_fechamento_por_resultado(request):
         'tem_despesa': bool(dados['linhas_despesa']),
         'tem_receita': bool(dados['linhas_receita']),
         'total_despesa_txt': dados['total_despesa_txt'],
+        'total_deducao_txt': dados['total_deducao_txt'],
         'total_receita_txt': dados['total_receita_txt'],
         'resultado_txt': dados['resultado_txt'],
         'resultado_negativo': dados['resultado_negativo'],

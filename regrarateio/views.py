@@ -20,7 +20,7 @@ from regrarateio.models import (
     LancamentoRateio,
     RegraRateio,
     RegraRateioItem,
-    descricao_sem_meta_importacao,
+    descricao_rateio_importacao,
 )
 from regrarateio.services import (
     _regra_usa_valor_manual,
@@ -917,7 +917,7 @@ def _parse_valores_rateio_post(request, titulo_ids):
 
 def _descricao_titulo_receber(car) -> str:
     raw = (car.observacao or car.doc or car.cliente or '').strip()
-    cleaned = descricao_sem_meta_importacao(raw)
+    cleaned = descricao_rateio_importacao(raw)
     return (cleaned or raw)[:255]
 
 
