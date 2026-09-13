@@ -342,7 +342,7 @@ def _lancamento_rateio_list_query(request, extra=None, *, sort_override=None, di
     for k, v in filtros.items():
         if v:
             q[k] = v
-    for flag in ('abrir_convenio', 'abrir_obs_forma'):
+    for flag in ('abrir_convenio', 'abrir_obs_forma', 'abrir_cobranca'):
         v = (request.GET.get(flag) or '').strip()
         if v:
             q[flag] = v
@@ -488,7 +488,7 @@ class LancamentoRateioList(ListView):
                 ad = (request.GET.get('ad_irpj_periodo') or saved.get('ad_irpj_periodo') or '').strip()
                 if ad:
                     q['ad_irpj_periodo'] = ad
-                for flag in ('abrir_convenio', 'abrir_obs_forma', 'page', 'sort', 'dir'):
+                for flag in ('abrir_convenio', 'abrir_obs_forma', 'abrir_cobranca', 'page', 'sort', 'dir'):
                     v = (request.GET.get(flag) or '').strip()
                     if v:
                         q[flag] = v
@@ -751,6 +751,34 @@ class LancamentoRateioList(ListView):
             ensure_ascii=False,
         )
         context['convenio_periodo_label_obs'] = context.get('convenio_periodo_label', 'Período do filtro')
+
+        from regrarateio.cobranca_totalizadores import coletar_totais_cobranca
+
+        cobranca_data = coletar_totais_cobranca(qs_filtro)
+        cobranca_linhas = []
+        for row in cobranca_data['por_cobranca']:
+            cobranca_linhas.append({
+                'cobranca': row['cobranca'],
+                'valor': row['valor'],
+                'qtd': row['qtd'],
+                'valor_txt': _fmt_br_moeda(row['valor']),
+            })
+        context['cobranca_linhas'] = cobranca_linhas
+        context['cobranca_totalizadores_json'] = json.dumps(
+            {
+                'por_cobranca': [
+                    {
+                        'cobranca': row['cobranca'],
+                        'valor': str(row['valor'].quantize(Decimal('0.01'))),
+                        'qtd': row['qtd'],
+                    }
+                    for row in cobranca_data['por_cobranca']
+                ],
+                'celulas': cobranca_data['celulas'],
+            },
+            ensure_ascii=False,
+        )
+        context['convenio_periodo_label_cobranca'] = context.get('convenio_periodo_label', 'Período do filtro')
 
         return context
 

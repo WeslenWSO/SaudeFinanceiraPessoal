@@ -179,6 +179,37 @@ def _a_faturar(texto: str) -> bool:
     return 'A FATURAR' in t or t == 'AFATURAR'
 
 
+# Viabilidade (convênio) → cobrança «A FATURAR» + título pendente na importação.
+_CONVENIO_A_FATURAR_TOKENS = (
+    'fusex isent',
+    'fusex pass',
+    'corpo de bombeiro',
+    'policia militar',
+    'postal saude',
+    'posta saude',
+    'bradesco',
+    'funcional',
+    'geap',
+    'cassi',
+    'fusex',
+)
+
+
+def _norm_convenio(texto: str) -> str:
+    return _norm_header(texto or '').upper()
+
+
+def _viabilidade_convenio_a_faturar(viabilidade: str) -> bool:
+    t = _norm_convenio(viabilidade)
+    if not t:
+        return False
+    return any(tok in t for tok in _CONVENIO_A_FATURAR_TOKENS)
+
+
+def _cobranca_a_faturar(cache: dict) -> Cobranca | None:
+    return _resolver_cobranca('A FATURAR', cache)
+
+
 def _montar_observacao(
     paciente: str,
     procedimento: str,
@@ -335,7 +366,7 @@ def _resolver_regra(empresa_id: int, texto: str, cache: dict) -> RegraRateio | N
 
 def _resolver_cobranca(texto: str, cache: dict) -> Cobranca | None:
     key = (texto or '').strip().upper()
-    if not key or _a_faturar(texto):
+    if not key:
         return None
     if key in cache:
         return cache[key]
@@ -451,7 +482,11 @@ def parse_receita_planilha_xlsx(
             continue
 
         nf = _extrair_nf_forma_pagamento(forma_pg) or _extrair_nf_forma_pagamento(obs_forma)
-        a_faturar = _a_faturar(forma_pg) or _a_faturar(obs_forma)
+        a_faturar = (
+            _a_faturar(forma_pg)
+            or _a_faturar(obs_forma)
+            or _viabilidade_convenio_a_faturar(viabilidade)
+        )
 
         linhas.append(
             {
@@ -576,7 +611,7 @@ def _importar_linha_receita(
     forma_txt = ln.get('forma_pagamento') or ''
     obs_forma = ln.get('obs_forma') or ''
     nf = ln.get('nf') or ''
-    a_faturar = ln.get('a_faturar', False)
+    a_faturar = ln.get('a_faturar', False) or _viabilidade_convenio_a_faturar(viabilidade)
 
     regra = _resolver_regra(empresa_id, str(ln['regra_id']), regra_cache)
     if not regra:
@@ -587,7 +622,10 @@ def _importar_linha_receita(
         return 0, 0, 1, []
 
     nota = _nota_por_numero(empresa_id, nf, nota_cache)
-    cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
+    if a_faturar:
+        cobranca = _cobranca_a_faturar(cobranca_cache)
+    else:
+        cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
     cliente = (viabilidade or paciente or 'Importação planilha')[:200]
 
     if a_faturar:

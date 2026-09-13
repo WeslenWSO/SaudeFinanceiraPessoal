@@ -249,6 +249,13 @@ class LancamentoRateio(models.Model):
             return self.conta_receber.doc
         return '—'
 
+    def cobranca_exibicao(self) -> str:
+        if self.conta_pagar_id and self.conta_pagar and self.conta_pagar.cobranca_id:
+            return self.conta_pagar.cobranca.descricao
+        if self.conta_receber_id and self.conta_receber and self.conta_receber.forma_pagamento_id:
+            return self.conta_receber.forma_pagamento.descricao
+        return '—'
+
     def _conta_bancaria_obj(self):
         if self.conta_pagar_id and self.conta_pagar and self.conta_pagar.conta_banco_id:
             return self.conta_pagar.conta_banco
