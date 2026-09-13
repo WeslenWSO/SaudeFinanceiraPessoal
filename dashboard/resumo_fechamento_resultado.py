@@ -2,7 +2,7 @@
 from collections import defaultdict
 from decimal import Decimal
 
-from regrarateio.models import LancamentoRateio
+from regrarateio.models import LancamentoRateio, _meta_observacao_importacao
 from regrarateio.views import _filtra_queryset_lancamento_rateio_por_periodo
 
 MESES_PT = (
@@ -23,16 +23,18 @@ MESES_PT = (
 
 
 def _meta_observacao_car(car):
-    modalidade = ''
-    viabilidade = ''
-    if car and car.observacao:
-        for part in car.observacao.split('|'):
-            p = part.strip()
-            if p.startswith('Mod:'):
-                modalidade = p[4:].strip()
-            elif p.startswith('Viab:'):
-                viabilidade = p[5:].strip()
-    return modalidade, viabilidade
+    meta = _meta_observacao_importacao((car.observacao or '') if car else '')
+    return meta['modalidade'], meta['viabilidade']
+
+
+def _cliente_receita_txt(lr):
+    if not lr.conta_receber_id:
+        return '—'
+    car = lr.conta_receber
+    paciente = _meta_observacao_importacao(car.observacao or '')['paciente']
+    if not paciente and lr.descricao and 'Pac:' in lr.descricao:
+        paciente = _meta_observacao_importacao(lr.descricao)['paciente']
+    return paciente or '—'
 
 
 def _textos_receita_extra(lr):
@@ -105,11 +107,13 @@ def _grade_linhas_rateio(qs):
                 lr.data_pagamento.strftime('%d/%m/%Y') if lr.data_pagamento else '—'
             )
         modalidade_txt, forma_pgto_txt, viabilidade_txt = _textos_receita_extra(lr)
+        cliente_txt = _cliente_receita_txt(lr) if lr.conta_receber_id else '—'
         out.append(
             {
                 'data_txt': data_txt,
                 'emissao_txt': emissao_txt,
                 'nota_txt': nota_txt,
+                'cliente_txt': cliente_txt,
                 'titulo_valor_txt': _fmt_moeda_br(vt),
                 'descricao': (lr.descricao or '').strip() or '—',
                 'socio_nome': str(lr.socio) if lr.socio_id else '—',

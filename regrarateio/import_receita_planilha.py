@@ -626,7 +626,7 @@ def _importar_linha_receita(
         cobranca = _cobranca_a_faturar(cobranca_cache)
     else:
         cobranca = _resolver_cobranca(forma_txt, cobranca_cache) or _resolver_cobranca(obs_forma, cobranca_cache)
-    cliente = (viabilidade or paciente or 'Importação planilha')[:200]
+    cliente = (paciente or viabilidade or 'Importação planilha')[:200]
 
     if a_faturar:
         status = 'pendente'

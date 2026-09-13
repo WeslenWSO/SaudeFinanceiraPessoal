@@ -22,9 +22,13 @@ def _linhas_grade(linhas, *, com_receita_extra=False):
             linha['data_txt'],
             linha['emissao_txt'],
             linha['nota_txt'],
+        ]
+        if com_receita_extra:
+            base.append(linha.get('cliente_txt') or '—')
+        base.extend([
             linha['descricao'],
             linha['socio_nome'],
-        ]
+        ])
         if com_receita_extra:
             base.extend([
                 linha.get('modalidade_txt') or '—',
@@ -143,6 +147,7 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
         'Data',
         'Emissão',
         'NF',
+        'Cliente',
         'Descrição',
         'Sócio',
         'Modalidade',
@@ -154,14 +159,14 @@ def gerar_resumo_fechamento_resultado_excel(ctx) -> HttpResponse:
 
     # --- Aba: Receitas ---
     ws_rec = wb.create_sheet('Receitas rateadas')
-    row = _cabecalho_ws(ws_rec, ctx, 'Receitas rateadas', 10, st)
+    row = _cabecalho_ws(ws_rec, ctx, 'Receitas rateadas', 11, st)
     rec_rows = _linhas_grade(ctx.get('linhas_receita'), com_receita_extra=True)
     if ctx.get('total_receita_txt'):
         rec_rows.append(
-            ['', '', '', '', '', '', '', '', 'Total', _parse_moeda_br_txt(ctx['total_receita_txt'])]
+            ['', '', '', '', '', '', '', '', '', 'Total', _parse_moeda_br_txt(ctx['total_receita_txt'])]
         )
-    _escrever_tabela(ws_rec, row, grade_headers_rec, rec_rows, st, money_cols={9, 10})
-    _auto_largura(ws_rec, 10)
+    _escrever_tabela(ws_rec, row, grade_headers_rec, rec_rows, st, money_cols={10, 11})
+    _auto_largura(ws_rec, 11)
 
     # --- Aba: Despesas ---
     ws_desp = wb.create_sheet('Despesas rateadas')

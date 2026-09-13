@@ -204,6 +204,7 @@
                         <th>Data</th>
                         <th>Emissão</th>
                         <th>NF</th>
+                        <th>Cliente</th>
                         <th>Descrição</th>
                         <th>Sócio</th>
                         <th>Modalidade</th>
@@ -220,6 +221,7 @@
                             <td>{{ row.data_txt }}</td>
                             <td>{{ row.emissao_txt }}</td>
                             <td>{{ row.nota_txt }}</td>
+                            <td>{{ row.cliente_txt }}</td>
                             <td>{{ row.descricao }}</td>
                             <td>{{ row.socio_nome }}</td>
                             <td>{{ row.modalidade_txt }}</td>
@@ -231,14 +233,14 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="10" class="text-center text-muted py-4">Nenhuma receita rateada no período.</td>
+                            <td colspan="11" class="text-center text-muted py-4">Nenhuma receita rateada no período.</td>
                         </tr>
                     {% endif %}
                 </tbody>
                 {% if tem_receita %}
                 <tfoot class="table-secondary fw-semibold">
                     <tr>
-                        <td colspan="9" class="text-end">Total receitas rateadas</td>
+                        <td colspan="10" class="text-end">Total receitas rateadas</td>
                         <td class="text-end text-success">R$ {{ total_receita_txt }}</td>
                     </tr>
                 </tfoot>
