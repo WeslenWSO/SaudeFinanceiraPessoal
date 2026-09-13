@@ -97,50 +97,39 @@ def _mapa_planejado_por_categoria(empresa, ano) -> dict[int, list[Decimal]]:
 
 
 def _mapa_receitas_por_categoria_mes(empresa, ano) -> dict[tuple[int, int], Decimal]:
-    """Receitas importadas do Conta Azul (conta_azul_parcela_id)."""
+    """Receitas já recebidas (regime de caixa), importadas do Conta Azul."""
     mapa: dict[tuple[int, int], Decimal] = defaultdict(lambda: Decimal('0'))
     base = ContaAReceber.objects.filter(
         empresa=empresa,
         conta_azul_parcela_id__gt='',
         categoria_id__isnull=False,
+        status='pago',
+        data_recebimento__isnull=False,
     )
     for row in base.filter(
-        status='pago',
         data_recebimento__year=ano,
     ).values('categoria_id', 'data_recebimento__month').annotate(
         total=Sum('valor_recebido'),
     ):
         mapa[(row['categoria_id'], row['data_recebimento__month'])] += row['total'] or Decimal('0')
-
-    for row in base.exclude(status='pago').filter(
-        data_vencimento__year=ano,
-    ).values('categoria_id', 'data_vencimento__month').annotate(
-        total=Sum('valor_a_receber'),
-    ):
-        mapa[(row['categoria_id'], row['data_vencimento__month'])] += row['total'] or Decimal('0')
     return mapa
 
 
 def _mapa_despesas_por_categoria_mes(empresa, ano, tipo: str) -> dict[tuple[int, int], Decimal]:
-    """Despesas / investimento / DL importados do Conta Azul."""
+    """Despesas / investimento / DL já pagos (regime de caixa), importados do Conta Azul."""
     mapa: dict[tuple[int, int], Decimal] = defaultdict(lambda: Decimal('0'))
     base = ContasaPagar.objects.filter(
         empresa=empresa,
         conta_azul_parcela_id__gt='',
         categoria__tipo=tipo,
+        status='pago',
+        dtPag__isnull=False,
     )
     for row in base.filter(
         dtPag__year=ano,
         valorPago__gt=0,
     ).values('categoria_id', 'dtPag__month').annotate(total=Sum('valorPago')):
         mapa[(row['categoria_id'], row['dtPag__month'])] += row['total'] or Decimal('0')
-
-    for row in base.filter(
-        dtvenc__year=ano,
-    ).filter(Q(valorPago__isnull=True) | Q(valorPago=0)).values(
-        'categoria_id', 'dtvenc__month',
-    ).annotate(total=Sum('valorDoc')):
-        mapa[(row['categoria_id'], row['dtvenc__month'])] += row['total'] or Decimal('0')
     return mapa
 
 
@@ -339,8 +328,6 @@ def _bloco_emprestimos_planilha(empresa, ano: int) -> tuple[list[dict], list[Dec
                 vals[m - 1] += (
                     p.valor_pago if p.valor_pago is not None else (p.valor_parcela or Decimal('0'))
                 )
-            else:
-                vals[m - 1] += p.valor_parcela or Decimal('0')
         if not _tem_movimento(vals):
             continue
 

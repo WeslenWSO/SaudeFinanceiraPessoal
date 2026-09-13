@@ -129,21 +129,13 @@ def _mapa_receitas(empresa, colunas: list[tuple[int, int]]) -> dict[tuple[int, i
     )
     for row in base.filter(
         status='pago',
+        data_recebimento__isnull=False,
         data_recebimento__gte=ini,
         data_recebimento__lte=fim,
     ).values('categoria_id', 'data_recebimento__year', 'data_recebimento__month').annotate(
         total=Sum('valor_recebido'),
     ):
         mapa[(row['categoria_id'], row['data_recebimento__year'], row['data_recebimento__month'])] += (
-            row['total'] or Decimal('0')
-        )
-    for row in base.exclude(status='pago').filter(
-        data_vencimento__gte=ini,
-        data_vencimento__lte=fim,
-    ).values('categoria_id', 'data_vencimento__year', 'data_vencimento__month').annotate(
-        total=Sum('valor_a_receber'),
-    ):
-        mapa[(row['categoria_id'], row['data_vencimento__year'], row['data_vencimento__month'])] += (
             row['total'] or Decimal('0')
         )
     return mapa
@@ -156,6 +148,8 @@ def _mapa_despesas(empresa, colunas: list[tuple[int, int]], tipo: str) -> dict[t
         empresa=empresa,
         conta_azul_parcela_id__gt='',
         categoria__tipo=tipo,
+        status='pago',
+        dtPag__isnull=False,
     )
     for row in base.filter(
         dtPag__gte=ini,
@@ -163,14 +157,6 @@ def _mapa_despesas(empresa, colunas: list[tuple[int, int]], tipo: str) -> dict[t
         valorPago__gt=0,
     ).values('categoria_id', 'dtPag__year', 'dtPag__month').annotate(total=Sum('valorPago')):
         mapa[(row['categoria_id'], row['dtPag__year'], row['dtPag__month'])] += row['total'] or Decimal('0')
-
-    for row in base.filter(
-        dtvenc__gte=ini,
-        dtvenc__lte=fim,
-    ).filter(Q(valorPago__isnull=True) | Q(valorPago=0)).values(
-        'categoria_id', 'dtvenc__year', 'dtvenc__month',
-    ).annotate(total=Sum('valorDoc')):
-        mapa[(row['categoria_id'], row['dtvenc__year'], row['dtvenc__month'])] += row['total'] or Decimal('0')
     return mapa
 
 
