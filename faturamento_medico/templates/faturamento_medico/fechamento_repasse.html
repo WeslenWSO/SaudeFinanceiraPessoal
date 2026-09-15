@@ -240,7 +240,7 @@
                                 </thead>
                                 <tbody>
                                     {% for faturamento in faturamentos %}
-                                    <tr>
+                                    <tr data-valor-total="{{ faturamento.total|stringformat:'f'|default:'0' }}">
                                         <td>
                                             <input type="checkbox" name="faturamentos_selecionados" value="{{ faturamento.id }}" class="faturamento-checkbox">
                                         </td>
@@ -294,7 +294,7 @@
                                                 -
                                             {% endfor %}
                                         </td>
-                                        <td>
+                                        <td class="col-valor-total-item">
                                             {% for item in faturamento.itens_servico.all %}
                                                 R$ {{ item.total|floatformat:2 }}<br>
                                             {% empty %}
@@ -365,6 +365,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('select-all');
     const faturamentoCheckboxes = document.querySelectorAll('.faturamento-checkbox');
 
+    if (!selectAllCheckbox) {
+        return;
+    }
+
     selectAllCheckbox.addEventListener('change', function() {
         faturamentoCheckboxes.forEach(checkbox => {
             checkbox.checked = selectAllCheckbox.checked;
@@ -382,27 +386,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    function parseMoedaBr(texto) {
+        const s = (texto || '').trim().replace(/R\$\s?/g, '').replace(/\s/g, '');
+        if (!s) return 0;
+        return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    function valorTotalDaLinha(row) {
+        const attr = row.getAttribute('data-valor-total');
+        if (attr !== null && attr !== '') {
+            return parseFloat(attr) || 0;
+        }
+        const valorTotalCell = row.querySelector('.col-valor-total-item');
+        if (!valorTotalCell) return 0;
+        let soma = 0;
+        valorTotalCell.textContent.split(/\n/).forEach(function(linha) {
+            soma += parseMoedaBr(linha);
+        });
+        return soma;
+    }
+
     // Função para atualizar o valor total dos faturamentos selecionados
     function atualizarValorTotal() {
         const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
         let total = 0;
 
-        checkedBoxes.forEach(checkbox => {
+        checkedBoxes.forEach(function(checkbox) {
             const row = checkbox.closest('tr');
-            // A coluna Valor Total Item é a 17ª coluna (ajustada após mudanças)
-            const valorTotalCell = row.querySelector('td:nth-child(17)'); // Coluna Valor Total Item
-            if (valorTotalCell) {
-                // Para múltiplos valores na célula, somar todos
-                const valores = valorTotalCell.textContent.split('<br>');
-                valores.forEach(valorText => {
-                    const valor = parseFloat(valorText.trim().replace('R$ ', '').replace(',', '.')) || 0;
-                    total += valor;
-                });
+            if (row) {
+                total += valorTotalDaLinha(row);
             }
         });
 
-        console.log('Total calculado:', total);
-        document.getElementById('valor_total_selecionado').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+        document.getElementById('valor_total_selecionado').value =
+            'R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     // Botão Calcular Valores
@@ -410,12 +427,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const percentualImposto = parseFloat(document.getElementById('percentual_imposto').value) || 0;
         const percentualComissao = parseFloat(document.getElementById('percentual_comissao').value) || 0;
         const valorTotalText = document.getElementById('valor_total_selecionado').value;
-        const valorTotal = parseFloat(valorTotalText.replace('R$ ', '').replace(',', '.')) || 0;
-
-        console.log('Valor total selecionado:', valorTotalText, 'Convertido para:', valorTotal);
+        const valorTotal = parseMoedaBr(valorTotalText);
 
         const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
-        console.log('Número de checkboxes selecionados:', checkedBoxes.length);
 
         if (checkedBoxes.length === 0) {
             alert('Selecione pelo menos um faturamento para calcular.');
