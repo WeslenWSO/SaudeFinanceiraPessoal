@@ -5429,58 +5429,60 @@ def fechamento_repasse(request):
     if request.method == 'POST':
         faturamentos_ids = request.POST.getlist('faturamentos_selecionados')
 
-        if request.POST.get('aplicar_comissao') and faturamentos_ids:
-            # Aplicar comissão aos faturamentos selecionados
-            percentual_imposto = float(request.POST.get('percentual_imposto', 0))
-            percentual_comissao = float(request.POST.get('percentual_comissao', 0))
+        if request.POST.get('aplicar_comissao'):
+            from decimal import Decimal
 
-            # Usar getlist para obter todos os valores do campo
-            faturamentos_ids = request.POST.getlist('faturamentos_selecionados')
+            def _resp_comissao(ok: bool, msg: str, *, status: int = 200):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'success': ok, 'message': msg}, status=status)
+                if ok:
+                    messages.success(request, msg)
+                else:
+                    messages.error(request, msg)
+                return redirect('faturamento_medico:fechamento_repasse')
 
-            # Debug: verificar o que está sendo recebido
-            logger.info(f"faturamentos_ids após getlist: {faturamentos_ids} (tipo: {type(faturamentos_ids)})")
+            if not faturamentos_ids:
+                return _resp_comissao(False, 'Selecione pelo menos um faturamento.', status=400)
 
-            # Converter IDs para inteiros para evitar problemas de tipo
+            try:
+                percentual_imposto = Decimal(
+                    str(request.POST.get('percentual_imposto', '0')).replace(',', '.')
+                )
+                percentual_comissao = Decimal(
+                    str(request.POST.get('percentual_comissao', '0')).replace(',', '.')
+                )
+            except (InvalidOperation, ValueError):
+                return _resp_comissao(False, 'Percentuais inválidos.', status=400)
+
             try:
                 faturamentos_ids = [int(id.strip()) for id in faturamentos_ids if id.strip()]
             except (ValueError, TypeError) as e:
                 logger.error(f"Erro ao converter IDs: {e}. faturamentos_ids: {faturamentos_ids}")
-                messages.error(request, 'IDs de faturamentos inválidos.')
-                return redirect('faturamento_medico:fechamento_repasse')
+                return _resp_comissao(False, 'IDs de faturamentos inválidos.', status=400)
 
-            faturamentos = FaturamentoMedico.objects.filter(
+            faturamentos_sel = FaturamentoMedico.objects.filter(
                 id__in=faturamentos_ids,
-                empresa_id=empresa_id
+                empresa_id=empresa_id,
             )
+            if not faturamentos_sel.exists():
+                return _resp_comissao(False, 'Nenhum faturamento encontrado para os IDs selecionados.', status=404)
 
-            for faturamento in faturamentos:
-                # Calcular valores com precisão decimal (manter como Decimal)
-                from decimal import Decimal
-                total_decimal = Decimal(str(faturamento.total))
-                percentual_imposto_decimal = Decimal(str(percentual_imposto))
-                percentual_comissao_decimal = Decimal(str(percentual_comissao))
-
-                valor_imposto = (total_decimal * percentual_imposto_decimal / 100).quantize(Decimal('0.01'))
+            for faturamento in faturamentos_sel:
+                total_decimal = Decimal(str(faturamento.total or 0))
+                valor_imposto = (total_decimal * percentual_imposto / 100).quantize(Decimal('0.01'))
                 base_comissao = total_decimal - valor_imposto
-                valor_comissao = (base_comissao * percentual_comissao_decimal / 100).quantize(Decimal('0.01'))
+                valor_comissao = (base_comissao * percentual_comissao / 100).quantize(Decimal('0.01'))
 
-                # Atualizar campos
                 faturamento.percentual_imposto = percentual_imposto
                 faturamento.percentual_comissao = percentual_comissao
                 faturamento.valor_imposto = valor_imposto
                 faturamento.valor_comissao = valor_comissao
                 faturamento.save()
 
-            # Verificar se é uma requisição AJAX
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from django.http import JsonResponse
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Comissão aplicada com sucesso para {len(faturamentos_ids)} faturamento(s)!'
-                })
-            else:
-                messages.success(request, f'Comissão aplicada com sucesso para {len(faturamentos_ids)} faturamento(s)!')
-                return redirect('faturamento_medico:fechamento_repasse')
+            return _resp_comissao(
+                True,
+                f'Comissão aplicada com sucesso para {faturamentos_sel.count()} faturamento(s)!',
+            )
 
         elif faturamentos_ids:
             # Usar data atual se não foi fornecida

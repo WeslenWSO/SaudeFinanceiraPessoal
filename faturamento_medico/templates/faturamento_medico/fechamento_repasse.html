@@ -392,6 +392,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
     }
 
+    function parseNumeroBr(texto) {
+        const s = (texto || '').trim().replace(/\s/g, '');
+        if (!s) return 0;
+        if (s.indexOf(',') >= 0) {
+            return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        return parseFloat(s) || 0;
+    }
+
     function valorTotalDaLinha(row) {
         const attr = row.getAttribute('data-valor-total');
         if (attr !== null && attr !== '') {
@@ -424,8 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Botão Calcular Valores
     document.getElementById('btn-calcular').addEventListener('click', function() {
-        const percentualImposto = parseFloat(document.getElementById('percentual_imposto').value) || 0;
-        const percentualComissao = parseFloat(document.getElementById('percentual_comissao').value) || 0;
+        const percentualImposto = parseNumeroBr(document.getElementById('percentual_imposto').value);
+        const percentualComissao = parseNumeroBr(document.getElementById('percentual_comissao').value);
         const valorTotalText = document.getElementById('valor_total_selecionado').value;
         const valorTotal = parseMoedaBr(valorTotalText);
 
@@ -457,8 +466,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Botão Aplicar Comissão
     document.getElementById('btn-aplicar-comissao').addEventListener('click', function() {
-        const percentualImposto = parseFloat(document.getElementById('percentual_imposto').value) || 0;
-        const percentualComissao = parseFloat(document.getElementById('percentual_comissao').value) || 0;
+        const percentualImposto = parseNumeroBr(document.getElementById('percentual_imposto').value);
+        const percentualComissao = parseNumeroBr(document.getElementById('percentual_comissao').value);
         const checkedBoxes = document.querySelectorAll('.faturamento-checkbox:checked');
 
         if (checkedBoxes.length === 0) {
@@ -482,22 +491,28 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('{% url "faturamento_medico:fechamento_repasse" %}', {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
+            .then(function(data) {
                 if (data.success) {
                     alert(data.message);
                     location.reload();
                 } else {
-                    alert('Erro: ' + data.message);
+                    alert('Erro: ' + (data.message || 'Resposta inválida do servidor.'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Erro:', error);
-                alert('Erro ao aplicar comissão.');
+                alert('Erro ao aplicar comissão. Recarregue a página e tente novamente.');
             });
         }
     });
