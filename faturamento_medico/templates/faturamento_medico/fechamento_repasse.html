@@ -68,6 +68,11 @@
                                 <label>Anestesista</label>
                                 <input type="text" name="anestesista" class="form-control" placeholder="Nome do anestesista" value="{{ filtros.anestesista }}">
                             </div>
+                            <div class="col-md-3">
+                                <label>Código Relatório</label>
+                                <input type="text" name="codigo_relatorio" class="form-control" placeholder="Ex.: 12345, 67890" value="{{ filtros.codigo_relatorio|default:'' }}">
+                                <small class="text-muted">Vários códigos separados por vírgula</small>
+                            </div>
                             <div class="col-md-2">
                                 <label>Data de Fechamento</label>
                                 <input type="date" name="data_fechamento" class="form-control" value="{{ filtros.data_fechamento }}">

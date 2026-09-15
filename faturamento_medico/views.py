@@ -375,6 +375,32 @@ def _q_convenio_filtro(nome: str) -> Q:
     return Q(convenio__iexact=conv)
 
 
+def _parse_codigos_relatorio_filtro(valor) -> list[str]:
+    """Separa vários códigos de relatório (vírgula, ponto-e-vírgula ou quebra de linha)."""
+    if not valor:
+        return []
+    if isinstance(valor, (list, tuple)):
+        out: list[str] = []
+        for item in valor:
+            out.extend(_parse_codigos_relatorio_filtro(item))
+        return list(dict.fromkeys(c for c in out if c))
+    raw = str(valor).strip()
+    if not raw:
+        return []
+    tokens = re.split(r'[,;\n\r\t]+', raw)
+    return list(dict.fromkeys(t.strip() for t in tokens if t.strip()))
+
+
+def _aplicar_filtro_codigo_relatorio(qs, valor):
+    codigos = _parse_codigos_relatorio_filtro(valor)
+    if not codigos:
+        return qs
+    q = Q()
+    for cod in codigos:
+        q |= Q(codigo_relatorio__icontains=cod)
+    return qs.filter(q)
+
+
 def _stats_de_grid_linhas(grid_linhas):
     """Totais por convênio/anestesista a partir das linhas do grid (mesma base do RESUMO)."""
     from collections import defaultdict
@@ -5352,6 +5378,7 @@ def fechamento_repasse(request):
     convenios = request.GET.getlist('convenio')
     data_fechamento = request.GET.get('data_fechamento')
     anestesista = request.GET.get('anestesista')
+    codigo_relatorio = request.GET.get('codigo_relatorio', '')
     mostrar_fechados = request.GET.get('mostrar_fechados', 'false').lower() == 'true'
 
     # Buscar convênios disponíveis para a empresa
@@ -5393,6 +5420,7 @@ def fechamento_repasse(request):
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
+    faturamentos = _aplicar_filtro_codigo_relatorio(faturamentos, codigo_relatorio)
 
     # Filtrar apenas faturamentos com anestesista
     faturamentos = faturamentos.exclude(anestesista__isnull=True).exclude(anestesista='')
@@ -5587,6 +5615,7 @@ def fechamento_repasse(request):
             'convenio': convenios,
             'data_fechamento': data_fechamento,
             'anestesista': anestesista,
+            'codigo_relatorio': codigo_relatorio,
         },
         'mostrar_fechados': mostrar_fechados,
     }
@@ -5630,6 +5659,7 @@ def exportar_excel_fechados(request):
     convenios = request.GET.getlist('convenio')
     data_fechamento = request.GET.get('data_fechamento')
     anestesista = request.GET.get('anestesista')
+    codigo_relatorio = request.GET.get('codigo_relatorio', '')
 
     # Buscar convênios disponíveis para a empresa (para compatibilidade)
     convenios_disponiveis = []
@@ -5649,6 +5679,7 @@ def exportar_excel_fechados(request):
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
+    faturamentos = _aplicar_filtro_codigo_relatorio(faturamentos, codigo_relatorio)
 
     # Filtrar apenas faturamentos com anestesista e fechados
     faturamentos = faturamentos.exclude(anestesista__isnull=True).exclude(anestesista='')
@@ -5706,6 +5737,9 @@ def exportar_excel_fechados(request):
         filtros_texto += f" Convênios: {', '.join(convenios)}"
     if anestesista:
         filtros_texto += f" Anestesista: {anestesista}"
+    codigos_rel = _parse_codigos_relatorio_filtro(codigo_relatorio)
+    if codigos_rel:
+        filtros_texto += f" Código(s) relatório: {', '.join(codigos_rel)}"
 
     ws.cell(row=5, column=1).value = filtros_texto
     ws.cell(row=5, column=1).font = Font(italic=True)
@@ -6141,6 +6175,7 @@ def imprimir_repasses_fechados(request):
     convenios = request.GET.getlist('convenio')
     data_fechamento = request.GET.get('data_fechamento')
     anestesista = request.GET.get('anestesista')
+    codigo_relatorio = request.GET.get('codigo_relatorio', '')
 
     # Query base - apenas faturamentos fechados com anestesista
     faturamentos = FaturamentoMedico.objects.filter(
@@ -6162,6 +6197,7 @@ def imprimir_repasses_fechados(request):
         faturamentos = faturamentos.filter(q_objects)
     if anestesista:
         faturamentos = faturamentos.filter(anestesista__icontains=anestesista)
+    faturamentos = _aplicar_filtro_codigo_relatorio(faturamentos, codigo_relatorio)
 
     # Agrupar por anestesista
     repasses_por_anestesista = {}
