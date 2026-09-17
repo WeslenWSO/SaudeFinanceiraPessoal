@@ -220,6 +220,31 @@ def _preco_de_item(item: dict) -> Decimal | None:
     return None
 
 
+def _aplicar_fiscal_da_api(
+    servico: ServicoContaAzul,
+    fiscal: dict,
+    *,
+    preservar_fiscal_pendente: bool = True,
+) -> None:
+    """Só preenche fiscal com valor vindo da API — nunca apaga o que já está no SF."""
+    if preservar_fiscal_pendente and servico.fiscal_pendente_envio:
+        return
+    if fiscal.get('natureza_operacao'):
+        servico.natureza_operacao = fiscal['natureza_operacao'][:80]
+    if fiscal.get('c_class_trib'):
+        servico.c_class_trib = fiscal['c_class_trib'][:20]
+    if fiscal.get('codigo_nbs'):
+        servico.codigo_nbs = fiscal['codigo_nbs'][:30]
+    if fiscal.get('indicador_operacao'):
+        servico.indicador_operacao = fiscal['indicador_operacao'][:20]
+    if fiscal.get('aliquota_ibs') is not None:
+        servico.aliquota_ibs = fiscal['aliquota_ibs']
+    if fiscal.get('aliquota_ibs_municipal') is not None:
+        servico.aliquota_ibs_municipal = fiscal['aliquota_ibs_municipal']
+    if fiscal.get('aliquota_cbs') is not None:
+        servico.aliquota_cbs = fiscal['aliquota_cbs']
+
+
 def aplicar_item_api_ao_servico(
     servico: ServicoContaAzul,
     item: dict,
@@ -227,36 +252,24 @@ def aplicar_item_api_ao_servico(
     preservar_fiscal_pendente: bool = True,
 ) -> None:
     fiscal = extrair_fiscal_de_resposta(item)
-    servico.codigo = str(item.get('codigo') or servico.codigo or '')[:50]
-    servico.descricao = str(item.get('descricao') or servico.descricao or '')[:300]
+    if item.get('codigo') not in (None, ''):
+        servico.codigo = str(item.get('codigo'))[:50]
+    if item.get('descricao') not in (None, ''):
+        servico.descricao = str(item.get('descricao'))[:300]
     servico.status = _status_de_item(item)
     preco = _preco_de_item(item)
     if preco is not None:
         servico.preco = preco
-    servico.codigo_cnae = str(item.get('codigo_cnae') or servico.codigo_cnae or '')[:20]
-    servico.lei_116 = str(item.get('lei_116') or servico.lei_116 or '')[:20]
+    if item.get('codigo_cnae') not in (None, ''):
+        servico.codigo_cnae = str(item.get('codigo_cnae'))[:20]
+    if item.get('lei_116') not in (None, ''):
+        servico.lei_116 = str(item.get('lei_116'))[:20]
 
     mun = fiscal['codigo_servico_municipal'][:20]
     if mun:
         servico.codigo_servico_municipal = mun
 
-    if not (preservar_fiscal_pendente and servico.fiscal_pendente_envio):
-        # API v1 costuma não devolver IBS/CBS — não sobrescrever com vazio.
-        if fiscal['natureza_operacao']:
-            servico.natureza_operacao = fiscal['natureza_operacao'][:80]
-        if fiscal['c_class_trib']:
-            servico.c_class_trib = fiscal['c_class_trib'][:20]
-        if fiscal['codigo_nbs']:
-            servico.codigo_nbs = fiscal['codigo_nbs'][:30]
-        if fiscal['indicador_operacao']:
-            servico.indicador_operacao = fiscal['indicador_operacao'][:20]
-
-    if fiscal['aliquota_ibs'] is not None:
-        servico.aliquota_ibs = fiscal['aliquota_ibs']
-    if fiscal['aliquota_ibs_municipal'] is not None:
-        servico.aliquota_ibs_municipal = fiscal['aliquota_ibs_municipal']
-    if fiscal['aliquota_cbs'] is not None:
-        servico.aliquota_cbs = fiscal['aliquota_cbs']
+    _aplicar_fiscal_da_api(servico, fiscal, preservar_fiscal_pendente=preservar_fiscal_pendente)
 
 
 def importar_servicos(

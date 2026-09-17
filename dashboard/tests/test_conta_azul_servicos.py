@@ -118,6 +118,28 @@ class ExtrairFiscalServicoTest(TestCase):
         self.assertEqual(servico.c_class_trib, '000001')
         self.assertEqual(servico.codigo_nbs, '1.2301.22.00')
 
+    def test_import_atualiza_cadastro_sem_apagar_fiscal(self):
+        empresa = Empresa.objects.create(razao='Keep3', cnpj='12345678000194')
+        servico = ServicoContaAzul.objects.create(
+            empresa=empresa,
+            conta_azul_id='uuid-3',
+            c_class_trib='000001',
+            indicador_operacao='030101',
+            fiscal_pendente_envio=False,
+        )
+        item = {
+            'descricao': 'Exame RM',
+            'codigo_cnae': '8630503',
+            'lei_116': '04.02',
+            'codigo_municipio_servico': '1148541402',
+        }
+        aplicar_item_api_ao_servico(servico, item)
+        self.assertEqual(servico.lei_116, '04.02')
+        self.assertEqual(servico.codigo_cnae, '8630503')
+        self.assertEqual(servico.codigo_servico_municipal, '1148541402')
+        self.assertEqual(servico.c_class_trib, '000001')
+        self.assertEqual(servico.indicador_operacao, '030101')
+
     def test_replicar_fiscal_exige_origem_com_dados(self):
         empresa = Empresa.objects.create(razao='Repl2', cnpj='12345678000196')
         origem = ServicoContaAzul.objects.create(empresa=empresa, conta_azul_id='vazio')

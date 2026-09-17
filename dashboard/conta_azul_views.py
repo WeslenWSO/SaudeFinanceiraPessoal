@@ -613,7 +613,9 @@ def conta_azul_servicos_lista(request, pk):
                         messages.success(
                             request,
                             f"Importação concluída: {stats.get('criados', 0)} criados, "
-                            f"{stats.get('atualizados', 0)} atualizados.",
+                            f"{stats.get('atualizados', 0)} atualizados. "
+                            'Cadastro (CNAE, Lei 116, serv. municipal) atualizado; '
+                            'dados IBS/CBS locais foram preservados.',
                         )
                 except ContaAzulAPIError as exc:
                     messages.error(request, str(exc))
