@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
@@ -73,6 +73,24 @@ PATCH_CCLASSTRIB = 'codigo_classificacao_tributaria'
 PATCH_NBS = 'codigo_nbs'
 PATCH_INDICADOR = 'codigo_indicador_operacao'
 PATCH_NATUREZA = 'natureza_operacao'
+
+CAMPOS_IMPORT_SERVICO = (
+    'codigo',
+    'descricao',
+    'status',
+    'preco',
+    'codigo_cnae',
+    'lei_116',
+    'codigo_servico_municipal',
+    'natureza_operacao',
+    'c_class_trib',
+    'codigo_nbs',
+    'indicador_operacao',
+    'aliquota_ibs',
+    'aliquota_ibs_municipal',
+    'aliquota_cbs',
+    'atualizado_em',
+)
 
 
 def _valor_texto(val: Any) -> str:
@@ -285,37 +303,59 @@ def importar_servicos(
         return {**stats, 'erro': str(exc)}
 
     agora = timezone.now()
+    if dry_run:
+        stats['criados'] = sum(
+            1 for item in itens if str(item.get('id') or item.get('uuid') or '').strip()
+        )
+        return stats
+
+    ca_ids = [
+        str(item.get('id') or item.get('uuid') or '').strip()
+        for item in itens
+    ]
+    ca_ids_validos = [cid for cid in ca_ids if cid]
+    stats['erros'] += len(ca_ids) - len(ca_ids_validos)
+
+    existentes = {
+        s.conta_azul_id: s
+        for s in ServicoContaAzul.objects.filter(empresa=empresa, conta_azul_id__in=ca_ids_validos)
+    }
+
+    criar: list[ServicoContaAzul] = []
+    atualizar: list[ServicoContaAzul] = []
+
     for item in itens:
         ca_id = str(item.get('id') or item.get('uuid') or '').strip()
         if not ca_id:
-            stats['erros'] += 1
             continue
-        if dry_run:
-            stats['criados'] += 1
-            continue
-        try:
-            detalhe = item
-            if ca_id:
-                try:
-                    detalhe_api = client.buscar_servico_por_id(ca_id)
-                    if detalhe_api:
-                        detalhe = detalhe_api
-                except ContaAzulAPIError:
-                    detalhe = item
-            obj = ServicoContaAzul.objects.filter(empresa=empresa, conta_azul_id=ca_id).first()
-            criado = obj is None
-            if criado:
-                obj = ServicoContaAzul(empresa=empresa, conta_azul_id=ca_id, importado_em=agora)
-            aplicar_item_api_ao_servico(obj, detalhe)
-            if criado:
-                obj.importado_em = agora
-            obj.save()
-            if criado:
-                stats['criados'] += 1
-            else:
-                stats['atualizados'] += 1
-        except IntegrityError:
-            stats['erros'] += 1
+        obj = existentes.get(ca_id)
+        criado = obj is None
+        if criado:
+            obj = ServicoContaAzul(empresa=empresa, conta_azul_id=ca_id, importado_em=agora)
+            existentes[ca_id] = obj
+        # GET /v1/servicos já devolve os mesmos campos do detalhe — evita N+1 na API.
+        aplicar_item_api_ao_servico(obj, item)
+        obj.atualizado_em = agora
+        if criado:
+            criar.append(obj)
+        else:
+            atualizar.append(obj)
+
+    try:
+        with transaction.atomic():
+            if criar:
+                ServicoContaAzul.objects.bulk_create(criar, batch_size=100)
+            if atualizar:
+                ServicoContaAzul.objects.bulk_update(
+                    atualizar,
+                    CAMPOS_IMPORT_SERVICO,
+                    batch_size=100,
+                )
+    except IntegrityError:
+        stats['erros'] += len(criar) + len(atualizar)
+    else:
+        stats['criados'] = len(criar)
+        stats['atualizados'] = len(atualizar)
     return stats
 
 

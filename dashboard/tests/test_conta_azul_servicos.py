@@ -1,10 +1,12 @@
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from django.test import TestCase
 
 from dashboard.conta_azul.servicos import (
     aplicar_item_api_ao_servico,
     extrair_fiscal_de_resposta,
+    importar_servicos,
     montar_payload_fiscal,
     replicar_fiscal_servicos,
 )
@@ -145,3 +147,23 @@ class ExtrairFiscalServicoTest(TestCase):
         origem = ServicoContaAzul.objects.create(empresa=empresa, conta_azul_id='vazio')
         with self.assertRaises(ContaAzulAPIError):
             replicar_fiscal_servicos(empresa, origem, [])
+
+    def test_importar_nao_busca_detalhe_por_id(self):
+        empresa = Empresa.objects.create(razao='Imp', cnpj='12345678000193')
+        client = MagicMock()
+        client.buscar_servicos.return_value = [
+            {
+                'id': 'uuid-import-1',
+                'codigo': 'S1',
+                'descricao': 'Serviço teste',
+                'codigo_cnae': '8630503',
+                'lei_116': '04.02',
+                'codigo_municipio_servico': '040205',
+            }
+        ]
+        stats = importar_servicos(empresa, client)
+        self.assertEqual(stats['criados'], 1)
+        client.buscar_servico_por_id.assert_not_called()
+        obj = ServicoContaAzul.objects.get(empresa=empresa, conta_azul_id='uuid-import-1')
+        self.assertEqual(obj.lei_116, '04.02')
+        self.assertEqual(obj.codigo_servico_municipal, '040205')

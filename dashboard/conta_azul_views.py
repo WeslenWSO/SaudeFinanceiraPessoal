@@ -9,6 +9,7 @@ from datetime import date
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, OperationalError
+from django.db.utils import ProgrammingError
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -595,8 +596,17 @@ def conta_azul_servicos_lista(request, pk):
         return redirect('empresa:lista')
 
     config = obter_ou_criar_config(empresa)
-    servicos = ServicoContaAzul.objects.filter(empresa=empresa).order_by('codigo', 'descricao')
-    pendentes = servicos.filter(fiscal_pendente_envio=True).count()
+    try:
+        servicos = ServicoContaAzul.objects.filter(empresa=empresa).order_by('codigo', 'descricao')
+        pendentes = servicos.filter(fiscal_pendente_envio=True).count()
+    except ProgrammingError:
+        logger.exception('ServicoContaAzul indisponível (migração pendente?) empresa=%s', pk)
+        messages.error(
+            request,
+            'Tabela de serviços Conta Azul não está atualizada no servidor. '
+            'Aguarde o deploy concluir (migrate) ou contate o administrador.',
+        )
+        return redirect('empresa:conta_azul_config', pk=pk)
 
     if request.method == 'POST':
         acao = (request.POST.get('acao') or '').strip()
