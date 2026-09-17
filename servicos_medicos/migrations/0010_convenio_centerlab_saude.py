@@ -19,7 +19,7 @@ def cadastrar_centerlab(apps, schema_editor):
 
     empresa = (
         Empresa.objects.filter(pk=16).first()
-        or Empresa.objects.filter(nome__icontains='MEDICINARTE').order_by('id').first()
+        or Empresa.objects.filter(razao__icontains='MEDICINARTE').order_by('id').first()
     )
     if not empresa:
         return
@@ -37,7 +37,7 @@ def remover_centerlab(apps, schema_editor):
 
     empresa = (
         Empresa.objects.filter(pk=16).first()
-        or Empresa.objects.filter(nome__icontains='MEDICINARTE').order_by('id').first()
+        or Empresa.objects.filter(razao__icontains='MEDICINARTE').order_by('id').first()
     )
     if not empresa:
         return

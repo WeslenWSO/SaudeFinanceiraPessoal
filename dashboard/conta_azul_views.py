@@ -25,9 +25,10 @@ from dashboard.conta_azul.oauth import (
     url_autorizacao,
     validar_state_oauth,
 )
+from dashboard.conta_azul.servicos import enviar_fiscal_servico, enviar_servicos_pendentes, importar_servicos
 from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
-from dashboard.conta_azul_forms import ContaAzulConfigForm
-from dashboard.models import ContaAzulConfig
+from dashboard.conta_azul_forms import ContaAzulConfigForm, ServicoContaAzulFiscalForm
+from dashboard.models import ContaAzulConfig, ServicoContaAzul
 from empresa.models import Empresa
 
 logger = logging.getLogger(__name__)
@@ -558,4 +559,118 @@ def conta_azul_dashboard_por_tipo(request):
         request,
         'dashboard/conta_azul_por_tipo.html',
         {'dados': dados, 'dashboard_ativo': 'por_tipo', **ctx},
+    )
+
+
+@login_required
+def conta_azul_servicos_lista(request, pk):
+    empresa = get_object_or_404(Empresa, pk=pk)
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão.')
+        return redirect('empresa:lista')
+
+    config = obter_ou_criar_config(empresa)
+    servicos = ServicoContaAzul.objects.filter(empresa=empresa).order_by('codigo', 'descricao')
+    pendentes = servicos.filter(fiscal_pendente_envio=True).count()
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip()
+        if acao == 'importar':
+            if not config.tem_refresh_token():
+                messages.error(request, 'Conecte o Conta Azul antes de importar serviços.')
+            else:
+                try:
+                    client = ContaAzulClient.para_empresa(empresa)
+                    stats = importar_servicos(empresa, client)
+                    if stats.get('erro'):
+                        messages.error(request, stats['erro'])
+                    else:
+                        messages.success(
+                            request,
+                            f"Importação concluída: {stats.get('criados', 0)} criados, "
+                            f"{stats.get('atualizados', 0)} atualizados.",
+                        )
+                except ContaAzulAPIError as exc:
+                    messages.error(request, str(exc))
+            return redirect('empresa:conta_azul_servicos_lista', pk=pk)
+
+        if acao == 'enviar_pendentes':
+            if not config.tem_refresh_token():
+                messages.error(request, 'Conecte o Conta Azul antes de enviar.')
+            else:
+                try:
+                    client = ContaAzulClient.para_empresa(empresa)
+                    stats = enviar_servicos_pendentes(empresa, client)
+                    if stats['enviados']:
+                        messages.success(request, f"{stats['enviados']} serviço(s) enviado(s) ao Conta Azul.")
+                    if stats['erros']:
+                        messages.warning(
+                            request,
+                            f"{stats['erros']} erro(s): " + '; '.join(stats.get('detalhes') or [])[:500],
+                        )
+                    if not stats['enviados'] and not stats['erros']:
+                        messages.info(request, 'Nenhum serviço pendente de envio.')
+                except ContaAzulAPIError as exc:
+                    messages.error(request, str(exc))
+            return redirect('empresa:conta_azul_servicos_lista', pk=pk)
+
+    return render(
+        request,
+        'empresa/conta_azul_servicos_list.html',
+        {
+            'empresa': empresa,
+            'config': config,
+            'servicos': servicos,
+            'pendentes': pendentes,
+            'descricao': f'Serviços Conta Azul — {empresa.razao}',
+        },
+    )
+
+
+@login_required
+def conta_azul_servico_editar(request, pk, servico_pk):
+    empresa = get_object_or_404(Empresa, pk=pk)
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão.')
+        return redirect('empresa:lista')
+
+    servico = get_object_or_404(ServicoContaAzul, pk=servico_pk, empresa=empresa)
+    config = obter_ou_criar_config(empresa)
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or 'salvar').strip()
+        form = ServicoContaAzulFiscalForm(request.POST, instance=servico)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.fiscal_pendente_envio = True
+            obj.save()
+            if acao == 'enviar':
+                if not config.tem_refresh_token():
+                    messages.error(request, 'Conecte o Conta Azul antes de enviar.')
+                else:
+                    try:
+                        client = ContaAzulClient.para_empresa(empresa)
+                        enviar_fiscal_servico(empresa, client, obj)
+                        messages.success(request, 'Dados fiscais enviados ao Conta Azul.')
+                        return redirect('empresa:conta_azul_servicos_lista', pk=pk)
+                    except ContaAzulAPIError as exc:
+                        messages.error(request, str(exc))
+            else:
+                messages.success(request, 'Alterações salvas localmente (pendente de envio).')
+                return redirect('empresa:conta_azul_servico_editar', pk=pk, servico_pk=servico_pk)
+        else:
+            messages.error(request, 'Corrija os erros do formulário.')
+    else:
+        form = ServicoContaAzulFiscalForm(instance=servico)
+
+    return render(
+        request,
+        'empresa/conta_azul_servico_form.html',
+        {
+            'empresa': empresa,
+            'config': config,
+            'servico': servico,
+            'form': form,
+            'descricao': f'Editar serviço — {servico.descricao[:80]}',
+        },
     )

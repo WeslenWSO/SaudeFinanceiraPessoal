@@ -174,3 +174,20 @@ class ContaAzulClient:
 
     def testar_conexao(self) -> dict:
         return self.get('/v1/categorias', {'pagina': 1, 'tamanho_pagina': 1})
+
+    def buscar_servicos(self, **filtros) -> list:
+        return self.paginar_todos('/v1/servicos', filtros)
+
+    def buscar_servico_por_id(self, servico_id: str) -> dict:
+        sid = (servico_id or '').strip()
+        if not sid:
+            return {}
+        data = self.get(f'/v1/servicos/{sid}')
+        return data if isinstance(data, dict) else {}
+
+    def atualizar_servico(self, servico_id: str, payload: dict) -> dict:
+        sid = (servico_id or '').strip()
+        if not sid:
+            raise ContaAzulAPIError('ID do serviço não informado.')
+        headers = {'Content-Type': 'application/json'}
+        return self._request('PATCH', f'/v1/servicos/{sid}', json=payload, headers=headers)

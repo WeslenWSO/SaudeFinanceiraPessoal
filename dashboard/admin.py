@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from dashboard.conta_azul_forms import ContaAzulConfigForm
-from dashboard.models import ContaAzulConfig, GeminiConfig
+from dashboard.models import ContaAzulConfig, GeminiConfig, ServicoContaAzul
 
 
 @admin.register(ContaAzulConfig)
@@ -29,6 +29,30 @@ class ContaAzulConfigAdmin(admin.ModelAdmin):
         return obj.tem_refresh_token()
 
     conectado_ok.boolean = True
+
+
+@admin.register(ServicoContaAzul)
+class ServicoContaAzulAdmin(admin.ModelAdmin):
+    list_display = (
+        'codigo',
+        'descricao',
+        'empresa',
+        'c_class_trib',
+        'codigo_nbs',
+        'fiscal_pendente_envio',
+        'atualizado_em',
+    )
+    list_filter = ('fiscal_pendente_envio', 'empresa')
+    search_fields = ('codigo', 'descricao', 'conta_azul_id')
+    readonly_fields = (
+        'aliquota_ibs',
+        'aliquota_ibs_municipal',
+        'aliquota_cbs',
+        'importado_em',
+        'enviado_em',
+        'criado_em',
+        'atualizado_em',
+    )
 
 
 @admin.register(GeminiConfig)

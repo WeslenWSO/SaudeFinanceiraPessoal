@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.urls import path
 from .views import (
     LancamentoListView, LancamentoCreateView, LancamentoUpdateView, LancamentoDeleteView,
-    UploadOFXView, UploadPDFView, ExtratoPreviaView, ConfirmarImportacaoView,
+    UploadOFXView, UploadPDFView, ExtratoPreviaView, ConciliarStonePreviaView, ConfirmarImportacaoView,
     ContaBancariaListView, ContaBancariaCreateView, ContaBancariaUpdateView, ContaBancariaDeleteView,
     ConciliarView, DesconciliarView, ExtratoMovimentoListView,
     transferir_view, detalhes_modal, lancamento_relatorios_view, exportar_conciliacao_view,
@@ -29,6 +29,11 @@ urlpatterns = [
     path("extrato/ofx/", UploadOFXView.as_view(), name="upload_ofx"),
     path("extrato/pdf/", UploadPDFView.as_view(), name="upload_pdf"),
     path("extrato/previsao/<int:extrato_arquivo_id>/", ExtratoPreviaView.as_view(), name="extrato_previa"),
+    path(
+        "extrato/previsao/<int:extrato_arquivo_id>/conciliar-stone/",
+        ConciliarStonePreviaView.as_view(),
+        name="conciliar_stone_previa",
+    ),
     path("extrato/confirmar-importacao/<int:extrato_arquivo_id>/", ConfirmarImportacaoView.as_view(), name="confirmar_importacao"),
 
     path("conciliar/", ConciliarView.as_view(), name="conciliar"),

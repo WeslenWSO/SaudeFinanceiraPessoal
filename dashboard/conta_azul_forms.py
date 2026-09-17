@@ -1,6 +1,6 @@
 from django import forms
 
-from dashboard.models import ContaAzulConfig
+from dashboard.models import ContaAzulConfig, ServicoContaAzul
 
 
 class ContaAzulConfigForm(forms.ModelForm):
@@ -40,3 +40,27 @@ class ContaAzulConfigForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+
+class ServicoContaAzulFiscalForm(forms.ModelForm):
+    class Meta:
+        model = ServicoContaAzul
+        fields = (
+            'natureza_operacao',
+            'codigo_nbs',
+            'indicador_operacao',
+            'c_class_trib',
+        )
+        widgets = {
+            'natureza_operacao': forms.TextInput(attrs={'class': 'form-control'}),
+            'codigo_nbs': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '1.2301.22.00'}),
+            'indicador_operacao': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '030101'}),
+            'c_class_trib': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '000001'}),
+        }
+        help_texts = {
+            'c_class_trib': (
+                'Código de Classificação Tributária. O Conta Azul calcula IBS/CBS automaticamente a partir deste código.'
+            ),
+            'codigo_nbs': 'Nomenclatura Brasileira de Serviços (cNBS).',
+            'indicador_operacao': 'Código indicador de operação (INDop).',
+        }

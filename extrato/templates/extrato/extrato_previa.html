@@ -26,6 +26,9 @@
           <div class="panel mb-4 d-flex flex-wrap gap-4">
             <div><strong>Total Créditos:</strong> <span class="text-success">R$ {{ total_creditos|floatformat:2 }}</span></div>
             <div><strong>Total Débitos:</strong> <span class="text-danger">R$ {{ total_debitos|floatformat:2 }}</span></div>
+            <div><strong>Sugestões Stone:</strong>
+              <span class="badge bg-info text-dark">{{ total_sugestoes_stone|default:0 }}</span>
+            </div>
             <div><strong>Por status:</strong>
               {% for st, cnt in contagem_status.items %}
                 <span class="badge bg-secondary me-1">{{ st }}: {{ cnt }}</span>
@@ -35,40 +38,102 @@
             </div>
           </div>
 
-          <form method="post" action="{% url 'extrato:confirmar_importacao' extrato_arquivo_id=extrato_arquivo_id %}" class="mb-3">
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="fas fa-credit-card me-1"></i>
+            Recebimentos Stone (<em>Recebimento vendas - Bandeira | Crédito</em>) são cruzados com o relatório Stone importado
+            e exibem NF/autorização quando o recebível já está vinculado a uma conta a receber.
+          </div>
+
+          <form method="post" action="{% url 'extrato:confirmar_importacao' extrato_arquivo_id=extrato_arquivo_id %}" class="mb-4">
             {% csrf_token %}
             <button type="submit" class="btn btn-success" onclick="return confirm('Confirmar importação destes lançamentos?');">
               <i class="fas fa-check me-1"></i> Confirmar Importação
             </button>
           </form>
 
-          {% if lancamentos %}
-          <div class="table-responsive">
-            <table class="table table-striped">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Histórico</th>
-                  <th class="text-end">Valor</th>
-                  <th>FITID</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for l in lancamentos %}
-                <tr>
-                  <td>{{ l.data|date:"d/m/Y" }}</td>
-                  <td title="{{ l.historico }}">{{ l.historico|truncatewords:12 }}</td>
-                  <td class="text-end {% if l.valor >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    {% if l.valor >= 0 %}+{% endif %}R$ {{ l.valor|floatformat:2 }}
-                  </td>
-                  <td class="font-monospace small">{{ l.fitid|default:"-" }}</td>
-                  <td><span class="badge {% if l.status_importacao == 'P' %}bg-warning{% elif l.status_importacao == 'I' %}bg-success{% else %}bg-secondary{% endif %}">{{ l.get_status_importacao_display }}</span></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          {% if linhas_previa %}
+          <div class="vstack gap-3">
+            {% for linha in linhas_previa %}
+            {% with l=linha.lancamento sug=linha.sugestao %}
+            <div class="card border {% if sug and sug.relatorio_ids %}border-primary{% elif l.conciliado %}border-success{% endif %}">
+              <div class="card-body p-3">
+                <div class="row g-3 align-items-start">
+                  <div class="col-lg-5">
+                    <div class="small text-muted mb-1">Extrato bancário</div>
+                    <div class="fw-semibold">{{ l.data|date:"d/m/Y" }}</div>
+                    <div class="small">{{ l.historico }}</div>
+                    <div class="mt-1 fs-5 {% if l.valor >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      {% if l.valor >= 0 %}+{% endif %}R$ {{ l.valor|floatformat:2 }}
+                    </div>
+                    <div class="small text-muted font-monospace">FITID: {{ l.fitid|default:"—" }}</div>
+                    {% if l.conciliado %}
+                    <span class="badge bg-success mt-1">Conciliado</span>
+                    {% elif l.status_importacao == 'P' %}
+                    <span class="badge bg-warning text-dark mt-1">Prévia</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-lg-7">
+                    {% if sug and sug.eh_stone %}
+                    <div class="small text-muted mb-1">Sugestão Stone</div>
+                    {% if sug.relatorio_ids %}
+                    <div class="mb-2">
+                      <span class="badge {% if sug.confianca == 'alta' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                        {{ sug.confianca|title }}
+                      </span>
+                      {% if sug.bandeira %}<span class="badge bg-secondary">{{ sug.bandeira }}</span>{% endif %}
+                      <span class="text-muted small ms-2">Soma: R$ {{ sug.soma_liquida|floatformat:2 }}</span>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-bordered mb-2 small">
+                        <thead class="table-light">
+                          <tr>
+                            <th>NF</th>
+                            <th>Autorização</th>
+                            <th>Cliente</th>
+                            <th>Parcela</th>
+                            <th class="text-end">Líquido</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for item in sug.itens %}
+                          <tr>
+                            <td>{{ item.nota_fiscal|default:"—" }}</td>
+                            <td><code>{{ item.autorizacao|default:"—" }}</code></td>
+                            <td>{{ item.cliente|truncatechars:30|default:"—" }}</td>
+                            <td>{{ item.parcela }}</td>
+                            <td class="text-end">R$ {{ item.valor_liquido|floatformat:2 }}</td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                    {% if not l.conciliado %}
+                    <form method="post" action="{% url 'extrato:conciliar_stone_previa' extrato_arquivo_id=extrato_arquivo_id %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="lancamento_id" value="{{ l.id }}">
+                      {% for rid in sug.relatorio_ids %}
+                      <input type="hidden" name="relatorio_ids" value="{{ rid }}">
+                      {% endfor %}
+                      <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-link me-1"></i> Conciliar
+                      </button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <div class="alert alert-warning py-2 small mb-0">{{ sug.mensagem }}</div>
+                    {% endif %}
+                    {% elif l.valor > 0 %}
+                    <div class="text-muted small">Sem sugestão automática para este crédito.</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
           </div>
+
           {% if page_obj.paginator.num_pages > 1 %}
           <nav class="mt-3">
             <ul class="pagination pagination-sm">

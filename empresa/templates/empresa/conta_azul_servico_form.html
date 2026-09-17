@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-xl px-4 py-4">
+  {% include 'parcial/_messages.html' %}
+
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Editar serviço — dados fiscais</h1>
+    <p class="text-muted small mb-0">
+      <a href="{% url 'empresa:conta_azul_servicos_lista' empresa.pk %}">Voltar à lista</a>
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold">Dados do catálogo (somente leitura)</div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Código</dt>
+            <dd class="col-sm-8">{{ servico.codigo|default:"—" }}</dd>
+            <dt class="col-sm-4">Descrição</dt>
+            <dd class="col-sm-8">{{ servico.descricao }}</dd>
+            <dt class="col-sm-4">Lei 116</dt>
+            <dd class="col-sm-8">{{ servico.lei_116|default:"—" }}</dd>
+            <dt class="col-sm-4">CNAE</dt>
+            <dd class="col-sm-8">{{ servico.codigo_cnae|default:"—" }}</dd>
+            <dt class="col-sm-4">Serv. municipal</dt>
+            <dd class="col-sm-8">{{ servico.codigo_servico_municipal|default:"—" }}</dd>
+            <dt class="col-sm-4">Preço</dt>
+            <dd class="col-sm-8">{% if servico.preco %}R$ {{ servico.preco }}{% else %}—{% endif %}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-header fw-semibold">IBS / CBS (calculados pelo Conta Azul)</div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Alíquota CBS</dt>
+            <dd class="col-sm-7">{% if servico.aliquota_cbs is not None %}{{ servico.aliquota_cbs }}%{% else %}—{% endif %}</dd>
+            <dt class="col-sm-5">IBS estadual</dt>
+            <dd class="col-sm-7">{% if servico.aliquota_ibs is not None %}{{ servico.aliquota_ibs }}%{% else %}—{% endif %}</dd>
+            <dt class="col-sm-5">IBS municipal</dt>
+            <dd class="col-sm-7">{% if servico.aliquota_ibs_municipal is not None %}{{ servico.aliquota_ibs_municipal }}%{% else %}—{% endif %}</dd>
+          </dl>
+          <p class="text-muted mb-0 mt-2">Atualizados após importar ou enviar ao Conta Azul.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold">Reforma Tributária — editável</div>
+        <div class="card-body">
+          <form method="post">{% csrf_token %}
+            {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+              {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+
+            {% if servico.fiscal_pendente_envio %}
+            <div class="alert alert-warning py-2 small">Alterações locais ainda não enviadas ao Conta Azul.</div>
+            {% endif %}
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="submit" name="acao" value="salvar" class="btn btn-primary">Salvar localmente</button>
+              <button type="submit" name="acao" value="enviar" class="btn btn-success" {% if not config.tem_refresh_token %}disabled{% endif %}>
+                Salvar e enviar ao Conta Azul
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

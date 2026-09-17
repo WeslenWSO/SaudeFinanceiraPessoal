@@ -1075,7 +1075,52 @@ class ExtratoPreviaView(ListView):
         ctx["total_debitos"] = total_debitos
         ctx["contagem_status"] = contagem_status
         ctx["extrato_arquivo_id"] = extrato_arquivo_id
+
+        from extrato.services.stone_conciliacao_previa import sugerir_conciliacao_stone
+
+        linhas_previa = []
+        total_sugestoes = 0
+        for lanc in ctx.get("lancamentos") or []:
+            sug = sugerir_conciliacao_stone(lanc, empresa_id)
+            if sug and sug.get("relatorio_ids"):
+                total_sugestoes += 1
+            linhas_previa.append({"lancamento": lanc, "sugestao": sug})
+        ctx["linhas_previa"] = linhas_previa
+        ctx["total_sugestoes_stone"] = total_sugestoes
         return ctx
+
+
+class ConciliarStonePreviaView(View):
+    """Concilia lançamento Stone na prévia do extrato com recebíveis sugeridos."""
+
+    def post(self, request, extrato_arquivo_id):
+        empresa_id = request.session.get("empresa_id")
+        if not empresa_id:
+            messages.error(request, "Nenhuma empresa selecionada.")
+            return redirect("extrato:lancamento_list")
+
+        lancamento_id = request.POST.get("lancamento_id")
+        relatorio_ids = [int(x) for x in request.POST.getlist("relatorio_ids") if str(x).isdigit()]
+        if not lancamento_id or not relatorio_ids:
+            messages.error(request, "Informe lançamento e recebíveis para conciliar.")
+            return redirect("extrato:extrato_previa", extrato_arquivo_id=extrato_arquivo_id)
+
+        lancamento = get_object_or_404(
+            Lancamento,
+            pk=lancamento_id,
+            empresa_id=empresa_id,
+            extrato_arquivo_id=extrato_arquivo_id,
+        )
+
+        from extrato.services.stone_conciliacao_previa import conciliar_stone_lancamento
+
+        try:
+            qtd = conciliar_stone_lancamento(lancamento, relatorio_ids, int(empresa_id))
+            messages.success(request, f"Conciliação Stone realizada: {qtd} recebível(is) vinculado(s).")
+        except ValueError as exc:
+            messages.error(request, str(exc))
+
+        return redirect("extrato:extrato_previa", extrato_arquivo_id=extrato_arquivo_id)
 
 
 class ConfirmarImportacaoView(View):

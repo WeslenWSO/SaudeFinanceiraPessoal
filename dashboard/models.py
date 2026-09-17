@@ -126,3 +126,127 @@ class GeminiConfig(models.Model):
 
     def api_key_configurada(self) -> bool:
         return bool((self.api_key or '').strip())
+
+
+class ServicoContaAzul(models.Model):
+    """Catálogo de serviços NFS-e sincronizado com Conta Azul (Reforma Tributária)."""
+
+    STATUS_ATIVO = 'ATIVO'
+    STATUS_INATIVO = 'INATIVO'
+    STATUS_CHOICES = [
+        (STATUS_ATIVO, 'Ativo'),
+        (STATUS_INATIVO, 'Inativo'),
+    ]
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='servicos_conta_azul',
+        verbose_name='Empresa',
+    )
+    conta_azul_id = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='ID Conta Azul',
+    )
+    codigo = models.CharField(max_length=50, blank=True, default='', verbose_name='Código')
+    descricao = models.CharField(max_length=300, blank=True, default='', verbose_name='Descrição')
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        blank=True,
+        default=STATUS_ATIVO,
+        verbose_name='Status',
+    )
+    preco = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Preço',
+    )
+    codigo_cnae = models.CharField(max_length=20, blank=True, default='', verbose_name='CNAE')
+    lei_116 = models.CharField(max_length=20, blank=True, default='', verbose_name='Lei 116')
+    natureza_operacao = models.CharField(
+        max_length=80,
+        blank=True,
+        default='',
+        verbose_name='Natureza de operação',
+    )
+    codigo_servico_municipal = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='Código serviço municipal',
+    )
+    c_class_trib = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='cClassTrib',
+        help_text='Código de Classificação Tributária (Reforma Tributária). Ex.: 000001',
+    )
+    codigo_nbs = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        verbose_name='NBS (cNBS)',
+        help_text='Ex.: 1.2301.22.00',
+    )
+    indicador_operacao = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='Indicador da operação',
+        help_text='Ex.: 030101',
+    )
+    aliquota_ibs = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name='Alíquota IBS estadual (%)',
+        help_text='Somente leitura — calculada pelo Conta Azul.',
+    )
+    aliquota_ibs_municipal = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name='Alíquota IBS municipal (%)',
+        help_text='Somente leitura — calculada pelo Conta Azul.',
+    )
+    aliquota_cbs = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name='Alíquota CBS (%)',
+        help_text='Somente leitura — calculada pelo Conta Azul.',
+    )
+    fiscal_pendente_envio = models.BooleanField(
+        default=False,
+        verbose_name='Fiscal pendente de envio',
+    )
+    importado_em = models.DateTimeField(null=True, blank=True, verbose_name='Importado em')
+    enviado_em = models.DateTimeField(null=True, blank=True, verbose_name='Enviado em')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Serviço Conta Azul'
+        verbose_name_plural = 'Serviços Conta Azul'
+        ordering = ['codigo', 'descricao']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'conta_azul_id'],
+                condition=models.Q(conta_azul_id__gt=''),
+                name='servico_conta_azul_unico',
+            ),
+        ]
+
+    def __str__(self):
+        rotulo = self.codigo or self.conta_azul_id or str(self.pk)
+        return f'{rotulo} — {self.descricao[:60]}'
