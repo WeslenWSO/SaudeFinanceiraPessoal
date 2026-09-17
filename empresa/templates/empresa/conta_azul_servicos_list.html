@@ -7,7 +7,7 @@
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
     <div>
       <h1 class="h3 mb-1"><i class="fas fa-briefcase-medical me-2"></i>{{ descricao }}</h1>
-      <p class="text-muted small mb-0">Catálogo NFS-e — Reforma Tributária (cClassTrib / IBS / CBS)</p>
+      <p class="text-muted small mb-0">Catálogo NFS-e — cadastro Conta Azul + Reforma Tributária (cClassTrib / IBS / CBS)</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
       <a href="{% url 'empresa:conta_azul_config' empresa.pk %}" class="btn btn-outline-secondary btn-sm">Configuração Conta Azul</a>
@@ -18,14 +18,18 @@
   <div class="alert alert-warning">
     Conecte o Conta Azul em <a href="{% url 'empresa:conta_azul_config' empresa.pk %}">Configuração</a> para importar e enviar serviços.
   </div>
+  {% else %}
+  <div class="alert alert-info py-2 small mb-0">
+    Conta Azul conectado. Use <strong>Importar do Conta Azul</strong> para trazer CNAE, Lei 116, serviço municipal e demais dados cadastrais.
+  </div>
   {% endif %}
 
-  <div class="alert alert-warning py-2 small">
-    <strong>Envio ao Conta Azul:</strong> a API v1 aceita o PATCH, mas hoje <strong>não grava</strong> cClassTrib/NBS/Indicador no cadastro.
-    Use este SF para preparar e replicar; o preenchimento definitivo ainda é no Conta Azul Pro (cadastro do serviço).
+  <div class="alert alert-warning py-2 small mt-3">
+    <strong>Reforma tributária (IBS/CBS):</strong> a API v1 ainda não devolve nem grava cClassTrib/NBS/Indicador.
+    Preencha no SF para replicar; o cadastro definitivo continua no Conta Azul Pro.
   </div>
 
-  <div class="card shadow-sm mb-4">
+  <div class="card shadow-sm mb-4 mt-3">
     <div class="card-body d-flex flex-wrap gap-2 align-items-center">
       <form method="post" class="d-inline">{% csrf_token %}
         <input type="hidden" name="acao" value="importar">
@@ -58,7 +62,7 @@
             <option value="">— Selecione o serviço já preenchido —</option>
             {% for s in servicos_com_fiscal %}
             <option value="{{ s.pk }}" {% if origem_id == s.pk %}selected{% endif %}>
-              {{ s.codigo|default:"?" }} — {{ s.descricao|truncatechars:50 }}
+              {{ s.descricao|truncatechars:45 }}
               {% if s.c_class_trib %} ({{ s.c_class_trib }}){% endif %}
             </option>
             {% endfor %}
@@ -79,18 +83,25 @@
         <table class="table table-hover table-sm mb-0 align-middle">
           <thead class="table-light">
             <tr>
-              <th style="width: 2.5rem;">
+              <th rowspan="2" style="width: 2.5rem; vertical-align: middle;">
                 <input type="checkbox" class="form-check-input" id="selecionar-todos" title="Selecionar todos">
               </th>
-              <th>Código</th>
-              <th>Descrição</th>
+              <th rowspan="2" style="vertical-align: middle;">Descrição</th>
+              <th colspan="5" class="text-center border-start border-end bg-body-secondary">Cadastro (importado do Conta Azul)</th>
+              <th colspan="5" class="text-center border-end bg-body-secondary">Reforma tributária</th>
+              <th rowspan="2" style="vertical-align: middle;"></th>
+            </tr>
+            <tr>
+              <th class="border-start">Lei 116</th>
+              <th>CNAE</th>
+              <th>Serv. municipal</th>
+              <th>Natureza</th>
+              <th class="border-end text-end">Preço</th>
               <th>cClassTrib</th>
               <th>NBS</th>
               <th>Indicador</th>
               <th class="text-end">IBS est.</th>
-              <th class="text-end">IBS mun.</th>
-              <th class="text-end">CBS</th>
-              <th></th>
+              <th class="text-end border-end">CBS</th>
             </tr>
           </thead>
           <tbody>
@@ -99,14 +110,23 @@
               <td>
                 <input type="checkbox" class="form-check-input chk-servico" name="servico_ids" value="{{ s.pk }}">
               </td>
-              <td>{{ s.codigo|default:"—" }}</td>
-              <td>{{ s.descricao|truncatechars:60 }}</td>
+              <td>
+                <div>{{ s.descricao|truncatechars:55 }}</div>
+                {% if s.codigo %}<div class="text-muted small">Cód. {{ s.codigo }}</div>{% endif %}
+                {% if s.status == 'INATIVO' %}<span class="badge bg-secondary">Inativo</span>{% endif %}
+              </td>
+              <td class="border-start"><code>{{ s.lei_116|default:"—" }}</code></td>
+              <td><code>{{ s.codigo_cnae|default:"—" }}</code></td>
+              <td><code>{{ s.codigo_servico_municipal|default:"—" }}</code></td>
+              <td class="small">{{ s.natureza_operacao|default:"—"|truncatechars:22 }}</td>
+              <td class="border-end text-end text-nowrap">
+                {% if s.preco %}R$ {{ s.preco }}{% else %}—{% endif %}
+              </td>
               <td><code>{{ s.c_class_trib|default:"—" }}</code></td>
               <td><code>{{ s.codigo_nbs|default:"—" }}</code></td>
               <td><code>{{ s.indicador_operacao|default:"—" }}</code></td>
               <td class="text-end">{% if s.aliquota_ibs is not None %}{{ s.aliquota_ibs }}%{% else %}—{% endif %}</td>
-              <td class="text-end">{% if s.aliquota_ibs_municipal is not None %}{{ s.aliquota_ibs_municipal }}%{% else %}—{% endif %}</td>
-              <td class="text-end">{% if s.aliquota_cbs is not None %}{{ s.aliquota_cbs }}%{% else %}—{% endif %}</td>
+              <td class="text-end border-end">{% if s.aliquota_cbs is not None %}{{ s.aliquota_cbs }}%{% else %}—{% endif %}</td>
               <td class="text-end text-nowrap">
                 {% if s.fiscal_pendente_envio %}<span class="badge bg-warning text-dark me-1">Pendente</span>{% endif %}
                 <a href="{% url 'empresa:conta_azul_servico_editar' empresa.pk s.pk %}" class="btn btn-outline-primary btn-sm">Editar</a>
@@ -114,7 +134,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="10" class="text-center text-muted py-4">
+              <td colspan="14" class="text-center text-muted py-4">
                 Nenhum serviço importado. Clique em <strong>Importar do Conta Azul</strong>.
               </td>
             </tr>

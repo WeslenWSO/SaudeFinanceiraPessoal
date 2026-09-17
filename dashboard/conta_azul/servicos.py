@@ -236,7 +236,9 @@ def aplicar_item_api_ao_servico(
     servico.codigo_cnae = str(item.get('codigo_cnae') or servico.codigo_cnae or '')[:20]
     servico.lei_116 = str(item.get('lei_116') or servico.lei_116 or '')[:20]
 
-    servico.codigo_servico_municipal = fiscal['codigo_servico_municipal'][:20] or servico.codigo_servico_municipal
+    mun = fiscal['codigo_servico_municipal'][:20]
+    if mun:
+        servico.codigo_servico_municipal = mun
 
     if not (preservar_fiscal_pendente and servico.fiscal_pendente_envio):
         # API v1 costuma não devolver IBS/CBS — não sobrescrever com vazio.
