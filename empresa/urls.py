@@ -24,6 +24,7 @@ from dashboard.conta_azul_views import (
     conta_azul_oauth_dev,
     conta_azul_oauth_dev_captura,
     conta_azul_oauth_iniciar,
+    conta_azul_catalogo_fiscal,
     conta_azul_servico_editar,
     conta_azul_servicos_lista,
     conta_azul_sincronizar,
@@ -55,6 +56,11 @@ urlpatterns = [
     path('<int:pk>/configuracao-integracao/', empresa_integracao, name='empresa_integracao'),
     path('<int:pk>/conta-azul/', conta_azul_config, name='conta_azul_config'),
     path('<int:pk>/conta-azul/servicos/', conta_azul_servicos_lista, name='conta_azul_servicos_lista'),
+    path(
+        '<int:pk>/conta-azul/servicos/catalogo/',
+        conta_azul_catalogo_fiscal,
+        name='conta_azul_catalogo_fiscal',
+    ),
     path(
         '<int:pk>/conta-azul/servicos/<int:servico_pk>/',
         conta_azul_servico_editar,

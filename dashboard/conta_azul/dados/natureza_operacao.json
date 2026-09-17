@@ -1,0 +1,22 @@
+[
+  {
+    "codigo": "1",
+    "label": "Operação tributável",
+    "descricao": "Operação tributável"
+  },
+  {
+    "codigo": "2",
+    "label": "Imunidade",
+    "descricao": "Imunidade"
+  },
+  {
+    "codigo": "3",
+    "label": "Exportação de serviço",
+    "descricao": "Exportação de serviço"
+  },
+  {
+    "codigo": "4",
+    "label": "Não Incidência",
+    "descricao": "Não Incidência"
+  }
+]

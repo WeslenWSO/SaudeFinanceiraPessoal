@@ -1,0 +1,62 @@
+[
+  {
+    "codigo": "030101",
+    "descricao": "Serviço prestado fisicamente | Estabelecimento do fornecedor",
+    "label": "030101 - Serviço prestado fisicamente | Estabelecimento do fornecedor"
+  },
+  {
+    "codigo": "030102",
+    "descricao": "Serviço prestado fisicamente | Endereço do adquirente",
+    "label": "030102 - Serviço prestado fisicamente | Endereço do adquirente"
+  },
+  {
+    "codigo": "030103",
+    "descricao": "Indicador de operação 030103",
+    "label": "030103 - Indicador de operação 030103"
+  },
+  {
+    "codigo": "030104",
+    "descricao": "Indicador de operação 030104",
+    "label": "030104 - Indicador de operação 030104"
+  },
+  {
+    "codigo": "050101",
+    "descricao": "Serviço não oneroso | Estabelecimento do fornecedor",
+    "label": "050101 - Serviço não oneroso | Estabelecimento do fornecedor"
+  },
+  {
+    "codigo": "050102",
+    "descricao": "Serviço não oneroso | Endereço do adquirente",
+    "label": "050102 - Serviço não oneroso | Endereço do adquirente"
+  },
+  {
+    "codigo": "050103",
+    "descricao": "Serviço não oneroso | Local da prestação",
+    "label": "050103 - Serviço não oneroso | Local da prestação"
+  },
+  {
+    "codigo": "050104",
+    "descricao": "Serviço não oneroso | Outros",
+    "label": "050104 - Serviço não oneroso | Outros"
+  },
+  {
+    "codigo": "100101",
+    "descricao": "Indicador de operação 100101",
+    "label": "100101 - Indicador de operação 100101"
+  },
+  {
+    "codigo": "100301",
+    "descricao": "Demais serviços onerosos | Domicílio do adquirente no País",
+    "label": "100301 - Demais serviços onerosos | Domicílio do adquirente no País"
+  },
+  {
+    "codigo": "100501",
+    "descricao": "Serviços por meio de plataforma digital | Domicílio do adquirente",
+    "label": "100501 - Serviços por meio de plataforma digital | Domicílio do adquirente"
+  },
+  {
+    "codigo": "301001",
+    "descricao": "Indicador de operação 301001",
+    "label": "301001 - Indicador de operação 301001"
+  }
+]

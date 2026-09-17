@@ -1,6 +1,25 @@
 {% extends 'base.html' %}
 {% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
 {% block conteudo %}
+<style>
+  .catalogo-dropdown {
+    position: absolute;
+    z-index: 1050;
+    max-height: 260px;
+    overflow-y: auto;
+    width: 100%;
+    display: none;
+  }
+  .catalogo-dropdown.show { display: block; }
+  .catalogo-wrap { position: relative; }
+  .catalogo-dropdown .list-group-item {
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 0.45rem 0.65rem;
+  }
+  .catalogo-dropdown .list-group-item small { color: #6c757d; }
+</style>
+
 <div class="container-xl px-4 py-4">
   {% include 'parcial/_messages.html' %}
 
@@ -9,6 +28,11 @@
     <p class="text-muted small mb-0">
       <a href="{% url 'empresa:conta_azul_servicos_lista' empresa.pk %}">Voltar à lista</a>
     </p>
+  </div>
+
+  <div class="alert alert-info py-2 small">
+    A API do Conta Azul <strong>não devolve</strong> cClassTrib, NBS e Indicador na importação.
+    Preencha aqui com as mesmas listas do Padrão Nacional NFS-e (como na tela do Conta Azul).
   </div>
 
   <div class="row g-4">
@@ -25,8 +49,6 @@
             <dd class="col-sm-8">{{ servico.lei_116|default:"—" }}</dd>
             <dt class="col-sm-4">CNAE</dt>
             <dd class="col-sm-8">{{ servico.codigo_cnae|default:"—" }}</dd>
-            <dt class="col-sm-4">Serv. municipal</dt>
-            <dd class="col-sm-8">{{ servico.codigo_servico_municipal|default:"—" }}</dd>
             <dt class="col-sm-4">Preço</dt>
             <dd class="col-sm-8">{% if servico.preco %}R$ {{ servico.preco }}{% else %}—{% endif %}</dd>
           </dl>
@@ -44,20 +66,33 @@
             <dt class="col-sm-5">IBS municipal</dt>
             <dd class="col-sm-7">{% if servico.aliquota_ibs_municipal is not None %}{{ servico.aliquota_ibs_municipal }}%{% else %}—{% endif %}</dd>
           </dl>
-          <p class="text-muted mb-0 mt-2">Atualizados após importar ou enviar ao Conta Azul.</p>
+          <p class="text-muted mb-0 mt-2">Atualizados após enviar ao Conta Azul.</p>
         </div>
       </div>
     </div>
 
     <div class="col-lg-7">
       <div class="card shadow-sm">
-        <div class="card-header fw-semibold">Reforma Tributária — editável</div>
+        <div class="card-header fw-semibold">Dados fiscais — editável</div>
         <div class="card-body">
-          <form method="post">{% csrf_token %}
+          {% if sugestoes_fiscais %}
+          <div class="alert alert-light border py-2 small mb-3">
+            <strong>Sugestão para LC 116 {{ servico.lei_116 }}:</strong>
+            {% if sugestoes_fiscais.codigo_nbs %}NBS {{ sugestoes_fiscais.codigo_nbs }}{% endif %}
+            {% if sugestoes_fiscais.indicador_operacao %} · INDop {{ sugestoes_fiscais.indicador_operacao }}{% endif %}
+            {% if sugestoes_fiscais.c_class_trib %} · cClassTrib {{ sugestoes_fiscais.c_class_trib }}{% endif %}
+            <button type="button" class="btn btn-link btn-sm p-0 ms-1" id="btn-aplicar-sugestao">Aplicar sugestão</button>
+          </div>
+          {% endif %}
+
+          <form method="post" id="form-fiscal-servico">{% csrf_token %}
             {% for field in form %}
-            <div class="mb-3">
+            <div class="mb-3 catalogo-wrap">
               <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
               {{ field }}
+              {% if field.name != 'natureza_operacao' %}
+              <div class="catalogo-dropdown list-group shadow-sm" data-for="{{ field.id_for_label }}"></div>
+              {% endif %}
               {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
               {% for err in field.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
             </div>
@@ -87,4 +122,95 @@
     </div>
   </div>
 </div>
+
+{{ sugestoes_fiscais|json_script:"sugestoes-fiscais-data" }}
+<script>
+(function () {
+  var catalogoUrl = "{{ catalogo_url|escapejs }}";
+  var lei116 = "{{ servico.lei_116|default:''|escapejs }}";
+  var sugestoesEl = document.getElementById('sugestoes-fiscais-data');
+  var sugestoes = sugestoesEl ? JSON.parse(sugestoesEl.textContent) : {};
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, ms);
+    };
+  }
+
+  function esconderDropdowns(exceto) {
+    document.querySelectorAll('.catalogo-dropdown').forEach(function (el) {
+      if (el !== exceto) el.classList.remove('show');
+    });
+  }
+
+  function renderDropdown(dropdown, itens, input) {
+    dropdown.innerHTML = '';
+    if (!itens.length) {
+      dropdown.innerHTML = '<div class="list-group-item text-muted">Nenhum resultado</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+    itens.forEach(function (item) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'list-group-item list-group-item-action';
+      var codigo = item.codigo || '';
+      var label = item.label || item.descricao || codigo;
+      btn.innerHTML = '<strong>' + codigo + '</strong><br><small>' + label + '</small>';
+      btn.addEventListener('click', function () {
+        input.value = codigo;
+        dropdown.classList.remove('show');
+      });
+      dropdown.appendChild(btn);
+    });
+    dropdown.classList.add('show');
+  }
+
+  function buscarCatalogo(input, dropdown) {
+    var tipo = input.getAttribute('data-catalogo');
+    var q = input.value.trim();
+    var url = catalogoUrl + '?tipo=' + encodeURIComponent(tipo) + '&q=' + encodeURIComponent(q);
+    if (lei116) url += '&lei_116=' + encodeURIComponent(lei116);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { renderDropdown(dropdown, data.itens || [], input); })
+      .catch(function () { dropdown.classList.remove('show'); });
+  }
+
+  document.querySelectorAll('.js-catalogo-fiscal').forEach(function (input) {
+    var dropdown = document.querySelector('.catalogo-dropdown[data-for="' + input.id + '"]');
+    if (!dropdown) return;
+    var buscar = debounce(function () { buscarCatalogo(input, dropdown); }, 250);
+    input.addEventListener('focus', function () {
+      esconderDropdowns(dropdown);
+      buscarCatalogo(input, dropdown);
+    });
+    input.addEventListener('input', buscar);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.catalogo-wrap')) esconderDropdowns(null);
+  });
+
+  var btnSug = document.getElementById('btn-aplicar-sugestao');
+  if (btnSug && sugestoes) {
+    btnSug.addEventListener('click', function () {
+      var map = {
+        codigo_nbs: 'id_codigo_nbs',
+        indicador_operacao: 'id_indicador_operacao',
+        c_class_trib: 'id_c_class_trib'
+      };
+      Object.keys(map).forEach(function (k) {
+        if (sugestoes[k]) {
+          var el = document.getElementById(map[k]);
+          if (el) el.value = sugestoes[k];
+        }
+      });
+    });
+  }
+})();
+</script>
 {% endblock %}

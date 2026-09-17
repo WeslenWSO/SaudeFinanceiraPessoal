@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, OperationalError
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -25,6 +26,13 @@ from dashboard.conta_azul.oauth import (
     trocar_codigo_por_tokens,
     url_autorizacao,
     validar_state_oauth,
+)
+from dashboard.conta_azul.catalogos_fiscais import (
+    listar_c_class_trib,
+    listar_codigo_servico_municipal,
+    listar_indicador_operacao,
+    listar_nbs,
+    sugestoes_por_lei_116,
 )
 from dashboard.conta_azul.servicos import (
     enviar_fiscal_servico,
@@ -747,6 +755,8 @@ def conta_azul_servico_editar(request, pk, servico_pk):
     else:
         form = ServicoContaAzulFiscalForm(instance=servico)
 
+    sugestoes = sugestoes_por_lei_116(servico.lei_116)
+
     return render(
         request,
         'empresa/conta_azul_servico_form.html',
@@ -755,6 +765,37 @@ def conta_azul_servico_editar(request, pk, servico_pk):
             'config': config,
             'servico': servico,
             'form': form,
+            'sugestoes_fiscais': sugestoes,
+            'catalogo_url': f'/empresa/{empresa.pk}/conta-azul/servicos/catalogo/',
             'descricao': f'Editar serviço — {servico.descricao[:80]}',
         },
     )
+
+
+@login_required
+def conta_azul_catalogo_fiscal(request, pk):
+    empresa = get_object_or_404(Empresa, pk=pk)
+    if not _empresa_autorizada(request, empresa):
+        return JsonResponse({'erro': 'Sem permissão.'}, status=403)
+
+    tipo = (request.GET.get('tipo') or '').strip().lower()
+    q = (request.GET.get('q') or '').strip()
+    lei_116 = (request.GET.get('lei_116') or '').strip()
+    limite = 30
+    try:
+        limite = min(max(int(request.GET.get('limite') or 30), 5), 100)
+    except ValueError:
+        limite = 30
+
+    if tipo == 'nbs':
+        itens = listar_nbs(q=q, lei_116=lei_116, limite=limite)
+    elif tipo in ('indicador', 'indop', 'indicador_operacao'):
+        itens = listar_indicador_operacao(q=q, lei_116=lei_116, limite=limite)
+    elif tipo in ('cclasstrib', 'classificacao', 'c_class_trib'):
+        itens = listar_c_class_trib(q=q, limite=limite)
+    elif tipo in ('servico_municipal', 'municipio', 'codigo_servico'):
+        itens = listar_codigo_servico_municipal(q=q, lei_116=lei_116, limite=limite)
+    else:
+        return JsonResponse({'erro': 'Tipo de catálogo inválido.'}, status=400)
+
+    return JsonResponse({'itens': itens})

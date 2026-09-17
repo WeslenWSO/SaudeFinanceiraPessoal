@@ -121,12 +121,21 @@ def _primeira_decimal(item: dict, chaves: tuple[str, ...]) -> Decimal | None:
     return None
 
 
+def _natureza_de_item(item: dict) -> str:
+    natureza = _primeira_chave(item, _CHAVES_NATUREZA)
+    bloco = item.get('natureza_operacional')
+    if not natureza and isinstance(bloco, dict):
+        natureza = _valor_texto(bloco.get('descricao') or bloco.get('nome') or bloco.get('label'))
+    # API costuma devolver só UUID em natureza_operacional — não gravar como texto legível.
+    if natureza and len(natureza) >= 32 and '-' in natureza:
+        return ''
+    return natureza
+
+
 def extrair_fiscal_de_resposta(item: dict) -> dict:
     """Extrai campos fiscais da reforma tributária de um JSON de serviço Conta Azul."""
     item = item or {}
-    natureza = _primeira_chave(item, _CHAVES_NATUREZA)
-    if not natureza and isinstance(item.get('natureza_operacional'), dict):
-        natureza = _valor_texto(item['natureza_operacional'].get('descricao') or item['natureza_operacional'].get('nome'))
+    natureza = _natureza_de_item(item)
     return {
         'natureza_operacao': natureza,
         'codigo_servico_municipal': _primeira_chave(item, _CHAVES_SERVICO_MUNICIPAL),
@@ -182,6 +191,8 @@ def montar_payload_fiscal(servico: ServicoContaAzul) -> dict:
     payload: dict[str, str] = {}
     if servico.natureza_operacao:
         payload[PATCH_NATUREZA] = servico.natureza_operacao.strip()
+    if servico.codigo_servico_municipal:
+        payload['codigo_municipio_servico'] = servico.codigo_servico_municipal.strip()
     if servico.c_class_trib:
         payload[PATCH_CCLASSTRIB] = servico.c_class_trib.strip()
     if servico.codigo_nbs:
@@ -263,11 +274,19 @@ def importar_servicos(
             stats['criados'] += 1
             continue
         try:
+            detalhe = item
+            if ca_id:
+                try:
+                    detalhe_api = client.buscar_servico_por_id(ca_id)
+                    if detalhe_api:
+                        detalhe = detalhe_api
+                except ContaAzulAPIError:
+                    detalhe = item
             obj = ServicoContaAzul.objects.filter(empresa=empresa, conta_azul_id=ca_id).first()
             criado = obj is None
             if criado:
                 obj = ServicoContaAzul(empresa=empresa, conta_azul_id=ca_id, importado_em=agora)
-            aplicar_item_api_ao_servico(obj, item)
+            aplicar_item_api_ao_servico(obj, detalhe)
             if criado:
                 obj.importado_em = agora
             obj.save()
@@ -325,6 +344,7 @@ def enviar_servicos_pendentes(empresa, client: ContaAzulClient) -> dict:
 
 CAMPOS_FISCAIS_REPLICAR = (
     'natureza_operacao',
+    'codigo_servico_municipal',
     'c_class_trib',
     'codigo_nbs',
     'indicador_operacao',
