@@ -104,6 +104,20 @@ class ExtrairFiscalServicoTest(TestCase):
         self.assertTrue(dest1.fiscal_pendente_envio)
         self.assertEqual(dest2.indicador_operacao, '030101')
 
+    def test_import_nao_apaga_fiscal_quando_api_retorna_vazio(self):
+        empresa = Empresa.objects.create(razao='Keep', cnpj='12345678000195')
+        servico = ServicoContaAzul.objects.create(
+            empresa=empresa,
+            conta_azul_id='uuid-2',
+            c_class_trib='000001',
+            codigo_nbs='1.2301.22.00',
+            fiscal_pendente_envio=False,
+        )
+        item = {'codigo': 'S2', 'descricao': 'Atualizado', 'dados_fiscais': {}}
+        aplicar_item_api_ao_servico(servico, item, preservar_fiscal_pendente=False)
+        self.assertEqual(servico.c_class_trib, '000001')
+        self.assertEqual(servico.codigo_nbs, '1.2301.22.00')
+
     def test_replicar_fiscal_exige_origem_com_dados(self):
         empresa = Empresa.objects.create(razao='Repl2', cnpj='12345678000196')
         origem = ServicoContaAzul.objects.create(empresa=empresa, conta_azul_id='vazio')

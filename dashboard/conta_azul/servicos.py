@@ -239,10 +239,15 @@ def aplicar_item_api_ao_servico(
     servico.codigo_servico_municipal = fiscal['codigo_servico_municipal'][:20] or servico.codigo_servico_municipal
 
     if not (preservar_fiscal_pendente and servico.fiscal_pendente_envio):
-        servico.natureza_operacao = fiscal['natureza_operacao'][:80]
-        servico.c_class_trib = fiscal['c_class_trib'][:20]
-        servico.codigo_nbs = fiscal['codigo_nbs'][:30]
-        servico.indicador_operacao = fiscal['indicador_operacao'][:20]
+        # API v1 costuma não devolver IBS/CBS — não sobrescrever com vazio.
+        if fiscal['natureza_operacao']:
+            servico.natureza_operacao = fiscal['natureza_operacao'][:80]
+        if fiscal['c_class_trib']:
+            servico.c_class_trib = fiscal['c_class_trib'][:20]
+        if fiscal['codigo_nbs']:
+            servico.codigo_nbs = fiscal['codigo_nbs'][:30]
+        if fiscal['indicador_operacao']:
+            servico.indicador_operacao = fiscal['indicador_operacao'][:20]
 
     if fiscal['aliquota_ibs'] is not None:
         servico.aliquota_ibs = fiscal['aliquota_ibs']
@@ -314,10 +319,31 @@ def enviar_fiscal_servico(
     if not payload:
         raise ContaAzulAPIError('Informe ao menos cClassTrib, NBS ou Indicador da operação.')
 
+    fiscal_local = {
+        'natureza_operacao': servico.natureza_operacao,
+        'codigo_servico_municipal': servico.codigo_servico_municipal,
+        'c_class_trib': servico.c_class_trib,
+        'codigo_nbs': servico.codigo_nbs,
+        'indicador_operacao': servico.indicador_operacao,
+    }
+
     client.atualizar_servico(ca_id, payload)
     detalhe = client.buscar_servico_por_id(ca_id)
     if detalhe:
-        aplicar_item_api_ao_servico(servico, detalhe, preservar_fiscal_pendente=False)
+        aplicar_item_api_ao_servico(servico, detalhe, preservar_fiscal_pendente=True)
+
+    for campo, valor in fiscal_local.items():
+        if valor and not (getattr(servico, campo) or '').strip():
+            setattr(servico, campo, valor)
+
+    if not fiscal_gravado_na_resposta_api(detalhe):
+        servico.fiscal_pendente_envio = True
+        servico.save()
+        raise ContaAzulAPIError(
+            'O Conta Azul respondeu à requisição, mas não gravou cClassTrib/NBS/Indicador. '
+            'A API v1 ainda não persiste esses campos de Reforma Tributária — '
+            'preencha manualmente no cadastro do serviço no Conta Azul Pro.'
+        )
 
     agora = timezone.now()
     servico.fiscal_pendente_envio = False
@@ -356,6 +382,15 @@ def servico_tem_dados_fiscais(servico: ServicoContaAzul) -> bool:
         (servico.c_class_trib or '').strip()
         or (servico.codigo_nbs or '').strip()
         or (servico.indicador_operacao or '').strip()
+    )
+
+
+def fiscal_gravado_na_resposta_api(item: dict) -> bool:
+    fiscal = extrair_fiscal_de_resposta(item or {})
+    return bool(
+        (fiscal.get('c_class_trib') or '').strip()
+        or (fiscal.get('codigo_nbs') or '').strip()
+        or (fiscal.get('indicador_operacao') or '').strip()
     )
 
 
