@@ -6,7 +6,9 @@ from dashboard.conta_azul.servicos import (
     aplicar_item_api_ao_servico,
     extrair_fiscal_de_resposta,
     montar_payload_fiscal,
+    replicar_fiscal_servicos,
 )
+from dashboard.conta_azul.client import ContaAzulAPIError
 from dashboard.models import ServicoContaAzul
 from empresa.models import Empresa
 
@@ -71,3 +73,39 @@ class ExtrairFiscalServicoTest(TestCase):
         aplicar_item_api_ao_servico(servico, item, preservar_fiscal_pendente=True)
         self.assertEqual(servico.c_class_trib, '999999')
         self.assertEqual(servico.descricao, 'Novo nome')
+
+    def test_replicar_fiscal_copia_campos_e_marca_pendente(self):
+        empresa = Empresa.objects.create(razao='Repl', cnpj='12345678000197')
+        origem = ServicoContaAzul.objects.create(
+            empresa=empresa,
+            conta_azul_id='orig-1',
+            codigo='M1',
+            c_class_trib='000001',
+            codigo_nbs='1.2301.22.00',
+            indicador_operacao='030101',
+            natureza_operacao='Tributação normal',
+        )
+        dest1 = ServicoContaAzul.objects.create(
+            empresa=empresa,
+            conta_azul_id='dest-1',
+            codigo='D1',
+        )
+        dest2 = ServicoContaAzul.objects.create(
+            empresa=empresa,
+            conta_azul_id='dest-2',
+            codigo='D2',
+        )
+        stats = replicar_fiscal_servicos(empresa, origem, [dest1.pk, dest2.pk, origem.pk])
+        self.assertEqual(stats['replicados'], 2)
+        dest1.refresh_from_db()
+        dest2.refresh_from_db()
+        self.assertEqual(dest1.c_class_trib, '000001')
+        self.assertEqual(dest1.codigo_nbs, '1.2301.22.00')
+        self.assertTrue(dest1.fiscal_pendente_envio)
+        self.assertEqual(dest2.indicador_operacao, '030101')
+
+    def test_replicar_fiscal_exige_origem_com_dados(self):
+        empresa = Empresa.objects.create(razao='Repl2', cnpj='12345678000196')
+        origem = ServicoContaAzul.objects.create(empresa=empresa, conta_azul_id='vazio')
+        with self.assertRaises(ContaAzulAPIError):
+            replicar_fiscal_servicos(empresa, origem, [])

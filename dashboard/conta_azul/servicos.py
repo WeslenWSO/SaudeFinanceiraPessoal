@@ -321,3 +321,71 @@ def enviar_servicos_pendentes(empresa, client: ContaAzulClient) -> dict:
             stats['erros'] += 1
             stats['detalhes'].append(f'{servico.codigo or servico.pk}: {exc}')
     return stats
+
+
+CAMPOS_FISCAIS_REPLICAR = (
+    'natureza_operacao',
+    'c_class_trib',
+    'codigo_nbs',
+    'indicador_operacao',
+)
+
+
+def servico_tem_dados_fiscais(servico: ServicoContaAzul) -> bool:
+    return bool(
+        (servico.c_class_trib or '').strip()
+        or (servico.codigo_nbs or '').strip()
+        or (servico.indicador_operacao or '').strip()
+    )
+
+
+def replicar_fiscal_servicos(
+    empresa,
+    origem: ServicoContaAzul,
+    destino_pks: list[int],
+) -> dict:
+    if origem.empresa_id != empresa.pk:
+        raise ContaAzulAPIError('Serviço origem não pertence à empresa.')
+    if not servico_tem_dados_fiscais(origem):
+        raise ContaAzulAPIError(
+            'O serviço origem não possui cClassTrib, NBS ou Indicador para replicar.'
+        )
+
+    destino_pks = [pk for pk in destino_pks if pk != origem.pk]
+    stats = {'replicados': 0, 'ignorados': 0}
+    if not destino_pks:
+        return stats
+
+    valores = {campo: getattr(origem, campo) for campo in CAMPOS_FISCAIS_REPLICAR}
+    destinos = ServicoContaAzul.objects.filter(empresa=empresa, pk__in=destino_pks)
+    for destino in destinos:
+        for campo, valor in valores.items():
+            setattr(destino, campo, valor)
+        destino.fiscal_pendente_envio = True
+        destino.save(update_fields=[*CAMPOS_FISCAIS_REPLICAR, 'fiscal_pendente_envio'])
+        stats['replicados'] += 1
+    stats['ignorados'] = len(destino_pks) - stats['replicados']
+    return stats
+
+
+def enviar_servicos_selecionados(
+    empresa,
+    client: ContaAzulClient,
+    servico_pks: list[int],
+) -> dict:
+    stats = {'enviados': 0, 'erros': 0, 'detalhes': []}
+    if not servico_pks:
+        return stats
+    servicos = (
+        ServicoContaAzul.objects.filter(empresa=empresa, pk__in=servico_pks)
+        .exclude(conta_azul_id='')
+        .order_by('codigo', 'descricao')
+    )
+    for servico in servicos:
+        try:
+            enviar_fiscal_servico(empresa, client, servico)
+            stats['enviados'] += 1
+        except ContaAzulAPIError as exc:
+            stats['erros'] += 1
+            stats['detalhes'].append(f'{servico.codigo or servico.pk}: {exc}')
+    return stats

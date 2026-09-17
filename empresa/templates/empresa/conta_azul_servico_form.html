@@ -74,6 +74,14 @@
               </button>
             </div>
           </form>
+
+          {% if servico.c_class_trib or servico.codigo_nbs or servico.indicador_operacao %}
+          <hr>
+          <p class="small mb-2">Replique estes dados fiscais para outros serviços sem editar um a um:</p>
+          <a href="{% url 'empresa:conta_azul_servicos_lista' empresa.pk %}?origem={{ servico.pk }}" class="btn btn-outline-warning btn-sm">
+            <i class="fas fa-copy me-1"></i> Ir replicar para outros serviços
+          </a>
+          {% endif %}
         </div>
       </div>
     </div>

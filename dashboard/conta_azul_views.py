@@ -9,6 +9,7 @@ from datetime import date
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, OperationalError
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -25,7 +26,13 @@ from dashboard.conta_azul.oauth import (
     url_autorizacao,
     validar_state_oauth,
 )
-from dashboard.conta_azul.servicos import enviar_fiscal_servico, enviar_servicos_pendentes, importar_servicos
+from dashboard.conta_azul.servicos import (
+    enviar_fiscal_servico,
+    enviar_servicos_pendentes,
+    enviar_servicos_selecionados,
+    importar_servicos,
+    replicar_fiscal_servicos,
+)
 from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
 from dashboard.conta_azul_forms import ContaAzulConfigForm, ServicoContaAzulFiscalForm
 from dashboard.models import ContaAzulConfig, ServicoContaAzul
@@ -51,6 +58,16 @@ def _empresa_autorizada(request, empresa: Empresa) -> bool:
         return int(sid) == int(empresa.pk)
     except (TypeError, ValueError):
         return str(sid) == str(empresa.pk)
+
+
+def _parse_servico_ids_post(request) -> list[int]:
+    ids: list[int] = []
+    for raw in request.POST.getlist('servico_ids'):
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return ids
 
 
 @login_required
@@ -614,6 +631,67 @@ def conta_azul_servicos_lista(request, pk):
                     messages.error(request, str(exc))
             return redirect('empresa:conta_azul_servicos_lista', pk=pk)
 
+        servico_ids = _parse_servico_ids_post(request)
+
+        if acao == 'replicar':
+            try:
+                origem_pk = int(request.POST.get('origem_id') or 0)
+            except ValueError:
+                origem_pk = 0
+            origem = ServicoContaAzul.objects.filter(pk=origem_pk, empresa=empresa).first()
+            if not origem:
+                messages.error(request, 'Selecione o serviço origem (modelo) para replicar.')
+            elif not servico_ids:
+                messages.error(request, 'Marque ao menos um serviço destino na lista.')
+            else:
+                try:
+                    stats = replicar_fiscal_servicos(empresa, origem, servico_ids)
+                    if stats['replicados']:
+                        messages.success(
+                            request,
+                            f"Dados fiscais replicados para {stats['replicados']} serviço(s). "
+                            'Marque-os e use "Enviar selecionados" para atualizar o Conta Azul.',
+                        )
+                    else:
+                        messages.info(request, 'Nenhum serviço destino foi atualizado.')
+                except ContaAzulAPIError as exc:
+                    messages.error(request, str(exc))
+            return redirect('empresa:conta_azul_servicos_lista', pk=pk)
+
+        if acao == 'enviar_selecionados':
+            if not config.tem_refresh_token():
+                messages.error(request, 'Conecte o Conta Azul antes de enviar.')
+            elif not servico_ids:
+                messages.error(request, 'Marque ao menos um serviço para enviar.')
+            else:
+                try:
+                    client = ContaAzulClient.para_empresa(empresa)
+                    stats = enviar_servicos_selecionados(empresa, client, servico_ids)
+                    if stats['enviados']:
+                        messages.success(
+                            request,
+                            f"{stats['enviados']} serviço(s) selecionado(s) enviado(s) ao Conta Azul.",
+                        )
+                    if stats['erros']:
+                        messages.warning(
+                            request,
+                            f"{stats['erros']} erro(s): " + '; '.join(stats.get('detalhes') or [])[:500],
+                        )
+                    if not stats['enviados'] and not stats['erros']:
+                        messages.info(request, 'Nenhum dos serviços selecionados pôde ser enviado.')
+                except ContaAzulAPIError as exc:
+                    messages.error(request, str(exc))
+            return redirect('empresa:conta_azul_servicos_lista', pk=pk)
+
+    origem_id = None
+    origem_raw = (request.GET.get('origem') or '').strip()
+    if origem_raw.isdigit():
+        origem_id = int(origem_raw)
+
+    servicos_com_fiscal = servicos.filter(
+        Q(c_class_trib__gt='') | Q(codigo_nbs__gt='') | Q(indicador_operacao__gt='')
+    )
+
     return render(
         request,
         'empresa/conta_azul_servicos_list.html',
@@ -622,6 +700,8 @@ def conta_azul_servicos_lista(request, pk):
             'config': config,
             'servicos': servicos,
             'pendentes': pendentes,
+            'servicos_com_fiscal': servicos_com_fiscal,
+            'origem_id': origem_id,
             'descricao': f'Serviços Conta Azul — {empresa.razao}',
         },
     )
@@ -656,7 +736,11 @@ def conta_azul_servico_editar(request, pk, servico_pk):
                     except ContaAzulAPIError as exc:
                         messages.error(request, str(exc))
             else:
-                messages.success(request, 'Alterações salvas localmente (pendente de envio).')
+                messages.success(
+                    request,
+                    'Alterações salvas localmente (pendente de envio). '
+                    'Use "Ir replicar para outros serviços" abaixo para copiar em lote.',
+                )
                 return redirect('empresa:conta_azul_servico_editar', pk=pk, servico_pk=servico_pk)
         else:
             messages.error(request, 'Corrija os erros do formulário.')
