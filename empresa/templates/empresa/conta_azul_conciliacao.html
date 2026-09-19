@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-4">
+  {% include 'parcial/_messages.html' %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+      <h1 class="h4 mb-1"><i class="fas fa-balance-scale me-2"></i>{{ descricao }}</h1>
+      <p class="text-muted small mb-0">Extrato bancário (SF) ↔ títulos e recebíveis — contexto Conta Azul</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'empresa:conta_azul_config' empresa.pk %}" class="btn btn-outline-secondary btn-sm">Configuração</a>
+      <a href="{% url 'extrato:lancamento_list' %}" class="btn btn-outline-secondary btn-sm">Extrato completo</a>
+    </div>
+  </div>
+
+  {% if not config.tem_refresh_token %}
+  <div class="alert alert-warning py-2 small">
+    Conecte o Conta Azul para ver divergências e sincronizar títulos do período.
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body row g-2 align-items-end">
+      <form method="get" class="row g-2 align-items-end col-12">
+        <div class="col-md-3">
+          <label class="form-label small mb-1" for="conta_id">Conta bancária</label>
+          <select name="conta_id" id="conta_id" class="form-select form-select-sm">
+            <option value="">— Todas —</option>
+            {% for c in contas %}
+            <option value="{{ c.pk }}" {% if conta_id == c.pk %}selected{% endif %}>
+              {{ c.descricao }}{% if c.conta_azul_id %} (CA){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1" for="data_de">De</label>
+          <input type="date" class="form-control form-control-sm" name="data_de" id="data_de" value="{{ data_de_str }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1" for="data_ate">Até</label>
+          <input type="date" class="form-control form-control-sm" name="data_ate" id="data_ate" value="{{ data_ate_str }}">
+        </div>
+        <input type="hidden" name="aba" value="{{ aba }}">
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+        </div>
+      </form>
+      {% if config.tem_refresh_token %}
+      <div class="col-md-3">
+        <form method="post" action="{% url 'empresa:conta_azul_conciliacao' empresa.pk %}">{% csrf_token %}
+          <input type="hidden" name="acao" value="sync_periodo">
+          <input type="hidden" name="aba" value="{{ aba }}">
+          <input type="hidden" name="conta_id" value="{{ conta_id }}">
+          <input type="hidden" name="data_de" value="{{ data_de_str }}">
+          <input type="hidden" name="data_ate" value="{{ data_ate_str }}">
+          <button type="submit" class="btn btn-outline-success btn-sm w-100">
+            <i class="fas fa-sync me-1"></i> Re-sincronizar período (CA)
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if aba == 'pendentes' %}active{% endif %}"
+         href="?aba=pendentes&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+        Pendentes
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if aba == 'conciliados' %}active{% endif %}"
+         href="?aba=conciliados&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+        Conciliados
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if aba == 'divergencias' %}active{% endif %}"
+         href="?aba=divergencias&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+        Divergências CA
+      </a>
+    </li>
+  </ul>
+
+  {% if aba != 'divergencias' %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card border-warning">
+        <div class="card-body py-2">
+          <div class="small text-muted">Pendente de conciliação</div>
+          <div class="fw-bold">R$ {{ resumo.total_pendente|floatformat:2 }} <span class="text-muted fw-normal">({{ resumo.qtd_pendentes }})</span></div>
+        </div>
+      </div>
+    </div>
+    {% if conta_sel and conta_sel.conta_azul_id %}
+    <div class="col-md-4">
+      <div class="card border-info">
+        <div class="card-body py-2">
+          <div class="small text-muted">Saldo Conta Azul (sync)</div>
+          <div class="fw-bold">R$ {{ resumo.saldo_conta_azul|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-header py-2 fw-semibold small">Lançamentos do banco (SF)</div>
+        <div class="list-group list-group-flush" style="max-height: 520px; overflow-y: auto;">
+          {% for l in lancamentos %}
+          <a href="?aba={{ aba }}&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}&lancamento_id={{ l.pk }}&busca={{ busca|urlencode }}"
+             class="list-group-item list-group-item-action {% if lancamento_sel and lancamento_sel.pk == l.pk %}active{% endif %}">
+            <div class="d-flex justify-content-between">
+              <span class="small">{{ l.data|date:"d/m/Y" }}</span>
+              <span class="{% if l.valor > 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                R$ {{ l.valor|floatformat:2 }}
+              </span>
+            </div>
+            <div class="small text-truncate">{{ l.historico|truncatechars:70 }}</div>
+            {% if l.destaque_cartao %}<span class="badge bg-info text-dark">Cartão</span>{% endif %}
+          </a>
+          {% empty %}
+          <div class="list-group-item text-muted small">Nenhum lançamento neste filtro.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      {% if lancamento_sel %}
+      <div class="card shadow-sm mb-3 border-primary">
+        <div class="card-body py-2">
+          <div class="fw-semibold">Selecionado: R$ {{ lancamento_sel.valor|floatformat:2 }}</div>
+          <div class="small">{{ lancamento_sel.historico }}</div>
+          <div class="small text-muted">{{ lancamento_sel.data|date:"d/m/Y" }} — {{ lancamento_sel.conta }}</div>
+        </div>
+      </div>
+
+      <form method="get" class="input-group input-group-sm mb-2">
+        <input type="hidden" name="aba" value="{{ aba }}">
+        <input type="hidden" name="conta_id" value="{{ conta_id }}">
+        <input type="hidden" name="data_de" value="{{ data_de_str }}">
+        <input type="hidden" name="data_ate" value="{{ data_ate_str }}">
+        <input type="hidden" name="lancamento_id" value="{{ lancamento_sel.pk }}">
+        <input type="search" name="busca" class="form-control" placeholder="Buscar NFS-e, doc, cliente…" value="{{ busca }}">
+        <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+      </form>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-header py-2 fw-semibold small">Sugestões (títulos / cartão)</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th class="text-end">Valor</th>
+                <th>CA</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in sugestoes %}
+              <tr>
+                <td><span class="badge bg-secondary">{{ s.tipo }}</span></td>
+                <td>
+                  <div>{{ s.rotulo }}</div>
+                  <div class="text-muted small">{{ s.detalhe }}</div>
+                </td>
+                <td class="text-end">R$ {{ s.valor|floatformat:2 }}</td>
+                <td>
+                  {% if s.sync_ca %}<span class="badge bg-info text-dark" title="Sincronizado do Conta Azul">Sync CA</span>{% endif %}
+                  {% if s.baixado_ca %}<span class="badge bg-warning text-dark">CA</span>{% endif %}
+                  {% if s.conciliado_extrato %}<span class="badge bg-success">Extrato</span>{% endif %}
+                </td>
+                <td class="text-end text-nowrap">
+                  {% if s.tipo == 'cartao' %}
+                  <form method="post" class="d-inline">{% csrf_token %}
+                    <input type="hidden" name="acao" value="conciliar_cartao">
+                    <input type="hidden" name="lancamento_id" value="{{ lancamento_sel.pk }}">
+                    <input type="hidden" name="conta_id" value="{{ conta_id }}">
+                    {% for rid in s.meta.relatorio_ids %}
+                    <input type="hidden" name="relatorio_ids" value="{{ rid }}">
+                    {% empty %}
+                    <input type="hidden" name="relatorio_ids" value="{{ s.pk }}">
+                    {% endfor %}
+                    <button type="submit" class="btn btn-success btn-sm">Conciliar cartão</button>
+                  </form>
+                  {% elif s.tipo == 'receber' %}
+                  <a href="{% url 'extrato:conciliar_multiplo' lancamento_sel.pk %}?tipo_conta=receber&data_inicio={{ data_de_str }}&data_fim={{ data_ate_str }}&cliente_fornecedor={{ busca|urlencode }}"
+                     class="btn btn-primary btn-sm">Conciliar título(s)</a>
+                  {% else %}
+                  <a href="{% url 'extrato:conciliar_multiplo' lancamento_sel.pk %}?tipo_conta=pagar&data_inicio={{ data_de_str }}&data_fim={{ data_ate_str }}"
+                     class="btn btn-primary btn-sm">Conciliar título(s)</a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-muted small text-center py-3">Nenhuma sugestão — ajuste busca ou importe recebíveis.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'extrato:conciliar_multiplo' lancamento_sel.pk %}?tipo_conta={% if lancamento_sel.valor > 0 %}receber{% else %}pagar{% endif %}&data_inicio={{ data_de_str }}&data_fim={{ data_ate_str }}&cliente_fornecedor={{ busca|urlencode }}"
+           class="btn btn-primary">
+          <i class="fas fa-link me-1"></i> Abrir conciliação múltipla
+        </a>
+        <a href="{% url 'relatoriorecebiveis:relReclist' %}" class="btn btn-outline-secondary btn-sm">Recebíveis cartão</a>
+      </div>
+      {% else %}
+      <div class="card shadow-sm">
+        <div class="card-body text-muted text-center py-5">
+          Selecione um lançamento à esquerda para ver sugestões de conciliação.
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card shadow-sm">
+    <div class="card-header fw-semibold">Divergências SF × API Conta Azul (vencimento no período)</div>
+    <div class="card-body">
+      {% if divergencias.erro %}
+      <div class="alert alert-warning">{{ divergencias.erro }}</div>
+      {% else %}
+      <p class="small text-muted">
+        Receitas: CA {{ divergencias.totais.ca_receitas|default:0 }} / SF {{ divergencias.totais.sf_receitas|default:0 }} —
+        Despesas: CA {{ divergencias.totais.ca_despesas|default:0 }} / SF {{ divergencias.totais.sf_despesas|default:0 }}
+      </p>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Tipo</th>
+              <th>Motivo</th>
+              <th>Parcela CA</th>
+              <th>Descrição</th>
+              <th class="text-end">Valor CA</th>
+              <th class="text-end">Valor SF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in divergencias.linhas %}
+            <tr>
+              <td>{{ row.tipo_titulo }}</td>
+              <td><code>{{ row.motivo }}</code></td>
+              <td class="small"><code>{{ row.parcela_id|truncatechars:12 }}</code></td>
+              <td class="small">{{ row.descricao|truncatechars:50 }}</td>
+              <td class="text-end">{% if row.valor_ca %}R$ {{ row.valor_ca|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if row.valor_sf %}R$ {{ row.valor_sf|floatformat:2 }}{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma divergência encontrada para o período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

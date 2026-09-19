@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -35,6 +35,15 @@ from dashboard.conta_azul.catalogos_fiscais import (
     listar_nbs,
     sugestoes_por_lei_116,
 )
+from dashboard.conta_azul.conciliacao import (
+    contas_bancarias_conciliacao,
+    lancamento_eh_cartao_destaque,
+    montar_divergencias_ca,
+    montar_fila_lancamentos,
+    montar_resumo_conta,
+    serializar_sugestao,
+    sugerir_titulos_para_lancamento,
+)
 from dashboard.conta_azul.servicos import (
     enviar_fiscal_servico,
     enviar_servicos_pendentes,
@@ -42,6 +51,8 @@ from dashboard.conta_azul.servicos import (
     importar_servicos,
     replicar_fiscal_servicos,
 )
+from extrato.models import Lancamento
+from extrato.services.stone_conciliacao_previa import conciliar_stone_lancamento
 from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
 from dashboard.conta_azul_forms import ContaAzulConfigForm, ServicoContaAzulFiscalForm
 from dashboard.models import ContaAzulConfig, ServicoContaAzul
@@ -585,6 +596,180 @@ def conta_azul_dashboard_por_tipo(request):
         request,
         'dashboard/conta_azul_por_tipo.html',
         {'dados': dados, 'dashboard_ativo': 'por_tipo', **ctx},
+    )
+
+
+def _parse_periodo_conciliacao(request, hoje: date) -> tuple[date, date]:
+    data_de = _parse_data_param(request.GET.get('data_de') or request.POST.get('data_de'), date(hoje.year, hoje.month, 1))
+    if hoje.month == 12:
+        default_fim = date(hoje.year, 12, 31)
+    else:
+        default_fim = date(hoje.year, hoje.month + 1, 1) - timedelta(days=1)
+    data_ate = _parse_data_param(request.GET.get('data_ate') or request.POST.get('data_ate'), default_fim)
+    if data_ate < data_de:
+        data_de, data_ate = data_ate, data_de
+    return data_de, data_ate
+
+
+@login_required
+def conta_azul_conciliacao(request, pk):
+    """Workspace extrato SF × sugestões de títulos com contexto Conta Azul."""
+    empresa = get_object_or_404(Empresa, pk=pk)
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão.')
+        return redirect('empresa:lista')
+
+    config = obter_ou_criar_config(empresa)
+    hoje = date.today()
+    data_de, data_ate = _parse_periodo_conciliacao(request, hoje)
+    aba = (request.GET.get('aba') or request.POST.get('aba') or 'pendentes').strip().lower()
+    if aba not in ('pendentes', 'conciliados', 'divergencias'):
+        aba = 'pendentes'
+
+    try:
+        conta_id = int(request.GET.get('conta_id') or request.POST.get('conta_id') or 0)
+    except (TypeError, ValueError):
+        conta_id = 0
+
+    contas = contas_bancarias_conciliacao(empresa)
+    conta_sel = None
+    if conta_id:
+        conta_sel = next((c for c in contas if c.pk == conta_id), None)
+    elif contas:
+        conta_sel = next((c for c in contas if (c.conta_azul_id or '').strip()), contas[0])
+        conta_id = conta_sel.pk if conta_sel else 0
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip()
+        if acao == 'sync_periodo':
+            if not config.tem_refresh_token():
+                messages.error(request, 'Conecte o Conta Azul antes de sincronizar.')
+            else:
+                opcoes = dict(
+                    cadastros=False,
+                    receitas=True,
+                    despesas=True,
+                    transferencias=True,
+                    data_de=data_de,
+                    data_ate=data_ate,
+                )
+                threading.Thread(
+                    target=_executar_sync_conta_azul_em_background,
+                    args=(empresa.pk, opcoes),
+                    daemon=True,
+                ).start()
+                messages.info(
+                    request,
+                    'Sincronização do período iniciada em segundo plano. '
+                    'Atualize a página em 1–2 minutos.',
+                )
+            from django.urls import reverse
+
+            return redirect(
+                reverse('empresa:conta_azul_conciliacao', kwargs={'pk': pk})
+                + f'?aba={aba}&conta_id={conta_id}'
+                f'&data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}'
+            )
+
+        if acao == 'conciliar_cartao':
+            try:
+                lanc_id = int(request.POST.get('lancamento_id') or 0)
+            except (TypeError, ValueError):
+                lanc_id = 0
+            rel_ids = []
+            for raw in request.POST.getlist('relatorio_ids'):
+                try:
+                    rel_ids.append(int(raw))
+                except (TypeError, ValueError):
+                    continue
+            lanc = Lancamento.objects.filter(pk=lanc_id, empresa=empresa).first()
+            if not lanc or not rel_ids:
+                messages.error(request, 'Selecione lançamento e recebíveis de cartão.')
+            else:
+                try:
+                    n = conciliar_stone_lancamento(lanc, rel_ids, empresa.pk)
+                    messages.success(request, f'Conciliação cartão concluída ({n} movimento(s)).')
+                except (ValueError, ContaAzulAPIError) as exc:
+                    messages.error(request, str(exc))
+            from django.urls import reverse
+
+            return redirect(
+                reverse('empresa:conta_azul_conciliacao', kwargs={'pk': pk})
+                + f'?aba=pendentes&conta_id={conta_id}'
+                f'&data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}'
+            )
+
+    lancamentos = []
+    resumo = {'total_pendente': 0, 'qtd_pendentes': 0, 'saldo_conta_azul': 0}
+    if aba != 'divergencias':
+        lancamentos = montar_fila_lancamentos(
+            empresa,
+            conta_id=conta_id or None,
+            data_de=data_de,
+            data_ate=data_ate,
+            aba=aba if aba in ('pendentes', 'conciliados') else 'pendentes',
+        )
+        pend_qs = Lancamento.objects.filter(
+            empresa=empresa,
+            conciliado=False,
+            data__gte=data_de,
+            data__lte=data_ate,
+        )
+        if conta_id:
+            pend_qs = pend_qs.filter(conta_id=conta_id)
+        resumo = montar_resumo_conta(conta_sel, pendentes_qs=pend_qs)
+
+    lancamento_sel = None
+    sugestoes = []
+    busca = (request.GET.get('busca') or '').strip()
+    try:
+        lanc_sel_id = int(request.GET.get('lancamento_id') or 0)
+    except (TypeError, ValueError):
+        lanc_sel_id = 0
+    if lanc_sel_id:
+        lancamento_sel = Lancamento.objects.filter(pk=lanc_sel_id, empresa=empresa).select_related('conta').first()
+        if lancamento_sel:
+            sugestoes = [serializar_sugestao(s) for s in sugerir_titulos_para_lancamento(lancamento_sel, busca=busca)]
+
+    divergencias = {'erro': None, 'linhas': [], 'totais': {}}
+    if aba == 'divergencias' and config.tem_refresh_token():
+        try:
+            client = ContaAzulClient.para_empresa(empresa)
+            divergencias = montar_divergencias_ca(empresa, client, data_de, data_ate)
+        except ContaAzulAPIError as exc:
+            divergencias = {'erro': str(exc), 'linhas': [], 'totais': {}}
+    elif aba == 'divergencias':
+        divergencias = {
+            'erro': 'Conta Azul não conectada.',
+            'linhas': [],
+            'totais': {},
+        }
+
+    for lanc in lancamentos:
+        lanc.destaque_cartao = lancamento_eh_cartao_destaque(lanc)
+
+    return render(
+        request,
+        'empresa/conta_azul_conciliacao.html',
+        {
+            'empresa': empresa,
+            'config': config,
+            'contas': contas,
+            'conta_id': conta_id,
+            'conta_sel': conta_sel,
+            'data_de': data_de,
+            'data_ate': data_ate,
+            'data_de_str': data_de.isoformat(),
+            'data_ate_str': data_ate.isoformat(),
+            'aba': aba,
+            'lancamentos': lancamentos,
+            'resumo': resumo,
+            'lancamento_sel': lancamento_sel,
+            'sugestoes': sugestoes,
+            'busca': busca,
+            'divergencias': divergencias,
+            'descricao': f'Conciliação SF × Conta Azul — {empresa.razao}',
+        },
     )
 
 
