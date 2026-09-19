@@ -13,6 +13,13 @@
     Informe a quantidade contada por produto. Ao salvar, registramos a data e o seu usuário nesta rodada.
   </p>
 
+  {% if total_itens == 0 %}
+  <div class="alert alert-warning">
+    Não há produtos neste inventário.
+    <a href="{% url 'inventario:inventario_produtos' inventario.pk %}">Escolher produtos</a>
+    ou cadastre em <a href="{% url 'estoque:produto_list' %}">Estoque</a>.
+  </div>
+  {% else %}
   <form method="post" class="card shadow-sm">
     {% csrf_token %}
     {{ formset.management_form }}
@@ -43,5 +50,6 @@
       <button type="submit" class="btn btn-primary">Gravar {{ rodada }}ª contagem</button>
     </div>
   </form>
+  {% endif %}
 </div>
 {% endblock %}

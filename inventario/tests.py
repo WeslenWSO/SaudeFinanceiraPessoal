@@ -6,7 +6,8 @@ from django.urls import reverse
 
 from empresa.models import Empresa
 from estoque.models import ProdutoEstoque
-from inventario.models import Inventario, InventarioItem, InventarioResponsavelContagem
+from inventario.backup_estoque import aplicar_contagem_ao_estoque, criar_backup_estoque
+from inventario.models import EstoqueBackup, Inventario, InventarioItem, InventarioResponsavelContagem
 from inventario.services import popular_itens_do_estoque, salvar_responsaveis, usuario_pode_contar
 
 
@@ -91,3 +92,37 @@ class InventarioFluxoTests(TestCase):
         url = reverse('inventario:inventario_contagem', kwargs={'pk': inv.pk, 'rodada': 1})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
+
+
+class InventarioBackupEstoqueTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(razao='Empresa Teste', cnpj='12345678000199')
+        self.user = User.objects.create_user('admin_inv', password='x')
+        self.produto = ProdutoEstoque.objects.create(
+            empresa=self.empresa,
+            codigo_produto='P001',
+            descricao='Produto A',
+            quantidade_estoque=Decimal('10.000'),
+        )
+        self.inv = Inventario.objects.create(empresa=self.empresa, descricao='Inv')
+
+    def test_backup_e_aplicar_contagem(self):
+        bkp = criar_backup_estoque(self.inv, self.user)
+        self.assertEqual(bkp.linhas.count(), 1)
+        self.assertEqual(EstoqueBackup.objects.filter(inventario=self.inv).count(), 1)
+
+        item = InventarioItem.objects.create(
+            inventario=self.inv,
+            produto=self.produto,
+            codigo_produto='P001',
+            descricao_produto='Produto A',
+            quantidade_estoque=Decimal('10.000'),
+            contagem_2=Decimal('8.000'),
+        )
+        self.inv.rodada_atualiza_estoque = 2
+        self.inv.save(update_fields=['rodada_atualiza_estoque'])
+
+        stats = aplicar_contagem_ao_estoque(self.inv, self.user)
+        self.assertEqual(stats['atualizados'], 1)
+        self.produto.refresh_from_db()
+        self.assertEqual(self.produto.quantidade_estoque, Decimal('8.000'))

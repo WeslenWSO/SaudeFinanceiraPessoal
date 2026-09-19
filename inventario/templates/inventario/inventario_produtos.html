@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'inventario:inventario_detail' inventario.pk %}" class="btn btn-outline-secondary btn-sm">Voltar ao inventário</a>
+  </div>
+
+  {% include 'parcial/_messages.html' %}
+
+  <p class="text-muted small">
+    Os produtos vêm do cadastro <a href="{% url 'estoque:produto_list' %}">Estoque</a> da empresa selecionada.
+    Marque abaixo o que entra neste inventário ou use «Incluir todos do estoque» na tela anterior.
+  </p>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header py-2"><strong>Incluir produtos</strong></div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <label class="form-label">{{ form.produtos.label }}</label>
+            {{ form.produtos }}
+            {% if form.produtos.errors %}<div class="text-danger small">{{ form.produtos.errors }}</div>{% endif %}
+            <button type="submit" class="btn btn-primary btn-sm mt-3">Incluir selecionados</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-header py-2"><strong>Produtos neste inventário ({{ itens|length }})</strong></div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Código</th>
+                <th>Produto</th>
+                <th class="text-end">Qtd. estoque</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in itens %}
+              <tr>
+                <td><code>{{ item.codigo_produto }}</code></td>
+                <td>{{ item.descricao_produto }}</td>
+                <td class="text-end">{{ item.quantidade_estoque }}</td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'inventario:inventario_remover_item' inventario.pk item.pk %}" class="d-inline"
+                        onsubmit="return confirm('Remover este produto do inventário?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Remover</button>
+                  </form>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-muted py-4">Nenhum produto. Inclua pela lista ao lado ou sincronize todo o estoque.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

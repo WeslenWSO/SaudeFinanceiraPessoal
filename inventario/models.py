@@ -17,6 +17,20 @@ class Inventario(models.Model):
     )
     descricao = models.CharField(max_length=200, verbose_name='Descrição')
     aberto = models.BooleanField(default=True, verbose_name='Aberto')
+    rodada_atualiza_estoque = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Rodada que atualiza o estoque',
+        validators=[MinValueValidator(0), MaxValueValidator(3)],
+        help_text='0 = nenhuma; 1, 2 ou 3 = contagem usada para aplicar no estoque.',
+    )
+    estoque_aplicado_em = models.DateTimeField(null=True, blank=True)
+    estoque_aplicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventarios_estoque_aplicado',
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -89,6 +103,12 @@ class InventarioItem(models.Model):
         max_digits=14,
         decimal_places=3,
         verbose_name='Qtd. estoque (sistema)',
+    )
+    quantidade_estoque_contabil = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+        verbose_name='Est. contábil (sistema)',
     )
 
     contagem_1 = models.DecimalField(
@@ -189,3 +209,66 @@ class InventarioItem(models.Model):
     @property
     def diff_3(self):
         return self.diferenca_contagem(3)
+
+    def quantidade_para_aplicar(self, rodada: int) -> Decimal | None:
+        if rodada not in (1, 2, 3):
+            return None
+        return self.valor_contagem(rodada)
+
+
+class EstoqueBackup(models.Model):
+    inventario = models.ForeignKey(
+        Inventario,
+        on_delete=models.CASCADE,
+        related_name='backups_estoque',
+        verbose_name='Inventário',
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='backups_estoque',
+    )
+    descricao = models.CharField(max_length=200, blank=True, default='')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='backups_estoque_criados',
+    )
+
+    class Meta:
+        verbose_name = 'Backup de estoque'
+        verbose_name_plural = 'Backups de estoque'
+        ordering = ['-criado_em']
+
+    def __str__(self) -> str:
+        return f'Backup {self.criado_em:%d/%m/%Y %H:%M} — {self.inventario_id}'
+
+
+class EstoqueBackupLinha(models.Model):
+    backup = models.ForeignKey(
+        EstoqueBackup,
+        on_delete=models.CASCADE,
+        related_name='linhas',
+    )
+    produto = models.ForeignKey(
+        ProdutoEstoque,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    codigo_produto = models.CharField(max_length=50)
+    descricao = models.CharField(max_length=300)
+    marca = models.CharField(max_length=120, blank=True, default='')
+    quantidade_estoque = models.DecimalField(max_digits=14, decimal_places=3)
+    quantidade_estoque_contabil = models.DecimalField(max_digits=14, decimal_places=3, default=0)
+    valor_ultima_compra = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    valor_custo_medio = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    valor_custo_contabil = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+
+    class Meta:
+        verbose_name = 'Linha do backup de estoque'
+        verbose_name_plural = 'Linhas do backup de estoque'
+        ordering = ['codigo_produto']

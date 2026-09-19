@@ -13,8 +13,16 @@
       {% if form.descricao.errors %}<div class="text-danger small">{{ form.descricao.errors }}</div>{% endif %}
     </div>
 
+    {% if not object.pk %}
+    <div class="mb-3">
+      <label class="form-label">{{ form.produtos.label }}</label>
+      {{ form.produtos }}
+      {% if form.produtos.help_text %}<div class="form-text">{{ form.produtos.help_text }}</div>{% endif %}
+    </div>
+    {% endif %}
+
     <p class="text-muted small mb-3">
-      Defina quais usuários podem lançar cada rodada de contagem. Ao salvar a contagem, o sistema grava data e usuário automaticamente.
+      Defina quais usuários podem lançar cada rodada de contagem. Produtos vêm do módulo Estoque (empresa atual).
     </p>
 
     <div class="row g-3 mb-4">

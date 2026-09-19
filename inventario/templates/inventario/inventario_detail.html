@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
 {% block conteudo %}
+<style>
+  .col-contagem-ativa { background-color: rgba(13, 110, 253, 0.12) !important; }
+  .col-aplicar-estoque { background-color: rgba(25, 135, 84, 0.15) !important; font-weight: 600; }
+</style>
 <div class="container-fluid px-4 py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
@@ -8,11 +12,25 @@
       <p class="text-muted small mb-0">
         {% if object.aberto %}<span class="badge bg-success">Aberto</span>{% else %}<span class="badge bg-secondary">Fechado</span>{% endif %}
         · Criado em {{ object.criado_em|date:"d/m/Y H:i" }}
+        {% if object.estoque_aplicado_em %}
+        · Estoque atualizado em {{ object.estoque_aplicado_em|date:"d/m/Y H:i" }}
+        {% if object.estoque_aplicado_por %}por {{ object.estoque_aplicado_por.get_username }}{% endif %}
+        {% endif %}
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       {% if object.aberto %}
+      <a href="{% url 'inventario:inventario_produtos' object.pk %}" class="btn btn-outline-primary btn-sm">Escolher produtos</a>
       <a href="{% url 'inventario:inventario_config' object.pk %}" class="btn btn-outline-secondary btn-sm">Responsáveis</a>
+      <form method="post" action="{% url 'inventario:inventario_backup' object.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-warning btn-sm">Backup do estoque</button>
+      </form>
+      {% if ultimo_backup %}
+      <a href="{% url 'inventario:inventario_backup_excel' object.pk ultimo_backup.pk %}" class="btn btn-outline-success btn-sm">
+        <i class="fas fa-file-excel"></i> Excel backup
+      </a>
+      {% endif %}
       <form method="post" action="{% url 'inventario:inventario_sincronizar' object.pk %}" class="d-inline">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-info btn-sm">Incluir produtos novos do estoque</button>
@@ -36,6 +54,65 @@
   </div>
 
   {% include 'parcial/_messages.html' %}
+
+  {% if total_itens == 0 %}
+  <div class="alert alert-warning">
+    <strong>Nenhum produto para contagem.</strong>
+    Cadastre em <a href="{% url 'estoque:produto_list' %}">Estoque</a>, depois use
+    <a href="{% url 'inventario:inventario_produtos' object.pk %}">Escolher produtos</a>
+    ou «Incluir produtos novos do estoque».
+  </div>
+  {% endif %}
+
+  {% if ultimo_backup %}
+  <div class="alert alert-light border small py-2 mb-3">
+    <strong>Último backup:</strong> {{ ultimo_backup.criado_em|date:"d/m/Y H:i" }}
+    — {{ ultimo_backup.linhas.count }} produto(s)
+    {% if ultimo_backup.criado_por %} · por {{ ultimo_backup.criado_por.get_username }}{% endif %}
+  </div>
+  {% endif %}
+
+  {% if object.aberto %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+      <form method="post" action="{% url 'inventario:inventario_rodada_estoque' object.pk %}" class="row g-3 align-items-end">
+        {% csrf_token %}
+        <div class="col-lg-7">
+          <label class="form-label fw-semibold mb-2">Contagem que atualizará o estoque</label>
+          <div class="d-flex flex-wrap gap-3">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="rodada_atualiza_estoque" id="rod0" value="0" {% if rodada_estoque == 0 %}checked{% endif %}>
+              <label class="form-check-label" for="rod0">Nenhuma</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="rodada_atualiza_estoque" id="rod1" value="1" {% if rodada_estoque == 1 %}checked{% endif %}>
+              <label class="form-check-label" for="rod1">1ª contagem</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="rodada_atualiza_estoque" id="rod2" value="2" {% if rodada_estoque == 2 %}checked{% endif %}>
+              <label class="form-check-label" for="rod2">2ª contagem</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="rodada_atualiza_estoque" id="rod3" value="3" {% if rodada_estoque == 3 %}checked{% endif %}>
+              <label class="form-check-label" for="rod3">3ª contagem</label>
+            </div>
+          </div>
+          <p class="text-muted small mb-0 mt-2">A coluna <strong>Qtd. p/ estoque</strong> (verde) mostra o valor da contagem marcada.</p>
+        </div>
+        <div class="col-lg-5 d-flex flex-wrap gap-2 justify-content-lg-end">
+          <button type="submit" class="btn btn-outline-primary btn-sm">Salvar seleção</button>
+        </div>
+      </form>
+      <form method="post" action="{% url 'inventario:inventario_aplicar_estoque' object.pk %}" class="mt-2"
+            onsubmit="return confirm('Aplicar a contagem selecionada ao cadastro de estoque? Faça backup antes se necessário.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success btn-sm" {% if rodada_estoque == 0 %}disabled{% endif %}>
+          Aplicar contagem ao estoque
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="row g-3 mb-3">
     <div class="col-md-4">
@@ -90,12 +167,14 @@
             <th>Código</th>
             <th>Produto</th>
             <th class="text-end">Qtd. estoque</th>
-            <th class="text-end">1ª cont.</th>
-            <th class="text-end">Dif.</th>
-            <th class="text-end">2ª cont.</th>
-            <th class="text-end">Dif.</th>
-            <th class="text-end">3ª cont.</th>
-            <th class="text-end">Dif.</th>
+            <th class="text-end">Est. contábil</th>
+            <th class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">1ª cont.</th>
+            <th class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">Dif.</th>
+            <th class="text-end {% if rodada_estoque == 2 %}col-contagem-ativa{% endif %}">2ª cont.</th>
+            <th class="text-end {% if rodada_estoque == 2 %}col-contagem-ativa{% endif %}">Dif.</th>
+            <th class="text-end {% if rodada_estoque == 3 %}col-contagem-ativa{% endif %}">3ª cont.</th>
+            <th class="text-end {% if rodada_estoque == 3 %}col-contagem-ativa{% endif %}">Dif.</th>
+            <th class="text-end col-aplicar-estoque">Qtd. p/ estoque</th>
             <th>Feedback</th>
           </tr>
         </thead>
@@ -105,21 +184,33 @@
             <td><code>{{ item.codigo_produto }}</code></td>
             <td>{{ item.descricao_produto }}</td>
             <td class="text-end">{{ item.quantidade_estoque }}</td>
-            <td class="text-end">
+            <td class="text-end">{{ item.quantidade_estoque_contabil }}</td>
+            <td class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">
               {% if item.contagem_1 is not None %}{{ item.contagem_1 }}{% else %}<span class="text-muted">—</span>{% endif %}
               {% if item.contagem_1_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_1_em|date:"d/m H:i" }} · {{ item.contagem_1_por.get_username }}</div>{% endif %}
             </td>
-            <td class="text-end">{% if item.diff_1 is not None %}{% if item.diff_1 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_1 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-            <td class="text-end">
+            <td class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">{% if item.diff_1 is not None %}{% if item.diff_1 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_1 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end {% if rodada_estoque == 2 %}col-contagem-ativa{% endif %}">
               {% if item.contagem_2 is not None %}{{ item.contagem_2 }}{% else %}<span class="text-muted">—</span>{% endif %}
               {% if item.contagem_2_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_2_em|date:"d/m H:i" }} · {{ item.contagem_2_por.get_username }}</div>{% endif %}
             </td>
-            <td class="text-end">{% if item.diff_2 is not None %}{% if item.diff_2 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_2 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-            <td class="text-end">
+            <td class="text-end {% if rodada_estoque == 2 %}col-contagem-ativa{% endif %}">{% if item.diff_2 is not None %}{% if item.diff_2 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_2 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end {% if rodada_estoque == 3 %}col-contagem-ativa{% endif %}">
               {% if item.contagem_3 is not None %}{{ item.contagem_3 }}{% else %}<span class="text-muted">—</span>{% endif %}
               {% if item.contagem_3_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_3_em|date:"d/m H:i" }} · {{ item.contagem_3_por.get_username }}</div>{% endif %}
             </td>
-            <td class="text-end">{% if item.diff_3 is not None %}{% if item.diff_3 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_3 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end {% if rodada_estoque == 3 %}col-contagem-ativa{% endif %}">{% if item.diff_3 is not None %}{% if item.diff_3 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_3 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end col-aplicar-estoque">
+              {% if rodada_estoque == 1 %}
+                {% if item.contagem_1 is not None %}{{ item.contagem_1 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% elif rodada_estoque == 2 %}
+                {% if item.contagem_2 is not None %}{{ item.contagem_2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% elif rodada_estoque == 3 %}
+                {% if item.contagem_3 is not None %}{{ item.contagem_3 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
             <td class="small">
               {% for msg in item.feedback_contagens %}
               <div>
@@ -136,7 +227,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="10" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
+            <td colspan="12" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
           </tr>
           {% endfor %}
         </tbody>

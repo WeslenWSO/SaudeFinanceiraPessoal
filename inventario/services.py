@@ -4,10 +4,16 @@ from estoque.models import ProdutoEstoque
 from inventario.models import Inventario, InventarioItem, InventarioResponsavelContagem
 
 
-def popular_itens_do_estoque(inventario: Inventario) -> int:
+def popular_itens_do_estoque(
+    inventario: Inventario,
+    *,
+    produto_ids: list[int] | None = None,
+) -> int:
     produtos = ProdutoEstoque.objects.filter(empresa_id=inventario.empresa_id).order_by(
         'codigo_produto',
     )
+    if produto_ids is not None:
+        produtos = produtos.filter(pk__in=produto_ids)
     existentes = set(
         InventarioItem.objects.filter(inventario=inventario).values_list(
             'codigo_produto',
@@ -21,6 +27,7 @@ def popular_itens_do_estoque(inventario: Inventario) -> int:
             codigo_produto=p.codigo_produto,
             descricao_produto=p.descricao,
             quantidade_estoque=p.quantidade_estoque,
+            quantidade_estoque_contabil=p.quantidade_estoque_contabil,
         )
         for p in produtos
         if p.codigo_produto not in existentes

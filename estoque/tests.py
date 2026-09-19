@@ -1,7 +1,9 @@
 from decimal import Decimal
 from io import BytesIO
 
-from django.test import TestCase
+from django.test import Client, TestCase, override_settings
+from django.contrib.auth.models import User
+from django.urls import reverse
 from openpyxl import Workbook
 
 from empresa.models import Empresa
@@ -81,3 +83,44 @@ class ImportPlanilhaEstoqueTest(TestCase):
         p.refresh_from_db()
         self.assertEqual(p.descricao, 'Produto A novo')
         self.assertEqual(p.quantidade_estoque, Decimal('7'))
+
+
+@override_settings(ALLOWED_HOSTS=['testserver', 'localhost'])
+class ProdutoEstoqueViewTest(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(razao='Loja Teste', cnpj='12345678000177')
+        self.user = User.objects.create_user('estoque_user', password='secret')
+        self.client = Client()
+        self.client.login(username='estoque_user', password='secret')
+        session = self.client.session
+        session['empresa_id'] = self.empresa.pk
+        session.save()
+
+    def test_get_novo_produto(self):
+        url = reverse('estoque:produto_create')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Código do produto')
+
+    def test_post_cria_produto(self):
+        url = reverse('estoque:produto_create')
+        response = self.client.post(
+            url,
+            {
+                'codigo_produto': '99',
+                'descricao': 'Sofa',
+                'marca': 'Especial',
+                'quantidade_estoque': '1',
+                'quantidade_estoque_contabil': '1',
+                'valor_ultima_compra': '0',
+                'valor_custo_medio': '0',
+                'valor_custo_contabil': '0',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ProdutoEstoque.objects.filter(
+                empresa=self.empresa,
+                codigo_produto='99',
+            ).exists(),
+        )

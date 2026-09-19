@@ -59,9 +59,14 @@ class ProdutoEstoqueCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('estoque:produto_list')
 
     def form_valid(self, form):
+        from empresa.models import Empresa
+
         empresa_id = self.request.session.get('empresa_id')
         if not empresa_id:
             messages.error(self.request, 'Selecione uma empresa antes de cadastrar produtos.')
+            return redirect('empresa:lista')
+        if not Empresa.objects.filter(pk=empresa_id).exists():
+            messages.error(self.request, 'Empresa da sessão inválida. Selecione a empresa novamente.')
             return redirect('empresa:lista')
         form.instance.empresa_id = empresa_id
         messages.success(self.request, 'Produto cadastrado com sucesso.')
