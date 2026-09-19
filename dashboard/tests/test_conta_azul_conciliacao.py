@@ -59,8 +59,42 @@ class ConciliacaoSugestaoTest(TestCase):
             status='pendente',
             conta_azul_parcela_id='uuid-ca-5122',
         )
-        sugestoes = sugerir_titulos_para_lancamento(lanc, busca='5122')
+        sugestoes = sugerir_titulos_para_lancamento(
+            lanc,
+            busca='5122',
+            periodo_de=date(2026, 9, 1),
+            periodo_ate=date(2026, 9, 30),
+        )
         receber = [s for s in sugestoes if s.tipo == 'receber']
         self.assertTrue(receber)
         self.assertTrue(receber[0].sync_ca)
         self.assertGreater(receber[0].score, 30)
+
+    def test_sugerir_receber_sem_match_exato_valor(self):
+        lanc = Lancamento.objects.create(
+            empresa=self.empresa,
+            conta=self.conta,
+            banco=self.banco,
+            data=date(2026, 9, 16),
+            historico='Recebimento vendas - Mastercard | Crédito',
+            valor=Decimal('3711.51'),
+            conciliado=False,
+            fitid='fit-2',
+            hash_unico='test-conc-ca-2',
+        )
+        ContaAReceber.objects.create(
+            empresa=self.empresa,
+            cliente='Cliente parcela',
+            data_vencimento=date(2026, 9, 17),
+            valor_a_receber=Decimal('436.67'),
+            doc='5122',
+            parcela='1/6',
+            status='pendente',
+        )
+        sugestoes = sugerir_titulos_para_lancamento(
+            lanc,
+            periodo_de=date(2026, 9, 1),
+            periodo_ate=date(2026, 9, 30),
+        )
+        receber = [s for s in sugestoes if s.tipo == 'receber']
+        self.assertTrue(receber, 'Deve listar contas a receber mesmo sem valor igual ao depósito')

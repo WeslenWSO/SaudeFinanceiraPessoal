@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">{{ descricao }}</h1>
+      <p class="text-muted small mb-0">
+        {% if object.aberto %}<span class="badge bg-success">Aberto</span>{% else %}<span class="badge bg-secondary">Fechado</span>{% endif %}
+        · Criado em {{ object.criado_em|date:"d/m/Y H:i" }}
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if object.aberto %}
+      <a href="{% url 'inventario:inventario_config' object.pk %}" class="btn btn-outline-secondary btn-sm">Responsáveis</a>
+      <form method="post" action="{% url 'inventario:inventario_sincronizar' object.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-info btn-sm">Incluir produtos novos do estoque</button>
+      </form>
+      {% if pode_contar.1 %}
+      <a href="{% url 'inventario:inventario_contagem' object.pk 1 %}" class="btn btn-primary btn-sm">1ª contagem</a>
+      {% endif %}
+      {% if pode_contar.2 %}
+      <a href="{% url 'inventario:inventario_contagem' object.pk 2 %}" class="btn btn-primary btn-sm">2ª contagem</a>
+      {% endif %}
+      {% if pode_contar.3 %}
+      <a href="{% url 'inventario:inventario_contagem' object.pk 3 %}" class="btn btn-primary btn-sm">3ª contagem</a>
+      {% endif %}
+      <form method="post" action="{% url 'inventario:inventario_fechar' object.pk %}" class="d-inline" onsubmit="return confirm('Fechar este inventário?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm">Fechar</button>
+      </form>
+      {% endif %}
+      <a href="{% url 'inventario:inventario_list' %}" class="btn btn-link btn-sm">Voltar</a>
+    </div>
+  </div>
+
+  {% include 'parcial/_messages.html' %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body py-2">
+          <h2 class="h6 mb-2">1ª contagem — responsáveis</h2>
+          <ul class="small mb-0 ps-3">
+            {% for resp in responsaveis.1 %}
+            <li>{{ resp.usuario.get_username }}</li>
+            {% empty %}
+            <li class="text-muted">Nenhum usuário definido</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body py-2">
+          <h2 class="h6 mb-2">2ª contagem — responsáveis</h2>
+          <ul class="small mb-0 ps-3">
+            {% for resp in responsaveis.2 %}
+            <li>{{ resp.usuario.get_username }}</li>
+            {% empty %}
+            <li class="text-muted">Nenhum usuário definido</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body py-2">
+          <h2 class="h6 mb-2">3ª contagem — responsáveis</h2>
+          <ul class="small mb-0 ps-3">
+            {% for resp in responsaveis.3 %}
+            <li>{{ resp.usuario.get_username }}</li>
+            {% empty %}
+            <li class="text-muted">Nenhum usuário definido</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Produto</th>
+            <th class="text-end">Qtd. estoque</th>
+            <th class="text-end">1ª cont.</th>
+            <th class="text-end">Dif.</th>
+            <th class="text-end">2ª cont.</th>
+            <th class="text-end">Dif.</th>
+            <th class="text-end">3ª cont.</th>
+            <th class="text-end">Dif.</th>
+            <th>Feedback</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          <tr>
+            <td><code>{{ item.codigo_produto }}</code></td>
+            <td>{{ item.descricao_produto }}</td>
+            <td class="text-end">{{ item.quantidade_estoque }}</td>
+            <td class="text-end">
+              {% if item.contagem_1 is not None %}{{ item.contagem_1 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% if item.contagem_1_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_1_em|date:"d/m H:i" }} · {{ item.contagem_1_por.get_username }}</div>{% endif %}
+            </td>
+            <td class="text-end">{% if item.diff_1 is not None %}{% if item.diff_1 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_1 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end">
+              {% if item.contagem_2 is not None %}{{ item.contagem_2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% if item.contagem_2_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_2_em|date:"d/m H:i" }} · {{ item.contagem_2_por.get_username }}</div>{% endif %}
+            </td>
+            <td class="text-end">{% if item.diff_2 is not None %}{% if item.diff_2 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_2 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="text-end">
+              {% if item.contagem_3 is not None %}{{ item.contagem_3 }}{% else %}<span class="text-muted">—</span>{% endif %}
+              {% if item.contagem_3_em %}<div class="text-muted" style="font-size:0.7rem;">{{ item.contagem_3_em|date:"d/m H:i" }} · {{ item.contagem_3_por.get_username }}</div>{% endif %}
+            </td>
+            <td class="text-end">{% if item.diff_3 is not None %}{% if item.diff_3 == 0 %}<span class="text-success">0</span>{% else %}<span class="text-danger">{{ item.diff_3 }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="small">
+              {% for msg in item.feedback_contagens %}
+              <div>
+                {% if "confere" in msg %}
+                <span class="text-success"><i class="fas fa-check-circle"></i> {{ msg }}</span>
+                {% else %}
+                <span class="text-warning"><i class="fas fa-exclamation-triangle"></i> {{ msg }}</span>
+                {% endif %}
+              </div>
+              {% empty %}
+              <span class="text-muted">—</span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

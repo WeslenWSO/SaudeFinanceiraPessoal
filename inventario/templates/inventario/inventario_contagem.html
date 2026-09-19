@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'inventario:inventario_detail' inventario.pk %}" class="btn btn-outline-secondary btn-sm">Voltar ao inventário</a>
+  </div>
+
+  {% include 'parcial/_messages.html' %}
+
+  <p class="text-muted small">
+    Informe a quantidade contada por produto. Ao salvar, registramos a data e o seu usuário nesta rodada.
+  </p>
+
+  <form method="post" class="card shadow-sm">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Produto</th>
+            <th class="text-end">Qtd. estoque</th>
+            <th style="min-width:8rem;">Quantidade contada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for form in formset %}
+          <tr>
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            <td><code>{{ form.instance.codigo_produto }}</code></td>
+            <td>{{ form.instance.descricao_produto }}</td>
+            <td class="text-end">{{ form.instance.quantidade_estoque }}</td>
+            <td>{{ form.contagem_valor }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3 border-top">
+      <button type="submit" class="btn btn-primary">Gravar {{ rodada }}ª contagem</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

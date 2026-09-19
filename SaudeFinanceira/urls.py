@@ -41,6 +41,8 @@ urlpatterns = [
     path('cobranca/', include('cobranca.urls')),
     path('cliente/', include('cliente.urls')),
     path('fornecedor/', include('fornecedor.urls')),
+    path('estoque/', include('estoque.urls', namespace='estoque')),
+    path('inventario/', include('inventario.urls', namespace='inventario')),
     path('categoria/', include('categoria.urls')),
     path('regrarateio/', include('regrarateio.urls')),
     path('regraImposto/', include('regraImposto.urls')),

@@ -44,6 +44,7 @@
           <input type="date" class="form-control form-control-sm" name="data_ate" id="data_ate" value="{{ data_ate_str }}">
         </div>
         <input type="hidden" name="aba" value="{{ aba }}">
+        <input type="hidden" name="tipo" value="{{ tipo_movimento }}">
         <div class="col-md-2">
           <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
         </div>
@@ -53,6 +54,7 @@
         <form method="post" action="{% url 'empresa:conta_azul_conciliacao' empresa.pk %}">{% csrf_token %}
           <input type="hidden" name="acao" value="sync_periodo">
           <input type="hidden" name="aba" value="{{ aba }}">
+          <input type="hidden" name="tipo" value="{{ tipo_movimento }}">
           <input type="hidden" name="conta_id" value="{{ conta_id }}">
           <input type="hidden" name="data_de" value="{{ data_de_str }}">
           <input type="hidden" name="data_ate" value="{{ data_ate_str }}">
@@ -68,19 +70,19 @@
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
       <a class="nav-link {% if aba == 'pendentes' %}active{% endif %}"
-         href="?aba=pendentes&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+         href="?aba=pendentes&tipo={{ tipo_movimento }}&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
         Pendentes
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if aba == 'conciliados' %}active{% endif %}"
-         href="?aba=conciliados&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+         href="?aba=conciliados&tipo={{ tipo_movimento }}&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
         Conciliados
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if aba == 'divergencias' %}active{% endif %}"
-         href="?aba=divergencias&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+         href="?aba=divergencias&tipo={{ tipo_movimento }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
         Divergências CA
       </a>
     </li>
@@ -106,6 +108,37 @@
       </div>
     </div>
     {% endif %}
+    <div class="col-md-4">
+      <div class="card border-success">
+        <div class="card-body py-2">
+          <div class="small text-muted">Recebimentos pendentes</div>
+          <div class="fw-bold text-success">R$ {{ resumo.total_recebimentos|floatformat:2 }} <span class="text-muted fw-normal">({{ resumo.qtd_recebimentos }})</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-danger">
+        <div class="card-body py-2">
+          <div class="small text-muted">Pagamentos pendentes</div>
+          <div class="fw-bold text-danger">R$ {{ resumo.total_pagamentos|floatformat:2 }} <span class="text-muted fw-normal">({{ resumo.qtd_pagamentos }})</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-group btn-group-sm mb-3" role="group">
+    <a class="btn btn-outline-secondary {% if tipo_movimento == 'todos' %}active{% endif %}"
+       href="?aba={{ aba }}&tipo=todos&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+      Todos ({{ resumo.qtd_pendentes }})
+    </a>
+    <a class="btn btn-outline-success {% if tipo_movimento == 'recebimentos' %}active{% endif %}"
+       href="?aba={{ aba }}&tipo=recebimentos&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+      Recebimentos ({{ resumo.qtd_recebimentos }})
+    </a>
+    <a class="btn btn-outline-danger {% if tipo_movimento == 'pagamentos' %}active{% endif %}"
+       href="?aba={{ aba }}&tipo=pagamentos&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}">
+      Pagamentos ({{ resumo.qtd_pagamentos }})
+    </a>
   </div>
 
   <div class="row g-3">
@@ -114,7 +147,7 @@
         <div class="card-header py-2 fw-semibold small">Lançamentos do banco (SF)</div>
         <div class="list-group list-group-flush" style="max-height: 520px; overflow-y: auto;">
           {% for l in lancamentos %}
-          <a href="?aba={{ aba }}&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}&lancamento_id={{ l.pk }}&busca={{ busca|urlencode }}"
+          <a href="?aba={{ aba }}&tipo={{ tipo_movimento }}&conta_id={{ conta_id }}&data_de={{ data_de_str }}&data_ate={{ data_ate_str }}&lancamento_id={{ l.pk }}&busca={{ busca|urlencode }}"
              class="list-group-item list-group-item-action {% if lancamento_sel and lancamento_sel.pk == l.pk %}active{% endif %}">
             <div class="d-flex justify-content-between">
               <span class="small">{{ l.data|date:"d/m/Y" }}</span>
@@ -136,7 +169,14 @@
       {% if lancamento_sel %}
       <div class="card shadow-sm mb-3 border-primary">
         <div class="card-body py-2">
-          <div class="fw-semibold">Selecionado: R$ {{ lancamento_sel.valor|floatformat:2 }}</div>
+          <div class="fw-semibold">
+            Selecionado:
+            {% if lancamento_sel.valor > 0 %}
+            <span class="text-success">Recebimento R$ {{ lancamento_sel.valor|floatformat:2 }}</span>
+            {% else %}
+            <span class="text-danger">Pagamento R$ {{ lancamento_sel.valor|floatformat:2 }}</span>
+            {% endif %}
+          </div>
           <div class="small">{{ lancamento_sel.historico }}</div>
           <div class="small text-muted">{{ lancamento_sel.data|date:"d/m/Y" }} — {{ lancamento_sel.conta }}</div>
         </div>
@@ -144,6 +184,7 @@
 
       <form method="get" class="input-group input-group-sm mb-2">
         <input type="hidden" name="aba" value="{{ aba }}">
+        <input type="hidden" name="tipo" value="{{ tipo_movimento }}">
         <input type="hidden" name="conta_id" value="{{ conta_id }}">
         <input type="hidden" name="data_de" value="{{ data_de_str }}">
         <input type="hidden" name="data_ate" value="{{ data_ate_str }}">

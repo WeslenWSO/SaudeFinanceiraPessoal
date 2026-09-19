@@ -625,6 +625,9 @@ def conta_azul_conciliacao(request, pk):
     aba = (request.GET.get('aba') or request.POST.get('aba') or 'pendentes').strip().lower()
     if aba not in ('pendentes', 'conciliados', 'divergencias'):
         aba = 'pendentes'
+    tipo_movimento = (request.GET.get('tipo') or request.POST.get('tipo') or 'todos').strip().lower()
+    if tipo_movimento not in ('todos', 'recebimentos', 'pagamentos'):
+        tipo_movimento = 'todos'
 
     try:
         conta_id = int(request.GET.get('conta_id') or request.POST.get('conta_id') or 0)
@@ -667,7 +670,7 @@ def conta_azul_conciliacao(request, pk):
 
             return redirect(
                 reverse('empresa:conta_azul_conciliacao', kwargs={'pk': pk})
-                + f'?aba={aba}&conta_id={conta_id}'
+                + f'?aba={aba}&conta_id={conta_id}&tipo={tipo_movimento}'
                 f'&data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}'
             )
 
@@ -695,7 +698,7 @@ def conta_azul_conciliacao(request, pk):
 
             return redirect(
                 reverse('empresa:conta_azul_conciliacao', kwargs={'pk': pk})
-                + f'?aba=pendentes&conta_id={conta_id}'
+                + f'?aba=pendentes&conta_id={conta_id}&tipo={tipo_movimento}'
                 f'&data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}'
             )
 
@@ -708,6 +711,7 @@ def conta_azul_conciliacao(request, pk):
             data_de=data_de,
             data_ate=data_ate,
             aba=aba if aba in ('pendentes', 'conciliados') else 'pendentes',
+            tipo_movimento=tipo_movimento,
         )
         pend_qs = Lancamento.objects.filter(
             empresa=empresa,
@@ -729,7 +733,15 @@ def conta_azul_conciliacao(request, pk):
     if lanc_sel_id:
         lancamento_sel = Lancamento.objects.filter(pk=lanc_sel_id, empresa=empresa).select_related('conta').first()
         if lancamento_sel:
-            sugestoes = [serializar_sugestao(s) for s in sugerir_titulos_para_lancamento(lancamento_sel, busca=busca)]
+            sugestoes = [
+                serializar_sugestao(s)
+                for s in sugerir_titulos_para_lancamento(
+                    lancamento_sel,
+                    busca=busca,
+                    periodo_de=data_de,
+                    periodo_ate=data_ate,
+                )
+            ]
 
     divergencias = {'erro': None, 'linhas': [], 'totais': {}}
     if aba == 'divergencias' and config.tem_refresh_token():
@@ -762,6 +774,7 @@ def conta_azul_conciliacao(request, pk):
             'data_de_str': data_de.isoformat(),
             'data_ate_str': data_ate.isoformat(),
             'aba': aba,
+            'tipo_movimento': tipo_movimento,
             'lancamentos': lancamentos,
             'resumo': resumo,
             'lancamento_sel': lancamento_sel,

@@ -169,7 +169,9 @@ INSTALLED_APPS = [
     'planejamento_orcamentario',
     'agendador_tarefas',
     'indicadores',
-    
+    'estoque',
+    'inventario',
+
 
 
 

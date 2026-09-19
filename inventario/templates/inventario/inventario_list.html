@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'inventario:inventario_create' %}" class="btn btn-primary btn-sm">
+      <i class="fas fa-plus me-1"></i> Novo inventário
+    </a>
+  </div>
+
+  {% include 'parcial/_messages.html' %}
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Descrição</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in object_list %}
+          <tr>
+            <td>{{ inv.descricao }}</td>
+            <td>
+              {% if inv.aberto %}
+              <span class="badge bg-success">Aberto</span>
+              {% else %}
+              <span class="badge bg-secondary">Fechado</span>
+              {% endif %}
+            </td>
+            <td>{{ inv.criado_em|date:"d/m/Y H:i" }}</td>
+            <td class="text-end">
+              <a href="{% url 'inventario:inventario_detail' inv.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">Nenhum inventário cadastrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if is_paginated %}
+  <nav class="mt-3">
+    <ul class="pagination pagination-sm">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

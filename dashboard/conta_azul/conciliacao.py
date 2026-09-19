@@ -31,7 +31,9 @@ from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
 TOLERANCIA_VALOR = Decimal('0.10')
 TOLERANCIA_VALOR_TITULO = Decimal('0.05')
 JANELA_VENCIMENTO_DIAS = 3
+JANELA_VENCIMENTO_LISTAGEM_DIAS = 14
 JANELA_RECEBIVEL_DIAS = 3
+SCORE_MINIMO_LISTAGEM = 5
 
 TipoSugestao = Literal['receber', 'pagar', 'cartao']
 
@@ -60,10 +62,18 @@ def contas_bancarias_conciliacao(empresa) -> list[ContaBancaria]:
 
 def montar_resumo_conta(conta: ContaBancaria | None, *, pendentes_qs) -> dict[str, Any]:
     total_pendente = pendentes_qs.aggregate(t=Coalesce(Sum('valor'), Decimal('0')))['t'] or Decimal('0')
+    receb_qs = pendentes_qs.filter(valor__gt=0)
+    pag_qs = pendentes_qs.filter(valor__lt=0)
+    total_receb = receb_qs.aggregate(t=Coalesce(Sum('valor'), Decimal('0')))['t'] or Decimal('0')
+    total_pag = pag_qs.aggregate(t=Coalesce(Sum('valor'), Decimal('0')))['t'] or Decimal('0')
     saldo_ca = (conta.saldo_conta_azul if conta else None) or Decimal('0')
     return {
         'total_pendente': abs(total_pendente),
         'qtd_pendentes': pendentes_qs.count(),
+        'qtd_recebimentos': receb_qs.count(),
+        'qtd_pagamentos': pag_qs.count(),
+        'total_recebimentos': total_receb,
+        'total_pagamentos': abs(total_pag),
         'saldo_conta_azul': saldo_ca,
         'saldo_conta_azul_em': conta.saldo_conta_azul_em if conta else None,
     }
@@ -129,13 +139,12 @@ def sugerir_recebiveis_cartao(lancamento: Lancamento) -> list[SugestaoConciliaca
                     meta={'relatorio_ids': stone.get('relatorio_ids') or []},
                 )
             )
-        return sugestoes
 
     if not lancamento.data:
         return sugestoes
     data_ini = lancamento.data - timedelta(days=JANELA_RECEBIVEL_DIAS)
     data_fim = lancamento.data + timedelta(days=JANELA_RECEBIVEL_DIAS)
-    alvo = lancamento.valor
+    alvo = abs(lancamento.valor)
     for rel in RelatorioRecebiveisMaquinaCartao.objects.filter(
         empresa_id=lancamento.empresa_id,
         conciliado=False,
@@ -160,10 +169,33 @@ def sugerir_recebiveis_cartao(lancamento: Lancamento) -> list[SugestaoConciliaca
     return sorted(sugestoes, key=lambda s: -s.score)[:15]
 
 
+def _janela_vencimento_titulos(
+    lancamento: Lancamento,
+    periodo_de: date | None,
+    periodo_ate: date | None,
+) -> tuple[date, date]:
+    """Usa o período da tela; expande em torno da data do lançamento."""
+    if periodo_de and periodo_ate:
+        base_ini, base_fim = periodo_de, periodo_ate
+    elif lancamento.data:
+        base_ini = base_fim = lancamento.data
+    else:
+        hoje = date.today()
+        base_ini = date(hoje.year, hoje.month, 1)
+        base_fim = base_ini
+
+    if lancamento.data:
+        base_ini = min(base_ini, lancamento.data - timedelta(days=JANELA_VENCIMENTO_LISTAGEM_DIAS))
+        base_fim = max(base_fim, lancamento.data + timedelta(days=JANELA_VENCIMENTO_LISTAGEM_DIAS))
+    return base_ini, base_fim
+
+
 def sugerir_titulos_para_lancamento(
     lancamento: Lancamento,
     *,
     busca: str = '',
+    periodo_de: date | None = None,
+    periodo_ate: date | None = None,
 ) -> list[SugestaoConciliacao]:
     if lancamento.conciliado:
         return []
@@ -174,17 +206,17 @@ def sugerir_titulos_para_lancamento(
     credito = lancamento.valor > 0
     sugestoes: list[SugestaoConciliacao] = []
 
+    dv_ini, dv_fim = _janela_vencimento_titulos(lancamento, periodo_de, periodo_ate)
+
     if credito:
         qs = _annotate_conciliado_receber(
             ContaAReceber.objects.filter(
                 empresa_id=empresa_id,
                 status__in=('pendente', 'vencido', 'cartao'),
+                data_vencimento__gte=dv_ini,
+                data_vencimento__lte=dv_fim,
             )
         )
-        if lancamento.data:
-            dv_ini = lancamento.data - timedelta(days=JANELA_VENCIMENTO_DIAS)
-            dv_fim = lancamento.data + timedelta(days=JANELA_VENCIMENTO_DIAS)
-            qs = qs.filter(data_vencimento__range=(dv_ini, dv_fim))
         if busca:
             qs = qs.filter(
                 Q(cliente__icontains=busca)
@@ -199,10 +231,16 @@ def sugerir_titulos_para_lancamento(
             sc += _score_texto(tokens, car.doc or '', car.observacao or '', car.cliente or '')
             if car.conta_azul_parcela_id:
                 sc += 5
+            if lancamento.data:
+                dias = abs((car.data_vencimento - lancamento.data).days)
+                if dias <= JANELA_VENCIMENTO_DIAS:
+                    sc += 20
+                elif dias <= JANELA_VENCIMENTO_LISTAGEM_DIAS:
+                    sc += 8
             baixado_ca = car.status == 'pago' or bool(car.data_recebimento)
-            if sc <= 0 and not busca:
-                continue
-            if busca and sc < 10:
+            if sc < SCORE_MINIMO_LISTAGEM:
+                sc = SCORE_MINIMO_LISTAGEM
+            if busca and sc < 15:
                 sc = max(sc, 20)
             nf = ''
             if car.nota_id:
@@ -225,12 +263,10 @@ def sugerir_titulos_para_lancamento(
             ContasaPagar.objects.filter(
                 empresa_id=empresa_id,
                 status='pendente',
+                dtvenc__gte=dv_ini,
+                dtvenc__lte=dv_fim,
             )
         )
-        if lancamento.data:
-            dv_ini = lancamento.data - timedelta(days=JANELA_VENCIMENTO_DIAS)
-            dv_fim = lancamento.data + timedelta(days=JANELA_VENCIMENTO_DIAS)
-            qs = qs.filter(dtvenc__range=(dv_ini, dv_fim))
         if busca:
             qs = qs.filter(
                 Q(descricao__icontains=busca)
@@ -244,9 +280,15 @@ def sugerir_titulos_para_lancamento(
             sc += _score_texto(tokens, cap.descricao or '', cap.numdoc or '')
             if cap.conta_azul_parcela_id:
                 sc += 5
+            if lancamento.data:
+                dias = abs((cap.dtvenc - lancamento.data).days)
+                if dias <= JANELA_VENCIMENTO_DIAS:
+                    sc += 20
+                elif dias <= JANELA_VENCIMENTO_LISTAGEM_DIAS:
+                    sc += 8
             baixado_ca = cap.status == 'pago' or bool(cap.dtPag)
-            if sc <= 0 and not busca:
-                continue
+            if sc < SCORE_MINIMO_LISTAGEM:
+                sc = SCORE_MINIMO_LISTAGEM
             forn = cap.fornecedor.razao if cap.fornecedor_id else ''
             sugestoes.append(
                 SugestaoConciliacao(
@@ -276,6 +318,7 @@ def montar_fila_lancamentos(
     data_de: date,
     data_ate: date,
     aba: str = 'pendentes',
+    tipo_movimento: str = 'todos',
 ) -> list[Lancamento]:
     qs = Lancamento.objects.filter(
         empresa=empresa,
@@ -288,6 +331,11 @@ def montar_fila_lancamentos(
         qs = qs.filter(conciliado=True)
     else:
         qs = qs.filter(conciliado=False)
+    tipo_movimento = (tipo_movimento or 'todos').lower()
+    if tipo_movimento == 'recebimentos':
+        qs = qs.filter(valor__gt=0)
+    elif tipo_movimento == 'pagamentos':
+        qs = qs.filter(valor__lt=0)
     return list(qs.order_by('-data', '-id')[:200])
 
 
