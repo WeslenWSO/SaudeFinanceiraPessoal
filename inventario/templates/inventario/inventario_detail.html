@@ -114,11 +114,18 @@
   </div>
   {% endif %}
 
+  <div class="alert alert-light border small py-2 mb-3">
+    <strong>Produtos × usuários × rodada</strong> —
+    Produtos: botão <strong>Escolher produtos</strong> (ou no cadastro do inventário).
+    Usuários por rodada: <a href="{% url 'inventario:inventario_config' object.pk %}">Responsáveis</a>
+    (1ª, 2ª ou 3ª contagem). Cada usuário autorizado vê a mesma lista de produtos na rodada dele.
+  </div>
+
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body py-2">
-          <h2 class="h6 mb-2">1ª contagem — responsáveis</h2>
+          <h2 class="h6 mb-2">1ª contagem — quem pode contar</h2>
           <ul class="small mb-0 ps-3">
             {% for resp in responsaveis.1 %}
             <li>{{ resp.usuario.get_username }}</li>
@@ -132,7 +139,7 @@
     <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body py-2">
-          <h2 class="h6 mb-2">2ª contagem — responsáveis</h2>
+          <h2 class="h6 mb-2">2ª contagem — quem pode contar</h2>
           <ul class="small mb-0 ps-3">
             {% for resp in responsaveis.2 %}
             <li>{{ resp.usuario.get_username }}</li>
@@ -146,7 +153,7 @@
     <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body py-2">
-          <h2 class="h6 mb-2">3ª contagem — responsáveis</h2>
+          <h2 class="h6 mb-2">3ª contagem — quem pode contar</h2>
           <ul class="small mb-0 ps-3">
             {% for resp in responsaveis.3 %}
             <li>{{ resp.usuario.get_username }}</li>

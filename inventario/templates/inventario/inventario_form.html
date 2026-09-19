@@ -21,21 +21,29 @@
     </div>
     {% endif %}
 
-    <p class="text-muted small mb-3">
-      Defina quais usuários podem lançar cada rodada de contagem. Produtos vêm do módulo Estoque (empresa atual).
-    </p>
+    <div class="alert alert-light border small mb-3">
+      <strong>Como funciona</strong>
+      <ul class="mb-0 ps-3">
+        <li><strong>Produtos:</strong> lista acima (ou todos do Estoque se vazio). Vale para <em>todos</em> os contadores.</li>
+        <li><strong>Usuários:</strong> em cada coluna abaixo, escolha quem pode lançar a <strong>1ª</strong>, <strong>2ª</strong> ou <strong>3ª</strong> contagem.</li>
+        <li>Não há produtos diferentes por usuário — quem está na 1ª contagem vê os mesmos itens do inventário.</li>
+      </ul>
+    </div>
 
     <div class="row g-3 mb-4">
       <div class="col-md-4">
         <label class="form-label">{{ form.usuarios_contagem_1.label }}</label>
+        <div class="form-text mb-1">Quem pode gravar a <strong>1ª contagem</strong></div>
         {{ form.usuarios_contagem_1 }}
       </div>
       <div class="col-md-4">
         <label class="form-label">{{ form.usuarios_contagem_2.label }}</label>
+        <div class="form-text mb-1">Quem pode gravar a <strong>2ª contagem</strong></div>
         {{ form.usuarios_contagem_2 }}
       </div>
       <div class="col-md-4">
         <label class="form-label">{{ form.usuarios_contagem_3.label }}</label>
+        <div class="form-text mb-1">Quem pode gravar a <strong>3ª contagem</strong></div>
         {{ form.usuarios_contagem_3 }}
       </div>
     </div>
