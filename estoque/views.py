@@ -2,14 +2,20 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.list import ListView
 
-from estoque.forms import ProdutoEstoqueForm
+from estoque.forms import ProdutoEstoqueForm, ProdutoEstoqueImportForm
+from estoque.import_planilha import (
+    importar_produtos_estoque,
+    parse_planilha_produtos,
+    resposta_modelo_excel,
+)
 from estoque.models import ProdutoEstoque
 
 
@@ -81,6 +87,64 @@ class ProdutoEstoqueUpdateView(LoginRequiredMixin, _EmpresaQuerysetMixin, Update
         ctx = super().get_context_data(**kwargs)
         ctx['descricao'] = 'Editar produto — estoque'
         return ctx
+
+
+@login_required
+def produto_importar_excel(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa antes de importar.')
+        return redirect('empresa:lista')
+
+    if request.method == 'POST':
+        form = ProdutoEstoqueImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            content = form.cleaned_data['arquivo'].read()
+            linhas, avisos = parse_planilha_produtos(content)
+            if not linhas:
+                for msg in avisos[:10]:
+                    messages.error(request, msg)
+                if len(avisos) > 10:
+                    messages.error(request, f'… e mais {len(avisos) - 10} aviso(s).')
+            else:
+                stats = importar_produtos_estoque(
+                    empresa_id,
+                    linhas,
+                    atualizar_existentes=form.cleaned_data['atualizar_existentes'],
+                )
+                messages.success(
+                    request,
+                    (
+                        f'Importação concluída: {stats["criados"]} criado(s), '
+                        f'{stats["atualizados"]} atualizado(s), '
+                        f'{stats["ignorados"]} ignorado(s).'
+                    ),
+                )
+                for msg in avisos[:5]:
+                    messages.warning(request, msg)
+                return redirect('estoque:produto_list')
+    else:
+        form = ProdutoEstoqueImportForm()
+
+    return render(
+        request,
+        'estoque/produto_import.html',
+        {
+            'descricao': 'Importar estoque — Excel',
+            'form': form,
+        },
+    )
+
+
+@login_required
+def produto_modelo_excel(request):
+    data = resposta_modelo_excel()
+    response = HttpResponse(
+        data,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="modelo_importar_estoque.xlsx"'
+    return response
 
 
 @login_required

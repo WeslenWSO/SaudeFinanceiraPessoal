@@ -10,6 +10,7 @@ class ProdutoEstoqueAdmin(admin.ModelAdmin):
         'descricao',
         'marca',
         'quantidade_estoque',
+        'quantidade_estoque_contabil',
         'valor_custo_medio',
         'empresa',
     )

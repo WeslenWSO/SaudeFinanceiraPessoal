@@ -19,6 +19,12 @@ class ProdutoEstoque(models.Model):
         default=0,
         verbose_name='Quantidade em estoque',
     )
+    quantidade_estoque_contabil = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+        verbose_name='Estoque contábil',
+    )
     valor_ultima_compra = models.DecimalField(
         max_digits=12,
         decimal_places=4,

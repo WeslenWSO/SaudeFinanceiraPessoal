@@ -4,9 +4,14 @@
 <div class="container-fluid px-4 py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h4 mb-0">{{ descricao }}</h1>
-    <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm">
-      <i class="fas fa-plus me-1"></i> Novo produto
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'estoque:produto_import' %}" class="btn btn-outline-success btn-sm">
+        <i class="fas fa-file-excel me-1"></i> Importar Excel
+      </a>
+      <a href="{% url 'estoque:produto_create' %}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus me-1"></i> Novo produto
+      </a>
+    </div>
   </div>
 
   {% include 'parcial/_messages.html' %}
@@ -29,6 +34,7 @@
             <th>Descrição</th>
             <th>Marca</th>
             <th class="text-end">Qtd.</th>
+            <th class="text-end">Est. contábil</th>
             <th class="text-end">Últ. compra</th>
             <th class="text-end">Custo médio</th>
             <th class="text-end">Custo contábil</th>
@@ -42,6 +48,7 @@
             <td>{{ p.descricao }}</td>
             <td>{{ p.marca|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
+            <td class="text-end">{{ p.quantidade_estoque_contabil }}</td>
             <td class="text-end">R$ {{ p.valor_ultima_compra|floatformat:4 }}</td>
             <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
             <td class="text-end">R$ {{ p.valor_custo_contabil|floatformat:4 }}</td>
@@ -55,7 +62,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
+            <td colspan="9" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>
