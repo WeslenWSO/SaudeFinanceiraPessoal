@@ -23,9 +23,6 @@
 .relatorio-sedacao-table tr.linha-paga td {
     background-color: #f0fdf4;
 }
-.relatorio-sedacao-acao {
-    white-space: nowrap;
-}
 .relatorio-sedacao-print-wrap .table-responsive {
     overflow-x: auto;
 }
@@ -95,8 +92,6 @@
     .relatorio-sedacao-table col.col-exame { width: 14%; }
     .relatorio-sedacao-table col.col-anest { width: 15%; }
     .relatorio-sedacao-table col.col-valor { width: 10%; }
-    .relatorio-sedacao-table col.col-medico { width: 14%; }
-    .relatorio-sedacao-table col.col-pago { width: 6%; }
     .relatorio-sedacao-cabecalho h4 {
         font-size: 11pt;
         margin-bottom: 2px;
@@ -193,6 +188,7 @@
             </p>
 
             {% if linhas %}
+            <p class="no-print small text-muted mb-2">Linhas em verde = repasse já pago (altere no faturamento do exame).</p>
             <div class="table-responsive">
                 <table class="table table-sm table-striped table-bordered relatorio-sedacao-table mb-0">
                     <colgroup>
@@ -202,8 +198,6 @@
                         <col class="col-exame">
                         <col class="col-anest">
                         <col class="col-valor">
-                        <col class="col-medico">
-                        <col class="col-pago">
                     </colgroup>
                     <thead class="table-light">
                         <tr>
@@ -213,11 +207,6 @@
                             <th>Exame</th>
                             <th>Méd. anest.</th>
                             <th class="text-end">Vlr sed.</th>
-                            <th>Médico</th>
-                            <th class="text-center">
-                                <span class="no-print">Pago</span>
-                                <span class="d-none d-print-inline">Pago</span>
-                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -229,35 +218,6 @@
                             <td>{{ linha.exame }}</td>
                             <td>{{ linha.medico_anestesista }}</td>
                             <td class="text-end">R$ {{ linha.valor_fmt }}</td>
-                            <td>{{ linha.medico }}</td>
-                            <td class="text-center relatorio-sedacao-acao">
-                                <span class="d-none d-print-inline">{% if linha.pago %}Sim{% else %}Não{% endif %}</span>
-                                <span class="no-print">
-                                {% if linha.pago %}
-                                    <span class="badge bg-success"><i class="fas fa-check"></i> Pago</span>
-                                    <form method="post"
-                                          action="{% url 'faturamento_medico:marcar_lancamento_anestesista_pago' linha.id %}"
-                                          class="d-inline ms-1">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{{ relatorio_url }}">
-                                        <input type="hidden" name="acao" value="desmarcar">
-                                        <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Desfazer pagamento">
-                                            Desfazer
-                                        </button>
-                                    </form>
-                                {% else %}
-                                    <form method="post"
-                                          action="{% url 'faturamento_medico:marcar_lancamento_anestesista_pago' linha.id %}"
-                                          class="d-inline">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{{ relatorio_url }}">
-                                        <button type="submit" class="btn btn-outline-success btn-sm">
-                                            <i class="fas fa-dollar-sign"></i> Marcar pago
-                                        </button>
-                                    </form>
-                                {% endif %}
-                                </span>
-                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -265,8 +225,6 @@
                         <tr class="table-light fw-bold">
                             <td colspan="5" class="text-end">Total</td>
                             <td class="text-end">R$ {{ total_valor_fmt }}</td>
-                            <td></td>
-                            <td></td>
                         </tr>
                     </tfoot>
                 </table>
