@@ -10,10 +10,10 @@
     {% endif %}
 </div>
 <div class="card-body p-0">
-    <div class="fluxo-table-scroll">
+    <div class="fluxo-table-scroll fluxo-table-scroll-com-grafico">
     <table id="tabelaFluxoMensal" class="table table-hover table-bordered table-sm text-nowrap mb-0 align-middle fluxo-sticky-table">
         <thead class="table-light">
-            <tr>
+            <tr class="fluxo-head-meses">
                 <th rowspan="2" class="align-middle sticky-col">Categoria</th>
                 {% for mes in meses %}
                 <th colspan="4" class="text-center">
@@ -22,7 +22,7 @@
                 </th>
                 {% endfor %}
             </tr>
-            <tr>
+            <tr class="fluxo-head-sub">
                 {% for mes in meses %}
                 <th class="text-end small">Real.</th>
                 <th class="text-end small">Plan.</th>

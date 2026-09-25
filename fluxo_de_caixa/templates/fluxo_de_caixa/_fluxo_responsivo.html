@@ -3,7 +3,6 @@
 /* Área útil sem estourar a tela */
 .fluxo-resp-wrap {
   max-width: 100%;
-  overflow-x: clip;
 }
 .fluxo-resp-wrap .card {
   border-radius: 0.5rem;
@@ -62,13 +61,25 @@
   .fluxo-chart-box { height: 220px; }
 }
 
-/* Scroll horizontal com coluna fixa */
+/* Scroll da tabela: cabeçalho fixo ao rolar (vertical + horizontal) */
 .fluxo-table-scroll {
-  overflow-x: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
+  overscroll-behavior: contain;
   max-width: 100%;
+  max-height: min(62vh, calc(100dvh - 13rem));
   position: relative;
+}
+.fluxo-table-scroll.fluxo-table-scroll-com-grafico {
+  max-height: min(52vh, calc(100dvh - 22rem));
+}
+@media (max-width: 991.98px) {
+  .fluxo-table-scroll {
+    max-height: min(58vh, calc(100dvh - 11rem));
+  }
+  .fluxo-table-scroll.fluxo-table-scroll-com-grafico {
+    max-height: min(45vh, calc(100dvh - 18rem));
+  }
 }
 .fluxo-table-scroll::after {
   content: '⟵ deslize para ver os meses ⟶';
@@ -98,6 +109,21 @@
   top: 0;
   z-index: 2;
   background: #f8f9fa;
+  box-shadow: 0 1px 0 #dee2e6;
+}
+/* Real × Plan.: 2 linhas no cabeçalho */
+#tabelaFluxoMensal thead tr.fluxo-head-meses th {
+  top: 0;
+  z-index: 4;
+}
+#tabelaFluxoMensal thead tr.fluxo-head-sub th {
+  top: var(--fluxo-thead-linha1, 2.35rem);
+  z-index: 3;
+}
+#tabelaFluxoMensal thead th.sticky-col {
+  top: 0;
+  z-index: 6;
+  vertical-align: middle;
 }
 .fluxo-sticky-table .sticky-col {
   position: sticky;

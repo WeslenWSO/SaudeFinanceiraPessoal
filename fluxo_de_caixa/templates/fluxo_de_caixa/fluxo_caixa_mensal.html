@@ -57,7 +57,7 @@
                 </div>
                 {% endif %}
                 <div class="card-body p-0">
-                    <div class="fluxo-table-scroll">
+                    <div class="fluxo-table-scroll{% if grafico_planilha.tem_dados %} fluxo-table-scroll-com-grafico{% endif %}">
                         <table id="tabelaFluxoPlanilha" class="table table-sm table-bordered mb-0 fluxo-planilha fluxo-sticky-table has-grupo">
                             <thead>
                                 <tr class="table-light">
