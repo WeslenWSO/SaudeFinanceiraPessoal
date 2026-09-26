@@ -1,10 +1,12 @@
-"""Busca imagem de produto na internet (Openverse) com cache em banco."""
+"""Busca imagem de produto (Google Imagens / Openverse) com cache em banco."""
 from __future__ import annotations
 
 import logging
 import re
+from urllib.parse import quote_plus
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 
 from notafiscalentrada.models import ProdutoComercioFoto
@@ -12,6 +14,7 @@ from notafiscalentrada.models import ProdutoComercioFoto
 logger = logging.getLogger(__name__)
 
 _OPENVERSE = 'https://api.openverse.org/v1/images/'
+_GOOGLE_CSE = 'https://www.googleapis.com/customsearch/v1'
 _TIMEOUT = 12
 
 
@@ -25,7 +28,6 @@ def _limpar_query(nome: str, codigo: str = '') -> list[str]:
         queries.append(f'{codigo} {nome}'[:140])
     elif codigo:
         queries.append(codigo[:140])
-    # Remove ruído comum de NF
     out: list[str] = []
     for q in queries:
         q2 = re.sub(r'\s+', ' ', q).strip()
@@ -34,14 +36,64 @@ def _limpar_query(nome: str, codigo: str = '') -> list[str]:
     return out
 
 
+def termo_busca_foto(nome: str, codigo: str = '') -> str:
+    queries = _limpar_query(nome, codigo)
+    if queries:
+        return queries[0]
+    return (codigo or nome or '').strip()
+
+
+def url_google_imagens(nome: str, codigo: str = '') -> str:
+    """Link para abrir a busca de imagens no Google (nome/código do produto)."""
+    termo = termo_busca_foto(nome, codigo)
+    if not termo:
+        return 'https://www.google.com/search?tbm=isch'
+    return f'https://www.google.com/search?tbm=isch&q={quote_plus(termo)}'
+
+
+def _google_cse_configurado() -> tuple[str, str]:
+    key = getattr(settings, 'GOOGLE_CSE_API_KEY', '') or ''
+    cx = getattr(settings, 'GOOGLE_CSE_CX', '') or ''
+    return key.strip(), cx.strip()
+
+
+def _buscar_google_cse(query: str) -> str | None:
+    api_key, cx = _google_cse_configurado()
+    if not api_key or not cx:
+        return None
+    try:
+        resp = requests.get(
+            _GOOGLE_CSE,
+            params={
+                'key': api_key,
+                'cx': cx,
+                'q': query,
+                'searchType': 'image',
+                'num': 3,
+                'safe': 'active',
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        items = resp.json().get('items') or []
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning('Google CSE falhou (%s): %s', query[:40], exc)
+        return None
+
+    for hit in items:
+        link = hit.get('link')
+        if link and str(link).startswith('http'):
+            return str(link)
+    return None
+
+
 def _buscar_openverse(query: str) -> str | None:
     try:
         resp = requests.get(
             _OPENVERSE,
             params={
                 'q': query,
-                'page_size': 3,
-                'license_type': 'commercial,modification',
+                'page_size': 5,
             },
             timeout=_TIMEOUT,
             headers={'Accept': 'application/json'},
@@ -61,6 +113,9 @@ def _buscar_openverse(query: str) -> str | None:
 
 def buscar_url_imagem_internet(nome: str, codigo: str = '') -> tuple[str | None, str]:
     for query in _limpar_query(nome, codigo):
+        url = _buscar_google_cse(query)
+        if url:
+            return url, 'google'
         url = _buscar_openverse(query)
         if url:
             return url, 'openverse'
@@ -95,7 +150,7 @@ def obter_foto_produto(
         defaults={
             'nome_produto': (nome_produto or '')[:200],
             'url_imagem': url[:600],
-            'fonte': fonte or 'openverse',
+            'fonte': fonte or 'google',
             'atualizado_em': timezone.now(),
         },
     )

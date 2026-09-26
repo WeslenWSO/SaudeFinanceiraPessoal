@@ -369,6 +369,11 @@ if USE_S3_STORAGE:
 #   NFSE_NACIONAL_CONNECT_TIMEOUT — segundos para abrir TCP/TLS (padrão 120)
 #   NFSE_NACIONAL_READ_TIMEOUT — segundos para corpo da resposta (padrão 180)
 #   NFSE_NACIONAL_HTTP_RETRIES — tentativas extras em timeout/conexão (padrão 2)
+# Google Custom Search (Imagens) — opcional; miniatura na listagem de produtos comércio.
+# Crie em https://programmablesearchengine.google.com/ (searchType=image).
+GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', '').strip()
+GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '').strip()
+
 NFSE_NACIONAL = {
     "base_url": os.environ.get(
         "NFSE_NACIONAL_BASE_URL",

@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
-from .produto_foto import mapa_fotos_por_codigo, obter_foto_produto
+from .produto_foto import mapa_fotos_por_codigo, obter_foto_produto, url_google_imagens
 from empresa.models import Empresa
 from fornecedor.models import Fornecedor
 from regraConciliacao.models import RegraConciliacao
@@ -1249,6 +1249,7 @@ def listar_produtos_comercio(request):
     fotos = mapa_fotos_por_codigo(empresa_id, codigos)
     for item in page_itens:
         item.foto_url = fotos.get(item.codigo_produto, '')
+        item.google_foto_url = url_google_imagens(item.nome_produto, item.codigo_produto)
 
     context = {
         'page_obj': page_obj,
@@ -1285,12 +1286,20 @@ def produto_comercio_foto_api(request):
         nome,
         forcar_busca=forcar,
     )
+    google_url = url_google_imagens(nome, codigo)
     if not foto:
-        return JsonResponse({'ok': False, 'erro': 'Nenhuma imagem encontrada.'})
+        return JsonResponse(
+            {
+                'ok': False,
+                'erro': 'Nenhuma miniatura encontrada.',
+                'google_url': google_url,
+            },
+        )
     return JsonResponse(
         {
             'ok': True,
             'url': foto.url_imagem,
+            'google_url': google_url,
             'fonte': foto.fonte,
             'codigo': foto.codigo_produto,
         },

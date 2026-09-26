@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from empresa.models import Empresa
 from notafiscalentrada.models import NotaFiscalEntrada, NotaFiscalEntradaItem, ProdutoComercioFoto
-from notafiscalentrada.produto_foto import mapa_fotos_por_codigo
+from notafiscalentrada.produto_foto import mapa_fotos_por_codigo, url_google_imagens
 
 
 class ProdutosComercioListTest(TestCase):
@@ -75,6 +75,13 @@ class ProdutosComercioListTest(TestCase):
             },
         )
         self.assertNotContains(r2, 'Sofa Especial')
+
+    def test_link_google_imagens_na_listagem(self):
+        url = reverse('notafiscalentrada:produtos_comercio')
+        r = self.client.get(url, {'data_inicio': '2026-03-01', 'data_fim': '2026-03-31'})
+        self.assertEqual(r.status_code, 200)
+        esperado = url_google_imagens('Sofa Especial', 'P001')
+        self.assertContains(r, esperado)
 
     def test_mapa_fotos_cache(self):
         ProdutoComercioFoto.objects.create(
