@@ -7,7 +7,8 @@ from django.http import JsonResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils import timezone
-from django.db.models import Q
+from django.core.paginator import Paginator
+from django.db.models import Q, Sum
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
 from empresa.models import Empresa
 from fornecedor.models import Fornecedor
@@ -1195,6 +1196,63 @@ def listar_notas_fiscais(request):
     }
 
     return render(request, 'notafiscalentrada/listar.html', context)
+
+
+@login_required
+def listar_produtos_comercio(request):
+    """Itens de NF de comércio (compras) por período e busca de produto."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    hoje = timezone.localdate()
+    data_inicio = (request.GET.get('data_inicio') or '').strip()
+    data_fim = (request.GET.get('data_fim') or '').strip()
+    produto = (request.GET.get('produto') or '').strip()
+
+    if not data_inicio and not data_fim:
+        data_inicio = hoje.replace(day=1).isoformat()
+        data_fim = hoje.isoformat()
+
+    itens = (
+        NotaFiscalEntradaItem.objects.filter(
+            nota_fiscal__empresa_id=empresa_id,
+            nota_fiscal__tipo_nota='comercio',
+        )
+        .select_related('nota_fiscal')
+        .order_by('-nota_fiscal__data_emissao', 'nome_produto', 'codigo_produto')
+    )
+
+    if data_inicio:
+        itens = itens.filter(nota_fiscal__data_emissao__date__gte=data_inicio)
+    if data_fim:
+        itens = itens.filter(nota_fiscal__data_emissao__date__lte=data_fim)
+    if produto:
+        itens = itens.filter(
+            Q(nome_produto__icontains=produto) | Q(codigo_produto__icontains=produto),
+        )
+
+    totais = itens.aggregate(
+        qtd_total=Sum('quantidade'),
+        valor_total=Sum('valor_total'),
+    )
+
+    paginator = Paginator(itens, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'page_obj': page_obj,
+        'itens': page_obj.object_list,
+        'filtros': {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+            'produto': produto,
+        },
+        'totais': totais,
+        'quantidade_registros': paginator.count,
+    }
+    return render(request, 'notafiscalentrada/produtos_comercio.html', context)
 
 
 def _resolver_fornecedor_cadastro_da_nota(nota, empresa_id):
