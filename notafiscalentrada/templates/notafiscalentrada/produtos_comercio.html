@@ -113,14 +113,16 @@
                         {% for item in itens %}
                         <tr>
                             <td class="produto-foto-cell">
-                                <img src="{% url 'notafiscalentrada:produto_comercio_foto_img' %}?codigo={{ item.codigo_produto|urlencode }}&amp;nome={{ item.nome_produto|urlencode }}"
+                                <img src="{% if item.foto_exibir_url %}{{ item.foto_exibir_url }}{% else %}{% url 'notafiscalentrada:produto_comercio_foto_img' %}?codigo={{ item.codigo_produto|urlencode }}&amp;nome={{ item.nome_produto|urlencode }}{% endif %}"
                                      alt=""
                                      class="produto-foto-thumb produto-foto-img"
                                      width="56"
                                      height="56"
                                      loading="lazy"
+                                     referrerpolicy="no-referrer"
                                      data-codigo="{{ item.codigo_produto|escape }}"
                                      data-nome="{{ item.nome_produto|escape }}"
+                                     data-proxy="{% url 'notafiscalentrada:produto_comercio_foto_img' %}"
                                      title="{{ item.nome_produto|truncatechars:80 }}">
                             </td>
                             <td class="text-nowrap">{{ item.nota_fiscal.data_emissao|date:"d/m/Y" }}</td>
@@ -183,10 +185,19 @@
     img.src = baseImg + '?' + params.toString();
   }
 
+  document.querySelectorAll('.produto-foto-img').forEach(function (img) {
+    img.addEventListener('error', function () {
+      if (img.dataset.retried === '1') return;
+      img.dataset.retried = '1';
+      recarregarFoto(img, true);
+    });
+  });
+
   const btn = document.getElementById('btnBuscarFotosPagina');
   if (btn) {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.produto-foto-img').forEach(function (img) {
+        img.dataset.retried = '';
         recarregarFoto(img, true);
       });
     });

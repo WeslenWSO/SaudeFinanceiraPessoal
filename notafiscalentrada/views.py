@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils import timezone
@@ -12,9 +12,11 @@ from django.db.models import Q, Sum
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
 from .produto_foto import (
     baixar_bytes_imagem,
-    mapa_fotos_por_codigo,
+    mapa_fotos_arquivo_por_codigo,
     obter_foto_produto,
+    persistir_arquivo_imagem,
     placeholder_foto_svg,
+    precarregar_fotos_listagem,
     url_google_imagens,
 )
 from empresa.models import Empresa
@@ -1251,10 +1253,11 @@ def listar_produtos_comercio(request):
     paginator = Paginator(itens, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
     page_itens = list(page_obj.object_list)
+    precarregar_fotos_listagem(empresa_id, page_itens)
     codigos = list({i.codigo_produto for i in page_itens if i.codigo_produto})
-    fotos = mapa_fotos_por_codigo(empresa_id, codigos)
+    fotos_arquivo = mapa_fotos_arquivo_por_codigo(empresa_id, codigos)
     for item in page_itens:
-        item.foto_url = fotos.get(item.codigo_produto, '')
+        item.foto_exibir_url = fotos_arquivo.get(item.codigo_produto, '')
 
     context = {
         'page_obj': page_obj,
@@ -1331,25 +1334,23 @@ def produto_comercio_foto_img(request):
         nome,
         forcar_busca=forcar,
     )
-    if not foto or not foto.url_imagem:
-        return HttpResponse(
-            placeholder_foto_svg(),
-            content_type='image/svg+xml',
-            headers={'Cache-Control': 'private, max-age=300'},
+    if foto:
+        foto = persistir_arquivo_imagem(foto)
+
+    if foto and foto.imagem:
+        return FileResponse(
+            foto.imagem.open('rb'),
+            content_type='image/jpeg',
+            headers={'Cache-Control': 'private, max-age=604800'},
         )
 
-    corpo, ctype = baixar_bytes_imagem(foto.url_imagem)
-    if not corpo:
-        return HttpResponse(
-            placeholder_foto_svg(),
-            content_type='image/svg+xml',
-            headers={'Cache-Control': 'private, max-age=300'},
-        )
+    if foto and foto.url_imagem:
+        return HttpResponseRedirect(foto.url_imagem)
 
     return HttpResponse(
-        corpo,
-        content_type=ctype,
-        headers={'Cache-Control': 'private, max-age=604800'},
+        placeholder_foto_svg(),
+        content_type='image/svg+xml',
+        headers={'Cache-Control': 'private, max-age=300'},
     )
 
 

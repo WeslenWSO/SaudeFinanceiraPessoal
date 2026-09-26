@@ -251,7 +251,13 @@ class ProdutoComercioFoto(models.Model):
     )
     codigo_produto = models.CharField(max_length=50)
     nome_produto = models.CharField(max_length=200, blank=True, default='')
-    url_imagem = models.URLField(max_length=600)
+    url_imagem = models.URLField(max_length=600, blank=True, default='')
+    imagem = models.ImageField(
+        upload_to='produto_comercio/%Y/%m/',
+        blank=True,
+        null=True,
+        verbose_name='Arquivo da imagem',
+    )
     fonte = models.CharField(max_length=40, default='openverse')
     atualizado_em = models.DateTimeField(auto_now=True)
 

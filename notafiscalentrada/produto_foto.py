@@ -7,6 +7,7 @@ from urllib.parse import quote_plus
 
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from notafiscalentrada.models import ProdutoComercioFoto
@@ -126,35 +127,53 @@ def _buscar_wikipedia_thumb(query: str) -> str | None:
 
     for lang in ('en', 'pt'):
         termo = termos[0]
-        try:
-            resp = requests.get(
-                f'https://{lang}.wikipedia.org/w/api.php',
-                params={
-                    'action': 'opensearch',
-                    'search': termo,
-                    'limit': 5,
-                    'namespace': 0,
-                    'format': 'json',
-                },
-                headers=headers,
-                timeout=_TIMEOUT,
-            )
-            resp.raise_for_status()
-            titles = resp.json()[1] or []
-        except (requests.RequestException, ValueError, IndexError) as exc:
-            logger.warning('Wikipedia opensearch (%s) falhou: %s', lang, exc)
-            continue
-
-        termo_low = termo.lower()
-        for title in titles:
-            titulo_low = title.lower()
-            if termo_low not in titulo_low and not (
-                palavras and palavras[0].lower() in titulo_low
-            ):
-                continue
-            thumb = _wikipedia_thumb_por_titulo(lang, title, headers)
+        variantes = []
+        for v in (termo, termo.title(), termo.capitalize()):
+            if v and v not in variantes:
+                variantes.append(v)
+        for busca in variantes:
+            thumb = _wikipedia_opensearch_titulo(lang, busca, headers, termo, palavras)
             if thumb:
                 return thumb
+    return None
+
+
+def _wikipedia_opensearch_titulo(
+    lang: str,
+    busca: str,
+    headers: dict,
+    termo: str,
+    palavras: list[str],
+) -> str | None:
+    try:
+        resp = requests.get(
+            f'https://{lang}.wikipedia.org/w/api.php',
+            params={
+                'action': 'opensearch',
+                'search': busca,
+                'limit': 5,
+                'namespace': 0,
+                'format': 'json',
+            },
+            headers=headers,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        titles = resp.json()[1] or []
+    except (requests.RequestException, ValueError, IndexError) as exc:
+        logger.warning('Wikipedia opensearch (%s) falhou: %s', lang, exc)
+        return None
+
+    termo_low = termo.lower()
+    for title in titles:
+        titulo_low = title.lower()
+        if termo_low not in titulo_low and not (
+            palavras and palavras[0].lower() in titulo_low
+        ):
+            continue
+        thumb = _wikipedia_thumb_por_titulo(lang, title, headers)
+        if thumb:
+            return thumb
     return None
 
 
@@ -357,6 +376,86 @@ def placeholder_foto_svg() -> bytes:
     return _PLACEHOLDER_SVG
 
 
+def persistir_arquivo_imagem(foto: ProdutoComercioFoto) -> ProdutoComercioFoto:
+    """Grava a imagem no MEDIA para exibir na listagem sem depender do site externo."""
+    if foto.imagem:
+        return foto
+    if not foto.url_imagem:
+        return foto
+    corpo, ctype = baixar_bytes_imagem(foto.url_imagem)
+    if not corpo:
+        return foto
+    ext = 'jpg'
+    if 'png' in ctype:
+        ext = 'png'
+    elif 'webp' in ctype:
+        ext = 'webp'
+    nome_arquivo = f'{foto.codigo_produto[:40]}.{ext}'
+    foto.imagem.save(nome_arquivo, ContentFile(corpo), save=True)
+    return foto
+
+
+def precarregar_fotos_listagem(
+    empresa_id: int,
+    itens,
+    *,
+    max_produtos: int = 18,
+) -> None:
+    """Busca e salva fotos dos produtos visíveis (até max_produtos códigos distintos)."""
+    nome_por_codigo: dict[str, str] = {}
+    ordem_codigos: list[str] = []
+    for item in itens:
+        codigo = (getattr(item, 'codigo_produto', None) or '').strip()
+        if not codigo or codigo in nome_por_codigo:
+            continue
+        nome_por_codigo[codigo] = getattr(item, 'nome_produto', '') or ''
+        ordem_codigos.append(codigo)
+        if len(ordem_codigos) >= max_produtos:
+            break
+
+    if not ordem_codigos:
+        return
+
+    existentes = {
+        row.codigo_produto: row
+        for row in ProdutoComercioFoto.objects.filter(
+            empresa_id=empresa_id,
+            codigo_produto__in=ordem_codigos,
+        )
+    }
+
+    for codigo in ordem_codigos:
+        row = existentes.get(codigo)
+        if row and row.imagem:
+            continue
+        if row and row.url_imagem and not row.imagem:
+            persistir_arquivo_imagem(row)
+            continue
+        foto = obter_foto_produto(
+            empresa_id,
+            codigo,
+            nome_por_codigo.get(codigo, ''),
+            forcar_busca=False,
+        )
+        if foto:
+            persistir_arquivo_imagem(foto)
+
+
+def mapa_fotos_arquivo_por_codigo(empresa_id: int, codigos: list[str]) -> dict[str, str]:
+    """URLs locais (MEDIA) das fotos já salvas em disco."""
+    if not codigos:
+        return {}
+    out: dict[str, str] = {}
+    qs = ProdutoComercioFoto.objects.filter(
+        empresa_id=empresa_id,
+        codigo_produto__in=codigos,
+    )
+    for row in qs:
+        if row.imagem:
+            out[row.codigo_produto] = row.imagem.url
+    return out
+
+
 def mapa_fotos_por_codigo(empresa_id: int, codigos: list[str]) -> dict[str, str]:
     if not codigos:
         return {}
@@ -364,4 +463,4 @@ def mapa_fotos_por_codigo(empresa_id: int, codigos: list[str]) -> dict[str, str]
         empresa_id=empresa_id,
         codigo_produto__in=codigos,
     )
-    return {row.codigo_produto: row.url_imagem for row in qs}
+    return {row.codigo_produto: row.url_imagem for row in qs if row.url_imagem}
