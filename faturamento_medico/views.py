@@ -968,6 +968,24 @@ def _filtrar_por_medicos(qs, medicos_sel):
     return qs.filter(q_med) if q_med else qs
 
 
+def _filtrar_por_convenios(qs, convenios_sel):
+    if not convenios_sel:
+        return qs
+    q = Q()
+    for conv in convenios_sel:
+        q |= _q_convenio_filtro(conv)
+    return qs.filter(q) if q else qs
+
+
+def _listar_convenios_periodo(qs_periodo):
+    nomes = {
+        (c or '').strip()
+        for c in qs_periodo.values_list('convenio', flat=True).distinct()
+        if (c or '').strip()
+    }
+    return sorted(nomes, key=str.lower)
+
+
 def _codigos_modalidade_filtro_validos():
     return {codigo for codigo, _ in MODALIDADES_SOLICITANTE} | {'OUTROS'}
 
@@ -2757,6 +2775,7 @@ def _coletar_cards_map_exames_solicitante(request):
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
 
     freq_solicitante = defaultdict(int)
@@ -2780,13 +2799,16 @@ def _coletar_cards_map_exames_solicitante(request):
     )
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
     qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
 
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
     periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
-    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel or modalidades_sel)
+    incluir_lista_detalhada = bool(
+        solicitantes_sel or medicos_sel or modalidades_sel or convenios_sel
+    )
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     for faturamento in qs:
@@ -2841,6 +2863,7 @@ def _coletar_cards_map_exames_solicitante(request):
             'medico': medicos_sel,
             'modalidade': modalidades_sel,
             'status_agendamento': status_agendamento_sel,
+            'convenio': convenios_sel,
         },
     }
 
@@ -3153,6 +3176,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
 
     freq_solicitante = defaultdict(int)
@@ -3176,6 +3200,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
     )
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
     qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
@@ -3455,12 +3480,14 @@ def listar_exames_por_solicitante(request):
     status_agendamento_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
 
     status_disponiveis = sorted({
         (status or '').strip() or 'Não informado'
         for status in qs_periodo.values_list('status_agendamento', flat=True).distinct()
     }, key=str.lower)
+    convenios_disponiveis = _listar_convenios_periodo(qs_periodo)
 
     freq_solicitante = defaultdict(int)
     for raw in qs_periodo.values_list('medico_solicitante', flat=True):
@@ -3495,6 +3522,7 @@ def listar_exames_por_solicitante(request):
     medicos_disponiveis = _listar_nomes_medico_periodo(qs_periodo)
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
+    qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
 
@@ -3505,7 +3533,9 @@ def listar_exames_por_solicitante(request):
     metas_map = _carregar_metas_solicitante(empresa_id)
 
     grid_linhas = []
-    incluir_lista_detalhada = bool(solicitantes_sel or medicos_sel or modalidades_sel)
+    incluir_lista_detalhada = bool(
+        solicitantes_sel or medicos_sel or modalidades_sel or convenios_sel
+    )
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
@@ -3738,6 +3768,7 @@ def listar_exames_por_solicitante(request):
         'sugestoes_apelido': sugestoes_apelido,
         'qtd_grafias_sem_apelido': qtd_grafias_sem_apelido,
         'medicos_disponiveis': medicos_disponiveis,
+        'convenios_disponiveis': convenios_disponiveis,
         'status_disponiveis': status_disponiveis,
         'filtros': {
             'data_inicio': di.isoformat(),
@@ -3746,6 +3777,7 @@ def listar_exames_por_solicitante(request):
             'medico': medicos_sel,
             'modalidade': modalidades_sel,
             'status_agendamento': status_agendamento_sel,
+            'convenio': convenios_sel,
         },
         'modalidades_opcoes': MODALIDADES_SOLICITANTE,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
@@ -5279,7 +5311,7 @@ def marcar_lancamento_anestesista_pago(request, pk):
 
 @login_required
 def acerto_caixa(request):
-    """Fechamento / acerto de caixa — procedimentos, NF e resumo por viabilidade (convênio)."""
+    """Fechamento / acerto de caixa — procedimentos, NF e resumos de pagamento/aguardando faturamento."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')

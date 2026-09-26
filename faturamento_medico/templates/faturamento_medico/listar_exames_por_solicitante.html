@@ -185,21 +185,31 @@
                 </div>
                 <div class="card-body">
                     <form method="GET" class="mb-4">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-2">
+                        <div class="row g-2 align-items-end mb-2 pb-2 border-bottom">
+                            <div class="col-sm-6 col-md-3 col-lg-2">
                                 <label class="form-label small mb-0 text-muted">Data início</label>
                                 <input type="date" name="data_inicio" class="form-control"
                                        value="{{ filtros.data_inicio }}">
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-sm-6 col-md-3 col-lg-2">
                                 <label class="form-label small mb-0 text-muted">Data fim</label>
                                 <input type="date" name="data_fim" class="form-control"
                                        value="{{ filtros.data_fim }}">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-auto ms-md-auto d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter"></i> Filtrar
+                                </button>
+                                <a href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}" class="btn btn-outline-secondary">
+                                    Limpar
+                                </a>
+                            </div>
+                        </div>
+                        <div class="row g-3 align-items-stretch">
+                            <div class="col-lg-4">
                                 <label class="form-label small mb-0 text-muted">Status agendamento (múltiplo)</label>
-                                <div class="fm-solicitante-picker py-2">
-                                    <div class="fm-solicitante-lista" style="max-height: 9rem;">
+                                <div class="fm-solicitante-picker py-2 h-100">
+                                    <div class="fm-solicitante-lista" style="max-height: 10rem;">
                                         {% for st in status_disponiveis %}
                                         <label class="fm-solicitante-item">
                                             <input type="checkbox"
@@ -215,7 +225,64 @@
                                 </div>
                                 <div class="form-text">Vazio = exclui cancelados/desistência.</div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-4">
+                                <label class="form-label small mb-0 text-muted">Modalidade (múltiplo)</label>
+                                <div class="fm-solicitante-picker py-2 h-100">
+                                    <div class="fm-solicitante-lista" style="max-height: 10rem;">
+                                        {% for codigo, label in modalidades_opcoes %}
+                                        <label class="fm-solicitante-item">
+                                            <input type="checkbox"
+                                                   name="modalidade"
+                                                   value="{{ codigo }}"
+                                                   {% if codigo in filtros.modalidade %}checked{% endif %}>
+                                            <span>{{ codigo }} — {{ label }}</span>
+                                        </label>
+                                        {% endfor %}
+                                        <label class="fm-solicitante-item">
+                                            <input type="checkbox"
+                                                   name="modalidade"
+                                                   value="OUTROS"
+                                                   {% if 'OUTROS' in filtros.modalidade %}checked{% endif %}>
+                                            <span>Outros</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-text">Vazio = todas as modalidades.</div>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label small mb-0 text-muted">Convênio (múltiplo)</label>
+                                <div class="fm-solicitante-picker" id="pickerConvenio">
+                                    <input type="search"
+                                           id="buscaConvenio"
+                                           class="form-control form-control-sm mb-2"
+                                           placeholder="Pesquisar convênio..."
+                                           autocomplete="off">
+                                    <div id="convenioSelecionados" class="fm-solicitante-selecionados mb-2"></div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted" id="contagemConvenio"></span>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="selecionarTodosConvenios">Selecionar todos</button>
+                                            <button type="button" class="btn btn-link btn-sm p-0" id="limparConvenios">Limpar</button>
+                                        </div>
+                                    </div>
+                                    <div class="fm-solicitante-lista" id="listaConvenios">
+                                        {% for nome in convenios_disponiveis %}
+                                        <label class="fm-solicitante-item"
+                                               data-busca="{{ nome|lower }}">
+                                            <input type="checkbox"
+                                                   name="convenio"
+                                                   value="{{ nome }}"
+                                                   {% if nome in filtros.convenio %}checked{% endif %}>
+                                            <span>{{ nome }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <div class="p-2 small text-muted">Nenhum convênio no período</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="form-text">Vazio = todos os convênios.</div>
+                            </div>
+                            <div class="col-lg-6">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <label class="form-label small mb-0 text-muted">Solicitante (múltiplo)</label>
                                     <button type="button"
@@ -269,41 +336,7 @@
                                 </div>
                                 <div class="form-text">Somente solicitantes com apelido cadastrado.</div>
                             </div>
-                            <div class="col-md-2 d-flex gap-2 align-items-end">
-                                <button type="submit" class="btn btn-secondary">
-                                    <i class="fas fa-filter"></i> Filtrar
-                                </button>
-                                <a href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}" class="btn btn-outline-secondary">
-                                    Limpar
-                                </a>
-                            </div>
-                        </div>
-                        <div class="row g-2 align-items-end mt-2">
-                            <div class="col-md-3">
-                                <label class="form-label small mb-0 text-muted">Modalidade (múltiplo)</label>
-                                <div class="fm-solicitante-picker py-2">
-                                    <div class="fm-solicitante-lista" style="max-height: 9rem;">
-                                        {% for codigo, label in modalidades_opcoes %}
-                                        <label class="fm-solicitante-item">
-                                            <input type="checkbox"
-                                                   name="modalidade"
-                                                   value="{{ codigo }}"
-                                                   {% if codigo in filtros.modalidade %}checked{% endif %}>
-                                            <span>{{ codigo }} — {{ label }}</span>
-                                        </label>
-                                        {% endfor %}
-                                        <label class="fm-solicitante-item">
-                                            <input type="checkbox"
-                                                   name="modalidade"
-                                                   value="OUTROS"
-                                                   {% if 'OUTROS' in filtros.modalidade %}checked{% endif %}>
-                                            <span>Outros</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="form-text">Vazio = todas as modalidades.</div>
-                            </div>
-                            <div class="col-md-4">
+                            <div class="col-lg-6">
                                 <label class="form-label small mb-0 text-muted">Médico (múltiplo)</label>
                                 <div class="fm-solicitante-picker" id="pickerMedico">
                                     <input type="search"
@@ -353,6 +386,9 @@
                             {% endif %}
                             {% if filtros.status_agendamento %}
                             · {{ filtros.status_agendamento|length }} status selecionado(s)
+                            {% endif %}
+                            {% if filtros.convenio %}
+                            · {{ filtros.convenio|length }} convênio(s) selecionado(s)
                             {% endif %}
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
@@ -973,6 +1009,14 @@ initMultiPicker({
     contagemId: 'contagemMedico',
     limparId: 'limparMedicos',
     selecionarTodosId: 'selecionarTodosMedicos'
+});
+initMultiPicker({
+    listaId: 'listaConvenios',
+    buscaId: 'buscaConvenio',
+    chipsId: 'convenioSelecionados',
+    contagemId: 'contagemConvenio',
+    limparId: 'limparConvenios',
+    selecionarTodosId: 'selecionarTodosConvenios'
 });
 
 (function initNotasSolicitante() {

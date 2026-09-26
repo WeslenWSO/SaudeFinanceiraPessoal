@@ -127,6 +127,11 @@ def _moeda_br(valor) -> str:
     return f'{v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def _eh_aguardando_faturamento(status_txt: str) -> bool:
+    s = (status_txt or '').lower()
+    return 'aguard' in s and 'fatur' in s
+
+
 def _agrupar_forma_pagamento(forma: str) -> str:
     f = (forma or '').strip().upper()
     if not f or f == '-':
@@ -185,8 +190,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     notas_por_data = carregar_notas_por_data(empresa_id, di, df)
 
     linhas = []
-    resumo_convenio: dict[str, Decimal] = defaultdict(Decimal)
-    resumo_convenio_qtd: dict[str, int] = defaultdict(int)
     resumo_pagamento: dict[str, Decimal] = defaultdict(Decimal)
     resumo_aguardando_faturamento: dict[str, Decimal] = defaultdict(Decimal)
 
@@ -235,17 +238,18 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 total_item = fat.total or 0
                 valor_tabela = fat.valor or 0
 
+            aguardando_faturamento = _eh_aguardando_faturamento(status_txt)
+
             if not pagamento_contabilizado:
-                chave_pag = _agrupar_forma_pagamento(forma_pgto)
-                if valor_nota is not None:
-                    resumo_pagamento[chave_pag] += Decimal(str(valor_nota))
-                else:
-                    resumo_pagamento[chave_pag] += Decimal(str(total_item or 0))
+                if not aguardando_faturamento:
+                    chave_pag = _agrupar_forma_pagamento(forma_pgto)
+                    if valor_nota is not None:
+                        resumo_pagamento[chave_pag] += Decimal(str(valor_nota))
+                    else:
+                        resumo_pagamento[chave_pag] += Decimal(str(total_item or 0))
                 pagamento_contabilizado = True
 
-            resumo_convenio[convenio] += Decimal(str(total_item or 0))
-            resumo_convenio_qtd[convenio] += 1
-            if 'aguard' in (status_txt or '').lower() and 'fatur' in (status_txt or '').lower():
+            if aguardando_faturamento:
                 resumo_aguardando_faturamento[convenio] += Decimal(str(total_item or 0))
 
             linhas.append({
@@ -279,21 +283,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         else:
             _add_linha(None)
 
-    total_geral = sum((l['total_item'] or 0) for l in linhas)
-
-    resumo_convenio_lista = sorted(
-        [
-            {
-                'convenio': nome,
-                'qtd': resumo_convenio_qtd[nome],
-                'total': total,
-                'total_fmt': _moeda_br(total),
-            }
-            for nome, total in resumo_convenio.items()
-        ],
-        key=lambda x: (-x['total'], x['convenio'].lower()),
-    )
-
     resumo_pagamento_lista = sorted(
         [
             {'rotulo': k, 'total': v, 'total_fmt': _moeda_br(v)}
@@ -309,14 +298,14 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         ],
         key=lambda x: (-x['total'], x['convenio'].lower()),
     )
+    total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
 
     return {
         'linhas': linhas,
         'quantidade_linhas': len(linhas),
-        'total_geral_fmt': _moeda_br(total_geral),
-        'resumo_convenio': resumo_convenio_lista,
         'resumo_pagamento': resumo_pagamento_lista,
         'resumo_aguardando_faturamento': resumo_aguardando_lista,
+        'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
         'filtros': {
             'data_inicio': di.isoformat(),
