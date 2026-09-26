@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.fm-solicitante-lista {
+    max-height: 9rem;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.5rem;
+    background: #fff;
+}
+.fm-solicitante-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.15rem;
+}
+.acerto-resumo-card { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.5rem; padding: 1rem; }
+.acerto-table thead th { font-size: 0.72rem; white-space: nowrap; vertical-align: middle; }
+.acerto-table td { font-size: 0.78rem; vertical-align: middle; }
+</style>
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h3 class="card-title mb-0">Acerto de Caixa</h3>
+                <small class="text-muted">Período: {{ periodo_fmt }}</small>
+            </div>
+            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Faturamento
+            </a>
+        </div>
+        <div class="card-body">
+            {% if empresa %}
+            <p class="small mb-3"><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</p>
+            {% endif %}
+
+            <form method="get" class="mb-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1" for="data_inicio">Data início</label>
+                        <input type="date" id="data_inicio" name="data_inicio" class="form-control form-control-sm"
+                               value="{{ filtros.data_inicio }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1" for="data_fim">Data fim</label>
+                        <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
+                               value="{{ filtros.data_fim }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1" for="checkin">Check-in (contém)</label>
+                        <input type="search" id="checkin" name="checkin" class="form-control form-control-sm"
+                               placeholder="Nome do operador"
+                               value="{{ filtros.checkin }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1" for="hora_inicial">Hora inicial</label>
+                        <input type="time" id="hora_inicial" name="hora_inicial" class="form-control form-control-sm"
+                               value="{{ filtros.hora_inicial }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1" for="hora_final">Hora final</label>
+                        <input type="time" id="hora_final" name="hora_final" class="form-control form-control-sm"
+                               value="{{ filtros.hora_final }}">
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                        <a href="{% url 'faturamento_medico:acerto_caixa' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                    </div>
+                </div>
+                <div class="row g-2 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Status agendamento (múltipla seleção)</label>
+                        <div class="fm-solicitante-lista">
+                            {% for st in status_disponiveis %}
+                            <label class="fm-solicitante-item">
+                                <input type="checkbox" name="status_agendamento" value="{{ st }}"
+                                       {% if st in filtros.status_agendamento %}checked{% endif %}>
+                                <span>{{ st }}</span>
+                            </label>
+                            {% empty %}
+                            <span class="text-muted small">Nenhum status no período.</span>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Vazio = exclui cancelados, desistência e deletados.</div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row g-3 mb-4">
+                <div class="col-lg-4">
+                    <div class="acerto-resumo-card h-100">
+                        <h6 class="mb-2">Resumo por forma de pagamento (NF)</h6>
+                        <table class="table table-sm table-borderless mb-0">
+                            {% for row in resumo_pagamento %}
+                            <tr>
+                                <td>{{ row.rotulo }}</td>
+                                <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="text-muted">Sem dados no filtro.</td></tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="acerto-resumo-card h-100">
+                        <h6 class="mb-2">Aguardando faturamento — por convênio</h6>
+                        <table class="table table-sm table-borderless mb-0">
+                            {% for row in resumo_aguardando_faturamento %}
+                            <tr>
+                                <td>{{ row.convenio|truncatechars:35 }}</td>
+                                <td class="text-end">R$ {{ row.total_fmt }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="text-muted">Nenhum item com esse status.</td></tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="acerto-resumo-card h-100">
+                        <h6 class="mb-2">Resumo por viabilidade (convênio)</h6>
+                        <table class="table table-sm table-borderless mb-0">
+                            {% for row in resumo_convenio %}
+                            <tr>
+                                <td>{{ row.convenio|truncatechars:30 }} <span class="text-muted">({{ row.qtd }})</span></td>
+                                <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td class="text-muted">Sem dados.</td></tr>
+                            {% endfor %}
+                            {% if resumo_convenio %}
+                            <tr class="border-top">
+                                <td class="fw-bold">Total do período</td>
+                                <td class="text-end fw-bold">R$ {{ total_geral_fmt }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered acerto-table mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Data</th>
+                            <th>Paciente</th>
+                            <th>Código</th>
+                            <th>Procedimento</th>
+                            <th>Mod.</th>
+                            <th>Contraste</th>
+                            <th class="text-end">Total item</th>
+                            <th>NF</th>
+                            <th>Forma pgto.</th>
+                            <th class="text-end">Valor NF</th>
+                            <th>Caixa (check-in)</th>
+                            <th>Discriminação NF</th>
+                            <th class="text-end">V. tabela</th>
+                            <th>Status agenda</th>
+                            <th>Convênio (viabilidade)</th>
+                            <th>Início</th>
+                            <th>Fim</th>
+                            <th>Motivo cancel.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in linhas %}
+                        <tr>
+                            <td class="text-nowrap">{{ linha.data_fmt }}</td>
+                            <td>{{ linha.paciente|truncatechars:28 }}</td>
+                            <td><code class="small">{{ linha.codigo_servico }}</code></td>
+                            <td>{{ linha.procedimento|truncatechars:45 }}</td>
+                            <td>{{ linha.modalidade }}</td>
+                            <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                            <td class="text-end">R$ {{ linha.total_item_fmt }}</td>
+                            <td>{{ linha.nota_fiscal }}</td>
+                            <td>{{ linha.forma_pgto|truncatechars:18 }}</td>
+                            <td class="text-end">{{ linha.valor_nota_fmt }}</td>
+                            <td>{{ linha.caixa|truncatechars:20 }}</td>
+                            <td>{{ linha.discriminacao|truncatechars:40 }}</td>
+                            <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
+                            <td><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
+                            <td>{{ linha.convenio|truncatechars:28 }}</td>
+                            <td class="text-nowrap">{{ linha.horario_inicio }}</td>
+                            <td class="text-nowrap">{{ linha.horario_fim }}</td>
+                            <td>{{ linha.motivo_cancelamento|truncatechars:25 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="18" class="text-center text-muted py-4">Nenhum procedimento no filtro.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

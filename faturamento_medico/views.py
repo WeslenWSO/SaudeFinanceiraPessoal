@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -5274,6 +5275,24 @@ def marcar_lancamento_anestesista_pago(request, pk):
     if next_url.startswith('/'):
         return redirect(next_url)
     return redirect('faturamento_medico:relatorio_sedacao_anestesista')
+
+
+@login_required
+def acerto_caixa(request):
+    """Fechamento / acerto de caixa — procedimentos, NF e resumo por viabilidade (convênio)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
+
+    from empresa.models import Empresa
+
+    empresa = Empresa.objects.filter(pk=empresa_id).first()
+    contexto = montar_contexto_acerto_caixa(request, empresa_id)
+    contexto['empresa'] = empresa
+    return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
 
 
 def relatorio_sedacao_anestesista(request):

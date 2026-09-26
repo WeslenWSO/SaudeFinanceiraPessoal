@@ -66,6 +66,10 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='faturamento_medico:dashboard_exames', permissao='faturamento_medico',
     ),
     MenuItemDef(
+        'faturamento_acerto_caixa', 'Acerto de Caixa', 'fa-cash-register', 'faturamento',
+        url_name='faturamento_medico:acerto_caixa', permissao='faturamento_medico',
+    ),
+    MenuItemDef(
         'faturamento_relatorio_sedacao', 'Relatório Sedação Anestesista', 'fa-syringe', 'faturamento',
         url_name='faturamento_medico:relatorio_sedacao_anestesista', permissao='faturamento_medico',
     ),
