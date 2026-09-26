@@ -302,10 +302,13 @@ def buscar_url_imagem_internet(nome: str, codigo: str = '') -> tuple[str | None,
         if url:
             return url, 'wikipedia'
 
+    if getattr(settings, 'PRODUTO_FOTO_USAR_DDG', False):
+        for query in queries:
+            url = _buscar_duckduckgo_imagens(query)
+            if url:
+                return url, 'duckduckgo'
+
     for query in queries:
-        url = _buscar_duckduckgo_imagens(query)
-        if url:
-            return url, 'duckduckgo'
         url = _buscar_openverse(query)
         if url:
             return url, 'openverse'
@@ -378,67 +381,24 @@ def placeholder_foto_svg() -> bytes:
 
 def persistir_arquivo_imagem(foto: ProdutoComercioFoto) -> ProdutoComercioFoto:
     """Grava a imagem no MEDIA para exibir na listagem sem depender do site externo."""
-    if foto.imagem:
-        return foto
-    if not foto.url_imagem:
-        return foto
-    corpo, ctype = baixar_bytes_imagem(foto.url_imagem)
-    if not corpo:
-        return foto
-    ext = 'jpg'
-    if 'png' in ctype:
-        ext = 'png'
-    elif 'webp' in ctype:
-        ext = 'webp'
-    nome_arquivo = f'{foto.codigo_produto[:40]}.{ext}'
-    foto.imagem.save(nome_arquivo, ContentFile(corpo), save=True)
+    try:
+        if foto.imagem:
+            return foto
+        if not foto.url_imagem:
+            return foto
+        corpo, ctype = baixar_bytes_imagem(foto.url_imagem)
+        if not corpo:
+            return foto
+        ext = 'jpg'
+        if 'png' in ctype:
+            ext = 'png'
+        elif 'webp' in ctype:
+            ext = 'webp'
+        nome_arquivo = f'{foto.codigo_produto[:40]}.{ext}'
+        foto.imagem.save(nome_arquivo, ContentFile(corpo), save=True)
+    except Exception as exc:
+        logger.warning('Não foi possível salvar arquivo da foto %s: %s', foto.codigo_produto, exc)
     return foto
-
-
-def precarregar_fotos_listagem(
-    empresa_id: int,
-    itens,
-    *,
-    max_produtos: int = 18,
-) -> None:
-    """Busca e salva fotos dos produtos visíveis (até max_produtos códigos distintos)."""
-    nome_por_codigo: dict[str, str] = {}
-    ordem_codigos: list[str] = []
-    for item in itens:
-        codigo = (getattr(item, 'codigo_produto', None) or '').strip()
-        if not codigo or codigo in nome_por_codigo:
-            continue
-        nome_por_codigo[codigo] = getattr(item, 'nome_produto', '') or ''
-        ordem_codigos.append(codigo)
-        if len(ordem_codigos) >= max_produtos:
-            break
-
-    if not ordem_codigos:
-        return
-
-    existentes = {
-        row.codigo_produto: row
-        for row in ProdutoComercioFoto.objects.filter(
-            empresa_id=empresa_id,
-            codigo_produto__in=ordem_codigos,
-        )
-    }
-
-    for codigo in ordem_codigos:
-        row = existentes.get(codigo)
-        if row and row.imagem:
-            continue
-        if row and row.url_imagem and not row.imagem:
-            persistir_arquivo_imagem(row)
-            continue
-        foto = obter_foto_produto(
-            empresa_id,
-            codigo,
-            nome_por_codigo.get(codigo, ''),
-            forcar_busca=False,
-        )
-        if foto:
-            persistir_arquivo_imagem(foto)
 
 
 def mapa_fotos_arquivo_por_codigo(empresa_id: int, codigos: list[str]) -> dict[str, str]:

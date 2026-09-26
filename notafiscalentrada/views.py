@@ -16,7 +16,6 @@ from .produto_foto import (
     obter_foto_produto,
     persistir_arquivo_imagem,
     placeholder_foto_svg,
-    precarregar_fotos_listagem,
     url_google_imagens,
 )
 from empresa.models import Empresa
@@ -1253,9 +1252,12 @@ def listar_produtos_comercio(request):
     paginator = Paginator(itens, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
     page_itens = list(page_obj.object_list)
-    precarregar_fotos_listagem(empresa_id, page_itens)
     codigos = list({i.codigo_produto for i in page_itens if i.codigo_produto})
-    fotos_arquivo = mapa_fotos_arquivo_por_codigo(empresa_id, codigos)
+    fotos_arquivo: dict[str, str] = {}
+    try:
+        fotos_arquivo = mapa_fotos_arquivo_por_codigo(empresa_id, codigos)
+    except Exception:
+        fotos_arquivo = {}
     for item in page_itens:
         item.foto_exibir_url = fotos_arquivo.get(item.codigo_produto, '')
 
@@ -1328,24 +1330,27 @@ def produto_comercio_foto_img(request):
     if not codigo:
         return HttpResponse(placeholder_foto_svg(), content_type='image/svg+xml')
 
-    foto = obter_foto_produto(
-        empresa_id,
-        codigo,
-        nome,
-        forcar_busca=forcar,
-    )
-    if foto:
-        foto = persistir_arquivo_imagem(foto)
-
-    if foto and foto.imagem:
-        return FileResponse(
-            foto.imagem.open('rb'),
-            content_type='image/jpeg',
-            headers={'Cache-Control': 'private, max-age=604800'},
+    try:
+        foto = obter_foto_produto(
+            empresa_id,
+            codigo,
+            nome,
+            forcar_busca=forcar,
         )
+        if foto:
+            foto = persistir_arquivo_imagem(foto)
 
-    if foto and foto.url_imagem:
-        return HttpResponseRedirect(foto.url_imagem)
+        if foto and foto.imagem:
+            return FileResponse(
+                foto.imagem.open('rb'),
+                content_type='image/jpeg',
+                headers={'Cache-Control': 'private, max-age=604800'},
+            )
+
+        if foto and foto.url_imagem:
+            return HttpResponseRedirect(foto.url_imagem)
+    except Exception:
+        pass
 
     return HttpResponse(
         placeholder_foto_svg(),
