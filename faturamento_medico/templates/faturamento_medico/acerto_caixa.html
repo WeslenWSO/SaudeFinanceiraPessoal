@@ -128,8 +128,9 @@
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
 
+            {% csrf_token %}
             <div class="table-responsive">
-                <table class="table table-sm table-striped table-bordered acerto-table mb-0">
+                <table id="acertoCaixaTable" data-compact-nf-celula class="table table-sm table-striped table-bordered acerto-table mb-0">
                     <thead class="table-dark">
                         <tr>
                             <th>Data</th>
@@ -154,7 +155,7 @@
                     </thead>
                     <tbody>
                         {% for linha in linhas %}
-                        <tr>
+                        <tr data-faturamento-id="{{ linha.faturamento_id }}">
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
                             <td>{{ linha.paciente|truncatechars:28 }}</td>
                             <td><code class="small">{{ linha.codigo_servico }}</code></td>
@@ -162,11 +163,65 @@
                             <td>{{ linha.modalidade }}</td>
                             <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
                             <td class="text-end">R$ {{ linha.total_item_fmt }}</td>
-                            <td>{{ linha.nota_fiscal }}</td>
-                            <td>{{ linha.forma_pgto|truncatechars:18 }}</td>
-                            <td class="text-end">{{ linha.valor_nota_fmt }}</td>
+                            <td class="fm-celula-nf"
+                                data-faturamento-id="{{ linha.faturamento_id }}"
+                                data-paciente="{{ linha.paciente }}"
+                                data-data="{{ linha.data_iso }}">
+                                {% if linha.mostrar_nf_celula %}
+                                    {% if linha.qtd_notas == 0 %}
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge bg-warning text-dark align-self-start">Sem NF</span>
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm py-0 px-2 js-vincular-nf"
+                                                data-faturamento-id="{{ linha.faturamento_id }}"
+                                                data-paciente="{{ linha.paciente }}"
+                                                data-data="{{ linha.data_iso }}">
+                                            Vincular NF
+                                        </button>
+                                    </div>
+                                    {% elif linha.qtd_notas == 1 %}
+                                    {% with nota=linha.notas_vinculadas.0 %}
+                                    <div>
+                                        <a href="{{ nota.url }}" target="_blank" rel="noopener"
+                                           title="NF {{ nota.numero }} — {{ nota.data_emissao_fmt }}">
+                                            {{ nota.numero }}
+                                        </a>
+                                        {% if nota.manual %}
+                                        <span class="badge bg-secondary">Manual</span>
+                                        {% endif %}
+                                        <div class="mt-1 d-flex gap-1 flex-wrap">
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm py-0 px-2 js-vincular-nf"
+                                                    data-faturamento-id="{{ linha.faturamento_id }}"
+                                                    data-paciente="{{ linha.paciente }}"
+                                                    data-data="{{ linha.data_iso }}">
+                                                Alterar
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm py-0 px-2 js-desvincular-nf"
+                                                    data-faturamento-id="{{ linha.faturamento_id }}"
+                                                    data-paciente="{{ linha.paciente }}"
+                                                    data-data="{{ linha.data_iso }}">
+                                                Desvincular
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                    {% else %}
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0 js-ver-notas-multi"
+                                            data-notas="{{ linha.notas_json|escape }}">
+                                        {{ linha.qtd_notas }} notas
+                                    </button>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="fm-celula-forma-pgto">{{ linha.forma_pgto|truncatechars:18 }}</td>
+                            <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
                             <td>{{ linha.caixa|truncatechars:20 }}</td>
-                            <td>{{ linha.discriminacao|truncatechars:40 }}</td>
+                            <td class="fm-celula-discriminacao">{{ linha.discriminacao|truncatechars:40 }}</td>
                             <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
                             <td><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
                             <td>{{ linha.convenio|truncatechars:28 }}</td>
@@ -185,4 +240,5 @@
         </div>
     </div>
 </div>
+{% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 {% endblock %}

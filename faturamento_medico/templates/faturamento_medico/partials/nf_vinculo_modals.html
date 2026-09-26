@@ -109,19 +109,64 @@
             '</div>';
     }
 
+    function tabelaCompactaNF(celula) {
+        if (!celula) return false;
+        var table = celula.closest('table');
+        return !!(table && table.hasAttribute('data-compact-nf-celula'));
+    }
+
+    function formatValorNotaCelula(nota) {
+        if (!nota || nota.valor_fmt === undefined || nota.valor_fmt === null) return '-';
+        var v = String(nota.valor_fmt);
+        return v.indexOf('R$') >= 0 ? v : 'R$ ' + v;
+    }
+
+    function truncarTexto(texto, maxLen) {
+        var t = String(texto || '-').trim() || '-';
+        if (t.length <= maxLen) return t;
+        return t.slice(0, maxLen) + '…';
+    }
+
+    function atualizarColunasPagamentoNota(faturamentoId, nota) {
+        if (!faturamentoId) return;
+        var formaText = '-';
+        var valorText = '-';
+        var discText = '-';
+        if (nota) {
+            formaText = nota.forma_pagamento && nota.forma_pagamento !== '-'
+                ? nota.forma_pagamento
+                : '-';
+            valorText = formatValorNotaCelula(nota);
+            discText = truncarTexto(nota.discriminacao, 120);
+        }
+        document.querySelectorAll('tr[data-faturamento-id="' + faturamentoId + '"]').forEach(function(tr) {
+            var forma = tr.querySelector('.fm-celula-forma-pgto');
+            var valor = tr.querySelector('.fm-celula-valor-nf');
+            var disc = tr.querySelector('.fm-celula-discriminacao');
+            if (forma) forma.textContent = truncarTexto(formaText, 18);
+            if (valor) valor.textContent = valorText;
+            if (disc) disc.textContent = truncarTexto(discText, 40);
+        });
+    }
+
     function renderCelulaNF(celula, nota) {
         if (!celula || !nota) return;
         var faturamentoId = celula.getAttribute('data-faturamento-id') || vinculoAtual.faturamentoId || '';
         var paciente = vinculoAtual.paciente || celula.getAttribute('data-paciente') || '';
         var dataIso = vinculoAtual.data || celula.getAttribute('data-data') || '';
         var manual = nota.manual ? '<span class="badge bg-secondary">Manual</span> ' : '';
-        var pagamento = nota.forma_pagamento && nota.forma_pagamento !== '-'
+        var compact = tabelaCompactaNF(celula);
+        var pagamento = !compact && nota.forma_pagamento && nota.forma_pagamento !== '-'
             ? '<div class="mt-1"><span class="badge bg-info text-dark">' + escapeHtml(nota.forma_pagamento) + '</span></div>'
             : '';
+        var prefixoNumero = compact ? '' : 'NF ';
+        var valorInline = compact
+            ? ''
+            : ('<span class="text-muted">· R$ ' + escapeHtml(nota.valor_fmt) + '</span> ');
         celula.innerHTML =
             '<div>' +
-            '<a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a> ' +
-            '<span class="text-muted">· R$ ' + escapeHtml(nota.valor_fmt) + '</span> ' +
+            '<a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">' + prefixoNumero + escapeHtml(nota.numero) + '</a> ' +
+            valorInline +
             manual + pagamento +
             botoesAcaoNF(faturamentoId, paciente, dataIso) +
             '</div>';
@@ -129,8 +174,11 @@
 
     function atualizarLinhasMesmoFaturamento(faturamentoId, nota) {
         document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + faturamentoId + '"]').forEach(function(celula) {
-            renderCelulaNF(celula, nota);
+            if (celula.querySelector('.js-vincular-nf') || celula.querySelector('.js-desvincular-nf') || celula.querySelector('.js-ver-notas-multi') || celula.querySelector('a[href]')) {
+                renderCelulaNF(celula, nota);
+            }
         });
+        atualizarColunasPagamentoNota(faturamentoId, nota);
     }
 
     function abrirModalMultiplas(notas) {
@@ -212,7 +260,9 @@
                                     alert(res.error || 'Não foi possível vincular a NF.');
                                     return;
                                 }
-                                renderCelulaNF(vinculoAtual.celula, res.nota);
+                                if (vinculoAtual.celula) {
+                                    renderCelulaNF(vinculoAtual.celula, res.nota);
+                                }
                                 atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, res.nota);
                                 if (modalVincular && window.bootstrap) {
                                     bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
@@ -278,8 +328,11 @@
                     return;
                 }
                 document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + fatId + '"]').forEach(function(celula) {
-                    renderCelulaSemNF(celula, fatId, paciente, dataIso);
+                    if (celula.querySelector('.js-vincular-nf') || celula.querySelector('.js-desvincular-nf') || celula.querySelector('a[href]')) {
+                        renderCelulaSemNF(celula, fatId, paciente, dataIso);
+                    }
                 });
+                atualizarColunasPagamentoNota(fatId, null);
             })
             .catch(function() {
                 alert('Erro ao desvincular a NF.');

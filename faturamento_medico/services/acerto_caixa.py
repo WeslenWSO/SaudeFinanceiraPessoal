@@ -12,6 +12,7 @@ from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.models import FaturamentoMedico
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
+    notas_linha_para_json,
     resolver_notas_linha,
 )
 
@@ -220,8 +221,13 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
         itens = list(fat.itens_servico.all())
         pagamento_contabilizado = False
+        primeira_linha_faturamento = True
+        data_iso = fat.data.isoformat() if fat.data else ''
+        qtd_notas = len(notas)
+        notas_json = notas_linha_para_json(notas) if qtd_notas > 1 else ''
 
         def _add_linha(item=None):
+            nonlocal primeira_linha_faturamento
             nonlocal pagamento_contabilizado
             if item:
                 procedimento = item.servico or '-'
@@ -252,7 +258,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             if aguardando_faturamento:
                 resumo_aguardando_faturamento[convenio] += Decimal(str(total_item or 0))
 
+            mostrar_nf = primeira_linha_faturamento
+            primeira_linha_faturamento = False
+
             linhas.append({
+                'faturamento_id': fat.pk,
+                'data_iso': data_iso,
+                'mostrar_nf_celula': mostrar_nf,
+                'notas_vinculadas': notas,
+                'qtd_notas': qtd_notas,
+                'notas_json': notas_json,
                 'data_fmt': fat.data.strftime('%d/%m/%Y') if fat.data else '-',
                 'paciente': fat.nome or '-',
                 'codigo_servico': codigo,
