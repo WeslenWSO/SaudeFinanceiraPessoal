@@ -76,12 +76,13 @@ class ProdutosComercioListTest(TestCase):
         )
         self.assertNotContains(r2, 'Sofa Especial')
 
-    def test_link_google_imagens_na_listagem(self):
+    def test_coluna_foto_usa_proxy_de_imagem(self):
         url = reverse('notafiscalentrada:produtos_comercio')
         r = self.client.get(url, {'data_inicio': '2026-03-01', 'data_fim': '2026-03-31'})
         self.assertEqual(r.status_code, 200)
-        esperado = url_google_imagens('Sofa Especial', 'P001')
-        self.assertContains(r, esperado)
+        self.assertContains(r, reverse('notafiscalentrada:produto_comercio_foto_img'))
+        self.assertContains(r, 'produto-foto-img')
+        self.assertContains(r, 'P001')
 
     def test_mapa_fotos_cache(self):
         ProdutoComercioFoto.objects.create(

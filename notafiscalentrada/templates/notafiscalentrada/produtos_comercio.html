@@ -43,7 +43,7 @@
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h3 class="card-title mb-0">Produtos comprados — NF Comércio</h3>
-                <small class="text-muted">Itens das notas de entrada tipo comércio · clique na foto para abrir Google Imagens (miniatura em cache quando disponível)</small>
+                <small class="text-muted">Itens das notas de entrada tipo comércio · foto buscada na internet (cache por código do produto)</small>
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-outline-info btn-sm" id="btnBuscarFotosPagina">
@@ -113,29 +113,15 @@
                         {% for item in itens %}
                         <tr>
                             <td class="produto-foto-cell">
-                                <div class="produto-foto-wrap"
+                                <img src="{% url 'notafiscalentrada:produto_comercio_foto_img' %}?codigo={{ item.codigo_produto|urlencode }}&amp;nome={{ item.nome_produto|urlencode }}"
+                                     alt=""
+                                     class="produto-foto-thumb produto-foto-img"
+                                     width="56"
+                                     height="56"
+                                     loading="lazy"
                                      data-codigo="{{ item.codigo_produto|escape }}"
                                      data-nome="{{ item.nome_produto|escape }}"
-                                     data-google-url="{{ item.google_foto_url|escape }}"
-                                     {% if item.foto_url %}data-foto-url="{{ item.foto_url|escape }}"{% endif %}>
-                                    {% if item.foto_url %}
-                                    <a href="{{ item.google_foto_url }}" class="produto-foto-link" target="_blank"
-                                       rel="noopener noreferrer" title="Ver fotos no Google Imagens">
-                                        <img src="{{ item.foto_url }}"
-                                             alt=""
-                                             class="produto-foto-thumb"
-                                             loading="lazy"
-                                             referrerpolicy="no-referrer">
-                                    </a>
-                                    {% else %}
-                                    <a href="{{ item.google_foto_url }}" class="produto-foto-link" target="_blank"
-                                       rel="noopener noreferrer" title="Ver fotos no Google Imagens">
-                                        <span class="produto-foto-placeholder text-danger">
-                                            <i class="fab fa-google"></i>
-                                        </span>
-                                    </a>
-                                    {% endif %}
-                                </div>
+                                     title="{{ item.nome_produto|truncatechars:80 }}">
                             </td>
                             <td class="text-nowrap">{{ item.nota_fiscal.data_emissao|date:"d/m/Y" }}</td>
                             <td>
@@ -185,102 +171,24 @@
 
 <script>
 (function () {
-  const fotoUrl = "{% url 'notafiscalentrada:produto_comercio_foto' %}";
-  const buscando = new Set();
+  const baseImg = "{% url 'notafiscalentrada:produto_comercio_foto_img' %}";
 
-  function googleUrlDoWrap(wrap) {
-    return wrap.dataset.googleUrl || '';
-  }
-
-  function linkGoogle(wrap, conteudoHtml) {
-    const a = document.createElement('a');
-    a.href = googleUrlDoWrap(wrap) || 'https://www.google.com/search?tbm=isch';
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.className = 'produto-foto-link';
-    a.title = 'Ver fotos no Google Imagens';
-    a.innerHTML = conteudoHtml;
-    return a;
-  }
-
-  const googleIconHtml =
-    '<span class="produto-foto-placeholder text-danger"><i class="fab fa-google"></i></span>';
-
-  function mostrarSoGoogle(wrap) {
-    wrap.innerHTML = '';
-    wrap.appendChild(linkGoogle(wrap, googleIconHtml));
-  }
-
-  function aplicarImagem(wrap, url) {
-    wrap.dataset.fotoUrl = url;
-    wrap.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = '';
-    img.className = 'produto-foto-thumb';
-    img.loading = 'lazy';
-    img.referrerPolicy = 'no-referrer';
-    const a = linkGoogle(wrap, '');
-    a.appendChild(img);
-    img.onerror = function () {
-      mostrarSoGoogle(wrap);
-    };
-    wrap.appendChild(a);
-  }
-
-  function aplicarPorCodigo(codigo, url) {
-    document.querySelectorAll('.produto-foto-wrap').forEach(function (w) {
-      if (w.dataset.codigo === codigo) aplicarImagem(w, url);
-    });
-  }
-
-  function buscarFoto(wrap, refresh) {
-    const codigo = wrap.dataset.codigo;
-    if (!codigo || buscando.has(codigo)) return Promise.resolve();
-    const jaTem = Array.from(document.querySelectorAll('.produto-foto-wrap'))
-      .some(function (w) { return w.dataset.codigo === codigo && w.querySelector('img'); });
-    if (jaTem && !refresh) return Promise.resolve();
-    buscando.add(codigo);
+  function recarregarFoto(img, refresh) {
     const params = new URLSearchParams({
-      codigo: codigo,
-      nome: wrap.dataset.nome || '',
+      codigo: img.dataset.codigo || '',
+      nome: img.dataset.nome || '',
     });
     if (refresh) params.set('refresh', '1');
-    return fetch(fotoUrl + '?' + params.toString(), { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.google_url) {
-          document.querySelectorAll('.produto-foto-wrap').forEach(function (w) {
-            if (w.dataset.codigo === codigo) w.dataset.googleUrl = data.google_url;
-          });
-        }
-        if (data.ok && data.url) aplicarPorCodigo(codigo, data.url);
-      })
-      .catch(function () {})
-      .finally(function () { buscando.delete(codigo); });
+    params.set('_', String(Date.now()));
+    img.src = baseImg + '?' + params.toString();
   }
-
-  document.querySelectorAll('.produto-foto-wrap').forEach(function (wrap) {
-    const img = wrap.querySelector('img.produto-foto-thumb');
-    if (img) {
-      img.addEventListener('error', function () {
-        mostrarSoGoogle(wrap);
-      });
-    } else {
-      buscarFoto(wrap, false);
-    }
-  });
 
   const btn = document.getElementById('btnBuscarFotosPagina');
   if (btn) {
     btn.addEventListener('click', function () {
-      const wraps = Array.from(document.querySelectorAll('.produto-foto-wrap'));
-      let i = 0;
-      function next() {
-        if (i >= wraps.length) return;
-        buscarFoto(wraps[i], true).finally(function () { i += 1; next(); });
-      }
-      next();
+      document.querySelectorAll('.produto-foto-img').forEach(function (img) {
+        recarregarFoto(img, true);
+      });
     });
   }
 })();

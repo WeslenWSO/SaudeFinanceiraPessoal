@@ -373,6 +373,10 @@ if USE_S3_STORAGE:
 # Crie em https://programmablesearchengine.google.com/ (searchType=image).
 GOOGLE_CSE_API_KEY = os.environ.get('GOOGLE_CSE_API_KEY', '').strip()
 GOOGLE_CSE_CX = os.environ.get('GOOGLE_CSE_CX', '').strip()
+WIKIPEDIA_USER_AGENT = os.environ.get(
+    'WIKIPEDIA_USER_AGENT',
+    'SaudeFinanceiraPessoal/1.0 (notafiscal-comercio)',
+).strip()
 
 NFSE_NACIONAL = {
     "base_url": os.environ.get(

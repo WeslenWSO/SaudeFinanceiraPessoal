@@ -3,14 +3,20 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
-from .produto_foto import mapa_fotos_por_codigo, obter_foto_produto, url_google_imagens
+from .produto_foto import (
+    baixar_bytes_imagem,
+    mapa_fotos_por_codigo,
+    obter_foto_produto,
+    placeholder_foto_svg,
+    url_google_imagens,
+)
 from empresa.models import Empresa
 from fornecedor.models import Fornecedor
 from regraConciliacao.models import RegraConciliacao
@@ -1249,7 +1255,6 @@ def listar_produtos_comercio(request):
     fotos = mapa_fotos_por_codigo(empresa_id, codigos)
     for item in page_itens:
         item.foto_url = fotos.get(item.codigo_produto, '')
-        item.google_foto_url = url_google_imagens(item.nome_produto, item.codigo_produto)
 
     context = {
         'page_obj': page_obj,
@@ -1303,6 +1308,48 @@ def produto_comercio_foto_api(request):
             'fonte': foto.fonte,
             'codigo': foto.codigo_produto,
         },
+    )
+
+
+@login_required
+def produto_comercio_foto_img(request):
+    """Miniatura do produto (busca na internet + cache; exibida inline na listagem)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse(status=403)
+
+    codigo = (request.GET.get('codigo') or '').strip()
+    nome = (request.GET.get('nome') or '').strip()
+    forcar = request.GET.get('refresh') == '1'
+
+    if not codigo:
+        return HttpResponse(placeholder_foto_svg(), content_type='image/svg+xml')
+
+    foto = obter_foto_produto(
+        empresa_id,
+        codigo,
+        nome,
+        forcar_busca=forcar,
+    )
+    if not foto or not foto.url_imagem:
+        return HttpResponse(
+            placeholder_foto_svg(),
+            content_type='image/svg+xml',
+            headers={'Cache-Control': 'private, max-age=300'},
+        )
+
+    corpo, ctype = baixar_bytes_imagem(foto.url_imagem)
+    if not corpo:
+        return HttpResponse(
+            placeholder_foto_svg(),
+            content_type='image/svg+xml',
+            headers={'Cache-Control': 'private, max-age=300'},
+        )
+
+    return HttpResponse(
+        corpo,
+        content_type=ctype,
+        headers={'Cache-Control': 'private, max-age=604800'},
     )
 
 
