@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
+from .produto_foto import mapa_fotos_por_codigo, obter_foto_produto
 from empresa.models import Empresa
 from fornecedor.models import Fornecedor
 from regraConciliacao.models import RegraConciliacao
@@ -1240,10 +1241,15 @@ def listar_produtos_comercio(request):
 
     paginator = Paginator(itens, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
+    page_itens = list(page_obj.object_list)
+    codigos = list({i.codigo_produto for i in page_itens if i.codigo_produto})
+    fotos = mapa_fotos_por_codigo(empresa_id, codigos)
+    for item in page_itens:
+        item.foto_url = fotos.get(item.codigo_produto, '')
 
     context = {
         'page_obj': page_obj,
-        'itens': page_obj.object_list,
+        'itens': page_itens,
         'filtros': {
             'data_inicio': data_inicio,
             'data_fim': data_fim,
@@ -1253,6 +1259,38 @@ def listar_produtos_comercio(request):
         'quantidade_registros': paginator.count,
     }
     return render(request, 'notafiscalentrada/produtos_comercio.html', context)
+
+
+@login_required
+def produto_comercio_foto_api(request):
+    """Busca (ou retorna cache) foto do produto na internet — JSON."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'ok': False, 'erro': 'Empresa não selecionada.'}, status=400)
+
+    codigo = (request.GET.get('codigo') or '').strip()
+    nome = (request.GET.get('nome') or '').strip()
+    forcar = request.GET.get('refresh') == '1'
+
+    if not codigo:
+        return JsonResponse({'ok': False, 'erro': 'Código obrigatório.'}, status=400)
+
+    foto = obter_foto_produto(
+        empresa_id,
+        codigo,
+        nome,
+        forcar_busca=forcar,
+    )
+    if not foto:
+        return JsonResponse({'ok': False, 'erro': 'Nenhuma imagem encontrada.'})
+    return JsonResponse(
+        {
+            'ok': True,
+            'url': foto.url_imagem,
+            'fonte': foto.fonte,
+            'codigo': foto.codigo_produto,
+        },
+    )
 
 
 def _resolver_fornecedor_cadastro_da_nota(nota, empresa_id):

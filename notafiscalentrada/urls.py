@@ -11,6 +11,7 @@ app_name = 'notafiscalentrada'
 urlpatterns = [
     path('', views.listar_notas_fiscais, name='listar'),
     path('comercio/produtos/', views.listar_produtos_comercio, name='produtos_comercio'),
+    path('comercio/produto-foto/', views.produto_comercio_foto_api, name='produto_comercio_foto'),
     path('importar/', views.importar_xml, name='importar'),
     path('editar/<int:pk>/', views.editar_nota_fiscal, name='editar'),
     path('excluir/<int:pk>/', views.excluir_nota_fiscal, name='excluir'),

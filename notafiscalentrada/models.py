@@ -239,3 +239,31 @@ class NotaFiscalEntradaItem(models.Model):
 
     def __str__(self):
         return f"Item {self.numero_item} - {self.nome_produto}"
+
+
+class ProdutoComercioFoto(models.Model):
+    """Cache de URL de imagem do produto (busca na internet por código)."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='fotos_produto_comercio',
+    )
+    codigo_produto = models.CharField(max_length=50)
+    nome_produto = models.CharField(max_length=200, blank=True, default='')
+    url_imagem = models.URLField(max_length=600)
+    fonte = models.CharField(max_length=40, default='openverse')
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Foto produto (comércio)'
+        verbose_name_plural = 'Fotos produto (comércio)'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('empresa', 'codigo_produto'),
+                name='produto_comercio_foto_unico_empresa_codigo',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.codigo_produto} — foto'

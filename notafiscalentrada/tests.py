@@ -7,7 +7,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from empresa.models import Empresa
-from notafiscalentrada.models import NotaFiscalEntrada, NotaFiscalEntradaItem
+from notafiscalentrada.models import NotaFiscalEntrada, NotaFiscalEntradaItem, ProdutoComercioFoto
+from notafiscalentrada.produto_foto import mapa_fotos_por_codigo
 
 
 class ProdutosComercioListTest(TestCase):
@@ -52,3 +53,12 @@ class ProdutosComercioListTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Sofa Especial')
         self.assertContains(r, 'P001')
+
+    def test_mapa_fotos_cache(self):
+        ProdutoComercioFoto.objects.create(
+            empresa=self.empresa,
+            codigo_produto='P001',
+            url_imagem='https://example.com/foto.jpg',
+        )
+        m = mapa_fotos_por_codigo(self.empresa.pk, ['P001', 'X'])
+        self.assertEqual(m['P001'], 'https://example.com/foto.jpg')
