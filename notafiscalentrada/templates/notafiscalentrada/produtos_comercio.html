@@ -26,6 +26,17 @@
     color: #adb5bd;
     font-size: 1.1rem;
 }
+.produto-foto-link {
+    display: inline-block;
+    line-height: 0;
+}
+.produto-foto-link-fallback {
+    font-size: 0.65rem;
+    max-width: 4.2rem;
+    word-break: break-all;
+    line-height: 1.2;
+    display: inline-block;
+}
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -104,13 +115,17 @@
                             <td class="produto-foto-cell">
                                 <div class="produto-foto-wrap"
                                      data-codigo="{{ item.codigo_produto|escape }}"
-                                     data-nome="{{ item.nome_produto|escape }}">
+                                     data-nome="{{ item.nome_produto|escape }}"
+                                     {% if item.foto_url %}data-foto-url="{{ item.foto_url|escape }}"{% endif %}>
                                     {% if item.foto_url %}
-                                    <img src="{{ item.foto_url }}"
-                                         alt=""
-                                         class="produto-foto-thumb"
-                                         loading="lazy"
-                                         referrerpolicy="no-referrer">
+                                    <a href="{{ item.foto_url }}" class="produto-foto-link" target="_blank"
+                                       rel="noopener noreferrer" title="Abrir imagem na internet">
+                                        <img src="{{ item.foto_url }}"
+                                             alt=""
+                                             class="produto-foto-thumb"
+                                             loading="lazy"
+                                             referrerpolicy="no-referrer">
+                                    </a>
                                     {% else %}
                                     <span class="produto-foto-placeholder" title="Buscar foto">
                                         <i class="fas fa-camera"></i>
@@ -169,7 +184,28 @@
   const fotoUrl = "{% url 'notafiscalentrada:produto_comercio_foto' %}";
   const buscando = new Set();
 
+  function linkImagemInternet(url, conteudoHtml) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'produto-foto-link';
+    a.title = 'Abrir imagem na internet';
+    a.innerHTML = conteudoHtml;
+    return a;
+  }
+
+  const linkFallbackHtml =
+    '<span class="produto-foto-link-fallback text-primary"><i class="fas fa-external-link-alt"></i> Link</span>';
+
+  function mostrarLinkFallback(wrap, url) {
+    wrap.dataset.fotoUrl = url;
+    wrap.innerHTML = '';
+    wrap.appendChild(linkImagemInternet(url, linkFallbackHtml));
+  }
+
   function aplicarImagem(wrap, url) {
+    wrap.dataset.fotoUrl = url;
     wrap.innerHTML = '';
     const img = document.createElement('img');
     img.src = url;
@@ -177,10 +213,12 @@
     img.className = 'produto-foto-thumb';
     img.loading = 'lazy';
     img.referrerPolicy = 'no-referrer';
+    const a = linkImagemInternet(url, '');
+    a.appendChild(img);
     img.onerror = function () {
-      wrap.innerHTML = '<span class="produto-foto-placeholder" title="Imagem indisponível"><i class="fas fa-image"></i></span>';
+      mostrarLinkFallback(wrap, url);
     };
-    wrap.appendChild(img);
+    wrap.appendChild(a);
   }
 
   function aplicarPorCodigo(codigo, url) {
@@ -211,7 +249,13 @@
   }
 
   document.querySelectorAll('.produto-foto-wrap').forEach(function (wrap) {
-    if (!wrap.querySelector('img')) {
+    const img = wrap.querySelector('img.produto-foto-thumb');
+    if (img) {
+      img.addEventListener('error', function () {
+        const url = wrap.dataset.fotoUrl || (img.closest('a') && img.closest('a').href);
+        if (url) mostrarLinkFallback(wrap, url);
+      });
+    } else {
       buscarFoto(wrap, false);
     }
   });
