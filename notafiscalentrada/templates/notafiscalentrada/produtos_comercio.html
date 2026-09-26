@@ -56,13 +56,19 @@
                         <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
                                value="{{ filtros.data_fim }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1" for="fornecedor">Fornecedor</label>
+                        <input type="search" id="fornecedor" name="fornecedor" class="form-control form-control-sm"
+                               placeholder="Nome do fornecedor"
+                               value="{{ filtros.fornecedor }}">
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label small mb-1" for="produto">Produto</label>
                         <input type="search" id="produto" name="produto" class="form-control form-control-sm"
-                               placeholder="Código ou descrição do produto"
+                               placeholder="Código ou descrição"
                                value="{{ filtros.produto }}">
                     </div>
-                    <div class="col-md-4 d-flex flex-wrap gap-2">
+                    <div class="col-md-2 d-flex flex-wrap gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
                         <a href="{% url 'notafiscalentrada:produtos_comercio' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
                     </div>
@@ -140,7 +146,7 @@
                 <ul class="pagination pagination-sm mb-0">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&data_inicio={{ filtros.data_inicio }}&data_fim={{ filtros.data_fim }}&produto={{ filtros.produto|urlencode }}">Anterior</a>
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&data_inicio={{ filtros.data_inicio }}&data_fim={{ filtros.data_fim }}&fornecedor={{ filtros.fornecedor|urlencode }}&produto={{ filtros.produto|urlencode }}">Anterior</a>
                     </li>
                     {% endif %}
                     <li class="page-item disabled">
@@ -148,7 +154,7 @@
                     </li>
                     {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&data_inicio={{ filtros.data_inicio }}&data_fim={{ filtros.data_fim }}&produto={{ filtros.produto|urlencode }}">Próxima</a>
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&data_inicio={{ filtros.data_inicio }}&data_fim={{ filtros.data_fim }}&fornecedor={{ filtros.fornecedor|urlencode }}&produto={{ filtros.produto|urlencode }}">Próxima</a>
                     </li>
                     {% endif %}
                 </ul>

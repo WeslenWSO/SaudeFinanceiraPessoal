@@ -1211,6 +1211,7 @@ def listar_produtos_comercio(request):
     data_inicio = (request.GET.get('data_inicio') or '').strip()
     data_fim = (request.GET.get('data_fim') or '').strip()
     produto = (request.GET.get('produto') or '').strip()
+    fornecedor = (request.GET.get('fornecedor') or '').strip()
 
     if not data_inicio and not data_fim:
         data_inicio = hoje.replace(day=1).isoformat()
@@ -1233,6 +1234,8 @@ def listar_produtos_comercio(request):
         itens = itens.filter(
             Q(nome_produto__icontains=produto) | Q(codigo_produto__icontains=produto),
         )
+    if fornecedor:
+        itens = itens.filter(nota_fiscal__fornecedor_nome__icontains=fornecedor)
 
     totais = itens.aggregate(
         qtd_total=Sum('quantidade'),
@@ -1254,6 +1257,7 @@ def listar_produtos_comercio(request):
             'data_inicio': data_inicio,
             'data_fim': data_fim,
             'produto': produto,
+            'fornecedor': fornecedor,
         },
         'totais': totais,
         'quantidade_registros': paginator.count,

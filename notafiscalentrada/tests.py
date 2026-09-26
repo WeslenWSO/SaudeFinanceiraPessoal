@@ -54,6 +54,28 @@ class ProdutosComercioListTest(TestCase):
         self.assertContains(r, 'Sofa Especial')
         self.assertContains(r, 'P001')
 
+    def test_filtro_fornecedor(self):
+        url = reverse('notafiscalentrada:produtos_comercio')
+        r = self.client.get(
+            url,
+            {
+                'data_inicio': '2026-03-01',
+                'data_fim': '2026-03-31',
+                'fornecedor': 'Fornecedor A',
+            },
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Sofa Especial')
+        r2 = self.client.get(
+            url,
+            {
+                'data_inicio': '2026-03-01',
+                'data_fim': '2026-03-31',
+                'fornecedor': 'Inexistente',
+            },
+        )
+        self.assertNotContains(r2, 'Sofa Especial')
+
     def test_mapa_fotos_cache(self):
         ProdutoComercioFoto.objects.create(
             empresa=self.empresa,
