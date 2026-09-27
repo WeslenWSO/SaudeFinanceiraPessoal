@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acerto de Caixa — impressão</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: Calibri, Arial, Helvetica, sans-serif;
+            margin: 10px 14px;
+            font-size: 9px;
+            color: #000;
+            background: #fff;
+        }
+        .barra-acoes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+            padding: 8px 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .barra-acoes button,
+        .barra-acoes a {
+            display: inline-block;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .btn-imprimir { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        .btn-voltar { background: #6c757d; color: #fff; border-color: #6c757d; }
+        .top-banner {
+            background: #1f3864;
+            color: #fff;
+            text-align: center;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .empresa-detalhe {
+            text-align: center;
+            font-size: 9px;
+            color: #555;
+            margin: 3px 0 10px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 14px;
+            margin: 0 0 4px;
+            text-transform: uppercase;
+        }
+        .periodo {
+            text-align: center;
+            font-size: 10px;
+            margin-bottom: 12px;
+        }
+        .resumos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+        .resumo-box {
+            flex: 1 1 280px;
+            border: 1px solid #ccc;
+            padding: 8px 10px;
+        }
+        .resumo-box h2 {
+            font-size: 10px;
+            margin: 0 0 6px;
+            text-transform: uppercase;
+        }
+        .resumo-box table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .resumo-box td {
+            padding: 2px 4px;
+            vertical-align: top;
+        }
+        .resumo-box td:last-child {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .resumo-sub td:first-child { padding-left: 12px; }
+        .resumo-grupo td { border-top: 1px solid #ddd; padding-top: 4px; font-weight: bold; }
+        table.grid {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+        }
+        table.grid th,
+        table.grid td {
+            border: 1px solid #999;
+            padding: 3px 4px;
+            vertical-align: top;
+        }
+        table.grid thead th {
+            background: #333;
+            color: #fff;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        table.grid tbody tr:nth-child(even) { background: #f5f5f5; }
+        .text-end { text-align: right; }
+        .qtd-linhas {
+            margin: 8px 0 6px;
+            font-size: 9px;
+        }
+        .rodape-assinatura {
+            margin-top: 32px;
+            padding-top: 16px;
+            page-break-inside: avoid;
+            font-size: 12px;
+            letter-spacing: 0.02em;
+        }
+        .rodape-assinatura p {
+            margin: 0 0 22px;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+            table.grid thead { display: table-header-group; }
+            table.grid tr { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="barra-acoes no-print">
+        <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+        <a class="btn-voltar" href="{% url 'faturamento_medico:acerto_caixa' %}?{{ redirect_qs }}">Voltar</a>
+    </div>
+
+    {% if empresa %}
+    <div class="top-banner">{{ empresa.razao }}</div>
+    {% if empresa.cnpj %}
+    <p class="empresa-detalhe">CNPJ {{ empresa.cnpj }}</p>
+    {% endif %}
+    {% endif %}
+
+    <h1>Acerto de Caixa</h1>
+    <p class="periodo">Período: {{ periodo_fmt }}</p>
+
+    <div class="resumos">
+        <div class="resumo-box">
+            <h2>Resumo por forma de pagamento (NF)</h2>
+            <table>
+                {% for row in resumo_pagamento %}
+                <tr>
+                    <td>{{ row.rotulo }}</td>
+                    <td>R$ {{ row.total_fmt }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="2" class="text-muted">Sem dados.</td></tr>
+                {% endfor %}
+                {% if resumo_aguardando_faturamento %}
+                <tr class="resumo-grupo">
+                    <td>Aguardando faturamento</td>
+                    <td>R$ {{ total_aguardando_faturamento_fmt }}</td>
+                </tr>
+                {% for row in resumo_aguardando_faturamento %}
+                <tr class="resumo-sub">
+                    <td>{{ row.convenio }}</td>
+                    <td>R$ {{ row.total_fmt }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <p class="qtd-linhas"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Paciente</th>
+                <th>Procedimento</th>
+                <th>Mod.</th>
+                <th class="text-end">Total item</th>
+                <th>NF</th>
+                <th>Forma pgto.</th>
+                <th class="text-end">Valor NF</th>
+                <th>Caixa</th>
+                <th>Discriminação NF</th>
+                <th class="text-end">V. tabela</th>
+                <th class="text-end">Diferença</th>
+                <th>Status</th>
+                <th>Convênio</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in linhas %}
+            <tr>
+                <td>{{ linha.data_fmt }}</td>
+                <td>{{ linha.paciente }}</td>
+                <td>{{ linha.procedimento }}</td>
+                <td>{{ linha.modalidade }}</td>
+                <td class="text-end">R$ {{ linha.total_item_fmt }}</td>
+                <td>
+                    {% if linha.aguardando_faturamento %}—
+                    {% elif linha.qtd_notas == 1 %}{{ linha.notas_vinculadas.0.numero }}
+                    {% elif linha.nota_fiscal and linha.nota_fiscal != '-' %}{{ linha.nota_fiscal }}
+                    {% else %}—{% endif %}
+                </td>
+                <td>{{ linha.forma_pgto }}</td>
+                <td class="text-end">{{ linha.valor_nota_fmt }}</td>
+                <td>{{ linha.caixa }}</td>
+                <td>{{ linha.discriminacao }}</td>
+                <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
+                <td class="text-end">R$ {{ linha.diferenca_fmt }}</td>
+                <td>{{ linha.status_agendamento }}</td>
+                <td>{{ linha.convenio }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="14" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="rodape-assinatura">
+        <p>ASSIN ________________________________</p>
+        <p>DATA ____/____/____</p>
+    </div>
+</body>
+</html>

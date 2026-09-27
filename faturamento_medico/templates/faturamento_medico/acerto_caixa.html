@@ -34,9 +34,17 @@
                 <h3 class="card-title mb-0">Acerto de Caixa</h3>
                 <small class="text-muted">Período: {{ periodo_fmt }}</small>
             </div>
-            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i> Faturamento
-            </a>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
+                   class="btn btn-outline-primary btn-sm"
+                   target="_blank"
+                   rel="noopener">
+                    <i class="fas fa-print"></i> Imprimir
+                </a>
+                <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Faturamento
+                </a>
+            </div>
         </div>
         <div class="card-body">
             {% if empresa %}

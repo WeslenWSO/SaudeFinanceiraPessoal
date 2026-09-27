@@ -5324,7 +5324,26 @@ def acerto_caixa(request):
     empresa = Empresa.objects.filter(pk=empresa_id).first()
     contexto = montar_contexto_acerto_caixa(request, empresa_id)
     contexto['empresa'] = empresa
+    contexto['redirect_qs'] = request.GET.urlencode()
     return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
+
+
+@login_required
+def imprimir_acerto_caixa(request):
+    """Versão para impressão do Acerto de Caixa (mesmos filtros da tela)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
+    from empresa.models import Empresa
+
+    empresa = Empresa.objects.filter(pk=empresa_id).first()
+    contexto = montar_contexto_acerto_caixa(request, empresa_id)
+    contexto['empresa'] = empresa
+    contexto['redirect_qs'] = request.GET.urlencode()
+    return render(request, 'faturamento_medico/imprimir_acerto_caixa.html', contexto)
 
 
 def relatorio_sedacao_anestesista(request):
