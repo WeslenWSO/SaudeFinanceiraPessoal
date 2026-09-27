@@ -146,6 +146,7 @@
                             <th>Caixa (check-in)</th>
                             <th>Discriminação NF</th>
                             <th class="text-end">V. tabela</th>
+                            <th class="text-end">Diferença</th>
                             <th>Status agenda</th>
                             <th>Convênio (viabilidade)</th>
                             <th>Início</th>
@@ -155,19 +156,23 @@
                     </thead>
                     <tbody>
                         {% for linha in linhas %}
-                        <tr data-faturamento-id="{{ linha.faturamento_id }}">
+                        <tr data-faturamento-id="{{ linha.faturamento_id }}"
+                            data-total-item="{{ linha.total_item }}"
+                            data-valor-tabela="{{ linha.valor_tabela }}">
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
                             <td>{{ linha.paciente|truncatechars:28 }}</td>
                             <td><code class="small">{{ linha.codigo_servico }}</code></td>
                             <td>{{ linha.procedimento|truncatechars:45 }}</td>
                             <td>{{ linha.modalidade }}</td>
                             <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                            <td class="text-end">R$ {{ linha.total_item_fmt }}</td>
+                            <td class="text-end fm-celula-total-item">R$ {{ linha.total_item_fmt }}</td>
                             <td class="fm-celula-nf"
                                 data-faturamento-id="{{ linha.faturamento_id }}"
                                 data-paciente="{{ linha.paciente }}"
                                 data-data="{{ linha.data_iso }}">
-                                {% if linha.mostrar_nf_celula %}
+                                {% if linha.aguardando_faturamento %}
+                                <span class="text-muted">—</span>
+                                {% elif linha.mostrar_nf_celula %}
                                     {% if linha.qtd_notas == 0 %}
                                     <div class="d-flex flex-column gap-1">
                                         <span class="badge bg-warning text-dark align-self-start">Sem NF</span>
@@ -222,7 +227,8 @@
                             <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
                             <td>{{ linha.caixa|truncatechars:20 }}</td>
                             <td class="fm-celula-discriminacao">{{ linha.discriminacao|truncatechars:40 }}</td>
-                            <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
+                            <td class="text-end fm-celula-valor-tabela">R$ {{ linha.valor_tabela_fmt }}</td>
+                            <td class="text-end fm-celula-diferenca">R$ {{ linha.diferenca_fmt }}</td>
                             <td><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
                             <td>{{ linha.convenio|truncatechars:28 }}</td>
                             <td class="text-nowrap">{{ linha.horario_inicio }}</td>
@@ -231,7 +237,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="18" class="text-center text-muted py-4">Nenhum procedimento no filtro.</td>
+                            <td colspan="19" class="text-center text-muted py-4">Nenhum procedimento no filtro.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

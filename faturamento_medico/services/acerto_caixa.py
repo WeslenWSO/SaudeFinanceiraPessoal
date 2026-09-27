@@ -258,12 +258,31 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             if aguardando_faturamento:
                 resumo_aguardando_faturamento[convenio] += Decimal(str(total_item or 0))
 
-            mostrar_nf = primeira_linha_faturamento
+            mostrar_nf = primeira_linha_faturamento and not aguardando_faturamento
             primeira_linha_faturamento = False
+
+            if aguardando_faturamento:
+                forma_linha = 'A FATURAR'
+                valor_nota_linha = None
+                valor_nota_fmt_linha = '-'
+                disc_linha = '-'
+            else:
+                forma_linha = forma_pgto or '-'
+                valor_nota_linha = valor_nota
+                valor_nota_fmt_linha = _moeda_br(valor_nota) if valor_nota is not None else '-'
+                disc_linha = discriminacao[:120] if discriminacao else '-'
+
+            valor_tabela_dec = Decimal(str(valor_tabela or 0))
+            if valor_nota_linha is not None:
+                base_diferenca = Decimal(str(valor_nota_linha))
+            else:
+                base_diferenca = Decimal(str(total_item or 0))
+            diferenca = base_diferenca - valor_tabela_dec
 
             linhas.append({
                 'faturamento_id': fat.pk,
                 'data_iso': data_iso,
+                'aguardando_faturamento': aguardando_faturamento,
                 'mostrar_nf_celula': mostrar_nf,
                 'notas_vinculadas': notas,
                 'qtd_notas': qtd_notas,
@@ -276,13 +295,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'com_contraste': com_contraste,
                 'total_item': total_item,
                 'total_item_fmt': _moeda_br(total_item),
+                'valor_tabela': valor_tabela,
                 'nota_fiscal': numero_nf or '-',
-                'forma_pgto': forma_pgto or '-',
-                'valor_nota': valor_nota,
-                'valor_nota_fmt': _moeda_br(valor_nota) if valor_nota is not None else '-',
+                'forma_pgto': forma_linha,
+                'valor_nota': valor_nota_linha,
+                'valor_nota_fmt': valor_nota_fmt_linha,
                 'caixa': fat.checkin_por or '-',
-                'discriminacao': discriminacao[:120] if discriminacao else '-',
+                'discriminacao': disc_linha,
                 'valor_tabela_fmt': _moeda_br(valor_tabela),
+                'diferenca': diferenca,
+                'diferenca_fmt': _moeda_br(diferenca),
                 'status_agendamento': status_txt,
                 'status_css': status_css,
                 'convenio': convenio,

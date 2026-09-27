@@ -127,17 +127,48 @@
         return t.slice(0, maxLen) + '…';
     }
 
+    function valorNumericoNota(nota) {
+        if (!nota) return null;
+        if (nota.valor_liquido != null && nota.valor_liquido !== '') {
+            return Number(nota.valor_liquido);
+        }
+        if (nota.valor_bruto != null && nota.valor_bruto !== '') {
+            return Number(nota.valor_bruto);
+        }
+        return null;
+    }
+
+    function formatMoedaBR(num) {
+        var n = Number(num);
+        if (isNaN(n)) return '-';
+        var s = n.toFixed(2).replace('.', ',');
+        var partes = s.split(',');
+        partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return 'R$ ' + partes.join(',');
+    }
+
+    function atualizarDiferencaLinha(tr, valorNfNum) {
+        var diffCell = tr.querySelector('.fm-celula-diferenca');
+        if (!diffCell) return;
+        var total = parseFloat(tr.getAttribute('data-total-item') || '0') || 0;
+        var tabela = parseFloat(tr.getAttribute('data-valor-tabela') || '0') || 0;
+        var base = valorNfNum != null && !isNaN(valorNfNum) ? valorNfNum : total;
+        diffCell.textContent = formatMoedaBR(base - tabela);
+    }
+
     function atualizarColunasPagamentoNota(faturamentoId, nota) {
         if (!faturamentoId) return;
         var formaText = '-';
         var valorText = '-';
         var discText = '-';
+        var valorNfNum = null;
         if (nota) {
             formaText = nota.forma_pagamento && nota.forma_pagamento !== '-'
                 ? nota.forma_pagamento
                 : '-';
             valorText = formatValorNotaCelula(nota);
             discText = truncarTexto(nota.discriminacao, 120);
+            valorNfNum = valorNumericoNota(nota);
         }
         document.querySelectorAll('tr[data-faturamento-id="' + faturamentoId + '"]').forEach(function(tr) {
             var forma = tr.querySelector('.fm-celula-forma-pgto');
@@ -146,6 +177,7 @@
             if (forma) forma.textContent = truncarTexto(formaText, 18);
             if (valor) valor.textContent = valorText;
             if (disc) disc.textContent = truncarTexto(discText, 40);
+            atualizarDiferencaLinha(tr, valorNfNum);
         });
     }
 
