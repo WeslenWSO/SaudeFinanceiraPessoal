@@ -176,7 +176,15 @@
             var disc = tr.querySelector('.fm-celula-discriminacao');
             if (forma) forma.textContent = truncarTexto(formaText, 18);
             if (valor) valor.textContent = valorText;
-            if (disc) disc.textContent = truncarTexto(discText, 40);
+            if (disc) {
+                disc.textContent = truncarTexto(discText, 40);
+                var discTitle = nota && nota.discriminacao ? String(nota.discriminacao).trim() : '';
+                if (discTitle && discTitle !== '-') {
+                    disc.setAttribute('title', discTitle);
+                } else {
+                    disc.removeAttribute('title');
+                }
+            }
             atualizarDiferencaLinha(tr, valorNfNum);
         });
     }

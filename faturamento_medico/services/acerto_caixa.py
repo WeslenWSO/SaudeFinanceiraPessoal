@@ -9,7 +9,12 @@ import re
 from django.db.models import Q
 
 from faturamento_medico.lote_relatorio import _modalidade_item
-from faturamento_medico.models import FaturamentoMedico
+from faturamento_medico.models import (
+    CAIXAS_ACERTO_CHOICES,
+    CAIXAS_ACERTO_VALORES,
+    FaturamentoMedico,
+    rotulo_caixa_acerto,
+)
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
     notas_linha_para_json,
@@ -163,6 +168,12 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         di, df = df, di
 
     checkin = (request.GET.get('checkin') or '').strip()
+    caixas_sel = [
+        c.strip()
+        for c in request.GET.getlist('caixa')
+        if c and str(c).strip() in CAIXAS_ACERTO_VALORES
+    ]
+    somente_marcados = request.GET.get('somente_marcados') == '1'
     hora_ini_str = (request.GET.get('hora_inicial') or '').strip()
     hora_fim_str = (request.GET.get('hora_final') or '').strip()
     hora_ini_min = _parse_hora_minutos(hora_ini_str)
@@ -186,6 +197,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     qs = _filtrar_status(qs_periodo, status_sel)
     if checkin:
         qs = qs.filter(checkin_por__icontains=checkin)
+    if caixas_sel:
+        qs = qs.filter(caixa_acerto__in=caixas_sel)
+    if somente_marcados:
+        qs = qs.filter(marcado_acerto_caixa=True)
 
     qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
     notas_por_data = carregar_notas_por_data(empresa_id, di, df)
@@ -258,8 +273,15 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             if aguardando_faturamento:
                 resumo_aguardando_faturamento[convenio] += Decimal(str(total_item or 0))
 
+            mostrar_acerto = primeira_linha_faturamento
             mostrar_nf = primeira_linha_faturamento and not aguardando_faturamento
             primeira_linha_faturamento = False
+
+            caixa_valor = (fat.caixa_acerto or '').strip()
+            if caixa_valor:
+                caixa_exib = rotulo_caixa_acerto(caixa_valor)
+            else:
+                caixa_exib = (fat.checkin_por or '-').strip() or '-'
 
             if aguardando_faturamento:
                 forma_linha = 'A FATURAR'
@@ -270,7 +292,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 forma_linha = forma_pgto or '-'
                 valor_nota_linha = valor_nota
                 valor_nota_fmt_linha = _moeda_br(valor_nota) if valor_nota is not None else '-'
-                disc_linha = discriminacao[:120] if discriminacao else '-'
+                disc_linha = discriminacao if discriminacao else '-'
 
             valor_tabela_dec = Decimal(str(valor_tabela or 0))
             if valor_nota_linha is not None:
@@ -283,6 +305,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'faturamento_id': fat.pk,
                 'data_iso': data_iso,
                 'aguardando_faturamento': aguardando_faturamento,
+                'marcado_acerto_caixa': bool(fat.marcado_acerto_caixa),
+                'caixa_acerto': caixa_valor,
+                'mostrar_acerto_celula': mostrar_acerto,
                 'mostrar_nf_celula': mostrar_nf,
                 'notas_vinculadas': notas,
                 'qtd_notas': qtd_notas,
@@ -300,7 +325,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'forma_pgto': forma_linha,
                 'valor_nota': valor_nota_linha,
                 'valor_nota_fmt': valor_nota_fmt_linha,
-                'caixa': fat.checkin_por or '-',
+                'caixa': caixa_exib,
+                'caixa_exibicao': caixa_exib,
                 'discriminacao': disc_linha,
                 'valor_tabela_fmt': _moeda_br(valor_tabela),
                 'diferenca': diferenca,
@@ -337,6 +363,30 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     )
     total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
 
+    if caixas_sel:
+        nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c) for c in caixas_sel)
+    else:
+        caixas_unicos = sorted(
+            {
+                linha.get('caixa_acerto') or ''
+                for linha in linhas
+                if linha.get('caixa_acerto')
+            },
+            key=str.lower,
+        )
+        if caixas_unicos:
+            nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c) for c in caixas_unicos)
+        else:
+            operadores = sorted(
+                {
+                    (linha.get('checkin_por') or '').strip()
+                    for linha in linhas
+                    if (linha.get('checkin_por') or '').strip() and linha.get('checkin_por') != '-'
+                },
+                key=str.lower,
+            )
+            nome_caixa_acerto = ', '.join(operadores) if operadores else '—'
+
     return {
         'linhas': linhas,
         'quantidade_linhas': len(linhas),
@@ -344,13 +394,17 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_aguardando_faturamento': resumo_aguardando_lista,
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
+        'caixas_acerto': CAIXAS_ACERTO_CHOICES,
         'filtros': {
             'data_inicio': di.isoformat(),
             'data_fim': df.isoformat(),
             'checkin': checkin,
+            'caixa': caixas_sel,
+            'somente_marcados': somente_marcados,
             'hora_inicial': hora_ini_str,
             'hora_final': hora_fim_str,
             'status_agendamento': status_sel,
         },
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+        'nome_caixa_acerto': nome_caixa_acerto,
     }

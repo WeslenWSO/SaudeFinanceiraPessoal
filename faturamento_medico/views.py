@@ -5329,6 +5329,45 @@ def acerto_caixa(request):
 
 
 @login_required
+@require_POST
+def salvar_acerto_caixa_faturamento(request):
+    """AJAX: marca paciente para acerto de caixa e define o caixa."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    try:
+        faturamento_id = int(request.POST.get('faturamento_id') or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Faturamento inválido.'}, status=400)
+    if not faturamento_id:
+        return JsonResponse({'error': 'Informe o faturamento.'}, status=400)
+
+    from faturamento_medico.models import CAIXAS_ACERTO_VALORES, FaturamentoMedico, rotulo_caixa_acerto
+
+    faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
+    marcado = request.POST.get('marcado_acerto_caixa') in ('1', 'true', 'on', 'yes')
+    caixa = (request.POST.get('caixa_acerto') or '').strip()
+    if caixa and caixa not in CAIXAS_ACERTO_VALORES:
+        return JsonResponse({'error': 'Caixa inválido.'}, status=400)
+
+    if marcado and not caixa:
+        return JsonResponse({'error': 'Selecione o caixa ao marcar para acerto.'}, status=400)
+    faturamento.marcado_acerto_caixa = marcado
+    faturamento.caixa_acerto = caixa if marcado else ''
+
+    faturamento.save(update_fields=['marcado_acerto_caixa', 'caixa_acerto'])
+    caixa_exib = rotulo_caixa_acerto(faturamento.caixa_acerto) if faturamento.caixa_acerto else (
+        (faturamento.checkin_por or '-').strip() or '-'
+    )
+    return JsonResponse({
+        'ok': True,
+        'marcado_acerto_caixa': faturamento.marcado_acerto_caixa,
+        'caixa_acerto': faturamento.caixa_acerto,
+        'caixa_exibicao': caixa_exib,
+    })
+
+
+@login_required
 def imprimir_acerto_caixa(request):
     """Versão para impressão do Acerto de Caixa (mesmos filtros da tela)."""
     empresa_id = request.session.get('empresa_id')

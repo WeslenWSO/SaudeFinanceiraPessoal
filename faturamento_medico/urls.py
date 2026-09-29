@@ -48,6 +48,11 @@ urlpatterns = [
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('acerto-caixa/', views.acerto_caixa, name='acerto_caixa'),
     path('acerto-caixa/imprimir/', views.imprimir_acerto_caixa, name='imprimir_acerto_caixa'),
+    path(
+        'acerto-caixa/salvar-faturamento/',
+        views.salvar_acerto_caixa_faturamento,
+        name='salvar_acerto_caixa_faturamento',
+    ),
     path('relatorio-sedacao-anestesista/', views.relatorio_sedacao_anestesista, name='relatorio_sedacao_anestesista'),
     path(
         'lancamento-anestesista/<int:pk>/marcar-pago/',

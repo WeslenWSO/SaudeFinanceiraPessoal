@@ -11,6 +11,29 @@ def data_atual():
     return timezone.now().date()
 
 
+CAIXAS_ACERTO_CHOICES = [
+    ('Beatriz', 'Caixa - Beatriz'),
+    ('Estela', 'Caixa - Estela'),
+    ('Vitoria', 'Caixa - Vitoria'),
+    ('Joao', 'Caixa - João'),
+    ('Marcela', 'Caixa - Marcela'),
+    ('Laura', 'Caixa - Laura'),
+    ('Thaine', 'Caixa - Thaine'),
+]
+
+CAIXAS_ACERTO_VALORES = frozenset(c[0] for c in CAIXAS_ACERTO_CHOICES)
+
+
+def rotulo_caixa_acerto(nome: str) -> str:
+    nome = (nome or '').strip()
+    if not nome:
+        return ''
+    for valor, rotulo in CAIXAS_ACERTO_CHOICES:
+        if valor == nome:
+            return rotulo
+    return nome
+
+
 class FaturamentoMedico(models.Model):
     """Modelo para Faturamento Médico"""
 
@@ -96,6 +119,18 @@ class FaturamentoMedico(models.Model):
     )
     tecnico = models.CharField(verbose_name='Técnico', max_length=200, blank=True, null=True)
     checkin_por = models.CharField(verbose_name='Check-in Por', max_length=200, blank=True, null=True)
+    marcado_acerto_caixa = models.BooleanField(
+        verbose_name='Marcado para acerto de caixa',
+        default=False,
+        db_index=True,
+    )
+    caixa_acerto = models.CharField(
+        verbose_name='Caixa (acerto)',
+        max_length=40,
+        blank=True,
+        default='',
+        choices=CAIXAS_ACERTO_CHOICES,
+    )
     agendado_por = models.CharField(verbose_name='Agendado Por', max_length=200, blank=True, null=True)
     tag = models.CharField(verbose_name='Tag', max_length=100, blank=True, null=True)
     indicacao_clinica = models.TextField(verbose_name='Indicação Clínica', blank=True, null=True)

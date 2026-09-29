@@ -26,6 +26,7 @@
 .acerto-resumo-grupo td { border-top: 1px solid #dee2e6; }
 .acerto-table thead th { font-size: 0.72rem; white-space: nowrap; vertical-align: middle; }
 .acerto-table td { font-size: 0.78rem; vertical-align: middle; }
+.acerto-table .fm-celula-discriminacao[title] { cursor: help; }
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -63,11 +64,17 @@
                         <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
                                value="{{ filtros.data_fim }}">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label small mb-1" for="checkin">Check-in (contém)</label>
-                        <input type="search" id="checkin" name="checkin" class="form-control form-control-sm"
-                               placeholder="Nome do operador"
-                               value="{{ filtros.checkin }}">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Caixa (múltiplo)</label>
+                        <div class="fm-solicitante-lista" style="max-height: 7rem;">
+                            {% for valor, rotulo in caixas_acerto %}
+                            <label class="fm-solicitante-item">
+                                <input type="checkbox" name="caixa" value="{{ valor }}"
+                                       {% if valor in filtros.caixa %}checked{% endif %}>
+                                <span>{{ rotulo }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small mb-1" for="hora_inicial">Hora inicial</label>
@@ -84,7 +91,7 @@
                         <a href="{% url 'faturamento_medico:acerto_caixa' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
                     </div>
                 </div>
-                <div class="row g-2 mt-2">
+                <div class="row g-2 mt-2 align-items-end">
                     <div class="col-md-6">
                         <label class="form-label small mb-1">Status agendamento (múltipla seleção)</label>
                         <div class="fm-solicitante-lista">
@@ -99,6 +106,13 @@
                             {% endfor %}
                         </div>
                         <div class="form-text">Vazio = exclui cancelados, desistência e deletados.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-check mb-0">
+                            <input type="checkbox" class="form-check-input" name="somente_marcados" value="1"
+                                   {% if filtros.somente_marcados %}checked{% endif %}>
+                            <span class="form-check-label small">Somente marcados para acerto de caixa</span>
+                        </label>
                     </div>
                 </div>
             </form>
@@ -148,10 +162,12 @@
                             <th>Mod.</th>
                             <th>Contraste</th>
                             <th class="text-end">Total item</th>
+                            <th title="Incluir no acerto de caixa">Acerto</th>
+                            <th>Caixa</th>
                             <th>NF</th>
                             <th>Forma pgto.</th>
                             <th class="text-end">Valor NF</th>
-                            <th>Caixa (check-in)</th>
+                            <th>Operador check-in</th>
                             <th>Discriminação NF</th>
                             <th class="text-end">V. tabela</th>
                             <th class="text-end">Diferença</th>
@@ -174,6 +190,31 @@
                             <td>{{ linha.modalidade }}</td>
                             <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
                             <td class="text-end fm-celula-total-item">R$ {{ linha.total_item_fmt }}</td>
+                            <td class="text-center fm-celula-acerto-flag">
+                                {% if linha.mostrar_acerto_celula %}
+                                <input type="checkbox"
+                                       class="form-check-input js-acerto-caixa-flag m-0"
+                                       data-faturamento-id="{{ linha.faturamento_id }}"
+                                       {% if linha.marcado_acerto_caixa %}checked{% endif %}
+                                       aria-label="Marcar acerto de caixa">
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="fm-celula-caixa-select">
+                                {% if linha.mostrar_acerto_celula %}
+                                <select class="form-select form-select-sm js-caixa-acerto"
+                                        data-faturamento-id="{{ linha.faturamento_id }}"
+                                        aria-label="Caixa">
+                                    <option value="">—</option>
+                                    {% for valor, rotulo in caixas_acerto %}
+                                    <option value="{{ valor }}" {% if linha.caixa_acerto == valor %}selected{% endif %}>{{ rotulo }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% else %}
+                                <span class="fm-celula-caixa-nome">{{ linha.caixa_exibicao|truncatechars:22 }}</span>
+                                {% endif %}
+                            </td>
                             <td class="fm-celula-nf"
                                 data-faturamento-id="{{ linha.faturamento_id }}"
                                 data-paciente="{{ linha.paciente }}"
@@ -233,8 +274,9 @@
                             </td>
                             <td class="fm-celula-forma-pgto">{{ linha.forma_pgto|truncatechars:18 }}</td>
                             <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
-                            <td>{{ linha.caixa|truncatechars:20 }}</td>
-                            <td class="fm-celula-discriminacao">{{ linha.discriminacao|truncatechars:40 }}</td>
+                            <td class="fm-celula-checkin">{{ linha.checkin_por|truncatechars:20 }}</td>
+                            <td class="fm-celula-discriminacao"
+                                {% if linha.discriminacao and linha.discriminacao != '-' %}title="{{ linha.discriminacao }}"{% endif %}>{{ linha.discriminacao|truncatechars:40 }}</td>
                             <td class="text-end fm-celula-valor-tabela">R$ {{ linha.valor_tabela_fmt }}</td>
                             <td class="text-end fm-celula-diferenca">R$ {{ linha.diferenca_fmt }}</td>
                             <td><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
@@ -245,7 +287,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="19" class="text-center text-muted py-4">Nenhum procedimento no filtro.</td>
+                            <td colspan="21" class="text-center text-muted py-4">Nenhum procedimento no filtro.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -255,4 +297,95 @@
     </div>
 </div>
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
+<script>
+(function initAcertoCaixaMarcacao() {
+    var salvarUrl = "{% url 'faturamento_medico:salvar_acerto_caixa_faturamento %}";
+    var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrfToken = csrfEl ? csrfEl.value : '';
+
+    function linhasFaturamento(faturamentoId) {
+        return document.querySelectorAll('tr[data-faturamento-id="' + faturamentoId + '"]');
+    }
+
+    function atualizarCaixaNomeNasLinhas(faturamentoId, texto) {
+        linhasFaturamento(faturamentoId).forEach(function(tr) {
+            var nome = tr.querySelector('.fm-celula-caixa-nome');
+            if (nome) nome.textContent = texto || '—';
+        });
+    }
+
+    function salvar(faturamentoId, marcado, caixa) {
+        var body = new URLSearchParams({
+            faturamento_id: String(faturamentoId),
+            marcado_acerto_caixa: marcado ? '1' : '0',
+            caixa_acerto: caixa || ''
+        });
+        return fetch(salvarUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: body.toString()
+        }).then(function(r) { return r.json(); });
+    }
+
+    function dadosLinha(faturamentoId) {
+        var tr = document.querySelector('tr[data-faturamento-id="' + faturamentoId + '"]');
+        if (!tr) return { marcado: false, caixa: '' };
+        var cb = tr.querySelector('.js-acerto-caixa-flag');
+        var sel = tr.querySelector('.js-caixa-acerto');
+        return {
+            marcado: cb ? cb.checked : false,
+            caixa: sel ? sel.value : ''
+        };
+    }
+
+    document.addEventListener('change', function(e) {
+        var cb = e.target.closest('.js-acerto-caixa-flag');
+        if (cb) {
+            var fatId = cb.getAttribute('data-faturamento-id');
+            var sel = document.querySelector('.js-caixa-acerto[data-faturamento-id="' + fatId + '"]');
+            if (cb.checked && sel && !sel.value) {
+                sel.focus();
+                return;
+            }
+            salvar(fatId, cb.checked, sel ? sel.value : '').then(function(res) {
+                if (!res.ok) {
+                    alert(res.error || 'Não foi possível salvar.');
+                    cb.checked = !cb.checked;
+                    return;
+                }
+                atualizarCaixaNomeNasLinhas(fatId, res.caixa_exibicao);
+            }).catch(function() {
+                alert('Erro ao salvar acerto de caixa.');
+                cb.checked = !cb.checked;
+            });
+            return;
+        }
+        var sel = e.target.closest('.js-caixa-acerto');
+        if (!sel) return;
+        var fatId = sel.getAttribute('data-faturamento-id');
+        var cb2 = document.querySelector('.js-acerto-caixa-flag[data-faturamento-id="' + fatId + '"]');
+        if (cb2 && !cb2.checked) {
+            cb2.checked = true;
+        }
+        if (!sel.value) {
+            if (cb2) cb2.checked = false;
+        }
+        salvar(fatId, cb2 ? cb2.checked : false, sel.value).then(function(res) {
+            if (!res.ok) {
+                alert(res.error || 'Não foi possível salvar.');
+                return;
+            }
+            if (cb2) cb2.checked = res.marcado_acerto_caixa;
+            sel.value = res.caixa_acerto || '';
+            atualizarCaixaNomeNasLinhas(fatId, res.caixa_exibicao);
+        }).catch(function() {
+            alert('Erro ao salvar caixa.');
+        });
+    });
+})();
+</script>
 {% endblock %}
