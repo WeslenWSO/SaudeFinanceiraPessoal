@@ -299,7 +299,7 @@
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 <script>
 (function initAcertoCaixaMarcacao() {
-    var salvarUrl = "{% url 'faturamento_medico:salvar_acerto_caixa_faturamento %}";
+    var salvarUrl = "{% url 'faturamento_medico:salvar_acerto_caixa_faturamento' %}";
     var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
     var csrfToken = csrfEl ? csrfEl.value : '';
 
