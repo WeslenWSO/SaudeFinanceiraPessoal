@@ -163,9 +163,11 @@
         var discText = '-';
         var valorNfNum = null;
         if (nota) {
-            formaText = nota.forma_pagamento && nota.forma_pagamento !== '-'
-                ? nota.forma_pagamento
-                : '-';
+            formaText = nota.forma_pagamento_exibicao && nota.forma_pagamento_exibicao !== '-'
+                ? nota.forma_pagamento_exibicao
+                : (nota.forma_pagamento && nota.forma_pagamento !== '-'
+                    ? nota.forma_pagamento
+                    : '-');
             valorText = formatValorNotaCelula(nota);
             discText = truncarTexto(nota.discriminacao, 120);
             valorNfNum = valorNumericoNota(nota);
@@ -174,7 +176,7 @@
             var forma = tr.querySelector('.fm-celula-forma-pgto');
             var valor = tr.querySelector('.fm-celula-valor-nf');
             var disc = tr.querySelector('.fm-celula-discriminacao');
-            if (forma) forma.textContent = truncarTexto(formaText, 18);
+            if (forma) forma.textContent = truncarTexto(formaText, 28);
             if (valor) valor.textContent = valorText;
             if (disc) {
                 disc.textContent = truncarTexto(discText, 40);

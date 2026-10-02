@@ -108,6 +108,116 @@ def _forma_pagamento_nota(nota: NotaFiscalServico) -> str:
     return (nota.extract_payment_method_from_description() or '').strip()
 
 
+def _rotulo_forma_pagamento_resumo(forma_canonica: str) -> str:
+    f = (forma_canonica or '').strip().upper()
+    if not f:
+        return 'Outros'
+    if 'DINHEIRO' in f:
+        return 'Dinheiro'
+    if 'PIX' in f:
+        return 'PIX'
+    if 'DEBIT' in f or 'DEBITO' in f or f == 'CD':
+        return 'Cartão de débito'
+    if 'CRED' in f or 'CREDITO' in f or f == 'CC':
+        return 'Cartão de crédito'
+    return (forma_canonica or '').strip().title()
+
+
+def _formas_clausula_pagamento(discriminacao: str) -> list[str]:
+    import re
+
+    from notasfiscais.utils import _forma_canonica_token_pagamento, extrair_forma_pagamento
+
+    if not discriminacao:
+        return []
+    m = re.search(r'pagamento\s*:\s*([^\n]+)', discriminacao, re.IGNORECASE)
+    if not m:
+        return []
+    trecho = m.group(1).strip()
+    for sep in ('PARCERIA:', 'CPF:', 'PACIENTE:'):
+        idx = trecho.upper().find(sep)
+        if idx > 0:
+            trecho = trecho[:idx].strip()
+    partes = re.split(r'\s+e\s+|\s*/\s*|\s+\+\s*', trecho, flags=re.IGNORECASE)
+    formas: list[str] = []
+    for parte in partes:
+        forma = _forma_canonica_token_pagamento(parte.strip()) or extrair_forma_pagamento(parte)
+        if forma and forma not in formas:
+            formas.append(forma)
+    return formas
+
+
+def _valores_procedimentos_discriminacao(
+    discriminacao: str,
+    valor_nf: Decimal | None,
+) -> list[Decimal]:
+    import re
+
+    from notasfiscais.utils import _PADRAO_VALOR_MONETARIO, _normalizar_valor_monetario_str
+
+    if not discriminacao:
+        return []
+    head = discriminacao
+    upper = head.upper()
+    for sep in ('PACIENTE:', 'CPF:', 'PAGAMENTO:'):
+        idx = upper.find(sep)
+        if idx > 0:
+            head = head[:idx]
+    valores: list[Decimal] = []
+    for match in _PADRAO_VALOR_MONETARIO.finditer(head):
+        val = _normalizar_valor_monetario_str(match.group(1))
+        if val is not None and val > 0:
+            valores.append(val)
+    if valor_nf is None or len(valores) < 2:
+        return []
+    if abs(sum(valores) - valor_nf) <= Decimal('0.05'):
+        return valores
+    return []
+
+
+def pagamentos_detalhados_nota(nota: NotaFiscalServico) -> list[tuple[str, Decimal]]:
+    """Pagamentos split na discriminação: [(rótulo resumo, valor), ...]."""
+    from notasfiscais.utils import (
+        extrair_pagamentos_mistos_discriminacao,
+        extrair_todas_formas_na_discriminacao,
+        extrair_valores_por_forma_da_discriminacao,
+    )
+
+    disc = _discriminacao_texto(nota.discriminacao)
+    valor_ref = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    pares = extrair_pagamentos_mistos_discriminacao(disc)
+    if len(pares) < 2:
+        formas = extrair_todas_formas_na_discriminacao(disc)
+        if len(formas) >= 2:
+            pares = extrair_valores_por_forma_da_discriminacao(disc, formas)
+    if len(pares) < 2:
+        formas_pag = _formas_clausula_pagamento(disc)
+        valores_proc = _valores_procedimentos_discriminacao(disc, valor_ref)
+        if len(formas_pag) >= 2 and len(valores_proc) == len(formas_pag):
+            pares = list(zip(formas_pag, valores_proc))
+    if len(pares) < 2:
+        return []
+    valor_ref = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    if valor_ref is not None:
+        total = sum(v for _, v in pares)
+        if abs(total - valor_ref) > Decimal('0.05'):
+            return []
+    return [(_rotulo_forma_pagamento_resumo(f), v) for f, v in pares]
+
+
+def forma_pagamento_exibicao_nota(nota: NotaFiscalServico) -> str:
+    detalhes = pagamentos_detalhados_nota(nota)
+    if detalhes:
+        partes = [f"{rotulo} R$ {_valor_fmt_decimal(v)}" for rotulo, v in detalhes]
+        return ' + '.join(partes)
+    forma = _forma_pagamento_nota(nota)
+    return forma or '-'
+
+
+def _valor_fmt_decimal(valor: Decimal) -> str:
+    return f'{valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
 def _valor_fmt_nota(nota: NotaFiscalServico) -> str:
     valor = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
     if valor is None:
@@ -126,6 +236,8 @@ def _decimal_para_json(valor):
 
 def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict:
     forma = _forma_pagamento_nota(nota)
+    pagamentos = pagamentos_detalhados_nota(nota)
+    forma_exibicao = forma_pagamento_exibicao_nota(nota)
     numero = (nota.numero_nota or '').strip() or f'#{nota.pk}'
     paciente_nota = _nome_paciente_nota(nota)
     valor_bruto = _decimal_para_json(nota.valor_bruto)
@@ -135,6 +247,15 @@ def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict
         'numero': numero,
         'url': reverse('notasfiscais:detail', args=[nota.pk]),
         'forma_pagamento': forma or '-',
+        'forma_pagamento_exibicao': forma_exibicao,
+        'pagamentos_detalhados': [
+            {
+                'rotulo': rotulo,
+                'valor': _decimal_para_json(valor),
+                'valor_fmt': _valor_fmt_decimal(valor),
+            }
+            for rotulo, valor in pagamentos
+        ],
         'cliente': (nota.cliente or '').strip() or '-',
         'paciente_nota': paciente_nota or (nota.cliente or '').strip() or '-',
         'valor_fmt': _valor_fmt_nota(nota),

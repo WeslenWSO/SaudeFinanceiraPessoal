@@ -272,7 +272,8 @@
                                 <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
-                            <td class="fm-celula-forma-pgto">{{ linha.forma_pgto|truncatechars:18 }}</td>
+                            <td class="fm-celula-forma-pgto"
+                                {% if linha.forma_pgto and linha.forma_pgto != '-' %}title="{{ linha.forma_pgto }}"{% endif %}>{{ linha.forma_pgto|truncatechars:28 }}</td>
                             <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
                             <td class="fm-celula-checkin">{{ linha.checkin_por|truncatechars:20 }}</td>
                             <td class="fm-celula-discriminacao"

@@ -224,7 +224,11 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             fat.nota_fiscal,
         )
         nota = _primeira_nota(notas)
-        forma_pgto = nota.get('forma_pagamento', '-') if nota else '-'
+        forma_pgto = (
+            (nota.get('forma_pagamento_exibicao') or nota.get('forma_pagamento') or '-')
+            if nota else '-'
+        )
+        pagamentos_nf = (nota.get('pagamentos_detalhados') or []) if nota else []
         valor_nota = None
         if nota:
             valor_nota = nota.get('valor_liquido') or nota.get('valor_bruto')
@@ -263,11 +267,20 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
             if not pagamento_contabilizado:
                 if not aguardando_faturamento:
-                    chave_pag = _agrupar_forma_pagamento(forma_pgto)
-                    if valor_nota is not None:
-                        resumo_pagamento[chave_pag] += Decimal(str(valor_nota))
+                    if len(pagamentos_nf) >= 2:
+                        for p in pagamentos_nf:
+                            rotulo = p.get('rotulo') or 'Outros'
+                            val = p.get('valor')
+                            if val is not None:
+                                resumo_pagamento[rotulo] += Decimal(str(val))
                     else:
-                        resumo_pagamento[chave_pag] += Decimal(str(total_item or 0))
+                        chave_pag = _agrupar_forma_pagamento(
+                            nota.get('forma_pagamento') if nota else forma_pgto
+                        )
+                        if valor_nota is not None:
+                            resumo_pagamento[chave_pag] += Decimal(str(valor_nota))
+                        else:
+                            resumo_pagamento[chave_pag] += Decimal(str(total_item or 0))
                 pagamento_contabilizado = True
 
             if aguardando_faturamento:

@@ -804,6 +804,73 @@ def extrair_valores_mesma_forma_da_discriminacao(
     return resultado
 
 
+def _forma_canonica_token_pagamento(token: str) -> Optional[str]:
+    """Interpreta sigla ou rótulo curto após valor (ex.: CD, DH, dinheiro)."""
+    if not token:
+        return None
+    t = _normalizar_texto(token.strip())
+    if not t:
+        return None
+    if t in ('cd',):
+        return 'CARTAO DEBITO'
+    if t in ('cc',):
+        return 'CARTAO CREDITO'
+    if t in ('dh', 'dn'):
+        return 'DINHEIRO'
+    if t in ('pix',):
+        return 'PIX'
+    if 'cartao debito' in t or 'cartao de debito' in t or t == 'debito':
+        return 'CARTAO DEBITO'
+    if 'cartao credito' in t or 'cartao de credito' in t or t == 'credito':
+        return 'CARTAO CREDITO'
+    if t in ('debito', 'deb'):
+        return 'CARTAO DEBITO'
+    if t in ('dinheiro', 'especie'):
+        return 'DINHEIRO'
+    return extrair_forma_pagamento(token)
+
+
+def extrair_pagamentos_mistos_discriminacao(
+    discriminacao: str,
+) -> List[Tuple[str, Decimal]]:
+    """
+    Vários pagamentos na mesma NF (ex.: 600,00 DINHEIRO E 300,00 CD).
+    Retorna lista (forma_canonica, valor).
+    """
+    if not discriminacao or not discriminacao.strip():
+        return []
+    texto = discriminacao.strip()
+    trechos: List[str] = []
+    m = re.search(r'forma\s+de\s+pagamento\s*:\s*([^\n]+)', texto, re.IGNORECASE)
+    if m:
+        trechos = re.split(r'\s+e\s+|\s*/\s*|\s+\+\s*', m.group(1), flags=re.IGNORECASE)
+    else:
+        m2 = re.search(r'pagamento\s*:\s*([^\n]+)', texto, re.IGNORECASE)
+        if m2:
+            trechos = re.split(r'\s+e\s+|\s*/\s*|\s+\+\s*', m2.group(1), flags=re.IGNORECASE)
+    resultado: List[Tuple[str, Decimal]] = []
+    for parte in trechos:
+        parte = (parte or '').strip()
+        if not parte:
+            continue
+        val_m = _PADRAO_VALOR_MONETARIO.search(parte)
+        if not val_m:
+            continue
+        val = _normalizar_valor_monetario_str(val_m.group(1))
+        if val is None or val <= 0:
+            continue
+        after = parte[val_m.end():].strip(' ,.;:-')
+        before = parte[: val_m.start()].strip(' ,.;:-')
+        forma = _forma_canonica_token_pagamento(after) or _forma_canonica_token_pagamento(before)
+        if not forma:
+            forma = extrair_forma_pagamento(parte)
+        if forma:
+            resultado.append((forma, val))
+    if len(resultado) >= 2:
+        return resultado
+    return []
+
+
 def extrair_aut_todos(discriminacao: str) -> List[str]:
     """Retorna todos os códigos AUT / STONE ID encontrados na discriminação."""
     if not discriminacao:
