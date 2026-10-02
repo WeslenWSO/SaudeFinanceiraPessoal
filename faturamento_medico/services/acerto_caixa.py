@@ -7,9 +7,11 @@ from decimal import Decimal
 import re
 
 from django.db.models import Q
+from django.utils import timezone
 
 from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.models import (
+    AcertoCaixaFechamento,
     CAIXAS_ACERTO_CHOICES,
     CAIXAS_ACERTO_VALORES,
     FaturamentoMedico,
@@ -159,6 +161,185 @@ def _primeira_nota(linhas_nota):
     return linhas_nota[0]
 
 
+def _filtros_para_snapshot(filtros: dict) -> dict:
+    return {
+        'checkin': filtros.get('checkin') or '',
+        'caixa': list(filtros.get('caixa') or []),
+        'somente_marcados': bool(filtros.get('somente_marcados')),
+        'hora_inicial': filtros.get('hora_inicial') or '',
+        'hora_final': filtros.get('hora_final') or '',
+        'status_agendamento': list(filtros.get('status_agendamento') or []),
+    }
+
+
+def _fechamentos_ativos_empresa(empresa_id: int):
+    return AcertoCaixaFechamento.objects.filter(
+        empresa_id=empresa_id,
+        reaberto_em__isnull=True,
+    )
+
+
+def _fechamento_cobre_faturamento(fech: AcertoCaixaFechamento, fat: FaturamentoMedico) -> bool:
+    if fat.empresa_id != fech.empresa_id:
+        return False
+    if not fat.data or fat.data < fech.data_inicio or fat.data > fech.data_fim:
+        return False
+    caixa_fat = (fat.caixa_acerto or '').strip()
+    if caixa_fat != fech.caixa:
+        return False
+
+    snap = fech.filtros or {}
+    checkin = (snap.get('checkin') or '').strip()
+    if checkin and checkin.lower() not in (fat.checkin_por or '').lower():
+        return False
+
+    if snap.get('somente_marcados') and not fat.marcado_acerto_caixa:
+        return False
+
+    status_sel = snap.get('status_agendamento') or []
+    if status_sel:
+        st = (fat.status_agendamento or '').strip() or 'Não informado'
+        if st not in status_sel:
+            return False
+    else:
+        st_norm = (fat.status_agendamento or '').strip()
+        for cancel in STATUS_CANCELADOS:
+            if st_norm.lower() == cancel.lower():
+                return False
+
+    hora_ini_min = _parse_hora_minutos(snap.get('hora_inicial'))
+    hora_fim_min = _parse_hora_minutos(snap.get('hora_final'))
+    mins = _parse_hora_minutos(fat.horario_inicio or fat.horario)
+    if hora_ini_min is not None and (mins is None or mins < hora_ini_min):
+        return False
+    if hora_fim_min is not None and (mins is None or mins > hora_fim_min):
+        return False
+    return True
+
+
+def faturamento_caixa_bloqueado(fat: FaturamentoMedico, fechamentos_ativos=None) -> bool:
+    if fechamentos_ativos is None:
+        fechamentos_ativos = _fechamentos_ativos_empresa(fat.empresa_id)
+    for fech in fechamentos_ativos:
+        if _fechamento_cobre_faturamento(fech, fat):
+            return True
+    return False
+
+
+def _request_com_caixa_unico(request, caixa: str):
+    """Copia GET do request fixando um único caixa (para saldo por fechamento)."""
+
+    class _Req:
+        pass
+
+    qd = request.GET.copy()
+    qd.setlist('caixa', [caixa])
+    r = _Req()
+    r.GET = qd
+    return r
+
+
+def _fechamento_ativo_mesmo_escopo(
+    empresa_id: int,
+    caixa: str,
+    data_inicio: date,
+    data_fim: date,
+    filtros_snap: dict,
+) -> AcertoCaixaFechamento | None:
+    for fech in _fechamentos_ativos_empresa(empresa_id).filter(
+        caixa=caixa,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+    ):
+        if (fech.filtros or {}) == filtros_snap:
+            return fech
+    return None
+
+
+def fechar_acertos_caixa(
+    request,
+    empresa_id: int,
+    *,
+    usuario,
+) -> tuple[list[AcertoCaixaFechamento], list[str]]:
+    """Fecha o acerto para cada caixa selecionado no filtro. Retorna (criados, erros)."""
+    ctx = montar_contexto_acerto_caixa(request, empresa_id)
+    filtros = ctx['filtros']
+    caixas_sel = filtros.get('caixa') or []
+    erros: list[str] = []
+    if not caixas_sel:
+        return [], ['Selecione ao menos um caixa no filtro para fechar.']
+    if request.POST.get('valores_conferidos') not in ('1', 'true', 'on', 'yes'):
+        return [], ['Marque que os valores foram conferidos antes de fechar o caixa.']
+
+    di = _parse_data_filtro(filtros['data_inicio'])
+    df = _parse_data_filtro(filtros['data_fim'])
+    snap = _filtros_para_snapshot(filtros)
+    criados: list[AcertoCaixaFechamento] = []
+
+    for caixa in caixas_sel:
+        if _fechamento_ativo_mesmo_escopo(empresa_id, caixa, di, df, snap):
+            erros.append(
+                f'{rotulo_caixa_acerto(caixa)} já está fechado neste período e filtros.'
+            )
+            continue
+        sub_ctx = montar_contexto_acerto_caixa(_request_com_caixa_unico(request, caixa), empresa_id)
+        resumo = sub_ctx.get('resumo_pagamento') or []
+        saldo = sum((row['total'] for row in resumo), Decimal('0'))
+        resumo_json = [
+            {'rotulo': row['rotulo'], 'total': str(row['total'])}
+            for row in resumo
+        ]
+        fech = AcertoCaixaFechamento.objects.create(
+            empresa_id=empresa_id,
+            caixa=caixa,
+            data_inicio=di,
+            data_fim=df,
+            saldo_total=saldo,
+            resumo_saldos=resumo_json,
+            filtros=snap,
+            fechado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
+        )
+        criados.append(fech)
+    return criados, erros
+
+
+def reabrir_acerto_caixa(fechamento: AcertoCaixaFechamento, *, usuario) -> None:
+    if not fechamento.ativo:
+        raise ValueError('Este fechamento já foi reaberto.')
+    fechamento.reaberto_em = timezone.now()
+    fechamento.reaberto_por = usuario if getattr(usuario, 'is_authenticated', False) else None
+    fechamento.save(update_fields=['reaberto_em', 'reaberto_por'])
+
+
+def montar_status_fechamentos_caixa(
+    empresa_id: int,
+    filtros: dict,
+) -> list[dict]:
+    caixas_sel = filtros.get('caixa') or []
+    if not caixas_sel:
+        return []
+    di = _parse_data_filtro(filtros['data_inicio'])
+    df = _parse_data_filtro(filtros['data_fim'])
+    snap = _filtros_para_snapshot(filtros)
+    status_list = []
+    for caixa in caixas_sel:
+        fech = _fechamento_ativo_mesmo_escopo(empresa_id, caixa, di, df, snap)
+        row = {
+            'caixa': caixa,
+            'rotulo': rotulo_caixa_acerto(caixa),
+            'fechado': fech is not None,
+            'fechamento_id': fech.pk if fech else None,
+            'fechado_em_fmt': (
+                timezone.localtime(fech.fechado_em).strftime('%d/%m/%Y %H:%M')
+                if fech else ''
+            ),
+            'saldo_total_fmt': _moeda_br(fech.saldo_total) if fech else '',
+        }
+        status_list.append(row)
+    return status_list
+
+
 def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     hoje = date.today()
     di_padrao, df_padrao = _periodo_padrao(hoje)
@@ -204,6 +385,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
     qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
     notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+    fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
+    fats_bloqueio: dict[int, bool] = {}
 
     linhas = []
     resumo_pagamento: dict[str, Decimal] = defaultdict(Decimal)
@@ -314,10 +497,14 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 base_diferenca = Decimal(str(total_item or 0))
             diferenca = base_diferenca - valor_tabela_dec
 
+            if fat.pk not in fats_bloqueio:
+                fats_bloqueio[fat.pk] = faturamento_caixa_bloqueado(fat, fechamentos_ativos)
+
             linhas.append({
                 'faturamento_id': fat.pk,
                 'data_iso': data_iso,
                 'aguardando_faturamento': aguardando_faturamento,
+                'caixa_bloqueado': fats_bloqueio.get(fat.pk, False),
                 'marcado_acerto_caixa': bool(fat.marcado_acerto_caixa),
                 'caixa_acerto': caixa_valor,
                 'mostrar_acerto_celula': mostrar_acerto,
@@ -400,6 +587,19 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             )
             nome_caixa_acerto = ', '.join(operadores) if operadores else '—'
 
+    filtros_dict = {
+        'data_inicio': di.isoformat(),
+        'data_fim': df.isoformat(),
+        'checkin': checkin,
+        'caixa': caixas_sel,
+        'somente_marcados': somente_marcados,
+        'hora_inicial': hora_ini_str,
+        'hora_final': hora_fim_str,
+        'status_agendamento': status_sel,
+    }
+    fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
+    pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
+
     return {
         'linhas': linhas,
         'quantidade_linhas': len(linhas),
@@ -408,16 +608,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
         'caixas_acerto': CAIXAS_ACERTO_CHOICES,
-        'filtros': {
-            'data_inicio': di.isoformat(),
-            'data_fim': df.isoformat(),
-            'checkin': checkin,
-            'caixa': caixas_sel,
-            'somente_marcados': somente_marcados,
-            'hora_inicial': hora_ini_str,
-            'hora_final': hora_fim_str,
-            'status_agendamento': status_sel,
-        },
+        'filtros': filtros_dict,
+        'fechamentos_caixa': fechamentos_caixa,
+        'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
         'nome_caixa_acerto': nome_caixa_acerto,
     }

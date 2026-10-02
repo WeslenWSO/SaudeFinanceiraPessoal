@@ -1055,3 +1055,71 @@ class ApelidoSolicitante(models.Model):
 
     def __str__(self):
         return f'{self.apelido} ← {self.grafia}'
+
+
+class AcertoCaixaFechamento(models.Model):
+    """Fechamento do acerto de caixa por caixa e período (bloqueia alteração de caixa até reabrir)."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='fechamentos_acerto_caixa',
+        verbose_name='Empresa',
+    )
+    caixa = models.CharField(
+        verbose_name='Caixa',
+        max_length=40,
+        choices=CAIXAS_ACERTO_CHOICES,
+    )
+    data_inicio = models.DateField(verbose_name='Data início')
+    data_fim = models.DateField(verbose_name='Data fim')
+    saldo_total = models.DecimalField(
+        verbose_name='Saldo (total NF)',
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0'),
+    )
+    resumo_saldos = models.JSONField(
+        verbose_name='Resumo por forma de pagamento',
+        default=list,
+        blank=True,
+    )
+    filtros = models.JSONField(
+        verbose_name='Filtros do acerto',
+        default=dict,
+        blank=True,
+    )
+    fechado_em = models.DateTimeField(verbose_name='Fechado em', default=timezone.now)
+    fechado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fechamentos_acerto_caixa',
+        verbose_name='Fechado por',
+    )
+    reaberto_em = models.DateTimeField(verbose_name='Reaberto em', null=True, blank=True)
+    reaberto_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reaberturas_acerto_caixa',
+        verbose_name='Reaberto por',
+    )
+
+    class Meta:
+        verbose_name = 'Fechamento acerto de caixa'
+        verbose_name_plural = 'Fechamentos acerto de caixa'
+        ordering = ['-fechado_em']
+        indexes = [
+            models.Index(fields=['empresa', 'caixa', 'data_inicio', 'data_fim']),
+        ]
+
+    @property
+    def ativo(self) -> bool:
+        return self.reaberto_em is None
+
+    def __str__(self):
+        status = 'aberto' if self.ativo else 'reaberto'
+        return f'{self.get_caixa_display()} {self.data_inicio:%d/%m/%Y}–{self.data_fim:%d/%m/%Y} ({status})'

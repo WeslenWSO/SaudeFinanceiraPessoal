@@ -151,6 +151,58 @@
                         </table>
                     </div>
                 </div>
+                <div class="col-lg-6">
+                    <div class="acerto-resumo-card h-100">
+                        <h6 class="mb-2">Fechamento do caixa</h6>
+                        {% if filtros.caixa %}
+                        <ul class="list-unstyled small mb-3">
+                            {% for st in fechamentos_caixa %}
+                            <li class="mb-2 d-flex flex-wrap align-items-center gap-2">
+                                {% if st.fechado %}
+                                <span class="badge bg-success">Fechado</span>
+                                <span>{{ st.rotulo }} — saldo R$ {{ st.saldo_total_fmt }} · {{ st.fechado_em_fmt }}</span>
+                                <form method="post"
+                                      action="{% url 'faturamento_medico:reabrir_acerto_caixa' %}?{{ redirect_qs }}"
+                                      class="d-inline mb-0"
+                                      onsubmit="return confirm('Reabrir este caixa? Será possível alterar marcações e caixa novamente.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="fechamento_id" value="{{ st.fechamento_id }}">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm py-0">Reabrir</button>
+                                </form>
+                                {% else %}
+                                <span class="badge bg-secondary">Aberto</span>
+                                <span>{{ st.rotulo }} — editável</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <form method="post"
+                              action="{% url 'faturamento_medico:fechar_acerto_caixa' %}?{{ redirect_qs }}"
+                              id="formFecharAcertoCaixa"
+                              class="border-top pt-2">
+                            {% csrf_token %}
+                            <label class="form-check mb-2">
+                                <input type="checkbox" class="form-check-input" name="valores_conferidos" value="1" id="chkValoresConferidos">
+                                <span class="form-check-label small">Valores conferidos — pronto para fechar o caixa</span>
+                            </label>
+                            <button type="submit"
+                                    class="btn btn-success btn-sm"
+                                    id="btnFecharAcertoCaixa"
+                                    disabled>
+                                <i class="fas fa-lock"></i> Fechar caixa
+                            </button>
+                            <p class="form-text mb-0 mt-2">
+                                Grava a data/hora e o saldo (totais por forma de pagamento). Com o caixa fechado,
+                                não é possível alterar a coluna Caixa até reabrir.
+                            </p>
+                        </form>
+                        {% else %}
+                        <p class="text-muted small mb-0">
+                            Marque um ou mais caixas no filtro acima para fechar ou reabrir o acerto.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
@@ -187,7 +239,8 @@
                         {% for linha in linhas %}
                         <tr data-faturamento-id="{{ linha.faturamento_id }}"
                             data-total-item="{{ linha.total_item }}"
-                            data-valor-tabela="{{ linha.valor_tabela }}">
+                            data-valor-tabela="{{ linha.valor_tabela }}"
+                            {% if linha.caixa_bloqueado %}data-caixa-bloqueado="1"{% endif %}>
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
                             <td>{{ linha.paciente|truncatechars:28 }}</td>
                             <td><code class="small">{{ linha.codigo_servico }}</code></td>
@@ -201,6 +254,7 @@
                                        class="form-check-input js-acerto-caixa-flag m-0"
                                        data-faturamento-id="{{ linha.faturamento_id }}"
                                        {% if linha.marcado_acerto_caixa %}checked{% endif %}
+                                       {% if linha.caixa_bloqueado %}disabled title="Caixa fechado — reabra para alterar"{% endif %}
                                        aria-label="Marcar acerto de caixa">
                                 {% else %}
                                 <span class="text-muted">—</span>
@@ -210,6 +264,7 @@
                                 {% if linha.mostrar_acerto_celula %}
                                 <select class="form-select form-select-sm js-caixa-acerto"
                                         data-faturamento-id="{{ linha.faturamento_id }}"
+                                        {% if linha.caixa_bloqueado %}disabled title="Caixa fechado — reabra para alterar"{% endif %}
                                         aria-label="Caixa">
                                     <option value="">—</option>
                                     {% for valor, rotulo in caixas_acerto %}
@@ -304,6 +359,28 @@
 </div>
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 <script>
+(function initFecharAcertoCaixa() {
+    var chk = document.getElementById('chkValoresConferidos');
+    var btn = document.getElementById('btnFecharAcertoCaixa');
+    if (!chk || !btn) return;
+    var algumAberto = {{ pode_fechar_caixa|yesno:"true,false" }};
+    function syncBtn() {
+        btn.disabled = !algumAberto || !chk.checked;
+    }
+    chk.addEventListener('change', syncBtn);
+    syncBtn();
+    btn.closest('form').addEventListener('submit', function(e) {
+        if (!chk.checked) {
+            e.preventDefault();
+            alert('Marque que os valores foram conferidos.');
+            return;
+        }
+        if (!confirm('Fechar o caixa para o período e filtros atuais? Não será possível alterar o caixa até reabrir.')) {
+            e.preventDefault();
+        }
+    });
+})();
+
 (function initAcertoCaixaMarcacao() {
     var salvarUrl = "{% url 'faturamento_medico:salvar_acerto_caixa_faturamento' %}";
     var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -334,7 +411,11 @@
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: body.toString()
-        }).then(function(r) { return r.json(); });
+        }).then(function(r) {
+            return r.json().then(function(data) {
+                return { status: r.status, data: data };
+            });
+        });
     }
 
     function dadosLinha(faturamentoId) {
@@ -348,9 +429,19 @@
         };
     }
 
+    function linhaBloqueada(faturamentoId) {
+        var tr = document.querySelector('tr[data-faturamento-id="' + faturamentoId + '"]');
+        return tr && tr.getAttribute('data-caixa-bloqueado') === '1';
+    }
+
     document.addEventListener('change', function(e) {
         var cb = e.target.closest('.js-acerto-caixa-flag');
         if (cb) {
+            if (linhaBloqueada(cb.getAttribute('data-faturamento-id'))) {
+                cb.checked = !cb.checked;
+                alert('Caixa fechado neste período. Reabra o caixa para alterar.');
+                return;
+            }
             var fatId = cb.getAttribute('data-faturamento-id');
             var sel = document.querySelector('.js-caixa-acerto[data-faturamento-id="' + fatId + '"]');
             if (cb.checked && sel && !sel.value) {
@@ -358,12 +449,13 @@
                 return;
             }
             salvar(fatId, cb.checked, sel ? sel.value : '').then(function(res) {
-                if (!res.ok) {
-                    alert(res.error || 'Não foi possível salvar.');
+                var data = res.data;
+                if (!data.ok) {
+                    alert(data.error || 'Não foi possível salvar.');
                     cb.checked = !cb.checked;
                     return;
                 }
-                atualizarCaixaNomeNasLinhas(fatId, res.caixa_exibicao);
+                atualizarCaixaNomeNasLinhas(fatId, data.caixa_exibicao);
             }).catch(function() {
                 alert('Erro ao salvar acerto de caixa.');
                 cb.checked = !cb.checked;
@@ -373,6 +465,10 @@
         var sel = e.target.closest('.js-caixa-acerto');
         if (!sel) return;
         var fatId = sel.getAttribute('data-faturamento-id');
+        if (linhaBloqueada(fatId)) {
+            alert('Caixa fechado neste período. Reabra o caixa para alterar.');
+            return;
+        }
         var cb2 = document.querySelector('.js-acerto-caixa-flag[data-faturamento-id="' + fatId + '"]');
         if (cb2 && !cb2.checked) {
             cb2.checked = true;
@@ -381,13 +477,14 @@
             if (cb2) cb2.checked = false;
         }
         salvar(fatId, cb2 ? cb2.checked : false, sel.value).then(function(res) {
-            if (!res.ok) {
-                alert(res.error || 'Não foi possível salvar.');
+            var data = res.data;
+            if (!data.ok) {
+                alert(data.error || 'Não foi possível salvar.');
                 return;
             }
-            if (cb2) cb2.checked = res.marcado_acerto_caixa;
-            sel.value = res.caixa_acerto || '';
-            atualizarCaixaNomeNasLinhas(fatId, res.caixa_exibicao);
+            if (cb2) cb2.checked = data.marcado_acerto_caixa;
+            sel.value = data.caixa_acerto || '';
+            atualizarCaixaNomeNasLinhas(fatId, data.caixa_exibicao);
         }).catch(function() {
             alert('Erro ao salvar caixa.');
         });
