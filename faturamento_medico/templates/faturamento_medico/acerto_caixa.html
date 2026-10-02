@@ -32,7 +32,12 @@
     <div class="card shadow-sm">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
-                <h3 class="card-title mb-0">Acerto de Caixa</h3>
+                <h3 class="card-title mb-0">
+                    Acerto de Caixa
+                    {% if nome_caixa_acerto and nome_caixa_acerto != '—' %}
+                    <span class="text-primary fw-normal">— {{ nome_caixa_acerto }}</span>
+                    {% endif %}
+                </h3>
                 <small class="text-muted">Período: {{ periodo_fmt }}</small>
             </div>
             <div class="d-flex flex-wrap gap-2">

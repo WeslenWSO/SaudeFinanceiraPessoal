@@ -60,6 +60,10 @@
             margin: 0 0 4px;
             text-transform: uppercase;
         }
+        h1 .titulo-caixa {
+            text-transform: none;
+            font-size: 13px;
+        }
         .periodo {
             text-align: center;
             font-size: 10px;
@@ -153,7 +157,12 @@
     {% endif %}
     {% endif %}
 
-    <h1>Acerto de Caixa</h1>
+    <h1>
+        Acerto de Caixa
+        {% if nome_caixa_acerto and nome_caixa_acerto != '—' %}
+        — <span class="titulo-caixa">{{ nome_caixa_acerto }}</span>
+        {% endif %}
+    </h1>
     <p class="periodo">Período: {{ periodo_fmt }}</p>
 
     <div class="resumos">
