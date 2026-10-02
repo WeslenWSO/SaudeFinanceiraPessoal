@@ -5343,6 +5343,7 @@ def salvar_acerto_caixa_faturamento(request):
         return JsonResponse({'error': 'Informe o faturamento.'}, status=400)
 
     from faturamento_medico.models import CAIXAS_ACERTO_VALORES, FaturamentoMedico, rotulo_caixa_acerto
+    from faturamento_medico.services.contas_caixa_acerto import conta_caixa_valida
 
     from faturamento_medico.services.acerto_caixa import faturamento_caixa_bloqueado
 
@@ -5354,7 +5355,7 @@ def salvar_acerto_caixa_faturamento(request):
         )
     marcado = request.POST.get('marcado_acerto_caixa') in ('1', 'true', 'on', 'yes')
     caixa = (request.POST.get('caixa_acerto') or '').strip()
-    if caixa and caixa not in CAIXAS_ACERTO_VALORES:
+    if caixa and caixa not in CAIXAS_ACERTO_VALORES and not conta_caixa_valida(empresa_id, caixa):
         return JsonResponse({'error': 'Caixa inválido.'}, status=400)
 
     if marcado and not caixa:
@@ -5363,7 +5364,7 @@ def salvar_acerto_caixa_faturamento(request):
     faturamento.caixa_acerto = caixa if marcado else ''
 
     faturamento.save(update_fields=['marcado_acerto_caixa', 'caixa_acerto'])
-    caixa_exib = rotulo_caixa_acerto(faturamento.caixa_acerto) if faturamento.caixa_acerto else (
+    caixa_exib = rotulo_caixa_acerto(faturamento.caixa_acerto, empresa_id) if faturamento.caixa_acerto else (
         (faturamento.checkin_por or '-').strip() or '-'
     )
     return JsonResponse({
@@ -5407,7 +5408,9 @@ def fechar_acerto_caixa(request):
     for msg in erros:
         messages.warning(request, msg)
     if criados:
-        rotulos = ', '.join(f.get_caixa_display() for f in criados)
+        from faturamento_medico.models import rotulo_caixa_acerto as rotulo_caixa
+
+        rotulos = ', '.join(rotulo_caixa(f.caixa, empresa_id) for f in criados)
         messages.success(
             request,
             f'Caixa fechado: {rotulos}. Saldo registrado em {len(criados)} fechamento(s).',
@@ -5431,7 +5434,7 @@ def reabrir_acerto_caixa(request):
         messages.error(request, 'Selecione uma empresa.')
         return redirect('dashboard:relatorio_mensal')
 
-    from faturamento_medico.models import AcertoCaixaFechamento
+    from faturamento_medico.models import AcertoCaixaFechamento, rotulo_caixa_acerto
     from faturamento_medico.services.acerto_caixa import reabrir_acerto_caixa as reabrir_svc
 
     try:
@@ -5450,7 +5453,8 @@ def reabrir_acerto_caixa(request):
     else:
         messages.success(
             request,
-            f'{fechamento.get_caixa_display()} reaberto. Você pode alterar o caixa novamente.',
+            f'{rotulo_caixa_acerto(fechamento.caixa, empresa_id)} reaberto. '
+            f'Você pode alterar o caixa novamente.',
         )
 
     qs = request.GET.urlencode()

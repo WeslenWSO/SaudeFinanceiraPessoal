@@ -24,10 +24,14 @@ CAIXAS_ACERTO_CHOICES = [
 CAIXAS_ACERTO_VALORES = frozenset(c[0] for c in CAIXAS_ACERTO_CHOICES)
 
 
-def rotulo_caixa_acerto(nome: str) -> str:
+def rotulo_caixa_acerto(nome: str, empresa_id: int | None = None) -> str:
     nome = (nome or '').strip()
     if not nome:
         return ''
+    if empresa_id is not None:
+        from faturamento_medico.services.contas_caixa_acerto import rotulo_caixa_acerto_valor
+
+        return rotulo_caixa_acerto_valor(nome, empresa_id)
     for valor, rotulo in CAIXAS_ACERTO_CHOICES:
         if valor == nome:
             return rotulo
@@ -129,7 +133,7 @@ class FaturamentoMedico(models.Model):
         max_length=40,
         blank=True,
         default='',
-        choices=CAIXAS_ACERTO_CHOICES,
+        help_text='ID da conta bancária tipo Caixa (cadastro em Contas Bancárias).',
     )
     agendado_por = models.CharField(verbose_name='Agendado Por', max_length=200, blank=True, null=True)
     tag = models.CharField(verbose_name='Tag', max_length=100, blank=True, null=True)
@@ -1069,7 +1073,7 @@ class AcertoCaixaFechamento(models.Model):
     caixa = models.CharField(
         verbose_name='Caixa',
         max_length=40,
-        choices=CAIXAS_ACERTO_CHOICES,
+        help_text='ID da conta bancária tipo Caixa.',
     )
     data_inicio = models.DateField(verbose_name='Data início')
     data_fim = models.DateField(verbose_name='Data fim')
@@ -1122,4 +1126,5 @@ class AcertoCaixaFechamento(models.Model):
 
     def __str__(self):
         status = 'aberto' if self.ativo else 'reaberto'
-        return f'{self.get_caixa_display()} {self.data_inicio:%d/%m/%Y}–{self.data_fim:%d/%m/%Y} ({status})'
+        rotulo = rotulo_caixa_acerto(self.caixa, self.empresa_id)
+        return f'{rotulo} {self.data_inicio:%d/%m/%Y}–{self.data_fim:%d/%m/%Y} ({status})'

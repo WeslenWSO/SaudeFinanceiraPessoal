@@ -78,8 +78,14 @@
                                        {% if valor in filtros.caixa %}checked{% endif %}>
                                 <span>{{ rotulo }}</span>
                             </label>
+                            {% empty %}
+                            <span class="text-muted small">
+                                Nenhuma conta tipo Caixa ativa.
+                                <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a>
+                            </span>
                             {% endfor %}
                         </div>
+                        <div class="form-text">Contas com tipo <strong>Caixa</strong> no cadastro financeiro.</div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small mb-1" for="hora_inicial">Hora inicial</label>

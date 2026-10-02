@@ -12,10 +12,13 @@ from django.utils import timezone
 from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.models import (
     AcertoCaixaFechamento,
-    CAIXAS_ACERTO_CHOICES,
     CAIXAS_ACERTO_VALORES,
     FaturamentoMedico,
     rotulo_caixa_acerto,
+)
+from faturamento_medico.services.contas_caixa_acerto import (
+    caixas_acerto_choices,
+    caixas_acerto_valores,
 )
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
@@ -280,7 +283,7 @@ def fechar_acertos_caixa(
     for caixa in caixas_sel:
         if _fechamento_ativo_mesmo_escopo(empresa_id, caixa, di, df, snap):
             erros.append(
-                f'{rotulo_caixa_acerto(caixa)} já está fechado neste período e filtros.'
+                f'{rotulo_caixa_acerto(caixa, empresa_id)} já está fechado neste período e filtros.'
             )
             continue
         sub_ctx = montar_contexto_acerto_caixa(_request_com_caixa_unico(request, caixa), empresa_id)
@@ -327,7 +330,7 @@ def montar_status_fechamentos_caixa(
         fech = _fechamento_ativo_mesmo_escopo(empresa_id, caixa, di, df, snap)
         row = {
             'caixa': caixa,
-            'rotulo': rotulo_caixa_acerto(caixa),
+            'rotulo': rotulo_caixa_acerto(caixa, empresa_id),
             'fechado': fech is not None,
             'fechamento_id': fech.pk if fech else None,
             'fechado_em_fmt': (
@@ -349,10 +352,11 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         di, df = df, di
 
     checkin = (request.GET.get('checkin') or '').strip()
+    valores_caixa = caixas_acerto_valores(empresa_id) | CAIXAS_ACERTO_VALORES
     caixas_sel = [
         c.strip()
         for c in request.GET.getlist('caixa')
-        if c and str(c).strip() in CAIXAS_ACERTO_VALORES
+        if c and str(c).strip() in valores_caixa
     ]
     somente_marcados = request.GET.get('somente_marcados') == '1'
     hora_ini_str = (request.GET.get('hora_inicial') or '').strip()
@@ -475,7 +479,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
             caixa_valor = (fat.caixa_acerto or '').strip()
             if caixa_valor:
-                caixa_exib = rotulo_caixa_acerto(caixa_valor)
+                caixa_exib = rotulo_caixa_acerto(caixa_valor, empresa_id)
             else:
                 caixa_exib = (fat.checkin_por or '-').strip() or '-'
 
@@ -564,7 +568,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
 
     if caixas_sel:
-        nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c) for c in caixas_sel)
+        nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)
     else:
         caixas_unicos = sorted(
             {
@@ -575,7 +579,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             key=str.lower,
         )
         if caixas_unicos:
-            nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c) for c in caixas_unicos)
+            nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_unicos)
         else:
             operadores = sorted(
                 {
@@ -607,7 +611,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_aguardando_faturamento': resumo_aguardando_lista,
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
-        'caixas_acerto': CAIXAS_ACERTO_CHOICES,
+        'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
