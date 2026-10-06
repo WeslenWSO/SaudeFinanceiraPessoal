@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>Orçamento vencedor — {{ coluna.nome_exibicao }}</title>
+    <style>
+        @page { size: A4; margin: 14mm; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 0; padding: 12px; }
+        h1 { font-size: 16px; text-align: center; margin: 0 0 4px; text-transform: uppercase; }
+        .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 14px; }
+        .meta { margin-bottom: 12px; font-size: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 5px 6px; }
+        th { background: #f0f0f0; }
+        .text-end { text-align: right; }
+        .total { font-weight: bold; font-size: 12px; margin-top: 10px; text-align: right; }
+        .no-print { margin-bottom: 12px; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Imprimir</button>
+        <a href="{% url 'orcamento_compra:detalhe' orcamento.pk %}">Voltar</a>
+    </div>
+    <h1>Orçamento vencedor — compra</h1>
+    <p class="sub">{{ orcamento.titulo }}</p>
+    <div class="meta">
+        {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
+        <div><strong>Fornecedor:</strong> {{ coluna.nome_exibicao }}</div>
+        {% if fornecedor %}
+        <div>CNPJ/CPF: {{ fornecedor.cnpj }}{% if fornecedor.telefone %} · Tel. {{ fornecedor.telefone }}{% endif %}</div>
+        {% if fornecedor.endereco_eletronico %}<div>E-mail: {{ fornecedor.endereco_eletronico }}</div>{% endif %}
+        {% endif %}
+        <div>Gerado em: {{ gerado_em_fmt }}</div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Produto</th>
+                <th class="text-end">Qtd.</th>
+                <th>Un.</th>
+                <th class="text-end">Preço unit.</th>
+                <th class="text-end">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in itens %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ row.obj.descricao }}</td>
+                <td class="text-end">{{ row.obj.quantidade }}</td>
+                <td>{{ row.obj.unidade }}</td>
+                <td class="text-end">{% if row.obj.preco_unitario is not None %}R$ {{ row.unit_fmt }}{% else %}—{% endif %}</td>
+                <td class="text-end">R$ {{ row.total_fmt }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center">Sem itens.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="total">Total do pedido: R$ {{ total_fmt }}</p>
+    {% if orcamento.observacao %}
+    <p class="meta"><strong>Observação:</strong> {{ orcamento.observacao }}</p>
+    {% endif %}
+</body>
+</html>

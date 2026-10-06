@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.oc-table { font-size: 0.82rem; }
+.oc-table input.form-control-sm { min-width: 5.5rem; }
+.oc-table .oc-produto input { min-width: 12rem; }
+.oc-celula-menor { background: #d1e7dd !important; }
+.oc-pdf-texto { max-height: 8rem; overflow: auto; font-size: 0.75rem; white-space: pre-wrap; }
+</style>
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h2 class="h4 mb-1">{{ orcamento.titulo }}</h2>
+            <p class="text-muted small mb-0">Comparação de preços · {{ orcamento.get_status_display }}</p>
+        </div>
+        <a href="{% url 'orcamento_compra:listar' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <form method="post" action="{% url 'orcamento_compra:atualizar_cabecalho' orcamento.pk %}" class="row g-2">
+                {% csrf_token %}
+                <div class="col-md-4">
+                    <label class="form-label small">Título</label>
+                    <input type="text" name="titulo" class="form-control form-control-sm" value="{{ orcamento.titulo }}" maxlength="200">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        {% for val, rotulo in status_choices %}
+                        <option value="{{ val }}" {% if orcamento.status == val %}selected{% endif %}>{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Observação</label>
+                    <input type="text" name="observacao" class="form-control form-control-sm" value="{{ orcamento.observacao }}">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2"><strong>Produtos e quantidades</strong></div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'orcamento_compra:adicionar_item' orcamento.pk %}" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <div class="col-md-5">
+                            <label class="form-label small">Do estoque (opcional)</label>
+                            <select name="produto_id" class="form-select form-select-sm" id="selProdutoEstoque">
+                                <option value="">— Digite abaixo —</option>
+                                {% for p in produtos %}
+                                <option value="{{ p.pk }}" data-desc="{{ p.descricao }}">{{ p.codigo_produto }} — {{ p.descricao|truncatechars:40 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Descrição</label>
+                            <input type="text" name="descricao" id="inpDescricaoItem" class="form-control form-control-sm" maxlength="300">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small">Qtd.</label>
+                            <input type="text" name="quantidade" class="form-control form-control-sm" value="1">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-success btn-sm w-100">+</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2"><strong>Fornecedores (colunas)</strong></div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'orcamento_compra:adicionar_fornecedor' orcamento.pk %}" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <div class="col-md-5">
+                            <label class="form-label small">Cadastro (opcional)</label>
+                            <select name="fornecedor_id" class="form-select form-select-sm" id="selFornecedor">
+                                <option value="">— Nome manual —</option>
+                                {% for f in fornecedores_cadastro %}
+                                <option value="{{ f.pk }}" data-nome="{{ f.razao }}">{{ f.razao|truncatechars:45 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small">Nome na tabela</label>
+                            <input type="text" name="nome_exibicao" id="inpNomeFornecedor" class="form-control form-control-sm" maxlength="200">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success btn-sm w-100">+ Coluna</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% for col in matriz.colunas %}
+    <div class="card shadow-sm mb-2">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <strong>{{ col.nome_exibicao }}</strong>
+                <form method="post" action="{% url 'orcamento_compra:upload_pdf_fornecedor' orcamento.pk col.pk %}"
+                      enctype="multipart/form-data" class="d-flex flex-wrap align-items-center gap-2 mb-0">
+                    {% csrf_token %}
+                    <input type="file" name="pdf_orcamento" accept=".pdf,application/pdf" class="form-control form-control-sm" style="max-width: 14rem;">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Importar PDF</button>
+                </form>
+                {% if col.pdf_orcamento %}
+                <a href="{{ col.pdf_orcamento.url }}" target="_blank" rel="noopener" class="btn btn-link btn-sm">Ver PDF</a>
+                {% endif %}
+                <form method="post" action="{% url 'orcamento_compra:excluir_fornecedor' orcamento.pk col.pk %}" class="ms-auto"
+                      onsubmit="return confirm('Remover esta coluna?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Remover coluna</button>
+                </form>
+            </div>
+            {% if col.pdf_texto %}
+            <details class="mt-2">
+                <summary class="small text-muted">Texto extraído do PDF (referência para lançar preços)</summary>
+                <div class="oc-pdf-texto border rounded p-2 mt-1 bg-light">{{ col.pdf_texto }}</div>
+            </details>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="card shadow-sm mb-3 border-success">
+        <div class="card-body py-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                    <h6 class="mb-1">Orçamento vencedor por fornecedor</h6>
+                    <p class="small text-muted mb-0">
+                        Cada item vai para o fornecedor com menor preço total.
+                        {{ qtd_itens_com_vencedor }} item(ns) com preço definido.
+                    </p>
+                </div>
+                <form method="post" action="{% url 'orcamento_compra:gerar_vencedores' orcamento.pk %}"
+                      onsubmit="return confirm('Gerar pedidos vencedores? Resultados anteriores serão substituídos.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-sm" {% if not pode_gerar_vencedor %}disabled{% endif %}>
+                        <i class="fas fa-trophy"></i> Gerar orçamentos vencedores
+                    </button>
+                </form>
+            </div>
+            {% if resultados_vencedores %}
+            <ul class="list-unstyled small mb-0 mt-3 border-top pt-2">
+                {% for res in resultados_vencedores %}
+                <li class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge bg-success">{{ res.obj.coluna_fornecedor.nome_exibicao }}</span>
+                    <span>{{ res.qtd_itens }} item(ns) · Total R$ {{ res.total_fmt }}</span>
+                    <span class="text-muted">· {{ res.obj.gerado_em|date:"d/m/Y H:i" }}</span>
+                    <a href="{% url 'orcamento_compra:imprimir_vencedor' orcamento.pk res.obj.pk %}"
+                       class="btn btn-outline-primary btn-sm py-0" target="_blank" rel="noopener">
+                        Imprimir / PDF
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="table-responsive card shadow-sm">
+        <table class="table table-bordered table-sm oc-table mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th style="min-width: 14rem;">Produto</th>
+                    <th class="text-center" style="width: 4rem;">Un.</th>
+                    <th class="text-end" style="width: 5rem;">Qtd.</th>
+                    <th style="min-width: 8rem;">Vencedor</th>
+                    {% for col in matriz.colunas %}
+                    <th class="text-center" style="min-width: 7rem;">{{ col.nome_exibicao|truncatechars:22 }}</th>
+                    {% endfor %}
+                    <th style="width: 3rem;"></th>
+                </tr>
+                <tr class="table-secondary">
+                    <th colspan="4" class="text-end small">Total coluna</th>
+                    {% for tot in matriz.totais_coluna %}
+                    <th class="text-end small fw-semibold">{% if tot.total_fmt != '—' %}R$ {{ tot.total_fmt }}{% else %}—{% endif %}</th>
+                    {% endfor %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in matriz.linhas %}
+                {% with item=linha.item %}
+                <tr data-item-id="{{ item.pk }}">
+                    <td class="oc-produto">
+                        <input type="text" class="form-control form-control-sm js-item-descricao" value="{{ item.descricao }}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm js-item-unidade text-center" value="{{ item.unidade }}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm js-item-quantidade text-end" value="{{ item.quantidade }}">
+                    </td>
+                    <td class="small">
+                        {% if linha.vencedor_nome %}
+                        <span class="badge bg-success">{{ linha.vencedor_nome|truncatechars:24 }}</span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% for cel in linha.celulas %}
+                    <td class="text-center {% if linha.vencedor_coluna_id == cel.coluna_id %}oc-celula-menor{% endif %}"
+                        data-coluna-id="{{ cel.coluna_id }}">
+                        <div class="input-group input-group-sm flex-nowrap mb-1">
+                            <span class="input-group-text py-0 px-1">U</span>
+                            <input type="text"
+                                   class="form-control form-control-sm js-preco-unitario text-end"
+                                   placeholder="0,00"
+                                   value="{{ cel.preco_unitario_input }}">
+                        </div>
+                        <div class="input-group input-group-sm flex-nowrap">
+                            <span class="input-group-text py-0 px-1">T</span>
+                            <input type="text"
+                                   class="form-control form-control-sm js-preco-total text-end"
+                                   placeholder="auto"
+                                   value="{{ cel.preco_total_input }}">
+                        </div>
+                        <div class="small text-muted js-preco-total-exib">{% if cel.preco_total_fmt != '—' %}R$ {{ cel.preco_total_fmt }}{% endif %}</div>
+                    </td>
+                    {% endfor %}
+                    <td class="text-center">
+                        <form method="post" action="{% url 'orcamento_compra:excluir_item' orcamento.pk item.pk %}"
+                              onsubmit="return confirm('Remover item?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Excluir item">&times;</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr>
+                    <td colspan="{{ matriz.colunas|length|add:5 }}" class="text-center text-muted py-4">
+                        Adicione produtos e fornecedores para montar a tabela de comparação.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="small text-muted mt-2">Células em verde: fornecedor vencedor na linha. Valores salvam ao sair do campo.</p>
+</div>
+{% csrf_token %}
+
+<script>
+(function() {
+    var selP = document.getElementById('selProdutoEstoque');
+    var inpD = document.getElementById('inpDescricaoItem');
+    if (selP && inpD) {
+        selP.addEventListener('change', function() {
+            var opt = selP.options[selP.selectedIndex];
+            if (opt && opt.dataset.desc) inpD.value = opt.dataset.desc;
+        });
+    }
+    var selF = document.getElementById('selFornecedor');
+    var inpN = document.getElementById('inpNomeFornecedor');
+    if (selF && inpN) {
+        selF.addEventListener('change', function() {
+            var opt = selF.options[selF.selectedIndex];
+            if (opt && opt.dataset.nome) inpN.value = opt.dataset.nome;
+        });
+    }
+
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrfToken = csrf ? csrf.value : '';
+    var salvarItemBase = "{% url 'orcamento_compra:salvar_item_ajax' orcamento.pk 0 %}".replace('/0/', '/');
+    var salvarPrecoUrl = "{% url 'orcamento_compra:salvar_preco_ajax' orcamento.pk %}";
+
+    function salvarItem(tr) {
+        var itemId = tr.getAttribute('data-item-id');
+        if (!itemId) return;
+        var url = salvarItemBase + itemId + '/salvar/';
+        var body = new URLSearchParams({
+            descricao: tr.querySelector('.js-item-descricao').value,
+            unidade: tr.querySelector('.js-item-unidade').value,
+            quantidade: tr.querySelector('.js-item-quantidade').value
+        });
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        });
+    }
+
+    function salvarPreco(td, tr) {
+        var itemId = tr.getAttribute('data-item-id');
+        var colId = td.getAttribute('data-coluna-id');
+        if (!itemId || !colId) return;
+        var body = new URLSearchParams({
+            item_id: itemId,
+            coluna_id: colId,
+            preco_unitario: td.querySelector('.js-preco-unitario').value,
+            preco_total: td.querySelector('.js-preco-total').value
+        });
+        fetch(salvarPrecoUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (!data.ok) return;
+            var ex = td.querySelector('.js-preco-total-exib');
+            if (ex) ex.textContent = data.preco_total_fmt ? ('R$ ' + data.preco_total_fmt) : '';
+        });
+    }
+
+    document.querySelectorAll('tr[data-item-id]').forEach(function(tr) {
+        tr.querySelectorAll('.js-item-descricao, .js-item-unidade, .js-item-quantidade').forEach(function(inp) {
+            inp.addEventListener('change', function() { salvarItem(tr); });
+        });
+        tr.querySelectorAll('td[data-coluna-id]').forEach(function(td) {
+            td.querySelectorAll('.js-preco-unitario, .js-preco-total').forEach(function(inp) {
+                inp.addEventListener('change', function() { salvarPreco(td, tr); });
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}

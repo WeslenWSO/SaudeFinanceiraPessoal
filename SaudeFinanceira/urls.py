@@ -63,6 +63,7 @@ urlpatterns = [
     path('agendador/', include('agendador_tarefas.urls', namespace='agendador_tarefas')),
     path('opcartao/', include('OPCARTAO.urls', namespace='opcartao')),
     path('indicadores/', include('indicadores.urls', namespace='indicadores')),
+    path('orcamento-compra/', include('orcamento_compra.urls', namespace='orcamento_compra')),
 
 ]
 

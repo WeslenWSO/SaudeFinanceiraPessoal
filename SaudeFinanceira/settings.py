@@ -171,6 +171,7 @@ INSTALLED_APPS = [
     'indicadores',
     'estoque',
     'inventario',
+    'orcamento_compra',
 
 
 

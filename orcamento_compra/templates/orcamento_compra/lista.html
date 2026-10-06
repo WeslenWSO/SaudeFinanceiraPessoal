@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h2 class="h4 mb-0">Orçamento de compra</h2>
+            <p class="text-muted small mb-0">Solicite cotações, compare preços por fornecedor e anexe PDFs.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <strong>Novo orçamento</strong>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'orcamento_compra:criar' %}" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-5">
+                    <label class="form-label small" for="titulo">Título</label>
+                    <input type="text" class="form-control form-control-sm" id="titulo" name="titulo"
+                           placeholder="Ex.: Material de consumo — out/2026" required maxlength="200">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small" for="observacao">Observação (opcional)</label>
+                    <input type="text" class="form-control form-control-sm" id="observacao" name="observacao" maxlength="500">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-plus"></i> Gerar orçamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Título</th>
+                        <th>Status</th>
+                        <th>Atualizado</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orcamentos %}
+                    <tr>
+                        <td><a href="{% url 'orcamento_compra:detalhe' o.pk %}">{{ o.titulo }}</a></td>
+                        <td><span class="badge bg-secondary">{{ o.get_status_display }}</span></td>
+                        <td class="text-nowrap">{{ o.atualizado_em|date:"d/m/Y H:i" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'orcamento_compra:detalhe' o.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a>
+                            <form method="post" action="{% url 'orcamento_compra:excluir' o.pk %}" class="d-inline"
+                                  onsubmit="return confirm('Excluir este orçamento?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">Nenhum orçamento ainda.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

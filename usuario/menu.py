@@ -109,6 +109,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('portal_nacional', 'Portal Nacional (SEFIN / DPS)', 'fa-cloud-download-alt', 'fiscal', url_name='notasfiscais:portal_nacional_import'),
     MenuItemDef('portal_extensao', 'Portal (extensão)', 'fa-puzzle-piece', 'fiscal', url_name='notasfiscais:portal_extensao_import'),
     MenuItemDef('nf_entrada', 'NF Comércio e Tomador', 'fa-file-lines', 'fiscal', url_name='notafiscalentrada:listar'),
+    MenuItemDef(
+        'orcamento_compra',
+        'Orçamento de compra',
+        'fa-balance-scale',
+        'financeiro',
+        url_name='orcamento_compra:listar',
+    ),
     MenuItemDef('contas_bancarias', 'Contas Bancárias', 'fa-university', 'financeiro', url_name='extrato:conta_bancaria_list'),
     MenuItemDef('contas_pagar', 'Contas a Pagar', 'fa-money-check-alt', 'financeiro', url_name='contasapagar:listaAPagar'),
     MenuItemDef('categorizar_pagos', 'Categorizar pagos', 'fa-tags', 'financeiro', url_name='contasapagar:categorizar_baixados'),
