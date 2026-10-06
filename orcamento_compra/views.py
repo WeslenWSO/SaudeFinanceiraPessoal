@@ -305,18 +305,71 @@ def excluir_fornecedor(request, pk: int, coluna_id: int):
 @login_required
 @require_POST
 def upload_pdf_fornecedor(request, pk: int, coluna_id: int):
+    import logging
+    from io import BytesIO
+
+    from django.core.files.base import ContentFile
+
+    logger = logging.getLogger(__name__)
     orcamento = _orcamento_empresa(request, pk)
     col = get_object_or_404(OrcamentoCompraFornecedor, pk=coluna_id, orcamento=orcamento)
     arquivo = request.FILES.get('pdf_orcamento')
     if not arquivo:
         messages.error(request, 'Selecione um arquivo PDF.')
         return redirect('orcamento_compra:detalhe', pk=pk)
-    if not (arquivo.name or '').lower().endswith('.pdf'):
-        messages.warning(request, 'O arquivo não parece ser PDF; mesmo assim foi anexado.')
-    col.pdf_orcamento = arquivo
-    col.pdf_texto = extrair_texto_pdf(arquivo)
-    col.save(update_fields=['pdf_orcamento', 'pdf_texto'])
-    messages.success(request, 'PDF importado. Use o texto extraído para lançar os preços na tabela.')
+
+    try:
+        buffer = BytesIO()
+        for chunk in arquivo.chunks():
+            buffer.write(chunk)
+        data = buffer.getvalue()
+        if not data:
+            messages.error(request, 'O arquivo enviado está vazio.')
+            return redirect('orcamento_compra:detalhe', pk=pk)
+        if len(data) > 50 * 1024 * 1024:
+            messages.error(request, 'PDF muito grande. Tamanho máximo: 50 MB.')
+            return redirect('orcamento_compra:detalhe', pk=pk)
+
+        nome = (arquivo.name or 'orcamento.pdf').replace('\\', '/').split('/')[-1].strip()
+        if not nome.lower().endswith('.pdf'):
+            messages.warning(request, 'Extensão incomum; o arquivo será salvo como PDF.')
+            if '.' not in nome:
+                nome = f'{nome}.pdf'
+
+        texto = extrair_texto_pdf(BytesIO(data))
+
+        if col.pdf_orcamento:
+            try:
+                col.pdf_orcamento.delete(save=False)
+            except Exception:
+                logger.exception('Não foi possível remover PDF anterior do fornecedor %s', col.pk)
+
+        col.pdf_orcamento.save(nome, ContentFile(data), save=False)
+        col.pdf_texto = texto
+        col.save(update_fields=['pdf_orcamento', 'pdf_texto'])
+
+        if texto.strip():
+            messages.success(
+                request,
+                'PDF importado. Confira o texto extraído e lance os preços na tabela de comparação.',
+            )
+        else:
+            messages.warning(
+                request,
+                'PDF anexado, mas não houve texto extraído (comum em PDF escaneado). '
+                'Use o arquivo como referência e digite os valores na tabela.',
+            )
+    except OSError as exc:
+        logger.exception('Erro de armazenamento ao importar PDF orçamento compra')
+        messages.error(
+            request,
+            f'Erro ao gravar o PDF no servidor ({exc}). '
+            'Verifique permissões da pasta media (MEDIA_ROOT).',
+        )
+    except Exception as exc:
+        logger.exception('Erro ao importar PDF orçamento compra')
+        messages.error(request, f'Erro ao importar PDF: {exc}')
+
     return redirect('orcamento_compra:detalhe', pk=pk)
 
 

@@ -117,7 +117,8 @@
                 <form method="post" action="{% url 'orcamento_compra:upload_pdf_fornecedor' orcamento.pk col.pk %}"
                       enctype="multipart/form-data" class="d-flex flex-wrap align-items-center gap-2 mb-0">
                     {% csrf_token %}
-                    <input type="file" name="pdf_orcamento" accept=".pdf,application/pdf" class="form-control form-control-sm" style="max-width: 14rem;">
+                    <input type="file" name="pdf_orcamento" accept=".pdf,application/pdf,application/x-pdf"
+                           class="form-control form-control-sm" style="max-width: 14rem;" required>
                     <button type="submit" class="btn btn-outline-primary btn-sm">Importar PDF</button>
                 </form>
                 {% if col.pdf_orcamento %}
