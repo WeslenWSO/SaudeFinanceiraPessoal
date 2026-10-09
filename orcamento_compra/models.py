@@ -67,6 +67,13 @@ class OrcamentoCompraItem(models.Model):
         related_name='orcamentos_compra_itens',
         verbose_name='Produto (estoque)',
     )
+    codigo_produto_comercio = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        verbose_name='Código produto (NF comércio)',
+        db_index=True,
+    )
     descricao = models.CharField(max_length=300, verbose_name='Produto / descrição')
     unidade = models.CharField(max_length=20, blank=True, default='UN', verbose_name='Unidade')
     quantidade = models.DecimalField(

@@ -7,8 +7,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
-from estoque.models import ProdutoEstoque
 from fornecedor.models import Fornecedor
+from orcamento_compra.services.produtos_comercio import (
+    dados_produto_comercio,
+    listar_produtos_comercio_distintos,
+)
 from orcamento_compra.models import (
     OrcamentoCompra,
     OrcamentoCompraFornecedor,
@@ -167,7 +170,8 @@ def detalhe(request, pk: int):
         return redirect('empresa:lista')
     orcamento = _orcamento_empresa(request, pk)
     matriz = _montar_matriz(orcamento)
-    produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:500]
+    busca_prod = (request.GET.get('busca_produto') or '').strip()
+    produtos_comercio = listar_produtos_comercio_distintos(empresa_id, busca=busca_prod)
     fornecedores = Fornecedor.objects.filter(empresa_id=empresa_id).order_by('razao')[:500]
     resultados_qs = (
         OrcamentoCompraResultadoVencedor.objects.filter(orcamento=orcamento)
@@ -190,7 +194,8 @@ def detalhe(request, pk: int):
         {
             'orcamento': orcamento,
             'matriz': matriz,
-            'produtos': produtos,
+            'produtos_comercio': produtos_comercio,
+            'busca_produto': busca_prod,
             'fornecedores_cadastro': fornecedores,
             'status_choices': OrcamentoCompra.STATUS_CHOICES,
             'resultados_vencedores': resultados,
@@ -230,22 +235,30 @@ def atualizar_cabecalho(request, pk: int):
 def adicionar_item(request, pk: int):
     orcamento = _orcamento_empresa(request, pk)
     empresa_id = _empresa_id(request)
-    produto_id = request.POST.get('produto_id')
+    codigo_comercio = (request.POST.get('produto_comercio_codigo') or '').strip()
     descricao = (request.POST.get('descricao') or '').strip()
     quantidade = _parse_decimal(request.POST.get('quantidade')) or Decimal('1')
-    produto = None
-    if produto_id:
-        produto = ProdutoEstoque.objects.filter(pk=produto_id, empresa_id=empresa_id).first()
-        if produto and not descricao:
-            descricao = produto.descricao
+    unidade = 'UN'
+    codigo_gravado = ''
+    if codigo_comercio:
+        dados = dados_produto_comercio(empresa_id, codigo_comercio)
+        if not dados:
+            messages.error(request, 'Produto de NF comércio não encontrado para este código.')
+            return redirect('orcamento_compra:detalhe', pk=pk)
+        codigo_gravado = dados['codigo']
+        if not descricao:
+            descricao = dados['nome']
+        unidade = dados['unidade']
     if not descricao:
-        messages.error(request, 'Informe o produto ou a descrição.')
+        messages.error(request, 'Selecione um produto de NF comércio ou informe a descrição.')
         return redirect('orcamento_compra:detalhe', pk=pk)
     max_ordem = orcamento.itens.order_by('-ordem').values_list('ordem', flat=True).first() or 0
     item = OrcamentoCompraItem.objects.create(
         orcamento=orcamento,
-        produto=produto,
+        produto=None,
+        codigo_produto_comercio=codigo_gravado,
         descricao=descricao,
+        unidade=unidade,
         quantidade=quantidade,
         ordem=max_ordem + 1,
     )

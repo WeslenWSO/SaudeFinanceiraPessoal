@@ -53,31 +53,54 @@
     <div class="row g-3 mb-3">
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header py-2"><strong>Produtos e quantidades</strong></div>
+                <div class="card-header py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Produtos — NF Comércio</strong>
+                    <a href="{% url 'notafiscalentrada:produtos_comercio' %}" class="btn btn-link btn-sm py-0" target="_blank" rel="noopener">
+                        Ver todos (notas entrada)
+                    </a>
+                </div>
                 <div class="card-body">
+                    <form method="get" class="row g-2 mb-2 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label small mb-0">Buscar produto (código ou nome)</label>
+                            <input type="search" name="busca_produto" class="form-control form-control-sm"
+                                   value="{{ busca_produto }}" placeholder="Filtrar lista de NF comércio">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Filtrar lista</button>
+                        </div>
+                    </form>
                     <form method="post" action="{% url 'orcamento_compra:adicionar_item' orcamento.pk %}" class="row g-2 align-items-end">
                         {% csrf_token %}
-                        <div class="col-md-5">
-                            <label class="form-label small">Do estoque (opcional)</label>
-                            <select name="produto_id" class="form-select form-select-sm" id="selProdutoEstoque">
-                                <option value="">— Digite abaixo —</option>
-                                {% for p in produtos %}
-                                <option value="{{ p.pk }}" data-desc="{{ p.descricao }}">{{ p.codigo_produto }} — {{ p.descricao|truncatechars:40 }}</option>
+                        <div class="col-12">
+                            <label class="form-label small">Produto (mesma base de <em>Produtos comprados — NF Comércio</em>)</label>
+                            <select name="produto_comercio_codigo" class="form-select form-select-sm" id="selProdutoComercio" required>
+                                <option value="">— Selecione —</option>
+                                {% for p in produtos_comercio %}
+                                <option value="{{ p.codigo }}"
+                                        data-desc="{{ p.nome }}"
+                                        data-un="{{ p.unidade }}">
+                                    {{ p.codigo }} — {{ p.nome|truncatechars:55 }} ({{ p.unidade }})
+                                </option>
+                                {% empty %}
+                                <option value="" disabled>Nenhum produto em NF comércio — importe notas tipo comércio</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Descrição</label>
-                            <input type="text" name="descricao" id="inpDescricaoItem" class="form-control form-control-sm" maxlength="300">
+                        <div class="col-md-7">
+                            <label class="form-label small">Descrição no orçamento (opcional)</label>
+                            <input type="text" name="descricao" id="inpDescricaoItem" class="form-control form-control-sm" maxlength="300"
+                                   placeholder="Usa o nome da NF se vazio">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label small">Qtd.</label>
                             <input type="text" name="quantidade" class="form-control form-control-sm" value="1">
                         </div>
-                        <div class="col-md-1">
+                        <div class="col-md-2">
                             <button type="submit" class="btn btn-success btn-sm w-100">+</button>
                         </div>
                     </form>
+                    <p class="form-text mb-0 mt-2">{{ produtos_comercio|length }} produto(s) distintos listados (por código na NF).</p>
                 </div>
             </div>
         </div>
@@ -183,7 +206,8 @@
         <table class="table table-bordered table-sm oc-table mb-0">
             <thead class="table-dark">
                 <tr>
-                    <th style="min-width: 14rem;">Produto</th>
+                    <th style="width: 6rem;">Cód. NF</th>
+                    <th style="min-width: 12rem;">Produto</th>
                     <th class="text-center" style="width: 4rem;">Un.</th>
                     <th class="text-end" style="width: 5rem;">Qtd.</th>
                     <th style="min-width: 8rem;">Vencedor</th>
@@ -193,7 +217,7 @@
                     <th style="width: 3rem;"></th>
                 </tr>
                 <tr class="table-secondary">
-                    <th colspan="4" class="text-end small">Total coluna</th>
+                    <th colspan="5" class="text-end small">Total coluna</th>
                     {% for tot in matriz.totais_coluna %}
                     <th class="text-end small fw-semibold">{% if tot.total_fmt != '—' %}R$ {{ tot.total_fmt }}{% else %}—{% endif %}</th>
                     {% endfor %}
@@ -204,6 +228,9 @@
                 {% for linha in matriz.linhas %}
                 {% with item=linha.item %}
                 <tr data-item-id="{{ item.pk }}">
+                    <td class="small text-muted">
+                        {% if item.codigo_produto_comercio %}<code>{{ item.codigo_produto_comercio }}</code>{% else %}—{% endif %}
+                    </td>
                     <td class="oc-produto">
                         <input type="text" class="form-control form-control-sm js-item-descricao" value="{{ item.descricao }}">
                     </td>
@@ -251,7 +278,7 @@
                 {% endwith %}
                 {% empty %}
                 <tr>
-                    <td colspan="{{ matriz.colunas|length|add:5 }}" class="text-center text-muted py-4">
+                    <td colspan="{{ matriz.colunas|length|add:6 }}" class="text-center text-muted py-4">
                         Adicione produtos e fornecedores para montar a tabela de comparação.
                     </td>
                 </tr>
@@ -265,12 +292,12 @@
 
 <script>
 (function() {
-    var selP = document.getElementById('selProdutoEstoque');
+    var selP = document.getElementById('selProdutoComercio');
     var inpD = document.getElementById('inpDescricaoItem');
     if (selP && inpD) {
         selP.addEventListener('change', function() {
             var opt = selP.options[selP.selectedIndex];
-            if (opt && opt.dataset.desc) inpD.value = opt.dataset.desc;
+            if (opt && opt.dataset.desc && !inpD.value) inpD.value = opt.dataset.desc;
         });
     }
     var selF = document.getElementById('selFornecedor');

@@ -61,7 +61,7 @@
                                 <option value="">— Não vincular —</option>
                                 {% for item in itens %}
                                 <option value="{{ item.pk }}" {% if linha.item_id == item.pk %}selected{% endif %}>
-                                    {{ item.descricao|truncatechars:55 }} (qtd {{ item.quantidade }} {{ item.unidade }})
+                                    {% if item.codigo_produto_comercio %}{{ item.codigo_produto_comercio }} — {% endif %}{{ item.descricao|truncatechars:50 }} (qtd {{ item.quantidade }} {{ item.unidade }})
                                 </option>
                                 {% endfor %}
                             </select>

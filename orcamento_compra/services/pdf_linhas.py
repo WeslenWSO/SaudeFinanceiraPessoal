@@ -100,6 +100,9 @@ def sugerir_item_id(descricao_pdf: str, itens: list) -> int | None:
     melhor_id = None
     melhor_score = 0.0
     for item in itens:
+        codigo = _normalizar(getattr(item, 'codigo_produto_comercio', '') or '')
+        if codigo and len(codigo) >= 3 and codigo in alvo:
+            return item.pk
         cand = _normalizar(item.descricao)
         if not cand:
             continue
