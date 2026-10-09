@@ -114,6 +114,12 @@ class OrcamentoCompraFornecedor(models.Model):
         verbose_name='PDF do fornecedor',
     )
     pdf_texto = models.TextField(blank=True, default='', verbose_name='Texto extraído do PDF')
+    pdf_linhas = models.JSONField(
+        blank=True,
+        default=list,
+        verbose_name='Linhas do PDF (de-para)',
+        help_text='Lista de itens detectados no PDF e vínculo com itens do orçamento.',
+    )
     observacao = models.TextField(blank=True, default='', verbose_name='Observação')
 
     class Meta:

@@ -123,6 +123,9 @@
                 </form>
                 {% if col.pdf_orcamento %}
                 <a href="{{ col.pdf_orcamento.url }}" target="_blank" rel="noopener" class="btn btn-link btn-sm">Ver PDF</a>
+                <a href="{% url 'orcamento_compra:vincular_pdf' orcamento.pk col.pk %}" class="btn btn-outline-success btn-sm">
+                    De-para produtos
+                </a>
                 {% endif %}
                 <form method="post" action="{% url 'orcamento_compra:excluir_fornecedor' orcamento.pk col.pk %}" class="ms-auto"
                       onsubmit="return confirm('Remover esta coluna?');">

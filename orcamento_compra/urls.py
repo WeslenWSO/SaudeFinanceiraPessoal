@@ -20,6 +20,16 @@ urlpatterns = [
         views.upload_pdf_fornecedor,
         name='upload_pdf_fornecedor',
     ),
+    path(
+        '<int:pk>/fornecedores/<int:coluna_id>/vincular-pdf/',
+        views.vincular_pdf,
+        name='vincular_pdf',
+    ),
+    path(
+        '<int:pk>/fornecedores/<int:coluna_id>/vincular-pdf/salvar/',
+        views.salvar_vinculo_pdf,
+        name='salvar_vinculo_pdf',
+    ),
     path('<int:pk>/precos/salvar/', views.salvar_preco_ajax, name='salvar_preco_ajax'),
     path('<int:pk>/gerar-vencedores/', views.gerar_vencedores, name='gerar_vencedores'),
     path(

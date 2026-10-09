@@ -17,6 +17,7 @@ from orcamento_compra.models import (
 )
 from orcamento_compra.models import OrcamentoCompraResultadoVencedor
 from orcamento_compra.services.pdf_orcamento import extrair_texto_pdf
+from orcamento_compra.services.vinculo_pdf import aplicar_vinculos_pdf, atualizar_linhas_do_texto
 from orcamento_compra.services.vencedor import gerar_orcamentos_vencedores, vencedor_por_item
 
 
@@ -346,19 +347,28 @@ def upload_pdf_fornecedor(request, pk: int, coluna_id: int):
 
         col.pdf_orcamento.save(nome, ContentFile(data), save=False)
         col.pdf_texto = texto
-        col.save(update_fields=['pdf_orcamento', 'pdf_texto'])
+        col.pdf_linhas = atualizar_linhas_do_texto(col) if texto.strip() else []
+        col.save(update_fields=['pdf_orcamento', 'pdf_texto', 'pdf_linhas'])
 
-        if texto.strip():
+        if texto.strip() and col.pdf_linhas:
             messages.success(
                 request,
-                'PDF importado. Confira o texto extraído e lance os preços na tabela de comparação.',
+                f'PDF importado — {len(col.pdf_linhas)} linha(s) detectada(s). '
+                'Vincule aos produtos do orçamento.',
             )
-        else:
+            return redirect('orcamento_compra:vincular_pdf', pk=pk, coluna_id=coluna_id)
+        if texto.strip():
             messages.warning(
                 request,
-                'PDF anexado, mas não houve texto extraído (comum em PDF escaneado). '
-                'Use o arquivo como referência e digite os valores na tabela.',
+                'PDF importado, mas nenhuma linha com preço foi reconhecida. '
+                'Você pode vincular manualmente ou lançar preços na tabela.',
             )
+            return redirect('orcamento_compra:vincular_pdf', pk=pk, coluna_id=coluna_id)
+        messages.warning(
+            request,
+            'PDF anexado sem texto extraído (comum em PDF escaneado). '
+            'Use o arquivo como referência e digite os valores na tabela.',
+        )
     except OSError as exc:
         logger.exception('Erro de armazenamento ao importar PDF orçamento compra')
         messages.error(
@@ -370,6 +380,76 @@ def upload_pdf_fornecedor(request, pk: int, coluna_id: int):
         logger.exception('Erro ao importar PDF orçamento compra')
         messages.error(request, f'Erro ao importar PDF: {exc}')
 
+    return redirect('orcamento_compra:detalhe', pk=pk)
+
+
+@login_required
+@require_GET
+def vincular_pdf(request, pk: int, coluna_id: int):
+    orcamento = _orcamento_empresa(request, pk)
+    col = get_object_or_404(OrcamentoCompraFornecedor, pk=coluna_id, orcamento=orcamento)
+    itens = list(orcamento.itens.order_by('ordem', 'id'))
+    linhas = list(col.pdf_linhas or [])
+    if not linhas and (col.pdf_texto or '').strip():
+        linhas = atualizar_linhas_do_texto(col)
+        col.pdf_linhas = linhas
+        col.save(update_fields=['pdf_linhas'])
+
+    linhas_view = []
+    for linha in linhas:
+        item_id = linha.get('item_id')
+        try:
+            item_id_int = int(item_id) if item_id else None
+        except (TypeError, ValueError):
+            item_id_int = None
+        total_dec = _parse_decimal(linha.get('preco_total'))
+        linhas_view.append({
+            'idx': linha.get('idx', 0),
+            'descricao': linha.get('descricao') or '',
+            'preco_total_fmt': _moeda_br(total_dec) if total_dec is not None else '—',
+            'item_id': item_id_int,
+        })
+
+    return render(
+        request,
+        'orcamento_compra/vincular_pdf.html',
+        {
+            'orcamento': orcamento,
+            'coluna': col,
+            'itens': itens,
+            'linhas': linhas_view,
+            'tem_pdf': bool(col.pdf_orcamento),
+        },
+    )
+
+
+@login_required
+@require_POST
+def salvar_vinculo_pdf(request, pk: int, coluna_id: int):
+    orcamento = _orcamento_empresa(request, pk)
+    col = get_object_or_404(OrcamentoCompraFornecedor, pk=coluna_id, orcamento=orcamento)
+    linhas = list(col.pdf_linhas or [])
+    if not linhas and (col.pdf_texto or '').strip():
+        linhas = atualizar_linhas_do_texto(col)
+
+    if request.POST.get('reprocessar') == '1':
+        linhas = atualizar_linhas_do_texto(col)
+        col.pdf_linhas = linhas
+        col.save(update_fields=['pdf_linhas'])
+        messages.info(request, 'Linhas do PDF reprocessadas.')
+        return redirect('orcamento_compra:vincular_pdf', pk=pk, coluna_id=coluna_id)
+
+    for linha in linhas:
+        idx = linha.get('idx')
+        key = f'item_{idx}'
+        raw = (request.POST.get(key) or '').strip()
+        linha['item_id'] = int(raw) if raw.isdigit() else None
+
+    vinculos, precos = aplicar_vinculos_pdf(col, linhas)
+    messages.success(
+        request,
+        f'Vínculo salvo: {vinculos} produto(s) ligado(s), {precos} preço(s) atualizado(s) na comparação.',
+    )
     return redirect('orcamento_compra:detalhe', pk=pk)
 
 
