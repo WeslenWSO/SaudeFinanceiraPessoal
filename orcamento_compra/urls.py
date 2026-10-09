@@ -11,6 +11,11 @@ urlpatterns = [
     path('<int:pk>/excluir/', views.excluir, name='excluir'),
     path('<int:pk>/cabecalho/', views.atualizar_cabecalho, name='atualizar_cabecalho'),
     path('<int:pk>/itens/adicionar/', views.adicionar_item, name='adicionar_item'),
+    path(
+        '<int:pk>/produtos-comercio/buscar/',
+        views.buscar_produto_comercio_ajax,
+        name='buscar_produto_comercio_ajax',
+    ),
     path('<int:pk>/itens/<int:item_id>/excluir/', views.excluir_item, name='excluir_item'),
     path('<int:pk>/itens/<int:item_id>/salvar/', views.salvar_item_ajax, name='salvar_item_ajax'),
     path('<int:pk>/fornecedores/adicionar/', views.adicionar_fornecedor, name='adicionar_fornecedor'),

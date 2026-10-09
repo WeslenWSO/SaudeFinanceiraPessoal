@@ -70,6 +70,9 @@
 .oc-planilha .oc-col-qtd { width: 5rem; text-align: right; }
 .oc-planilha .oc-col-acao { width: 2.5rem; text-align: center; }
 .oc-planilha td.oc-col-codigo { padding: 0.35rem 0.45rem; font-family: ui-monospace, monospace; font-size: 0.78rem; }
+.oc-resultados-produto { max-height: 11rem; overflow-y: auto; }
+.oc-resultados-produto .list-group-item { cursor: pointer; font-size: 0.82rem; padding: 0.35rem 0.5rem; }
+.oc-resultados-produto .list-group-item:hover { background: #e7f1ff; }
 </style>
 <div class="container-fluid py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
@@ -119,47 +122,43 @@
                     </a>
                 </div>
                 <div class="card-body">
-                    <form method="get" class="row g-2 mb-2 align-items-end">
-                        <div class="col-md-8">
-                            <label class="form-label small mb-0">Buscar produto (código ou nome)</label>
-                            <input type="search" name="busca_produto" class="form-control form-control-sm"
-                                   value="{{ busca_produto }}" placeholder="Filtrar lista de NF comércio">
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">Filtrar lista</button>
-                        </div>
-                    </form>
-                    <form method="post" action="{% url 'orcamento_compra:adicionar_item' orcamento.pk %}" class="row g-2 align-items-end">
+                    <p class="small text-muted mb-2 mb-md-3">
+                        Base: <em>Produtos comprados — NF Comércio</em>. Informe o <strong>código</strong> ou pesquise pela <strong>descrição</strong>.
+                    </p>
+                    <form method="post" action="{% url 'orcamento_compra:adicionar_item' orcamento.pk %}" id="formIncluirItemOrcamento" class="row g-2">
                         {% csrf_token %}
+                        <input type="hidden" name="produto_comercio_codigo" id="inpCodigoSelecionado" value="">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-0" for="inpBuscaCodigo">Código do produto</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="inpBuscaCodigo" class="form-control" placeholder="Ex.: 1003307" autocomplete="off">
+                                <button type="button" class="btn btn-outline-primary" id="btnBuscarCodigo" title="Buscar por código">OK</button>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small mb-0" for="inpBuscaDescricao">Pesquisar descrição</label>
+                            <input type="search" id="inpBuscaDescricao" class="form-control form-control-sm"
+                                   placeholder="Digite ao menos 2 letras…" autocomplete="off">
+                        </div>
                         <div class="col-12">
-                            <label class="form-label small">Produto (mesma base de <em>Produtos comprados — NF Comércio</em>)</label>
-                            <select name="produto_comercio_codigo" class="form-select form-select-sm" id="selProdutoComercio" required>
-                                <option value="">— Selecione —</option>
-                                {% for p in produtos_comercio %}
-                                <option value="{{ p.codigo }}"
-                                        data-desc="{{ p.nome }}"
-                                        data-un="{{ p.unidade }}">
-                                    {{ p.codigo }} — {{ p.nome|truncatechars:55 }} ({{ p.unidade }})
-                                </option>
-                                {% empty %}
-                                <option value="" disabled>Nenhum produto em NF comércio — importe notas tipo comércio</option>
-                                {% endfor %}
-                            </select>
+                            <div id="listaResultadosProduto" class="list-group list-group-flush border rounded d-none oc-resultados-produto"></div>
+                        </div>
+                        <div class="col-12">
+                            <div id="produtoSelecionadoPreview" class="small py-2 px-2 rounded bg-light text-muted border d-none"></div>
                         </div>
                         <div class="col-md-7">
-                            <label class="form-label small">Descrição no orçamento (opcional)</label>
+                            <label class="form-label small mb-0">Descrição no orçamento (opcional)</label>
                             <input type="text" name="descricao" id="inpDescricaoItem" class="form-control form-control-sm" maxlength="300"
                                    placeholder="Usa o nome da NF se vazio">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small">Qtd.</label>
+                            <label class="form-label small mb-0">Qtd.</label>
                             <input type="text" name="quantidade" class="form-control form-control-sm" value="1">
                         </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-success btn-sm w-100">+</button>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success btn-sm w-100" id="btnIncluirItem">+ Incluir</button>
                         </div>
                     </form>
-                    <p class="form-text mb-0 mt-2">{{ produtos_comercio|length }} produto(s) distintos listados (por código na NF).</p>
                 </div>
             </div>
         </div>
@@ -392,12 +391,107 @@
 
 <script>
 (function() {
-    var selP = document.getElementById('selProdutoComercio');
+    var buscarProdUrl = "{% url 'orcamento_compra:buscar_produto_comercio_ajax' orcamento.pk %}";
+    var inpCodigoSel = document.getElementById('inpCodigoSelecionado');
+    var inpBuscaCodigo = document.getElementById('inpBuscaCodigo');
+    var inpBuscaDesc = document.getElementById('inpBuscaDescricao');
+    var listaRes = document.getElementById('listaResultadosProduto');
+    var preview = document.getElementById('produtoSelecionadoPreview');
     var inpD = document.getElementById('inpDescricaoItem');
-    if (selP && inpD) {
-        selP.addEventListener('change', function() {
-            var opt = selP.options[selP.selectedIndex];
-            if (opt && opt.dataset.desc && !inpD.value) inpD.value = opt.dataset.desc;
+    var formInc = document.getElementById('formIncluirItemOrcamento');
+    var timerDesc = null;
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    function selecionarProduto(p) {
+        if (!p || !inpCodigoSel) return;
+        inpCodigoSel.value = p.codigo || '';
+        if (inpBuscaCodigo) inpBuscaCodigo.value = p.codigo || '';
+        if (preview) {
+            preview.classList.remove('d-none');
+            preview.innerHTML = '<strong>' + escHtml(p.codigo) + '</strong> — ' + escHtml(p.nome) +
+                ' <span class="text-muted">(' + escHtml(p.unidade) + ')</span>';
+        }
+        if (inpD && !inpD.value.trim()) inpD.value = p.nome || '';
+        if (listaRes) listaRes.classList.add('d-none');
+    }
+
+    function renderResultados(itens) {
+        if (!listaRes) return;
+        if (!itens || !itens.length) {
+            listaRes.innerHTML = '<div class="list-group-item text-muted">Nenhum produto encontrado.</div>';
+            listaRes.classList.remove('d-none');
+            return;
+        }
+        listaRes.innerHTML = itens.map(function(p) {
+            return '<button type="button" class="list-group-item list-group-item-action text-start" data-codigo="' +
+                escHtml(p.codigo) + '" data-nome="' + escHtml(p.nome) + '" data-un="' + escHtml(p.unidade) + '">' +
+                '<code>' + escHtml(p.codigo) + '</code> — ' + escHtml(p.nome) +
+                ' <span class="text-muted">(' + escHtml(p.unidade) + ')</span></button>';
+        }).join('');
+        listaRes.classList.remove('d-none');
+        listaRes.querySelectorAll('button[data-codigo]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                selecionarProduto({
+                    codigo: btn.getAttribute('data-codigo'),
+                    nome: btn.getAttribute('data-nome'),
+                    unidade: btn.getAttribute('data-un')
+                });
+            });
+        });
+    }
+
+    function buscarCodigoExato() {
+        var cod = (inpBuscaCodigo && inpBuscaCodigo.value || '').trim();
+        if (!cod) {
+            alert('Informe o código do produto.');
+            return;
+        }
+        fetch(buscarProdUrl + '?codigo_exato=1&q=' + encodeURIComponent(cod), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (!data.ok) {
+                alert(data.error || 'Produto não encontrado.');
+                return;
+            }
+            selecionarProduto(data.itens[0]);
+        }).catch(function() { alert('Erro ao buscar código.'); });
+    }
+
+    function buscarPorDescricao() {
+        var q = (inpBuscaDesc && inpBuscaDesc.value || '').trim();
+        if (q.length < 2) {
+            if (listaRes) listaRes.classList.add('d-none');
+            return;
+        }
+        fetch(buscarProdUrl + '?q=' + encodeURIComponent(q), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.ok) renderResultados(data.itens);
+        });
+    }
+
+    var btnCod = document.getElementById('btnBuscarCodigo');
+    if (btnCod) btnCod.addEventListener('click', buscarCodigoExato);
+    if (inpBuscaCodigo) {
+        inpBuscaCodigo.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); buscarCodigoExato(); }
+        });
+    }
+    if (inpBuscaDesc) {
+        inpBuscaDesc.addEventListener('input', function() {
+            clearTimeout(timerDesc);
+            timerDesc = setTimeout(buscarPorDescricao, 350);
+        });
+    }
+    if (formInc) {
+        formInc.addEventListener('submit', function(e) {
+            if (!inpCodigoSel || !inpCodigoSel.value.trim()) {
+                e.preventDefault();
+                alert('Selecione um produto pelo código ou pela pesquisa de descrição.');
+            }
         });
     }
     var selF = document.getElementById('selFornecedor');

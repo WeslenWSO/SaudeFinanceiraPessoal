@@ -11,6 +11,7 @@ from fornecedor.models import Fornecedor
 from orcamento_compra.services.produtos_comercio import (
     dados_produto_comercio,
     listar_produtos_comercio_distintos,
+    serializar_produto_comercio,
 )
 from orcamento_compra.models import (
     OrcamentoCompra,
@@ -170,8 +171,6 @@ def detalhe(request, pk: int):
         return redirect('empresa:lista')
     orcamento = _orcamento_empresa(request, pk)
     matriz = _montar_matriz(orcamento)
-    busca_prod = (request.GET.get('busca_produto') or '').strip()
-    produtos_comercio = listar_produtos_comercio_distintos(empresa_id, busca=busca_prod)
     fornecedores = Fornecedor.objects.filter(empresa_id=empresa_id).order_by('razao')[:500]
     resultados_qs = (
         OrcamentoCompraResultadoVencedor.objects.filter(orcamento=orcamento)
@@ -196,8 +195,6 @@ def detalhe(request, pk: int):
             'orcamento': orcamento,
             'itens_orcamento': itens_orcamento,
             'matriz': matriz,
-            'produtos_comercio': produtos_comercio,
-            'busca_produto': busca_prod,
             'fornecedores_cadastro': fornecedores,
             'status_choices': OrcamentoCompra.STATUS_CHOICES,
             'resultados_vencedores': resultados,
@@ -230,6 +227,32 @@ def atualizar_cabecalho(request, pk: int):
     orcamento.save(update_fields=['titulo', 'observacao', 'status', 'atualizado_em'])
     messages.success(request, 'Orçamento atualizado.')
     return redirect('orcamento_compra:detalhe', pk=pk)
+
+
+@login_required
+@require_GET
+def buscar_produto_comercio_ajax(request, pk: int):
+    """JSON: busca produtos NF comércio por código exato ou descrição."""
+    empresa_id = _empresa_id(request)
+    if not empresa_id:
+        return JsonResponse({'ok': False, 'error': 'Empresa não selecionada.'}, status=400)
+    _orcamento_empresa(request, pk)
+    q = (request.GET.get('q') or '').strip()
+    codigo_exato = request.GET.get('codigo_exato') == '1'
+    if codigo_exato:
+        if not q:
+            return JsonResponse({'ok': False, 'error': 'Informe o código.'}, status=400)
+        dados = dados_produto_comercio(empresa_id, q)
+        if not dados:
+            return JsonResponse({'ok': False, 'error': 'Código não encontrado na NF comércio.'}, status=404)
+        return JsonResponse({'ok': True, 'itens': [serializar_produto_comercio(dados)]})
+    if len(q) < 2:
+        return JsonResponse({'ok': True, 'itens': []})
+    itens = listar_produtos_comercio_distintos(empresa_id, busca=q, limite=25)
+    return JsonResponse({
+        'ok': True,
+        'itens': [serializar_produto_comercio(i) for i in itens],
+    })
 
 
 @login_required

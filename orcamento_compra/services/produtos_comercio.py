@@ -49,6 +49,15 @@ def listar_produtos_comercio_distintos(
     return sorted(por_codigo.values(), key=lambda x: x['nome'].lower())
 
 
+def serializar_produto_comercio(row: dict) -> dict:
+    return {
+        'codigo': row['codigo'],
+        'nome': row['nome'],
+        'unidade': row['unidade'],
+        'ultimo_valor_unitario': str(row['ultimo_valor_unitario']),
+    }
+
+
 def dados_produto_comercio(empresa_id: int, codigo: str) -> dict | None:
     codigo = (codigo or '').strip()
     if not codigo:
