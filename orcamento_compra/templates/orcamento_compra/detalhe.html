@@ -66,7 +66,8 @@
     position: relative;
 }
 .oc-planilha .oc-col-codigo { width: 6.5rem; }
-.oc-planilha .oc-col-un { width: 3.5rem; text-align: center; }
+.oc-planilha .oc-col-un { width: 7.5rem; text-align: center; }
+.oc-planilha select.oc-cell-unidade { font-size: 0.78rem; padding: 0.2rem 0.15rem; min-height: 1.85rem; }
 .oc-planilha .oc-col-qtd { width: 5rem; text-align: right; }
 .oc-planilha .oc-col-acao { width: 2.5rem; text-align: center; }
 .oc-planilha td.oc-col-codigo { padding: 0.35rem 0.45rem; font-family: ui-monospace, monospace; font-size: 0.78rem; }
@@ -146,12 +147,20 @@
                         <div class="col-12">
                             <div id="produtoSelecionadoPreview" class="small py-2 px-2 rounded bg-light text-muted border d-none"></div>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-md-5">
                             <label class="form-label small mb-0">Descrição no orçamento (opcional)</label>
                             <input type="text" name="descricao" id="inpDescricaoItem" class="form-control form-control-sm" maxlength="300"
                                    placeholder="Usa o nome da NF se vazio">
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label small mb-0" for="selUnidadeItem">Unidade</label>
+                            <select name="unidade" id="selUnidadeItem" class="form-select form-select-sm">
+                                {% for u in unidades_disponiveis %}
+                                <option value="{{ u }}" {% if u == 'UN' %}selected{% endif %}>{{ u }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label small mb-0">Qtd.</label>
                             <input type="text" name="quantidade" class="form-control form-control-sm" value="1">
                         </div>
@@ -218,7 +227,11 @@
                             <input type="text" class="oc-cell-input js-item-descricao" value="{{ item.descricao }}" aria-label="Produto">
                         </td>
                         <td>
-                            <input type="text" class="oc-cell-input js-item-unidade text-center" value="{{ item.unidade }}" aria-label="Unidade">
+                            <select class="oc-cell-unidade js-item-unidade w-100" aria-label="Unidade">
+                                {% for u in unidades_disponiveis %}
+                                <option value="{{ u }}" {% if item.unidade|lower == u|lower %}selected{% endif %}>{{ u }}</option>
+                                {% endfor %}
+                            </select>
                         </td>
                         <td>
                             <input type="text" class="oc-cell-input js-item-quantidade text-end" value="{{ item.quantidade }}" aria-label="Quantidade">
@@ -405,6 +418,25 @@
         return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     }
 
+    var selUnidadeItem = document.getElementById('selUnidadeItem');
+
+    function definirUnidadeSelect(sel, unidade) {
+        if (!sel || !unidade) return;
+        var alvo = String(unidade).trim();
+        if (!alvo) return;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value.toLowerCase() === alvo.toLowerCase()) {
+                sel.selectedIndex = i;
+                return;
+            }
+        }
+        var opt = document.createElement('option');
+        opt.value = alvo;
+        opt.textContent = alvo;
+        sel.appendChild(opt);
+        sel.value = alvo;
+    }
+
     function selecionarProduto(p) {
         if (!p || !inpCodigoSel) return;
         inpCodigoSel.value = p.codigo || '';
@@ -415,6 +447,7 @@
                 ' <span class="text-muted">(' + escHtml(p.unidade) + ')</span>';
         }
         if (inpD && !inpD.value.trim()) inpD.value = p.nome || '';
+        definirUnidadeSelect(selUnidadeItem, p.unidade || 'UN');
         if (listaRes) listaRes.classList.add('d-none');
     }
 

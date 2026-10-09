@@ -13,6 +13,7 @@ from orcamento_compra.services.produtos_comercio import (
     listar_produtos_comercio_distintos,
     serializar_produto_comercio,
 )
+from orcamento_compra.services.unidades import listar_unidades_disponiveis, normalizar_unidade_escolhida
 from orcamento_compra.models import (
     OrcamentoCompra,
     OrcamentoCompraFornecedor,
@@ -188,12 +189,23 @@ def detalhe(request, pk: int):
     ]
     preview_vencedores = vencedor_por_item(orcamento)
     itens_orcamento = list(orcamento.itens.order_by('ordem', 'id'))
+    unidades_disponiveis = listar_unidades_disponiveis(empresa_id)
+    vistos_uni = {u.lower() for u in unidades_disponiveis}
+    extras_uni: list[str] = []
+    for it in itens_orcamento:
+        u = (it.unidade or '').strip()
+        if u and u.lower() not in vistos_uni:
+            extras_uni.append(u)
+            vistos_uni.add(u.lower())
+    if extras_uni:
+        unidades_disponiveis = sorted(unidades_disponiveis + extras_uni, key=str.lower)
     return render(
         request,
         'orcamento_compra/detalhe.html',
         {
             'orcamento': orcamento,
             'itens_orcamento': itens_orcamento,
+            'unidades_disponiveis': unidades_disponiveis,
             'matriz': matriz,
             'fornecedores_cadastro': fornecedores,
             'status_choices': OrcamentoCompra.STATUS_CHOICES,
@@ -263,7 +275,9 @@ def adicionar_item(request, pk: int):
     codigo_comercio = (request.POST.get('produto_comercio_codigo') or '').strip()
     descricao = (request.POST.get('descricao') or '').strip()
     quantidade = _parse_decimal(request.POST.get('quantidade')) or Decimal('1')
-    unidade = 'UN'
+    unidades = listar_unidades_disponiveis(empresa_id)
+    unidade_post = (request.POST.get('unidade') or '').strip()
+    unidade = normalizar_unidade_escolhida(unidade_post, unidades) if unidade_post else 'UN'
     codigo_gravado = ''
     if codigo_comercio:
         dados = dados_produto_comercio(empresa_id, codigo_comercio)
@@ -273,7 +287,8 @@ def adicionar_item(request, pk: int):
         codigo_gravado = dados['codigo']
         if not descricao:
             descricao = dados['nome']
-        unidade = dados['unidade']
+        if not unidade_post:
+            unidade = normalizar_unidade_escolhida(dados['unidade'], unidades)
     if not descricao:
         messages.error(request, 'Selecione um produto de NF comércio ou informe a descrição.')
         return redirect('orcamento_compra:detalhe', pk=pk)
@@ -502,9 +517,10 @@ def salvar_item_ajax(request, pk: int, item_id: int):
     qtd = _parse_decimal(request.POST.get('quantidade'))
     if qtd is not None and qtd > 0:
         item.quantidade = qtd
+    unidades = listar_unidades_disponiveis(item.orcamento.empresa_id)
     unidade = (request.POST.get('unidade') or '').strip()
     if unidade:
-        item.unidade = unidade
+        item.unidade = normalizar_unidade_escolhida(unidade, unidades)
     item.save(update_fields=['descricao', 'quantidade', 'unidade'])
     return JsonResponse({
         'ok': True,
