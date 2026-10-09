@@ -188,11 +188,13 @@ def detalhe(request, pk: int):
         for res in resultados_qs
     ]
     preview_vencedores = vencedor_por_item(orcamento)
+    itens_orcamento = list(orcamento.itens.order_by('ordem', 'id'))
     return render(
         request,
         'orcamento_compra/detalhe.html',
         {
             'orcamento': orcamento,
+            'itens_orcamento': itens_orcamento,
             'matriz': matriz,
             'produtos_comercio': produtos_comercio,
             'busca_produto': busca_prod,

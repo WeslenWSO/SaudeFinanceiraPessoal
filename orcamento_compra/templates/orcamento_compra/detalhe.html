@@ -8,9 +8,68 @@
 <style>
 .oc-table { font-size: 0.82rem; }
 .oc-table input.form-control-sm { min-width: 5.5rem; }
-.oc-table .oc-produto input { min-width: 12rem; }
 .oc-celula-menor { background: #d1e7dd !important; }
 .oc-pdf-texto { max-height: 8rem; overflow: auto; font-size: 0.75rem; white-space: pre-wrap; }
+.oc-planilha-card { border: 1px solid #adb5bd; }
+.oc-planilha-toolbar {
+    background: linear-gradient(180deg, #f3f3f3 0%, #e8e8e8 100%);
+    border-bottom: 1px solid #adb5bd;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+}
+.oc-planilha-scroll { overflow: auto; max-height: 28rem; background: #fff; }
+.oc-planilha {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    table-layout: fixed;
+}
+.oc-planilha th, .oc-planilha td {
+    border: 1px solid #d0d7de;
+    padding: 0;
+    vertical-align: middle;
+}
+.oc-planilha thead th {
+    background: #217346;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.35rem 0.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.oc-planilha .oc-col-idx {
+    width: 2.75rem;
+    background: #f2f2f2;
+    color: #495057;
+    text-align: center;
+    font-weight: 600;
+    padding: 0.25rem;
+}
+.oc-planilha tbody tr:nth-child(even) td:not(.oc-col-idx) { background: #fafbfc; }
+.oc-planilha tbody tr:hover td:not(.oc-col-idx) { background: #eef6ff; }
+.oc-planilha .oc-cell-input {
+    display: block;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0.35rem 0.45rem;
+    font-size: inherit;
+    min-height: 1.85rem;
+}
+.oc-planilha .oc-cell-input:focus {
+    outline: 2px solid #0d6efd;
+    background: #fff;
+    z-index: 1;
+    position: relative;
+}
+.oc-planilha .oc-col-codigo { width: 6.5rem; }
+.oc-planilha .oc-col-un { width: 3.5rem; text-align: center; }
+.oc-planilha .oc-col-qtd { width: 5rem; text-align: right; }
+.oc-planilha .oc-col-acao { width: 2.5rem; text-align: center; }
+.oc-planilha td.oc-col-codigo { padding: 0.35rem 0.45rem; font-family: ui-monospace, monospace; font-size: 0.78rem; }
 </style>
 <div class="container-fluid py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
@@ -132,6 +191,59 @@
         </div>
     </div>
 
+    <div class="card shadow-sm mb-3 oc-planilha-card">
+        <div class="oc-planilha-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span><i class="fas fa-table"></i> <strong>Planilha — itens do orçamento</strong></span>
+            <span class="text-muted">{{ itens_orcamento|length }} linha(s) · alterações salvam ao sair do campo</span>
+        </div>
+        <div class="oc-planilha-scroll">
+            <table class="oc-planilha mb-0" id="planilhaItensOrcamento">
+                <thead>
+                    <tr>
+                        <th class="oc-col-idx">#</th>
+                        <th class="oc-col-codigo">Cód. NF</th>
+                        <th>Produto / descrição</th>
+                        <th class="oc-col-un">Un.</th>
+                        <th class="oc-col-qtd">Qtd.</th>
+                        <th class="oc-col-acao"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens_orcamento %}
+                    <tr data-item-id="{{ item.pk }}" class="oc-linha-item">
+                        <td class="oc-col-idx">{{ forloop.counter }}</td>
+                        <td class="oc-col-codigo text-muted">
+                            {% if item.codigo_produto_comercio %}{{ item.codigo_produto_comercio }}{% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <input type="text" class="oc-cell-input js-item-descricao" value="{{ item.descricao }}" aria-label="Produto">
+                        </td>
+                        <td>
+                            <input type="text" class="oc-cell-input js-item-unidade text-center" value="{{ item.unidade }}" aria-label="Unidade">
+                        </td>
+                        <td>
+                            <input type="text" class="oc-cell-input js-item-quantidade text-end" value="{{ item.quantidade }}" aria-label="Quantidade">
+                        </td>
+                        <td class="oc-col-acao">
+                            <form method="post" action="{% url 'orcamento_compra:excluir_item' orcamento.pk item.pk %}"
+                                  onsubmit="return confirm('Remover esta linha?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Excluir linha">&times;</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4" style="padding: 1rem !important;">
+                            Nenhum item ainda. Use o bloco acima para incluir produtos da NF Comércio.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     {% for col in matriz.colunas %}
     <div class="card shadow-sm mb-2">
         <div class="card-body py-2">
@@ -202,14 +314,14 @@
         </div>
     </div>
 
+    <p class="small fw-semibold text-muted mb-2 mt-1">Comparação de cotações (preços por fornecedor)</p>
     <div class="table-responsive card shadow-sm">
         <table class="table table-bordered table-sm oc-table mb-0">
             <thead class="table-dark">
                 <tr>
-                    <th style="width: 6rem;">Cód. NF</th>
-                    <th style="min-width: 12rem;">Produto</th>
-                    <th class="text-center" style="width: 4rem;">Un.</th>
-                    <th class="text-end" style="width: 5rem;">Qtd.</th>
+                    <th class="text-center" style="width: 2.5rem;">#</th>
+                    <th style="min-width: 14rem;">Produto (planilha acima)</th>
+                    <th class="text-end" style="width: 4rem;">Qtd.</th>
                     <th style="min-width: 8rem;">Vencedor</th>
                     {% for col in matriz.colunas %}
                     <th class="text-center" style="min-width: 7rem;">{{ col.nome_exibicao|truncatechars:22 }}</th>
@@ -217,7 +329,7 @@
                     <th style="width: 3rem;"></th>
                 </tr>
                 <tr class="table-secondary">
-                    <th colspan="5" class="text-end small">Total coluna</th>
+                    <th colspan="4" class="text-end small">Total coluna</th>
                     {% for tot in matriz.totais_coluna %}
                     <th class="text-end small fw-semibold">{% if tot.total_fmt != '—' %}R$ {{ tot.total_fmt }}{% else %}—{% endif %}</th>
                     {% endfor %}
@@ -227,19 +339,13 @@
             <tbody>
                 {% for linha in matriz.linhas %}
                 {% with item=linha.item %}
-                <tr data-item-id="{{ item.pk }}">
-                    <td class="small text-muted">
-                        {% if item.codigo_produto_comercio %}<code>{{ item.codigo_produto_comercio }}</code>{% else %}—{% endif %}
+                <tr data-item-id="{{ item.pk }}" data-linha-preco="1">
+                    <td class="text-center text-muted small">{{ forloop.counter }}</td>
+                    <td class="small">
+                        {% if item.codigo_produto_comercio %}<code>{{ item.codigo_produto_comercio }}</code> — {% endif %}
+                        <span class="js-sync-descricao">{{ item.descricao }}</span>
                     </td>
-                    <td class="oc-produto">
-                        <input type="text" class="form-control form-control-sm js-item-descricao" value="{{ item.descricao }}">
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm js-item-unidade text-center" value="{{ item.unidade }}">
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm js-item-quantidade text-end" value="{{ item.quantidade }}">
-                    </td>
+                    <td class="text-end small js-sync-quantidade">{{ item.quantidade }}</td>
                     <td class="small">
                         {% if linha.vencedor_nome %}
                         <span class="badge bg-success">{{ linha.vencedor_nome|truncatechars:24 }}</span>
@@ -267,19 +373,13 @@
                         <div class="small text-muted js-preco-total-exib">{% if cel.preco_total_fmt != '—' %}R$ {{ cel.preco_total_fmt }}{% endif %}</div>
                     </td>
                     {% endfor %}
-                    <td class="text-center">
-                        <form method="post" action="{% url 'orcamento_compra:excluir_item' orcamento.pk item.pk %}"
-                              onsubmit="return confirm('Remover item?');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Excluir item">&times;</button>
-                        </form>
-                    </td>
+                    <td></td>
                 </tr>
                 {% endwith %}
                 {% empty %}
                 <tr>
-                    <td colspan="{{ matriz.colunas|length|add:6 }}" class="text-center text-muted py-4">
-                        Adicione produtos e fornecedores para montar a tabela de comparação.
+                    <td colspan="{{ matriz.colunas|length|add:5 }}" class="text-center text-muted py-4">
+                        {% if not itens_orcamento %}Inclua itens na planilha acima.{% else %}Adicione fornecedores (colunas) para cotar preços.{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -316,14 +416,14 @@
 
     function salvarItem(tr) {
         var itemId = tr.getAttribute('data-item-id');
-        if (!itemId) return;
+        if (!itemId) return Promise.resolve();
         var url = salvarItemBase + itemId + '/salvar/';
         var body = new URLSearchParams({
             descricao: tr.querySelector('.js-item-descricao').value,
             unidade: tr.querySelector('.js-item-unidade').value,
             quantidade: tr.querySelector('.js-item-quantidade').value
         });
-        fetch(url, {
+        return fetch(url, {
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString()
@@ -351,10 +451,30 @@
         });
     }
 
-    document.querySelectorAll('tr[data-item-id]').forEach(function(tr) {
-        tr.querySelectorAll('.js-item-descricao, .js-item-unidade, .js-item-quantidade').forEach(function(inp) {
-            inp.addEventListener('change', function() { salvarItem(tr); });
+    function syncPrecoLinha(faturamentoId) {
+        var trPlan = document.querySelector('.oc-linha-item[data-item-id="' + faturamentoId + '"]');
+        if (!trPlan) return;
+        var desc = trPlan.querySelector('.js-item-descricao');
+        var qtd = trPlan.querySelector('.js-item-quantidade');
+        document.querySelectorAll('tr[data-linha-preco="1"][data-item-id="' + faturamentoId + '"]').forEach(function(trP) {
+            var sd = trP.querySelector('.js-sync-descricao');
+            var sq = trP.querySelector('.js-sync-quantidade');
+            if (sd && desc) sd.textContent = desc.value;
+            if (sq && qtd) sq.textContent = qtd.value;
         });
+    }
+
+    document.querySelectorAll('.oc-linha-item[data-item-id]').forEach(function(tr) {
+        tr.querySelectorAll('.js-item-descricao, .js-item-unidade, .js-item-quantidade').forEach(function(inp) {
+            inp.addEventListener('change', function() {
+                salvarItem(tr).then(function() {
+                    syncPrecoLinha(tr.getAttribute('data-item-id'));
+                });
+            });
+        });
+    });
+
+    document.querySelectorAll('tr[data-linha-preco="1"]').forEach(function(tr) {
         tr.querySelectorAll('td[data-coluna-id]').forEach(function(td) {
             td.querySelectorAll('.js-preco-unitario, .js-preco-total').forEach(function(inp) {
                 inp.addEventListener('change', function() { salvarPreco(td, tr); });
