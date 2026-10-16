@@ -170,6 +170,14 @@
                            title="Exportar tabela pivot para Excel">
                             <i class="fas fa-file-excel"></i> Excel resumo
                         </a>
+                        <a href="{% url 'faturamento_medico:listar_apelidos_solicitante' %}?redirect_qs={{ redirect_qs|urlencode }}"
+                           class="btn btn-outline-secondary btn-sm"
+                           id="btnListaApelidos"
+                           target="_blank"
+                           rel="noopener"
+                           title="Lista de apelidos cadastrados para revisão">
+                            <i class="fas fa-list"></i> Lista apelidos
+                        </a>
                         <a href="{% url 'faturamento_medico:imprimir_ranking_solicitante' %}?{{ redirect_qs }}"
                            class="btn btn-warning btn-sm text-dark"
                            id="btnRankingSolicitante"
@@ -1472,6 +1480,10 @@ initMultiPicker({
     (function() {
         var formFiltros = document.querySelector('form[method="GET"]');
         if (!formFiltros) return;
+        var btnListaApelidos = document.getElementById('btnListaApelidos');
+        var baseListaApelidos = btnListaApelidos
+            ? btnListaApelidos.getAttribute('href').split('?')[0]
+            : '';
         var botoes = [
             document.getElementById('btnRankingSolicitante'),
             document.getElementById('btnRankingSolicitanteBarra'),
@@ -1492,6 +1504,12 @@ initMultiPicker({
             bases.forEach(function(item) {
                 item.el.setAttribute('href', item.base + '?' + qs);
             });
+            if (btnListaApelidos && baseListaApelidos) {
+                btnListaApelidos.setAttribute(
+                    'href',
+                    baseListaApelidos + '?redirect_qs=' + encodeURIComponent(qs)
+                );
+            }
         }
         formFiltros.addEventListener('change', atualizarLinksResumo);
         formFiltros.addEventListener('submit', atualizarLinksResumo);

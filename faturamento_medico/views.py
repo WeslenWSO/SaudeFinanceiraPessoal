@@ -733,6 +733,38 @@ def _listar_apelidos_disponiveis(apelido_info: dict[str, dict]) -> list[dict]:
     ]
 
 
+def _listar_grupos_apelidos_cadastrados(empresa_id, termo_busca: str = '') -> list[dict]:
+    """Apelidos cadastrados agrupados, para revisão (apelido → grafias RIS)."""
+    if not empresa_id:
+        return []
+    termo = _normalizar_texto_filtro(termo_busca)
+    grupos: dict[str, list[str]] = defaultdict(list)
+    for row in ApelidoSolicitante.objects.filter(empresa_id=empresa_id).order_by('apelido', 'grafia'):
+        apelido = (row.apelido or '').strip()
+        grafia = (row.grafia or '').strip()
+        if not apelido or not grafia:
+            continue
+        grupos[apelido].append(grafia)
+
+    lista = []
+    for apelido, grafias in sorted(grupos.items(), key=lambda x: x[0].lower()):
+        grafias_unicas = sorted(set(grafias), key=str.lower)
+        if termo:
+            texto = _normalizar_texto_filtro(
+                apelido + ' ' + ' '.join(grafias_unicas)
+            )
+            if termo not in texto:
+                continue
+        qtd = len(grafias_unicas)
+        lista.append({
+            'apelido': apelido,
+            'grafias': grafias_unicas,
+            'qtd_grafias': qtd,
+            'cadastro_automatico': qtd == 1 and grafias_unicas[0].casefold() == apelido.casefold(),
+        })
+    return lista
+
+
 def _cadastrar_apelidos_automaticos_grafia_unica(
     empresa_id,
     raws,
@@ -3252,6 +3284,89 @@ def imprimir_ranking_solicitante(request):
     if context is None:
         return HttpResponse('Sessão expirada. Faça login novamente.')
     return render(request, 'faturamento_medico/imprimir_ranking_solicitante.html', context)
+
+
+def listar_apelidos_solicitante(request):
+    """Relatório para revisão: apelidos cadastrados e grafias vinculadas no RIS."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+
+    termo = (request.GET.get('q') or '').strip()
+    grupos = _listar_grupos_apelidos_cadastrados(empresa_id, termo)
+    total_grafias = sum(g['qtd_grafias'] for g in grupos)
+
+    try:
+        empresa = Empresa.objects.get(id=empresa_id)
+    except Empresa.DoesNotExist:
+        empresa = None
+
+    voltar_qs = (request.GET.get('redirect_qs') or '').strip()
+    context = {
+        'empresa': empresa,
+        'grupos': grupos,
+        'qtd_apelidos': len(grupos),
+        'total_grafias': total_grafias,
+        'termo_busca': termo,
+        'data_impressao': timezone.localtime(timezone.now()),
+        'redirect_qs': voltar_qs,
+    }
+    return render(request, 'faturamento_medico/listar_apelidos_solicitante.html', context)
+
+
+def exportar_apelidos_solicitante_excel(request):
+    """Exporta apelidos × grafias RIS para Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    termo = (request.GET.get('q') or '').strip()
+    grupos = _listar_grupos_apelidos_cadastrados(empresa_id, termo)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Apelidos'
+
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    bold = Font(bold=True)
+    lado = Side(style='thin', color='8EAADB')
+    borda = Border(left=lado, right=lado, top=lado, bottom=lado)
+
+    headers = ['Apelido', 'Grafia no RIS', 'Qtd. grafias do apelido', 'Cadastro automático']
+    for col, titulo in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col, value=titulo)
+        cell.font = bold
+        cell.fill = header_fill
+        cell.border = borda
+
+    row = 2
+    for grupo in grupos:
+        for grafia in grupo['grafias']:
+            ws.cell(row=row, column=1, value=grupo['apelido']).border = borda
+            ws.cell(row=row, column=2, value=grafia).border = borda
+            ws.cell(row=row, column=3, value=grupo['qtd_grafias']).border = borda
+            ws.cell(row=row, column=4, value='Sim' if grupo['cadastro_automatico'] else 'Não').border = borda
+            row += 1
+
+    for col_idx, width in enumerate((42, 42, 22, 18), start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True,
+        filename='apelidos_solicitante.xlsx',
+    )
+    return response
 
 
 def imprimir_resumo_mes_solicitante(request):
