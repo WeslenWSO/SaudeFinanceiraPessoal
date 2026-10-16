@@ -733,6 +733,64 @@ def _listar_apelidos_disponiveis(apelido_info: dict[str, dict]) -> list[dict]:
     ]
 
 
+def _cadastrar_apelidos_automaticos_grafia_unica(
+    empresa_id,
+    raws,
+    grafia_para_apelido: dict[str, str],
+    frequencias=None,
+) -> int:
+    """
+    Persiste apelido quando há apenas uma grafia RIS na sugestão (médico único).
+    Retorna quantidade de grafias cadastradas.
+    """
+    if not empresa_id:
+        return 0
+    sugestoes = _sugerir_grupos_apelido(raws, grafia_para_apelido, frequencias)
+    criados = 0
+    for grupo in sugestoes:
+        grafias = [g for g in (grupo.get('grafias') or []) if g]
+        if len(grafias) != 1:
+            continue
+        grafia = grafias[0]
+        if _lookup_apelido_grafia(grafia, grafia_para_apelido):
+            continue
+        apelido = (grupo.get('nome_sugerido') or grafia).strip() or grafia
+        if ApelidoSolicitante.objects.filter(
+            empresa_id=empresa_id,
+            grafia=grafia,
+        ).exclude(apelido=apelido).exists():
+            continue
+        ApelidoSolicitante.objects.update_or_create(
+            empresa_id=empresa_id,
+            grafia=grafia,
+            defaults={'apelido': apelido},
+        )
+        grafia_para_apelido[grafia] = apelido
+        criados += 1
+    return criados
+
+
+def _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias=None):
+    """Carrega apelidos, cadastra automaticamente grafias únicas e expande o período."""
+    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+    qtd_auto = 0
+    if empresa_id:
+        qtd_auto = _cadastrar_apelidos_automaticos_grafia_unica(
+            empresa_id,
+            raws,
+            grafia_para_apelido,
+            frequencias,
+        )
+        if qtd_auto:
+            grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
+        grafia_para_apelido,
+        apelido_info,
+        raws,
+    )
+    return grafia_para_apelido, apelido_info, qtd_auto
+
+
 def _sugerir_grupos_apelido(raws, grafia_para_apelido, frequencias=None) -> list[dict]:
     """Sugere agrupamentos automáticos para grafias ainda sem apelido."""
     nao_cadastrados = sorted({
@@ -2795,11 +2853,10 @@ def _coletar_cards_map_exames_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
-    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
-        grafia_para_apelido,
-        apelido_info,
+    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+        empresa_id,
         freq_solicitante.keys(),
+        freq_solicitante,
     )
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
         freq_solicitante.keys(),
@@ -3310,11 +3367,10 @@ def _coletar_grid_linhas_exames_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
-    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
-        grafia_para_apelido,
-        apelido_info,
+    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+        empresa_id,
         freq_solicitante.keys(),
+        freq_solicitante,
     )
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
         freq_solicitante.keys(),
@@ -3620,12 +3676,17 @@ def listar_exames_por_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
-    grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
-        grafia_para_apelido,
-        apelido_info,
+    grafia_para_apelido, apelido_info, qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+        empresa_id,
         freq_solicitante.keys(),
+        freq_solicitante,
     )
+    if qtd_auto_apelido:
+        messages.info(
+            request,
+            f'{qtd_auto_apelido} apelido(s) cadastrado(s) automaticamente '
+            f'(solicitante com uma única grafia no RIS).',
+        )
     mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
         freq_solicitante.keys(),
         freq_solicitante,
