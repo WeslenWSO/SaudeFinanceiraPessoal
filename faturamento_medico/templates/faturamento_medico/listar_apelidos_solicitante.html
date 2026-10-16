@@ -1,205 +1,250 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apelidos de solicitante — revisão</title>
-    <style>
-        @page { size: A4 portrait; margin: 12mm; }
-        * { box-sizing: border-box; }
-        body {
-            font-family: Calibri, Arial, Helvetica, sans-serif;
-            margin: 12px 16px;
-            font-size: 11px;
-            color: #000;
-        }
-        .barra-acoes {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 16px;
-            padding: 10px 12px;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-        }
-        .barra-acoes button, .barra-acoes a {
-            padding: 6px 14px;
-            font-size: 12px;
-            text-decoration: none;
-            border-radius: 4px;
-            cursor: pointer;
-            border: 1px solid transparent;
-        }
-        .btn-imprimir { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-        .btn-excel { background: #198754; color: #fff; border-color: #198754; }
-        .btn-voltar { background: #6c757d; color: #fff; border-color: #6c757d; }
-        .busca-form {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
-            margin-left: auto;
-        }
-        .busca-form input[type="search"] {
-            min-width: 14rem;
-            padding: 5px 8px;
-            font-size: 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-        }
-        .busca-form button {
-            padding: 5px 12px;
-            font-size: 12px;
-            background: #fff;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .top-banner {
-            background: #1f3864;
-            color: #fff;
-            text-align: center;
-            padding: 8px 12px;
-            font-size: 13px;
-            font-weight: bold;
-        }
-        .titulo-relatorio { text-align: center; margin: 14px 0 6px; }
-        .titulo-relatorio h1 { margin: 0; font-size: 15px; text-transform: uppercase; }
-        .meta-relatorio {
-            text-align: center;
-            font-size: 10px;
-            color: #555;
-            margin-bottom: 14px;
-        }
-        table.dados {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        table.dados th, table.dados td {
-            border: 1px solid #8eaadb;
-            padding: 6px 8px;
-            vertical-align: top;
-        }
-        table.dados thead th {
-            background: #bdd7ee;
-            text-align: left;
-        }
-        table.dados tbody tr:nth-child(even) { background: #f8f9fa; }
-        .col-num { width: 2.5rem; text-align: center; }
-        .col-qtd { width: 4rem; text-align: center; }
-        .badge-auto {
-            display: inline-block;
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 999px;
-            background: #fff3cd;
-            color: #664d03;
-            margin-left: 6px;
-        }
-        .badge-grupo {
-            display: inline-block;
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 999px;
-            background: #cfe2ff;
-            color: #084298;
-            margin-left: 6px;
-        }
-        .lista-grafias { margin: 0; padding-left: 1.1rem; }
-        .lista-grafias li { margin-bottom: 2px; }
-        .aviso-vazio {
-            padding: 16px;
-            border: 1px solid #ffc107;
-            background: #fff3cd;
-            border-radius: 4px;
-        }
-        @media print {
-            .no-print { display: none !important; }
-        }
-    </style>
-</head>
-<body>
-    <div class="barra-acoes no-print">
-        <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
-        <a class="btn-excel"
-           href="{% url 'faturamento_medico:exportar_apelidos_solicitante_excel' %}?{% if termo_busca %}q={{ termo_busca|urlencode }}&{% endif %}">Exportar Excel</a>
-        <a class="btn-voltar"
-           href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}{% if redirect_qs %}?{{ redirect_qs }}{% endif %}">Voltar</a>
-        <form method="get" class="busca-form">
-            {% if redirect_qs %}
-            <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+{% extends 'base.html' %}
+
+{% block nav_%}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.apelido-toolbar { border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 0.75rem; background: #f8f9fa; }
+.apelido-table td { vertical-align: middle; }
+.apelido-table .lista-grafias { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; }
+.badge-auto { background: #fff3cd; color: #664d03; }
+.badge-grupo { background: #cfe2ff; color: #084298; }
+@media print {
+    .no-print { display: none !important; }
+}
+</style>
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h3 class="card-title mb-0">Apelidos de solicitante — revisão</h3>
+            <div class="d-flex flex-wrap gap-2 no-print">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir
+                </button>
+                <a href="{% url 'faturamento_medico:exportar_apelidos_solicitante_excel' %}?{% if termo_busca %}q={{ termo_busca|urlencode }}&{% endif %}"
+                   class="btn btn-outline-success btn-sm">
+                    <i class="fas fa-file-excel"></i> Excel
+                </a>
+                <a href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}{% if redirect_qs %}?{{ redirect_qs }}{% endif %}"
+                   class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Exames por solicitante
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if messages %}
+            <div class="no-print mb-3">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2">{{ message }}</div>
+                {% endfor %}
+            </div>
             {% endif %}
-            <input type="search" name="q" value="{{ termo_busca }}" placeholder="Buscar apelido ou grafia…">
-            <button type="submit">Buscar</button>
-            {% if termo_busca %}
-            <a href="{% url 'faturamento_medico:listar_apelidos_solicitante' %}{% if redirect_qs %}?redirect_qs={{ redirect_qs|urlencode }}{% endif %}"
-               style="font-size:12px;">Limpar</a>
-            {% endif %}
-        </form>
-    </div>
 
-    {% if empresa %}
-    <div class="top-banner">{{ empresa.razao }}</div>
-    {% endif %}
+            <p class="text-muted small mb-3">
+                {% if empresa %}<strong>{{ empresa.razao }}</strong> · {% endif %}
+                {{ qtd_apelidos }} apelido(s) · {{ total_grafias }} grafia(s)
+                · Impressão {{ data_impressao|date:"d/m/Y H:i" }}
+            </p>
 
-    <div class="titulo-relatorio">
-        <h1>Apelidos de solicitante — revisão</h1>
-    </div>
-    <p class="meta-relatorio">
-        Impressão em {{ data_impressao|date:"d/m/Y H:i" }}
-        · {{ qtd_apelidos }} apelido(s)
-        · {{ total_grafias }} grafia(s) vinculada(s)
-        {% if termo_busca %} · Filtro: “{{ termo_busca }}”{% endif %}
-    </p>
+            <form method="get" class="apelido-toolbar d-flex flex-wrap gap-2 align-items-center mb-3 no-print">
+                {% if redirect_qs %}
+                <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+                {% endif %}
+                <input type="search" name="q" class="form-control form-control-sm" style="max-width:16rem;"
+                       value="{{ termo_busca }}" placeholder="Buscar apelido ou grafia…">
+                <button type="submit" class="btn btn-primary btn-sm">Buscar</button>
+                {% if termo_busca %}
+                <a class="btn btn-outline-secondary btn-sm"
+                   href="{% url 'faturamento_medico:listar_apelidos_solicitante' %}{% if redirect_qs %}?redirect_qs={{ redirect_qs|urlencode }}{% endif %}">Limpar</a>
+                {% endif %}
+            </form>
 
-    {% if grupos %}
-    <table class="dados">
-        <thead>
-            <tr>
-                <th class="col-num">#</th>
-                <th>Apelido (nome exibido)</th>
-                <th class="col-qtd">Grafias</th>
-                <th>Grafias no RIS vinculadas a este apelido</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for grupo in grupos %}
-            <tr>
-                <td class="col-num">{{ forloop.counter }}</td>
-                <td>
-                    <strong>{{ grupo.apelido }}</strong>
-                    {% if grupo.cadastro_automatico %}
-                    <span class="badge-auto">automático</span>
-                    {% elif grupo.qtd_grafias > 1 %}
-                    <span class="badge-grupo">{{ grupo.qtd_grafias }} grafias</span>
-                    {% endif %}
-                </td>
-                <td class="col-qtd">{{ grupo.qtd_grafias }}</td>
-                <td>
-                    <ul class="lista-grafias">
-                        {% for grafia in grupo.grafias %}
-                        <li>{{ grafia }}</li>
+            <div class="alert alert-light border small no-print mb-3">
+                <strong>Como corrigir:</strong> clique em <em>Corrigir</em> na linha.
+                Altere o <strong>apelido</strong> (nome exibido), marque/desmarque <strong>grafias</strong>
+                ou inclua novas grafias (nome exato do RIS, uma por linha).
+                Use <em>Excluir apelido</em> para desfazer um cadastro errado e cadastrar de novo em
+                Exames por solicitante.
+            </div>
+
+            {% if grupos %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover apelido-table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center" style="width:2.5rem;">#</th>
+                            <th>Apelido</th>
+                            <th class="text-center" style="width:4rem;">Grafias</th>
+                            <th>Grafias no RIS</th>
+                            <th class="text-end no-print" style="width:6rem;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for grupo in grupos %}
+                        <tr>
+                            <td class="text-center text-muted">{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ grupo.apelido }}</strong>
+                                {% if grupo.cadastro_automatico %}
+                                <span class="badge bg-warning text-dark">automático</span>
+                                {% elif grupo.qtd_grafias > 1 %}
+                                <span class="badge bg-primary">{{ grupo.qtd_grafias }} grafias</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ grupo.qtd_grafias }}</td>
+                            <td>
+                                <ul class="lista-grafias mb-0">
+                                    {% for grafia in grupo.grafias %}
+                                    <li>{{ grafia }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                            <td class="text-end no-print">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm py-0 px-2 js-corrigir-apelido"
+                                        data-apelido="{{ grupo.apelido }}"
+                                        data-grafias="{{ grupo.grafias|join:'|' }}">
+                                    Corrigir
+                                </button>
+                            </td>
+                        </tr>
                         {% endfor %}
-                    </ul>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <p class="meta-relatorio" style="margin-top:12px;text-align:left;">
-        <strong>Automático:</strong> cadastrado sozinho (uma única grafia igual ao apelido).
-        Edite em Exames por Solicitante → botão <em>Apelido</em> no card ou <em>Cadastrar apelido</em>.
-    </p>
-    {% else %}
-    <div class="aviso-vazio">
-        {% if termo_busca %}
-        Nenhum apelido encontrado para “{{ termo_busca }}”.
-        {% else %}
-        Nenhum apelido cadastrado para esta empresa.
-        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">
+                {% if termo_busca %}
+                Nenhum apelido encontrado para “{{ termo_busca }}”.
+                {% else %}
+                Nenhum apelido cadastrado para esta empresa.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
     </div>
-    {% endif %}
-</body>
-</html>
+</div>
+
+<div class="modal fade no-print" id="modalCorrigirApelido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="post" id="formCorrigirApelido">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="salvar_apelido">
+                <input type="hidden" name="origem" value="lista_apelidos">
+                <input type="hidden" name="apelido_anterior" id="inpApelidoAnterior" value="">
+                <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+                <input type="hidden" name="lista_q" value="{{ termo_busca }}">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">Corrigir apelido</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small mb-1" for="inpApelidoNome">Apelido (nome exibido)</label>
+                        <input type="text" class="form-control form-control-sm" name="apelido"
+                               id="inpApelidoNome" maxlength="200" required>
+                        <div class="form-text">Nome único nos filtros, cards e ranking.</div>
+                    </div>
+                    <div class="mb-3">
+                        <span class="form-label small d-block mb-1">Grafias vinculadas no RIS</span>
+                        <div id="listaGrafiasCorrigir" class="border rounded p-2 bg-light" style="max-height:12rem; overflow-y:auto;"></div>
+                        <div class="form-text">Desmarque para desvincular do apelido.</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small mb-1" for="inpGrafiasNovas">Incluir grafias (opcional)</label>
+                        <textarea class="form-control form-control-sm" name="grafias_novas" id="inpGrafiasNovas"
+                                  rows="3" placeholder="Cole o nome exato do RIS, uma grafia por linha"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="btnExcluirApelidoModal">
+                        Excluir apelido
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Salvar correção</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<form method="post" id="formExcluirApelido" class="d-none">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="excluir_apelido">
+    <input type="hidden" name="origem" value="lista_apelidos">
+    <input type="hidden" name="apelido" id="inpExcluirApelidoNome" value="">
+    <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+    <input type="hidden" name="lista_q" value="{{ termo_busca }}">
+</form>
+
+<script>
+(function() {
+    var modalEl = document.getElementById('modalCorrigirApelido');
+    var formCorrigir = document.getElementById('formCorrigirApelido');
+    var formExcluir = document.getElementById('formExcluirApelido');
+    var inpAnterior = document.getElementById('inpApelidoAnterior');
+    var inpNome = document.getElementById('inpApelidoNome');
+    var inpExcluirNome = document.getElementById('inpExcluirApelidoNome');
+    var listaGrafias = document.getElementById('listaGrafiasCorrigir');
+    var inpNovas = document.getElementById('inpGrafiasNovas');
+    var btnExcluir = document.getElementById('btnExcluirApelidoModal');
+    if (!modalEl || !formCorrigir) return;
+
+    function escHtml(t) {
+        return String(t || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function abrirCorrecao(apelido, grafias) {
+        if (inpAnterior) inpAnterior.value = apelido || '';
+        if (inpNome) inpNome.value = apelido || '';
+        if (inpExcluirNome) inpExcluirNome.value = apelido || '';
+        if (inpNovas) inpNovas.value = '';
+        if (listaGrafias) {
+            listaGrafias.innerHTML = '';
+            grafias.forEach(function(grafia) {
+                var label = document.createElement('label');
+                label.className = 'd-flex align-items-start gap-2 mb-2 small';
+                label.innerHTML =
+                    '<input type="checkbox" class="mt-1" name="grafias" value="' + escHtml(grafia) + '" checked>' +
+                    '<span>' + escHtml(grafia) + '</span>';
+                listaGrafias.appendChild(label);
+            });
+            if (!grafias.length) {
+                listaGrafias.innerHTML = '<p class="small text-muted mb-0">Nenhuma grafia — use o campo abaixo.</p>';
+            }
+        }
+        if (window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    }
+
+    document.querySelectorAll('.js-corrigir-apelido').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var apelido = btn.getAttribute('data-apelido') || '';
+            var bruto = btn.getAttribute('data-grafias') || '';
+            var grafias = bruto.split('|').map(function(s) { return s.trim(); }).filter(Boolean);
+            abrirCorrecao(apelido, grafias);
+        });
+    });
+
+    if (btnExcluir && formExcluir) {
+        btnExcluir.addEventListener('click', function() {
+            var nome = inpNome ? inpNome.value.trim() : '';
+            if (!nome) return;
+            if (!window.confirm('Excluir o apelido "' + nome + '" e desvincular todas as grafias?')) return;
+            if (inpExcluirNome) inpExcluirNome.value = nome;
+            formExcluir.submit();
+        });
+    }
+})();
+</script>
+{% endblock %}

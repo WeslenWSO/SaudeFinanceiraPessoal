@@ -1308,6 +1308,35 @@ def _metas_form_solicitante(solicitante, metas_map, grupos=None):
     ]
 
 
+def _url_retorno_apelido_solicitante(request) -> str:
+    origem = (request.POST.get('origem') or '').strip()
+    redirect_qs = (request.POST.get('redirect_qs') or '').strip()
+    lista_q = (request.POST.get('lista_q') or '').strip()
+    if origem == 'lista_apelidos':
+        url = reverse('faturamento_medico:listar_apelidos_solicitante')
+        params = []
+        if lista_q:
+            params.append(('q', lista_q))
+        if redirect_qs:
+            params.append(('redirect_qs', redirect_qs))
+        return f'{url}?{urlencode(params)}' if params else url
+    url = reverse('faturamento_medico:listar_exames_por_solicitante')
+    return f'{url}?{redirect_qs}' if redirect_qs else url
+
+
+def _grafias_apelido_post(request) -> list[str]:
+    grafias = {
+        g.strip()
+        for g in request.POST.getlist('grafias')
+        if g and str(g).strip()
+    }
+    for linha in (request.POST.get('grafias_novas') or '').splitlines():
+        g = linha.strip()
+        if g:
+            grafias.add(g)
+    return sorted(grafias, key=str.lower)
+
+
 def _salvar_apelido_solicitante(request):
     from django.db import transaction
 
@@ -1317,16 +1346,10 @@ def _salvar_apelido_solicitante(request):
         return redirect('faturamento_medico:listar_exames_por_solicitante')
 
     apelido = (request.POST.get('apelido') or '').strip()
-    grafias = sorted({
-        g.strip()
-        for g in request.POST.getlist('grafias')
-        if g and str(g).strip()
-    }, key=str.lower)
+    grafias = _grafias_apelido_post(request)
     apelido_anterior = (request.POST.get('apelido_anterior') or '').strip()
 
-    redirect_qs = (request.POST.get('redirect_qs') or '').strip()
-    url = reverse('faturamento_medico:listar_exames_por_solicitante')
-    destino = f'{url}?{redirect_qs}' if redirect_qs else url
+    destino = _url_retorno_apelido_solicitante(request)
 
     if not apelido:
         messages.error(request, 'Informe o apelido do solicitante.')
@@ -1377,6 +1400,33 @@ def _salvar_apelido_solicitante(request):
         request,
         f'Apelido "{apelido}" salvo com {len(grafias)} grafia(s).',
     )
+    return redirect(destino)
+
+
+def _excluir_apelido_solicitante(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('faturamento_medico:listar_exames_por_solicitante')
+
+    apelido = (request.POST.get('apelido') or '').strip()
+    destino = _url_retorno_apelido_solicitante(request)
+    if not apelido:
+        messages.error(request, 'Apelido não informado.')
+        return redirect(destino)
+
+    qtd, _ = ApelidoSolicitante.objects.filter(
+        empresa_id=empresa_id,
+        apelido=apelido,
+    ).delete()
+    MetaModalidadeSolicitante.objects.filter(
+        empresa_id=empresa_id,
+        solicitante=apelido,
+    ).delete()
+    if qtd:
+        messages.success(request, f'Apelido "{apelido}" removido ({qtd} grafia(s) desvinculada(s)).')
+    else:
+        messages.warning(request, f'Nenhum registro encontrado para o apelido "{apelido}".')
     return redirect(destino)
 
 
@@ -3288,6 +3338,13 @@ def imprimir_ranking_solicitante(request):
 
 def listar_apelidos_solicitante(request):
     """Relatório para revisão: apelidos cadastrados e grafias vinculadas no RIS."""
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip()
+        if acao == 'salvar_apelido':
+            return _salvar_apelido_solicitante(request)
+        if acao == 'excluir_apelido':
+            return _excluir_apelido_solicitante(request)
+
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return HttpResponse('Sessão expirada. Faça login novamente.')
