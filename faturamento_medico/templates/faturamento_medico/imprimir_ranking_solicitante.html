@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking — exames por solicitante</title>
+    <style>
+        @page { size: A4 landscape; margin: 10mm; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: Calibri, Arial, Helvetica, sans-serif;
+            margin: 12px 16px;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+        }
+        .barra-acoes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .barra-acoes button, .barra-acoes a {
+            display: inline-block;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-imprimir { background: #0d6efd; color: #fff; border: 1px solid #0d6efd; }
+        .btn-voltar { background: #6c757d; color: #fff; border: 1px solid #6c757d; }
+        .top-banner {
+            background: #1f3864;
+            color: #fff;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .empresa-detalhe { text-align: center; font-size: 10px; color: #555; margin: 4px 0 0; }
+        .titulo-relatorio { text-align: center; margin: 14px 0 4px; }
+        .titulo-relatorio h1 { margin: 0; font-size: 15px; font-weight: bold; text-transform: uppercase; }
+        .meta-relatorio {
+            text-align: center;
+            font-size: 10px;
+            color: #555;
+            margin: 0 0 16px;
+        }
+        .secao { margin-bottom: 28px; }
+        .secao h2 {
+            font-size: 13px;
+            margin: 0 0 8px;
+            padding: 6px 10px;
+            background: #e7f1ff;
+            border-left: 4px solid #0d6efd;
+        }
+        table.dados {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+        table.dados th, table.dados td {
+            border: 1px solid #8eaadb;
+            padding: 5px 8px;
+        }
+        table.dados thead th {
+            background: #bdd7ee;
+            font-weight: bold;
+            text-align: center;
+        }
+        table.dados tbody tr:nth-child(even) { background: #f8f9fa; }
+        .col-pos { width: 3rem; text-align: center; }
+        .col-qtd { width: 4.5rem; text-align: center; font-weight: bold; }
+        .col-nome { text-align: left; }
+        .destaque-1 { background: #fff3cd !important; }
+        .grid-modalidade {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            align-items: start;
+        }
+        .col-ranking h3 {
+            font-size: 11px;
+            margin: 0 0 6px;
+            text-align: center;
+            min-height: 2.6em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1f3864;
+            color: #fff;
+            padding: 6px 4px;
+            border-radius: 3px;
+        }
+        .col-ranking table { font-size: 10px; }
+        .col-ranking .col-nome { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .aviso-vazio {
+            padding: 16px;
+            border: 1px solid #ffc107;
+            background: #fff3cd;
+            color: #664d03;
+            border-radius: 4px;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+            .secao-modalidade { page-break-before: auto; }
+        }
+        @media (max-width: 900px) {
+            .grid-modalidade { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="barra-acoes no-print">
+        <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+        <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
+    </div>
+
+    {% if empresa %}
+    <div class="top-banner">{{ empresa.razao }}</div>
+    {% if empresa.cnpj %}
+    <p class="empresa-detalhe">CNPJ {{ empresa.cnpj }}</p>
+    {% endif %}
+    {% endif %}
+
+    <div class="titulo-relatorio">
+        <h1>Ranking — exames por solicitante</h1>
+    </div>
+    <p class="meta-relatorio">
+        Impressão em {{ data_impressao|date:"d/m/Y H:i" }}
+        · Período {{ periodo_fmt }}
+        · {{ total_exames }} exame(s)
+        · {{ qtd_solicitantes }} solicitante(s) com apelido
+        · Contagem por quantidade de exames (itens de serviço)
+    </p>
+
+    {% if ranking_total %}
+    <section class="secao" id="ranking-total">
+        <h2>Quem mais solicitou exames — total no período</h2>
+        {% if ranking_total %}
+        <table class="dados">
+            <thead>
+                <tr>
+                    <th class="col-pos">#</th>
+                    <th class="col-nome">Solicitante (apelido)</th>
+                    <th class="col-qtd">Qtd. exames</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in ranking_total %}
+                <tr{% if item.posicao == 1 %} class="destaque-1"{% endif %}>
+                    <td class="col-pos">{{ item.posicao }}º</td>
+                    <td class="col-nome">{{ item.nome }}</td>
+                    <td class="col-qtd">{{ item.qtd }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">Nenhum exame no período.</p>
+        {% endif %}
+    </section>
+
+    <section class="secao secao-modalidade" id="ranking-modalidade">
+        <h2>Ranking por modalidade — colunas na ordem: Ressonância, Tomografia, Ultrasson, Mamografia/Raio X, Demais</h2>
+        <div class="grid-modalidade">
+            {% for col in ranking_modalidade %}
+            <div class="col-ranking">
+                <h3>{{ col.label }}</h3>
+                {% if col.itens %}
+                <table class="dados">
+                    <thead>
+                        <tr>
+                            <th class="col-pos">#</th>
+                            <th class="col-nome">Solicitante</th>
+                            <th class="col-qtd">Qtd.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in col.itens %}
+                        <tr{% if item.posicao == 1 %} class="destaque-1"{% endif %}>
+                            <td class="col-pos">{{ item.posicao }}º</td>
+                            <td class="col-nome" title="{{ item.nome }}">{{ item.nome }}</td>
+                            <td class="col-qtd">{{ item.qtd }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="text-align:center;color:#888;font-size:10px;">—</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <p style="font-size:10px;color:#666;margin-top:8px;">
+            <strong>Demais:</strong> ECG, EEG e demais modalidades não listadas nas colunas anteriores.
+            Mamografia e Raio X somam as quantidades de MG e CR.
+        </p>
+    </section>
+    {% else %}
+    <div class="aviso-vazio">
+        Nenhum exame encontrado para os filtros selecionados.
+        Verifique o período, status de agendamento e solicitantes com apelido cadastrado.
+    </div>
+    {% endif %}
+</body>
+</html>

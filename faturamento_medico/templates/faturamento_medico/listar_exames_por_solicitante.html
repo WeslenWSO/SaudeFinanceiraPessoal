@@ -170,6 +170,14 @@
                            title="Exportar tabela pivot para Excel">
                             <i class="fas fa-file-excel"></i> Excel resumo
                         </a>
+                        <a href="{% url 'faturamento_medico:imprimir_ranking_solicitante' %}?{{ redirect_qs }}"
+                           class="btn btn-warning btn-sm text-dark"
+                           id="btnRankingSolicitante"
+                           target="_blank"
+                           rel="noopener"
+                           title="Quem mais solicitou exames (total e por modalidade)">
+                            <i class="fas fa-trophy"></i> Ranking
+                        </a>
                         <a href="{% url 'faturamento_medico:imprimir_resumo_mes_solicitante' %}?{{ redirect_qs }}"
                            class="btn btn-primary btn-sm"
                            id="btnResumoMesSolicitante"
@@ -403,6 +411,14 @@
                                id="btnExportarResumoMesExcelBarra"
                                title="Exportar tabela pivot para Excel">
                                 <i class="fas fa-file-excel"></i> Excel resumo
+                            </a>
+                            <a href="{% url 'faturamento_medico:imprimir_ranking_solicitante' %}?{{ redirect_qs }}"
+                               class="btn btn-outline-warning btn-sm text-dark"
+                               id="btnRankingSolicitanteBarra"
+                               target="_blank"
+                               rel="noopener"
+                               title="Quem mais solicitou exames (total e por modalidade)">
+                                <i class="fas fa-trophy"></i> Ranking
                             </a>
                             <a href="{% url 'faturamento_medico:imprimir_resumo_mes_solicitante' %}?{{ redirect_qs }}"
                                class="btn btn-outline-primary btn-sm"
@@ -1455,6 +1471,8 @@ initMultiPicker({
         var formFiltros = document.querySelector('form[method="GET"]');
         if (!formFiltros) return;
         var botoes = [
+            document.getElementById('btnRankingSolicitante'),
+            document.getElementById('btnRankingSolicitanteBarra'),
             document.getElementById('btnResumoMesSolicitante'),
             document.getElementById('btnResumoMesSolicitanteBarra'),
             document.getElementById('btnExportarResumoMesExcel'),

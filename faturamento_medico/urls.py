@@ -8,6 +8,11 @@ urlpatterns = [
     path('cancelados/', views.listar_cancelados, name='listar_cancelados'),
     path('exames-por-solicitante/', views.listar_exames_por_solicitante, name='listar_exames_por_solicitante'),
     path(
+        'exames-por-solicitante/ranking/',
+        views.imprimir_ranking_solicitante,
+        name='imprimir_ranking_solicitante',
+    ),
+    path(
         'exames-por-solicitante/resumo-mes/',
         views.imprimir_resumo_mes_solicitante,
         name='imprimir_resumo_mes_solicitante',

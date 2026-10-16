@@ -541,6 +541,15 @@ METAS_MODALIDADES_SOLICITANTE = (
     ('EG', 'EEG'),
 )
 
+# Colunas do ranking por modalidade (ordem fixa na tela/impressão).
+RANKING_GRUPOS_MODALIDADE_SOLICITANTE = (
+    ('MR', 'Ressonância'),
+    ('CT', 'Tomografia'),
+    ('US', 'Ultrassonografia'),
+    ('MG_CR', 'Mamografia e Raio X'),
+    ('DEMAIS', 'Demais'),
+)
+
 ROTULOS_MODALIDADE_RELATORIO = {
     'US': 'US - ULTRASSON',
     'MR': 'MR - RESSONANCIA',
@@ -3065,6 +3074,83 @@ def _montar_workbook_resumo_mes_solicitante(context):
     if not wb.sheetnames:
         wb.create_sheet('Resumo')
     return wb
+
+
+def _qtd_exames_grupo_ranking(dados_resumo, grupo_key: str) -> int:
+    mods = dados_resumo.get('modalidades') or {}
+    if grupo_key == 'MG_CR':
+        return int(mods.get('MG', 0) or 0) + int(mods.get('CR', 0) or 0)
+    if grupo_key == 'DEMAIS':
+        demais = int(dados_resumo.get('outros', 0) or 0)
+        demais += int(mods.get('EC', 0) or 0)
+        demais += int(mods.get('EG', 0) or 0)
+        return demais
+    return int(mods.get(grupo_key, 0) or 0)
+
+
+def _montar_ranking_total_solicitante(cards_map) -> list[dict]:
+    itens = [
+        {'nome': nome, 'qtd': int(dados.get('total') or 0)}
+        for nome, dados in cards_map.items()
+        if int(dados.get('total') or 0) > 0
+    ]
+    itens.sort(key=lambda x: (-x['qtd'], x['nome'].lower()))
+    for pos, item in enumerate(itens, start=1):
+        item['posicao'] = pos
+    return itens
+
+
+def _montar_ranking_colunas_modalidade_solicitante(cards_map) -> list[dict]:
+    colunas = []
+    for grupo_key, label in RANKING_GRUPOS_MODALIDADE_SOLICITANTE:
+        ranked = []
+        for nome, dados in cards_map.items():
+            qtd = _qtd_exames_grupo_ranking(dados, grupo_key)
+            if qtd <= 0:
+                continue
+            ranked.append({'nome': nome, 'qtd': qtd})
+        ranked.sort(key=lambda x: (-x['qtd'], x['nome'].lower()))
+        for pos, item in enumerate(ranked, start=1):
+            item['posicao'] = pos
+        colunas.append({'key': grupo_key, 'label': label, 'itens': ranked})
+    return colunas
+
+
+def _montar_contexto_ranking_solicitante(request):
+    coleta = _coletar_cards_map_exames_solicitante(request)
+    empresa_id = coleta.get('empresa_id')
+    if not empresa_id:
+        return None, coleta
+
+    cards_map = coleta['cards_map']
+    ranking_total = _montar_ranking_total_solicitante(cards_map)
+    ranking_modalidade = _montar_ranking_colunas_modalidade_solicitante(cards_map)
+
+    try:
+        empresa = Empresa.objects.get(id=empresa_id)
+    except Empresa.DoesNotExist:
+        empresa = None
+
+    context = {
+        'empresa': empresa,
+        'periodo_fmt': coleta['periodo_fmt'],
+        'filtros': coleta['filtros'],
+        'total_exames': sum(item['qtd'] for item in ranking_total),
+        'qtd_solicitantes': len(ranking_total),
+        'ranking_total': ranking_total,
+        'ranking_modalidade': ranking_modalidade,
+        'data_impressao': timezone.localtime(timezone.now()),
+        'redirect_qs': request.GET.urlencode(),
+    }
+    return context, coleta
+
+
+def imprimir_ranking_solicitante(request):
+    """Ranking de solicitantes: total de exames e por grupo de modalidade (filtros da tela)."""
+    context, _coleta = _montar_contexto_ranking_solicitante(request)
+    if context is None:
+        return HttpResponse('Sessão expirada. Faça login novamente.')
+    return render(request, 'faturamento_medico/imprimir_ranking_solicitante.html', context)
 
 
 def imprimir_resumo_mes_solicitante(request):
