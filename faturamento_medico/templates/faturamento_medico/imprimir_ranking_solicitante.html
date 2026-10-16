@@ -35,6 +35,21 @@
         }
         .btn-imprimir { background: #0d6efd; color: #fff; border: 1px solid #0d6efd; }
         .btn-voltar { background: #6c757d; color: #fff; border: 1px solid #6c757d; }
+        .filtro-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+        .filtro-top label { font-size: 12px; margin: 0; color: #495057; }
+        .filtro-top select {
+            font-size: 12px;
+            padding: 5px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            min-width: 11rem;
+        }
         .top-banner {
             background: #1f3864;
             color: #fff;
@@ -121,7 +136,35 @@
     <div class="barra-acoes no-print">
         <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
         <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
+        <div class="filtro-top">
+            <label for="selRankingTop">Exibir posições</label>
+            <select name="ranking_top" id="selRankingTop" aria-label="Quantidade de posições no ranking">
+                <option value="todos" {% if not ranking_top %}selected{% endif %}>Todos</option>
+                {% for n in ranking_top_opcoes %}
+                <option value="{{ n }}" {% if ranking_top == n %}selected{% endif %}>{{ n }} primeiros</option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
+    <script>
+    (function() {
+        var form = document.getElementById('formRankingTop');
+        var sel = document.getElementById('selRankingTop');
+        if (!form || !sel) return;
+        var base = '{{ ranking_qs_base|escapejs }}';
+        sel.addEventListener('change', function() {
+            var params = new URLSearchParams(base);
+            var top = sel.value;
+            if (top && top !== 'todos') {
+                params.set('ranking_top', top);
+            } else {
+                params.delete('ranking_top');
+            }
+            var qs = params.toString();
+            window.location.href = window.location.pathname + (qs ? ('?' + qs) : '');
+        });
+    })();
+    </script>
 
     {% if empresa %}
     <div class="top-banner">{{ empresa.razao }}</div>
@@ -138,6 +181,10 @@
         · Período {{ periodo_fmt }}
         · {{ total_exames }} exame(s)
         · {{ qtd_solicitantes }} solicitante(s) com apelido
+        · Exibindo: <strong>{{ ranking_top_label }}</strong>
+        {% if ranking_top and qtd_solicitantes_exibidos < qtd_solicitantes %}
+        ({{ qtd_solicitantes_exibidos }} de {{ qtd_solicitantes }} no ranking total)
+        {% endif %}
         · Contagem por quantidade de exames (itens de serviço)
     </p>
 

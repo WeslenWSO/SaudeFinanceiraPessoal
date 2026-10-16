@@ -550,6 +550,8 @@ RANKING_GRUPOS_MODALIDADE_SOLICITANTE = (
     ('DEMAIS', 'Demais'),
 )
 
+RANKING_TOP_OPCOES = (10, 20, 30)
+
 ROTULOS_MODALIDADE_RELATORIO = {
     'US': 'US - ULTRASSON',
     'MR': 'MR - RESSONANCIA',
@@ -3088,7 +3090,33 @@ def _qtd_exames_grupo_ranking(dados_resumo, grupo_key: str) -> int:
     return int(mods.get(grupo_key, 0) or 0)
 
 
-def _montar_ranking_total_solicitante(cards_map) -> list[dict]:
+def _parse_ranking_top(request) -> int | None:
+    """None = todos; 10/20/30 = limitar posições exibidas."""
+    raw = (request.GET.get('ranking_top') or '').strip().lower()
+    if not raw or raw in ('todos', 'all', '0'):
+        return None
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if n in RANKING_TOP_OPCOES:
+        return n
+    return None
+
+
+def _rotulo_ranking_top(limite: int | None) -> str:
+    if limite is None:
+        return 'Todos'
+    return f'{limite} primeiros'
+
+
+def _limitar_lista_ranking(itens: list[dict], limite: int | None) -> list[dict]:
+    if limite is None:
+        return itens
+    return itens[:limite]
+
+
+def _montar_ranking_total_solicitante(cards_map, limite: int | None = None) -> list[dict]:
     itens = [
         {'nome': nome, 'qtd': int(dados.get('total') or 0)}
         for nome, dados in cards_map.items()
@@ -3097,10 +3125,10 @@ def _montar_ranking_total_solicitante(cards_map) -> list[dict]:
     itens.sort(key=lambda x: (-x['qtd'], x['nome'].lower()))
     for pos, item in enumerate(itens, start=1):
         item['posicao'] = pos
-    return itens
+    return _limitar_lista_ranking(itens, limite)
 
 
-def _montar_ranking_colunas_modalidade_solicitante(cards_map) -> list[dict]:
+def _montar_ranking_colunas_modalidade_solicitante(cards_map, limite: int | None = None) -> list[dict]:
     colunas = []
     for grupo_key, label in RANKING_GRUPOS_MODALIDADE_SOLICITANTE:
         ranked = []
@@ -3112,6 +3140,7 @@ def _montar_ranking_colunas_modalidade_solicitante(cards_map) -> list[dict]:
         ranked.sort(key=lambda x: (-x['qtd'], x['nome'].lower()))
         for pos, item in enumerate(ranked, start=1):
             item['posicao'] = pos
+        ranked = _limitar_lista_ranking(ranked, limite)
         colunas.append({'key': grupo_key, 'label': label, 'itens': ranked})
     return colunas
 
@@ -3122,9 +3151,14 @@ def _montar_contexto_ranking_solicitante(request):
     if not empresa_id:
         return None, coleta
 
+    limite_top = _parse_ranking_top(request)
     cards_map = coleta['cards_map']
-    ranking_total = _montar_ranking_total_solicitante(cards_map)
-    ranking_modalidade = _montar_ranking_colunas_modalidade_solicitante(cards_map)
+    ranking_total_completo = _montar_ranking_total_solicitante(cards_map, limite=None)
+    ranking_total = _limitar_lista_ranking(ranking_total_completo, limite_top)
+    ranking_modalidade = _montar_ranking_colunas_modalidade_solicitante(cards_map, limite_top)
+
+    qs_sem_top = request.GET.copy()
+    qs_sem_top.pop('ranking_top', None)
 
     try:
         empresa = Empresa.objects.get(id=empresa_id)
@@ -3135,12 +3169,17 @@ def _montar_contexto_ranking_solicitante(request):
         'empresa': empresa,
         'periodo_fmt': coleta['periodo_fmt'],
         'filtros': coleta['filtros'],
-        'total_exames': sum(item['qtd'] for item in ranking_total),
-        'qtd_solicitantes': len(ranking_total),
+        'total_exames': sum(item['qtd'] for item in ranking_total_completo),
+        'qtd_solicitantes': len(ranking_total_completo),
+        'qtd_solicitantes_exibidos': len(ranking_total),
         'ranking_total': ranking_total,
         'ranking_modalidade': ranking_modalidade,
+        'ranking_top': limite_top if limite_top is not None else '',
+        'ranking_top_label': _rotulo_ranking_top(limite_top),
+        'ranking_top_opcoes': RANKING_TOP_OPCOES,
+        'ranking_qs_base': qs_sem_top.urlencode(),
         'data_impressao': timezone.localtime(timezone.now()),
-        'redirect_qs': request.GET.urlencode(),
+        'redirect_qs': qs_sem_top.urlencode(),
     }
     return context, coleta
 
