@@ -1430,6 +1430,101 @@ def _excluir_apelido_solicitante(request):
     return redirect(destino)
 
 
+def _juntar_apelidos_solicitante(request):
+    from django.db import transaction
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('faturamento_medico:listar_exames_por_solicitante')
+
+    destino = _url_retorno_apelido_solicitante(request)
+    apelidos = sorted({
+        (a or '').strip()
+        for a in request.POST.getlist('apelidos_juntar')
+        if (a or '').strip()
+    }, key=str.lower)
+    apelido_final = (request.POST.get('apelido_final') or '').strip()
+
+    if len(apelidos) < 2:
+        messages.error(request, 'Selecione ao menos dois apelidos para juntar.')
+        return redirect(destino)
+    if not apelido_final:
+        messages.error(request, 'Informe o apelido único após a união.')
+        return redirect(destino)
+
+    cadastrados = set(
+        ApelidoSolicitante.objects.filter(empresa_id=empresa_id)
+        .values_list('apelido', flat=True)
+        .distinct()
+    )
+    apelidos_validos = [a for a in apelidos if a in cadastrados]
+    if len(apelidos_validos) < 2:
+        messages.error(request, 'Apelidos selecionados inválidos ou já unificados.')
+        return redirect(destino)
+
+    rows = ApelidoSolicitante.objects.filter(
+        empresa_id=empresa_id,
+        apelido__in=apelidos_validos,
+    )
+    grafias = sorted({(r.grafia or '').strip() for r in rows if (r.grafia or '').strip()}, key=str.lower)
+    if not grafias:
+        messages.error(request, 'Nenhuma grafia encontrada nos apelidos selecionados.')
+        return redirect(destino)
+
+    outros = ApelidoSolicitante.objects.filter(
+        empresa_id=empresa_id,
+        grafia__in=grafias,
+    ).exclude(apelido__in=apelidos_validos)
+    if outros.exists():
+        nomes = ', '.join(sorted({o.apelido for o in outros[:5]}))
+        messages.error(
+            request,
+            f'Alguma grafia já pertence a outro apelido fora da seleção: {nomes}.',
+        )
+        return redirect(destino)
+
+    with transaction.atomic():
+        for antigo in apelidos_validos:
+            if antigo == apelido_final:
+                continue
+            for meta in MetaModalidadeSolicitante.objects.filter(
+                empresa_id=empresa_id,
+                solicitante=antigo,
+            ):
+                destino_meta, criada = MetaModalidadeSolicitante.objects.get_or_create(
+                    empresa_id=empresa_id,
+                    solicitante=apelido_final,
+                    modalidade=meta.modalidade,
+                    defaults={'meta': meta.meta},
+                )
+                if not criada and meta.meta > (destino_meta.meta or 0):
+                    destino_meta.meta = meta.meta
+                    destino_meta.save(update_fields=['meta'])
+            MetaModalidadeSolicitante.objects.filter(
+                empresa_id=empresa_id,
+                solicitante=antigo,
+            ).delete()
+
+        ApelidoSolicitante.objects.filter(
+            empresa_id=empresa_id,
+            apelido__in=apelidos_validos,
+        ).delete()
+        for grafia in grafias:
+            ApelidoSolicitante.objects.create(
+                empresa_id=empresa_id,
+                apelido=apelido_final,
+                grafia=grafia,
+            )
+
+    messages.success(
+        request,
+        f'Unidos {len(apelidos_validos)} apelido(s) em "{apelido_final}" '
+        f'({len(grafias)} grafia(s) no RIS).',
+    )
+    return redirect(destino)
+
+
 def _salvar_metas_modalidade_solicitante(request):
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
@@ -3450,6 +3545,8 @@ def listar_apelidos_solicitante(request):
             return _salvar_apelido_solicitante(request)
         if acao == 'excluir_apelido':
             return _excluir_apelido_solicitante(request)
+        if acao == 'juntar_apelidos':
+            return _juntar_apelidos_solicitante(request)
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:

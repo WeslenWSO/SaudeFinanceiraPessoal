@@ -62,18 +62,27 @@
             </form>
 
             <div class="alert alert-light border small no-print mb-3">
-                <strong>Como corrigir:</strong> clique em <em>Corrigir</em> na linha.
-                Altere o <strong>apelido</strong> (nome exibido), marque/desmarque <strong>grafias</strong>
-                ou inclua novas grafias (nome exato do RIS, uma por linha).
-                Use <em>Excluir apelido</em> para desfazer um cadastro errado e cadastrar de novo em
-                Exames por solicitante.
+                <strong>Corrigir um apelido:</strong> <em>Corrigir</em> na linha.
+                <strong>Juntar duplicados</strong> (ex.: WARLEI / WARLEY): marque 2 ou mais linhas e clique
+                <em>Juntar selecionados</em> — todas as grafias passam para um único apelido.
             </div>
 
             {% if grupos %}
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2 no-print">
+                <button type="button" class="btn btn-success btn-sm" id="btnJuntarApelidos" disabled>
+                    <i class="fas fa-compress-arrows-alt"></i> Juntar selecionados
+                </button>
+                <span class="small text-muted" id="contagemJuntarApelidos">0 selecionado(s)</span>
+                <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="btnMarcarTodosJuntar">Marcar todos visíveis</button>
+                <button type="button" class="btn btn-link btn-sm p-0" id="btnLimparJuntar">Limpar</button>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm table-striped table-hover apelido-table mb-0">
                     <thead class="table-light">
                         <tr>
+                            <th class="text-center no-print" style="width:2.25rem;" title="Selecionar para juntar">
+                                <input type="checkbox" id="chkMarcarTodosJuntar" aria-label="Marcar todos">
+                            </th>
                             <th class="text-center" style="width:2.5rem;">#</th>
                             <th>Apelido</th>
                             <th class="text-center" style="width:4rem;">Grafias</th>
@@ -83,7 +92,15 @@
                     </thead>
                     <tbody>
                         {% for grupo in grupos %}
-                        <tr>
+                        <tr class="js-linha-apelido"
+                            data-apelido="{{ grupo.apelido }}"
+                            data-grafias="{{ grupo.grafias|join:'|' }}">
+                            <td class="text-center no-print">
+                                <input type="checkbox"
+                                       class="js-chk-juntar-apelido"
+                                       value="{{ grupo.apelido }}"
+                                       aria-label="Selecionar {{ grupo.apelido }}">
+                            </td>
                             <td class="text-center text-muted">{{ forloop.counter }}</td>
                             <td>
                                 <strong>{{ grupo.apelido }}</strong>
@@ -173,6 +190,48 @@
     </div>
 </div>
 
+<div class="modal fade no-print" id="modalJuntarApelidos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="post" id="formJuntarApelidos">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="juntar_apelidos">
+                <input type="hidden" name="origem" value="lista_apelidos">
+                <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
+                <input type="hidden" name="lista_q" value="{{ termo_busca }}">
+                <div id="containerApelidosJuntar"></div>
+                <div class="modal-header py-2">
+                    <h5 class="modal-title">Juntar apelidos em um só</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        Os apelidos selecionados serão removidos e todas as grafias ficarão sob um único nome.
+                    </p>
+                    <div class="mb-3">
+                        <span class="form-label small d-block mb-1">Apelidos selecionados</span>
+                        <ul id="listaApelidosJuntar" class="small mb-0"></ul>
+                    </div>
+                    <div class="mb-3">
+                        <span class="form-label small d-block mb-1">Grafias que serão unificadas</span>
+                        <ul id="listaGrafiasJuntar" class="small mb-0 ps-3" style="max-height:10rem; overflow-y:auto;"></ul>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="inpApelidoFinalJuntar">Apelido final (nome exibido)</label>
+                        <input type="text" class="form-control form-control-sm" name="apelido_final"
+                               id="inpApelidoFinalJuntar" maxlength="200" required>
+                    </div>
+                    <div id="opcoesApelidoFinalJuntar" class="small"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm">Confirmar união</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <form method="post" id="formExcluirApelido" class="d-none">
     {% csrf_token %}
     <input type="hidden" name="acao" value="excluir_apelido">
@@ -245,6 +304,143 @@
             formExcluir.submit();
         });
     }
+})();
+
+(function initJuntarApelidos() {
+    var chkTodos = document.getElementById('chkMarcarTodosJuntar');
+    var btnJuntar = document.getElementById('btnJuntarApelidos');
+    var contagem = document.getElementById('contagemJuntarApelidos');
+    var btnMarcarTodos = document.getElementById('btnMarcarTodosJuntar');
+    var btnLimpar = document.getElementById('btnLimparJuntar');
+    var modalEl = document.getElementById('modalJuntarApelidos');
+    var formJuntar = document.getElementById('formJuntarApelidos');
+    var containerHidden = document.getElementById('containerApelidosJuntar');
+    var listaApelidos = document.getElementById('listaApelidosJuntar');
+    var listaGrafias = document.getElementById('listaGrafiasJuntar');
+    var inpFinal = document.getElementById('inpApelidoFinalJuntar');
+    var opcoesFinal = document.getElementById('opcoesApelidoFinalJuntar');
+    var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.js-chk-juntar-apelido'));
+    if (!checkboxes.length || !btnJuntar) return;
+
+    function selecionados() {
+        return checkboxes.filter(function(cb) { return cb.checked; });
+    }
+
+    function linhaDoCheckbox(cb) {
+        return cb.closest('.js-linha-apelido');
+    }
+
+    function atualizarUi() {
+        var sel = selecionados();
+        if (contagem) contagem.textContent = sel.length + ' selecionado(s)';
+        btnJuntar.disabled = sel.length < 2;
+        if (chkTodos) {
+            chkTodos.checked = sel.length > 0 && sel.length === checkboxes.length;
+            chkTodos.indeterminate = sel.length > 0 && sel.length < checkboxes.length;
+        }
+    }
+
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', atualizarUi);
+    });
+
+    if (chkTodos) {
+        chkTodos.addEventListener('change', function() {
+            checkboxes.forEach(function(cb) { cb.checked = chkTodos.checked; });
+            atualizarUi();
+        });
+    }
+    if (btnMarcarTodos) {
+        btnMarcarTodos.addEventListener('click', function() {
+            checkboxes.forEach(function(cb) { cb.checked = true; });
+            atualizarUi();
+        });
+    }
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', function() {
+            checkboxes.forEach(function(cb) { cb.checked = false; });
+            atualizarUi();
+        });
+    }
+
+    btnJuntar.addEventListener('click', function() {
+        var sel = selecionados();
+        if (sel.length < 2) return;
+        var apelidos = [];
+        var grafiasSet = {};
+        sel.forEach(function(cb) {
+            var tr = linhaDoCheckbox(cb);
+            var ap = cb.value || (tr && tr.getAttribute('data-apelido')) || '';
+            if (ap) apelidos.push(ap);
+            var bruto = tr ? (tr.getAttribute('data-grafias') || '') : '';
+            bruto.split('|').forEach(function(g) {
+                g = g.trim();
+                if (g) grafiasSet[g] = true;
+            });
+        });
+        apelidos.sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+        var grafias = Object.keys(grafiasSet).sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+
+        if (containerHidden) {
+            containerHidden.innerHTML = '';
+            apelidos.forEach(function(ap) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'apelidos_juntar';
+                inp.value = ap;
+                containerHidden.appendChild(inp);
+            });
+        }
+        if (listaApelidos) {
+            listaApelidos.innerHTML = '';
+            apelidos.forEach(function(ap) {
+                var li = document.createElement('li');
+                li.textContent = ap;
+                listaApelidos.appendChild(li);
+            });
+        }
+        if (listaGrafias) {
+            listaGrafias.innerHTML = '';
+            grafias.forEach(function(g) {
+                var li = document.createElement('li');
+                li.textContent = g;
+                listaGrafias.appendChild(li);
+            });
+        }
+        if (inpFinal) inpFinal.value = apelidos[0] || '';
+        if (opcoesFinal) {
+            opcoesFinal.innerHTML = '<span class="text-muted d-block mb-1">Usar um dos nomes selecionados:</span>';
+            apelidos.forEach(function(ap, idx) {
+                var id = 'radioApelidoFinal' + idx;
+                var wrap = document.createElement('div');
+                wrap.className = 'form-check form-check-inline';
+                wrap.innerHTML =
+                    '<input class="form-check-input js-radio-apelido-final" type="radio" name="_sugestao_apelido"' +
+                    ' id="' + id + '" value="' + ap.replace(/"/g, '&quot;') + '"' + (idx === 0 ? ' checked' : '') + '>' +
+                    '<label class="form-check-label" for="' + id + '">' + ap + '</label>';
+                opcoesFinal.appendChild(wrap);
+            });
+            opcoesFinal.querySelectorAll('.js-radio-apelido-final').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    if (radio.checked && inpFinal) inpFinal.value = radio.value;
+                });
+            });
+        }
+        if (modalEl && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    });
+
+    if (formJuntar) {
+        formJuntar.addEventListener('submit', function(e) {
+            if (!inpFinal || !inpFinal.value.trim()) {
+                e.preventDefault();
+                alert('Informe o apelido final.');
+            }
+        });
+    }
+
+    atualizarUi();
 })();
 </script>
 {% endblock %}
