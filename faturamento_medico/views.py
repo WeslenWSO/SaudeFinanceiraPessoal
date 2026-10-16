@@ -3216,6 +3216,11 @@ def _montar_contexto_ranking_solicitante(request):
 
     qs_sem_top = request.GET.copy()
     qs_sem_top.pop('ranking_top', None)
+    ranking_query_pairs = [
+        (chave, valor)
+        for chave in qs_sem_top
+        for valor in qs_sem_top.getlist(chave)
+    ]
 
     try:
         empresa = Empresa.objects.get(id=empresa_id)
@@ -3234,7 +3239,7 @@ def _montar_contexto_ranking_solicitante(request):
         'ranking_top': limite_top if limite_top is not None else '',
         'ranking_top_label': _rotulo_ranking_top(limite_top),
         'ranking_top_opcoes': RANKING_TOP_OPCOES,
-        'ranking_qs_base': qs_sem_top.urlencode(),
+        'ranking_query_pairs': ranking_query_pairs,
         'data_impressao': timezone.localtime(timezone.now()),
         'redirect_qs': qs_sem_top.urlencode(),
     }

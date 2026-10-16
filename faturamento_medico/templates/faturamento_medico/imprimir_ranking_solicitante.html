@@ -136,7 +136,10 @@
     <div class="barra-acoes no-print">
         <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
         <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
-        <div class="filtro-top">
+        <form method="get" class="filtro-top" id="formRankingTop">
+            {% for chave, valor in ranking_query_pairs %}
+            <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+            {% endfor %}
             <label for="selRankingTop">Exibir posições</label>
             <select name="ranking_top" id="selRankingTop" aria-label="Quantidade de posições no ranking">
                 <option value="todos" {% if not ranking_top %}selected{% endif %}>Todos</option>
@@ -144,16 +147,24 @@
                 <option value="{{ n }}" {% if ranking_top == n %}selected{% endif %}>{{ n }} primeiros</option>
                 {% endfor %}
             </select>
-        </div>
+        </form>
     </div>
     <script>
     (function() {
         var form = document.getElementById('formRankingTop');
         var sel = document.getElementById('selRankingTop');
-        if (!form || !sel) return;
-        var base = '{{ ranking_qs_base|escapejs }}';
+        if (!sel) return;
         sel.addEventListener('change', function() {
-            var params = new URLSearchParams(base);
+            if (sel.value === 'todos') {
+                sel.removeAttribute('name');
+            } else if (!sel.getAttribute('name')) {
+                sel.setAttribute('name', 'ranking_top');
+            }
+            if (form) {
+                form.submit();
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
             var top = sel.value;
             if (top && top !== 'todos') {
                 params.set('ranking_top', top);
