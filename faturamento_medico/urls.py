@@ -13,6 +13,11 @@ urlpatterns = [
         name='imprimir_ranking_solicitante',
     ),
     path(
+        'exames-por-solicitante/ranking/excel/',
+        views.exportar_ranking_solicitante_excel,
+        name='exportar_ranking_solicitante_excel',
+    ),
+    path(
         'exames-por-solicitante/apelidos/',
         views.listar_apelidos_solicitante,
         name='listar_apelidos_solicitante',

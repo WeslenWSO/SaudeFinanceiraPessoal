@@ -34,6 +34,7 @@
             cursor: pointer;
         }
         .btn-imprimir { background: #0d6efd; color: #fff; border: 1px solid #0d6efd; }
+        .btn-excel { background: #198754; color: #fff; border: 1px solid #198754; }
         .btn-voltar { background: #6c757d; color: #fff; border: 1px solid #6c757d; }
         .filtro-top {
             display: flex;
@@ -135,6 +136,9 @@
 <body>
     <div class="barra-acoes no-print">
         <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+        <a class="btn-excel"
+           href="{% url 'faturamento_medico:exportar_ranking_solicitante_excel' %}?{{ export_qs }}"
+           id="btnExportarRankingExcel">Exportar Excel</a>
         <a class="btn-voltar" href="{% url 'faturamento_medico:listar_exames_por_solicitante' %}?{{ redirect_qs }}">Voltar</a>
         <form method="get" class="filtro-top" id="formRankingTop">
             {% for chave, valor in ranking_query_pairs %}
@@ -154,6 +158,17 @@
         var form = document.getElementById('formRankingTop');
         var sel = document.getElementById('selRankingTop');
         if (!sel) return;
+        var btnExcel = document.getElementById('btnExportarRankingExcel');
+        var baseExcel = btnExcel ? btnExcel.getAttribute('href').split('?')[0] : '';
+
+        function atualizarLinkExcel() {
+            if (!btnExcel || !baseExcel) return;
+            var params = new URLSearchParams(window.location.search);
+            var qs = params.toString();
+            btnExcel.setAttribute('href', baseExcel + (qs ? ('?' + qs) : ''));
+        }
+        atualizarLinkExcel();
+
         sel.addEventListener('change', function() {
             if (sel.value === 'todos') {
                 sel.removeAttribute('name');

@@ -3324,8 +3324,114 @@ def _montar_contexto_ranking_solicitante(request):
         'ranking_query_pairs': ranking_query_pairs,
         'data_impressao': timezone.localtime(timezone.now()),
         'redirect_qs': qs_sem_top.urlencode(),
+        'export_qs': request.GET.urlencode(),
     }
     return context, coleta
+
+
+def _montar_workbook_ranking_solicitante(context):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    wb = Workbook()
+    header_fill = PatternFill(start_color='BDD7EE', end_color='BDD7EE', fill_type='solid')
+    bold = Font(bold=True)
+    lado = Side(style='thin', color='8EAADB')
+    borda = Border(left=lado, right=lado, top=lado, bottom=lado)
+    center = Alignment(horizontal='center', vertical='center')
+    left = Alignment(horizontal='left', vertical='center')
+
+    empresa = context.get('empresa')
+    periodo_fmt = context.get('periodo_fmt') or ''
+    ranking_top_label = context.get('ranking_top_label') or 'Todos'
+
+    def _cabecalho_planilha(ws, titulo: str):
+        row = 1
+        if empresa:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+            ws.cell(row=row, column=1, value=empresa.razao).font = bold
+            row += 1
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+        ws.cell(row=row, column=1, value=titulo).font = bold
+        row += 1
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+        ws.cell(
+            row=row,
+            column=1,
+            value=f'Período {periodo_fmt} · Exibindo {ranking_top_label}',
+        )
+        return row + 2
+
+    ws_total = wb.active
+    ws_total.title = 'Ranking total'
+    row = _cabecalho_planilha(ws_total, 'Quem mais solicitou exames — total')
+    for col, titulo in enumerate(['#', 'Solicitante (apelido)', 'Qtd. exames'], start=1):
+        cell = ws_total.cell(row=row, column=col, value=titulo)
+        cell.font = bold
+        cell.fill = header_fill
+        cell.border = borda
+        cell.alignment = center if col != 2 else left
+    row += 1
+    for item in context.get('ranking_total') or []:
+        ws_total.cell(row=row, column=1, value=item['posicao']).border = borda
+        ws_total.cell(row=row, column=1).alignment = center
+        ws_total.cell(row=row, column=2, value=item['nome']).border = borda
+        ws_total.cell(row=row, column=3, value=item['qtd']).border = borda
+        ws_total.cell(row=row, column=3).alignment = center
+        row += 1
+    ws_total.column_dimensions['A'].width = 6
+    ws_total.column_dimensions['B'].width = 42
+    ws_total.column_dimensions['C'].width = 14
+
+    ws_mod = wb.create_sheet('Por modalidade')
+    row = _cabecalho_planilha(ws_mod, 'Ranking por modalidade')
+    for col, titulo in enumerate(['Modalidade', '#', 'Solicitante', 'Qtd.'], start=1):
+        cell = ws_mod.cell(row=row, column=col, value=titulo)
+        cell.font = bold
+        cell.fill = header_fill
+        cell.border = borda
+        cell.alignment = center if col != 3 else left
+    row += 1
+    for col_mod in context.get('ranking_modalidade') or []:
+        label = col_mod.get('label') or ''
+        for item in col_mod.get('itens') or []:
+            ws_mod.cell(row=row, column=1, value=label).border = borda
+            ws_mod.cell(row=row, column=2, value=item['posicao']).border = borda
+            ws_mod.cell(row=row, column=2).alignment = center
+            ws_mod.cell(row=row, column=3, value=item['nome']).border = borda
+            ws_mod.cell(row=row, column=4, value=item['qtd']).border = borda
+            ws_mod.cell(row=row, column=4).alignment = center
+            row += 1
+    ws_mod.column_dimensions['A'].width = 22
+    ws_mod.column_dimensions['B'].width = 6
+    ws_mod.column_dimensions['C'].width = 42
+    ws_mod.column_dimensions['D'].width = 10
+
+    return wb
+
+
+def exportar_ranking_solicitante_excel(request):
+    """Exporta ranking de solicitantes (total e modalidades) para Excel."""
+    context, coleta = _montar_contexto_ranking_solicitante(request)
+    if context is None:
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    wb = _montar_workbook_ranking_solicitante(context)
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    di = coleta['di'].strftime('%Y%m%d')
+    df = coleta['df'].strftime('%Y%m%d')
+    nome_arquivo = f'ranking_solicitante_{di}_{df}.xlsx'
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = content_disposition_header(
+        as_attachment=True,
+        filename=nome_arquivo,
+    )
+    return response
 
 
 def imprimir_ranking_solicitante(request):
