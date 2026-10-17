@@ -4,13 +4,13 @@ from django.test import SimpleTestCase
 
 from datetime import date
 
+from dashboard.conta_azul.periodo import parse_periodo_integracao_ca
 from dashboard.conta_azul.receber_conciliado import (
     _baixas_conciliadas_parcela,
     _hash_lancamento_ca,
     _liquido_extrato_baixa,
     _marcador_baixa,
     _numero_nf_de_item,
-    parse_periodo_integracao_ca,
 )
 
 

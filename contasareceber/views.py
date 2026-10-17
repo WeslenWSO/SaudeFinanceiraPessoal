@@ -710,10 +710,7 @@ def listar_contas_a_receber(request):
 
 
 def _periodo_integracao_conta_azul_post(request) -> tuple[date | None, date | None, str | None]:
-    """Dia único ou intervalo (máx. 31 dias) para baixas conciliadas no CA."""
-    from django.utils.dateparse import parse_date as django_parse_date
-
-    from dashboard.conta_azul.receber_conciliado import parse_periodo_integracao_ca
+    from dashboard.conta_azul.periodo import parse_periodo_integracao_ca
 
     return parse_periodo_integracao_ca(request.POST)
 

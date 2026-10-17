@@ -10,7 +10,7 @@ from typing import Any
 from django.db import IntegrityError
 from django.utils.dateparse import parse_date, parse_datetime
 
-from dashboard.conta_azul.client import ContaAzulClient
+from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
 from notasfiscais.models import NotaFiscalServico
 from notasfiscais.utils import extrair_socio
 from socio.models import Socio
@@ -187,7 +187,10 @@ def importar_nfse_prestador_conta_azul(
     cur = data_de
     while cur <= data_ate:
         fim = min(cur + timedelta(days=14), data_ate)
-        itens = client.buscar_notas_fiscais_servico(data_de=cur, data_ate=fim)
+        try:
+            itens = client.buscar_notas_fiscais_servico(data_de=cur, data_ate=fim)
+        except ContaAzulAPIError as exc:
+            return {**stats, 'erro': f'{cur.isoformat()} a {fim.isoformat()}: {exc}'}
         for item in itens:
             if not isinstance(item, dict):
                 stats['erros'] += 1

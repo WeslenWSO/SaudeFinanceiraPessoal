@@ -69,15 +69,6 @@
             <a href="{% url 'notasfiscais:create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Nova NFSe</a>
             <a href="{% url 'notasfiscais:import' %}" class="btn btn-secondary"><i class="fas fa-upload"></i> Importar XML</a>
             {% if conta_azul_nfse_disponivel %}
-            <form method="post" action="{% url 'notasfiscais:importar_conta_azul' %}" class="d-inline"
-                  onsubmit="return confirm('Buscar NFS-e emitidas no Conta Azul para o período filtrado abaixo?');">
-                {% csrf_token %}
-                <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
-                <input type="hidden" name="data_fim" value="{{ data_fim }}">
-                <button type="submit" class="btn btn-secondary" title="Período = datas do filtro da listagem">
-                    <i class="fas fa-cloud-download-alt"></i> Buscar Conta Azul
-                </button>
-            </form>
             <a href="{{ conta_azul_sync_url }}" class="btn btn-muted btn-sm align-self-center" title="Sincronização completa Conta Azul">Integração CA</a>
             {% endif %}
             <a href="{% url 'notasfiscais:portal_extensao_import' %}{% if data_inicio or data_fim %}?{% if data_inicio %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% endif %}" class="btn btn-secondary" title="Portal nacional: Selenium e importação da pasta do mês"><i class="fas fa-puzzle-piece"></i> Portal (extensão)</a>
@@ -85,6 +76,108 @@
             <a href="{% url 'notasfiscais:export_excel' %}?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if conta_receber_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter %}&{% endif %}conta_receber={{ conta_receber_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}" class="btn btn-muted"><i class="fas fa-file-excel"></i> Exportar Excel</a>
         </div>
     </div>
+
+    {% if conta_azul_nfse_disponivel %}
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-3">
+            <form id="formImportarNfseContaAzul" method="post" action="{% url 'notasfiscais:importar_conta_azul' %}">
+                {% csrf_token %}
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <span class="form-label d-block small text-muted mb-1">Buscar NFS-e no Conta Azul</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="ca_periodo_modo" id="nfseCaModoDia" value="dia" autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="nfseCaModoDia">Um dia</label>
+                            <input type="radio" class="btn-check" name="ca_periodo_modo" id="nfseCaModoIntervalo" value="intervalo" checked autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="nfseCaModoIntervalo">Intervalo</label>
+                        </div>
+                    </div>
+                    <div class="col-auto nfse-ca-campo-dia" style="display: none;">
+                        <label class="form-label small mb-0" for="nfse_ca_periodo_dia">Dia</label>
+                        <input type="date" class="form-control form-control-sm" name="ca_periodo_dia" id="nfse_ca_periodo_dia"
+                               value="{{ ca_periodo_dia_default }}">
+                    </div>
+                    <div class="col-auto nfse-ca-campo-intervalo">
+                        <label class="form-label small mb-0" for="nfse_ca_data_de">De</label>
+                        <input type="date" class="form-control form-control-sm" name="ca_data_de" id="nfse_ca_data_de"
+                               value="{{ ca_data_de_default }}">
+                    </div>
+                    <div class="col-auto nfse-ca-campo-intervalo">
+                        <label class="form-label small mb-0" for="nfse_ca_data_ate">Até</label>
+                        <input type="date" class="form-control form-control-sm" name="ca_data_ate" id="nfse_ca_data_ate"
+                               value="{{ ca_data_ate_default }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-cloud-download-alt"></i> Importar do Conta Azul
+                        </button>
+                    </div>
+                    <div class="col-12">
+                        <p class="small text-muted mb-0 nfse-ca-campo-intervalo">Competência/emissão no CA — intervalo de até <strong>31 dias</strong> por execução (evita timeout).</p>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    (function () {
+        const form = document.getElementById('formImportarNfseContaAzul');
+        if (!form) return;
+        const modoDia = document.getElementById('nfseCaModoDia');
+        const modoIntervalo = document.getElementById('nfseCaModoIntervalo');
+        const camposDia = form.querySelectorAll('.nfse-ca-campo-dia');
+        const camposIntervalo = form.querySelectorAll('.nfse-ca-campo-intervalo');
+        const MAX_DIAS = 31;
+        function toggleCampos() {
+            const dia = modoDia && modoDia.checked;
+            camposDia.forEach(function (el) { el.style.display = dia ? '' : 'none'; });
+            camposIntervalo.forEach(function (el) { el.style.display = dia ? 'none' : ''; });
+        }
+        if (modoDia) modoDia.addEventListener('change', toggleCampos);
+        if (modoIntervalo) modoIntervalo.addEventListener('change', toggleCampos);
+        toggleCampos();
+        function parseIso(s) {
+            if (!s) return null;
+            const p = s.split('-').map(Number);
+            if (p.length !== 3) return null;
+            return new Date(p[0], p[1] - 1, p[2]);
+        }
+        form.addEventListener('submit', function (e) {
+            if (modoDia && modoDia.checked) {
+                if (!document.getElementById('nfse_ca_periodo_dia').value) {
+                    alert('Informe o dia.');
+                    e.preventDefault();
+                    return;
+                }
+            } else {
+                const de = document.getElementById('nfse_ca_data_de').value;
+                const ate = document.getElementById('nfse_ca_data_ate').value;
+                const d1 = parseIso(de);
+                const d2 = parseIso(ate);
+                if (!d1 || !d2) {
+                    alert('Informe as duas datas.');
+                    e.preventDefault();
+                    return;
+                }
+                if (d1 > d2) {
+                    alert('A data «De» não pode ser maior que «Até».');
+                    e.preventDefault();
+                    return;
+                }
+                const dias = Math.round((d2 - d1) / 86400000) + 1;
+                if (dias > MAX_DIAS) {
+                    alert('Use no máximo ' + MAX_DIAS + ' dias (selecionados: ' + dias + ').');
+                    e.preventDefault();
+                    return;
+                }
+            }
+            if (!confirm('Importar NFS-e emitidas no Conta Azul neste período?')) {
+                e.preventDefault();
+            }
+        });
+    })();
+    </script>
+    {% endif %}
 
     <!-- Indicadores (quantidades) -->
     <div class="indicadores-nfse">

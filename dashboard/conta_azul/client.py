@@ -207,16 +207,26 @@ class ContaAzulClient:
         params.setdefault('pagina', 1)
         params.setdefault('tamanho_pagina', 100)
         todos: list = []
-        while True:
+        pagina = int(params.get('pagina', 1))
+        for _ in range(200):
+            params['pagina'] = pagina
             data = self.get('/v1/notas-fiscais-servico', params)
+            if not isinstance(data, dict):
+                break
             itens = data.get('itens') or []
-            if isinstance(itens, list):
-                todos.extend(itens)
+            if not isinstance(itens, list):
+                break
+            todos.extend(itens)
             pag = data.get('paginacao') or {}
+            total_paginas = pag.get('total_paginas')
+            if total_paginas is not None and pagina >= int(total_paginas):
+                break
             total = pag.get('total_itens')
             if total is None:
-                total = data.get('itens_totais') or data.get('total') or len(todos)
-            if not itens or len(todos) >= int(total):
+                total = data.get('itens_totais') or data.get('total')
+            if not itens:
                 break
-            params['pagina'] = int(params.get('pagina', 1)) + 1
+            if total is not None and len(todos) >= int(total):
+                break
+            pagina += 1
         return todos

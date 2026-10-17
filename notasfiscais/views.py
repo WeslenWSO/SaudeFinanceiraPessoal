@@ -463,6 +463,19 @@ class NFSeListView(LoginRequiredMixin, ListView):
         return _apply_nfse_sort(queryset, sort_col, sort_dir)
 
     def get_context_data(self, **kwargs):
+        from django.core.cache import cache
+
+        empresa_id = self.request.session.get('empresa_id')
+        if empresa_id:
+            chave = _cache_chave_msg_nfse_ca(int(empresa_id))
+            payload = cache.get(chave)
+            if payload:
+                cache.delete(chave)
+                nivel = payload.get('nivel') or 'info'
+                texto = payload.get('texto') or ''
+                if texto:
+                    getattr(messages, nivel, messages.info)(self.request, texto)
+
         context = super().get_context_data(**kwargs)
         empresa_id = self.request.session.get('empresa_id')
 
@@ -535,9 +548,27 @@ class NFSeListView(LoginRequiredMixin, ListView):
             except Exception:
                 pass
 
+        hoje_ca = timezone.now().date()
+        ca_periodo_dia_default = hoje_ca.isoformat()
+        ca_data_de_default = hoje_ca.replace(day=1).isoformat()
+        ca_data_ate_default = hoje_ca.isoformat()
+        if data_inicio and data_fim:
+            try:
+                d_ini_ca = _parse_date(data_inicio)
+                d_fim_ca = _parse_date(data_fim)
+                if d_ini_ca and d_fim_ca and (d_fim_ca - d_ini_ca).days <= 30:
+                    ca_data_de_default = d_ini_ca.isoformat()
+                    ca_data_ate_default = d_fim_ca.isoformat()
+                    ca_periodo_dia_default = d_fim_ca.isoformat()
+            except Exception:
+                pass
+
         context.update({
             'conta_azul_nfse_disponivel': conta_azul_nfse,
             'conta_azul_sync_url': conta_azul_sync_url,
+            'ca_periodo_dia_default': ca_periodo_dia_default,
+            'ca_data_de_default': ca_data_de_default,
+            'ca_data_ate_default': ca_data_ate_default,
             'search': search,
             'valor_filter': valor_filter,
             'status_filter': status_filter,
@@ -1955,15 +1986,47 @@ def portal_extensao_importar_pasta_mes(request):
     return redirect("notasfiscais:portal_extensao_import")
 
 
+def _cache_chave_msg_nfse_ca(empresa_id: int) -> str:
+    return f'nfse_ca_import_msg_{empresa_id}'
+
+
+def _executar_import_nfse_ca_em_background(empresa_id: int, data_de: date, data_ate: date) -> None:
+    from django.core.cache import cache
+
+    from dashboard.conta_azul.client import ContaAzulAPIError
+    from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
+
+    chave = _cache_chave_msg_nfse_ca(empresa_id)
+    try:
+        empresa = Empresa.objects.get(pk=empresa_id)
+        resultado = sincronizar_conta_azul(
+            empresa,
+            nfse_prestador=True,
+            data_de=data_de,
+            data_ate=data_ate,
+        )
+        nivel, texto = mensagem_resultado_sync(resultado)
+        cache.set(chave, {'nivel': nivel, 'texto': texto}, timeout=900)
+    except ContaAzulAPIError as exc:
+        cache.set(chave, {'nivel': 'error', 'texto': f'Conta Azul: {exc}'}, timeout=900)
+    except Exception as exc:
+        logging.getLogger(__name__).exception(
+            'Falha ao importar NFS-e Conta Azul (empresa=%s, %s a %s)',
+            empresa_id,
+            data_de,
+            data_ate,
+        )
+        cache.set(chave, {'nivel': 'error', 'texto': f'Erro ao buscar NFS-e: {exc}'}, timeout=900)
+
+
 @login_required
 @require_POST
 def importar_nfse_conta_azul(request):
-    """Busca NFS-e de prestador na API Conta Azul (período do filtro da listagem)."""
-    from django.utils.dateparse import parse_date as django_parse_date
+    """Busca NFS-e de prestador na API Conta Azul (período explícito, máx. 31 dias)."""
+    import threading
 
-    from dashboard.conta_azul.client import ContaAzulAPIError
     from dashboard.conta_azul.config import obter_ou_criar_config
-    from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
+    from dashboard.conta_azul.periodo import parse_periodo_integracao_ca
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
@@ -1979,28 +2042,44 @@ def importar_nfse_conta_azul(request):
         )
         return redirect('notasfiscais:list')
 
-    di = django_parse_date((request.POST.get('data_inicio') or '').strip())
-    df = django_parse_date((request.POST.get('data_fim') or '').strip())
-    if not di or not df:
-        messages.error(request, 'Informe o período (filtro de datas) antes de buscar no Conta Azul.')
+    di, df, erro_periodo = parse_periodo_integracao_ca(request.POST)
+    if erro_periodo:
+        messages.error(request, erro_periodo)
         return redirect('notasfiscais:list')
-    if di > df:
-        messages.error(request, 'A data inicial não pode ser maior que a data final.')
-        return redirect('notasfiscais:list')
+    assert di is not None and df is not None
 
-    try:
-        resultado = sincronizar_conta_azul(
-            empresa,
-            nfse_prestador=True,
-            data_de=di,
-            data_ate=df,
+    dias = (df - di).days + 1
+    if dias <= 7:
+        from dashboard.conta_azul.client import ContaAzulAPIError
+        from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
+
+        try:
+            resultado = sincronizar_conta_azul(
+                empresa,
+                nfse_prestador=True,
+                data_de=di,
+                data_ate=df,
+            )
+            nivel, texto = mensagem_resultado_sync(resultado)
+            getattr(messages, nivel, messages.info)(request, texto)
+        except ContaAzulAPIError as exc:
+            messages.error(request, f'Conta Azul: {exc}')
+        except Exception as exc:
+            logging.getLogger(__name__).exception(
+                'Falha ao importar NFS-e Conta Azul (empresa=%s)', empresa.pk
+            )
+            messages.error(request, f'Erro ao buscar NFS-e: {exc}')
+    else:
+        threading.Thread(
+            target=_executar_import_nfse_ca_em_background,
+            args=(empresa.pk, di, df),
+            daemon=True,
+        ).start()
+        messages.info(
+            request,
+            f'Importação NFS-e Conta Azul iniciada ({di.strftime("%d/%m/%Y")} a {df.strftime("%d/%m/%Y")}). '
+            'Aguarde 1–2 minutos e atualize a página para ver o resultado. Use no máximo 31 dias por vez.',
         )
-        nivel, texto = mensagem_resultado_sync(resultado)
-        getattr(messages, nivel)(request, texto)
-    except ContaAzulAPIError as exc:
-        messages.error(request, f'Conta Azul: {exc}')
-    except Exception as exc:
-        messages.error(request, f'Erro ao buscar NFS-e: {exc}')
 
     return redirect('notasfiscais:list')
 
