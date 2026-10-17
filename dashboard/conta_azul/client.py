@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import requests
@@ -191,3 +192,31 @@ class ContaAzulClient:
             raise ContaAzulAPIError('ID do serviço não informado.')
         headers = {'Content-Type': 'application/json'}
         return self._request('PATCH', f'/v1/servicos/{sid}', json=payload, headers=headers)
+
+    def buscar_notas_fiscais_servico(
+        self,
+        *,
+        data_de: date,
+        data_ate: date,
+        **filtros,
+    ) -> list:
+        """Uma janela de competência (máx. 15 dias), com paginação CA."""
+        params = dict(filtros)
+        params['data_competencia_de'] = data_de.isoformat()
+        params['data_competencia_ate'] = data_ate.isoformat()
+        params.setdefault('pagina', 1)
+        params.setdefault('tamanho_pagina', 100)
+        todos: list = []
+        while True:
+            data = self.get('/v1/notas-fiscais-servico', params)
+            itens = data.get('itens') or []
+            if isinstance(itens, list):
+                todos.extend(itens)
+            pag = data.get('paginacao') or {}
+            total = pag.get('total_itens')
+            if total is None:
+                total = data.get('itens_totais') or data.get('total') or len(todos)
+            if not itens or len(todos) >= int(total):
+                break
+            params['pagina'] = int(params.get('pagina', 1)) + 1
+        return todos

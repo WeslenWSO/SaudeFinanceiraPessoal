@@ -6,6 +6,7 @@ from .views import (
     portal_extensao_credenciais,
     portal_extensao_executar_selenium,
     portal_extensao_importar_pasta_mes,
+    importar_nfse_conta_azul,
     aplicar_discriminacao_bulk,     aplicar_regra_imposto_bulk, aplicar_socio_bulk, aplicar_cobranca_bulk,
     gerar_contas_receber_bulk, excluir_nfse_bulk, extrair_discriminacao_ajax, get_filtered_ids, export_excel, NFSeSegmentView,
     detalhes_modal, ai_segmentacao, dashboard_nfse, retencoes_nota_ajax,
@@ -57,6 +58,11 @@ urlpatterns = [
         "importar-portal-extensao/importar-pasta-mes/",
         portal_extensao_importar_pasta_mes,
         name="portal_extensao_importar_pasta_mes",
+    ),
+    path(
+        'importar-conta-azul/',
+        importar_nfse_conta_azul,
+        name='importar_conta_azul',
     ),
     path('import-ajax/', import_xml_ajax, name='import_ajax'),
     # Cancelar/reativar (antes de detail para evitar ambiguidade de reverse)

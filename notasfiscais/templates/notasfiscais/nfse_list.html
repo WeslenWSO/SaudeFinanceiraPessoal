@@ -68,6 +68,18 @@
         <div class="btn-group">
             <a href="{% url 'notasfiscais:create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Nova NFSe</a>
             <a href="{% url 'notasfiscais:import' %}" class="btn btn-secondary"><i class="fas fa-upload"></i> Importar XML</a>
+            {% if conta_azul_nfse_disponivel %}
+            <form method="post" action="{% url 'notasfiscais:importar_conta_azul' %}" class="d-inline"
+                  onsubmit="return confirm('Buscar NFS-e emitidas no Conta Azul para o período filtrado abaixo?');">
+                {% csrf_token %}
+                <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
+                <input type="hidden" name="data_fim" value="{{ data_fim }}">
+                <button type="submit" class="btn btn-secondary" title="Período = datas do filtro da listagem">
+                    <i class="fas fa-cloud-download-alt"></i> Buscar Conta Azul
+                </button>
+            </form>
+            <a href="{{ conta_azul_sync_url }}" class="btn btn-muted btn-sm align-self-center" title="Sincronização completa Conta Azul">Integração CA</a>
+            {% endif %}
             <a href="{% url 'notasfiscais:portal_extensao_import' %}{% if data_inicio or data_fim %}?{% if data_inicio %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% endif %}" class="btn btn-secondary" title="Portal nacional: Selenium e importação da pasta do mês"><i class="fas fa-puzzle-piece"></i> Portal (extensão)</a>
             <a href="{% url 'notasfiscais:logs_notas_fiscais' %}" class="btn btn-muted"><i class="fas fa-history"></i> Logs NFSe</a>
             <a href="{% url 'notasfiscais:export_excel' %}?{% if search %}search={{ search }}{% endif %}{% if valor_filter %}{% if search %}&{% endif %}valor={{ valor_filter }}{% endif %}{% if status_filter %}{% if search %}&{% endif %}status={{ status_filter }}{% endif %}{% if status_nota_filter %}{% if search or status_filter %}&{% endif %}status_nota={{ status_nota_filter }}{% endif %}{% if forma_pagamento_filter %}{% if search or status_filter or status_nota_filter %}&{% endif %}forma_pagamento={{ forma_pagamento_filter }}{% endif %}{% if socio_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter %}&{% endif %}socio={{ socio_filter }}{% endif %}{% if conta_receber_filter %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter %}&{% endif %}conta_receber={{ conta_receber_filter }}{% endif %}{% if data_inicio %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter %}&{% endif %}data_inicio={{ data_inicio }}{% endif %}{% if data_fim %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio %}&{% endif %}data_fim={{ data_fim }}{% endif %}{% if paginate_by %}{% if search or status_filter or status_nota_filter or forma_pagamento_filter or socio_filter or conta_receber_filter or data_inicio or data_fim %}&{% endif %}paginate_by={{ paginate_by }}{% endif %}" class="btn btn-muted"><i class="fas fa-file-excel"></i> Exportar Excel</a>

@@ -523,7 +523,21 @@ class NFSeListView(LoginRequiredMixin, ListView):
         path_prefix = (self.request.path.strip('/').split('/') or ['notasfiscais'])[0] or 'notasfiscais'
         aplicar_socio_url = f'/{path_prefix}/nfse/aplicar-socio/'
         aplicar_cobranca_url = f'/{path_prefix}/nfse/aplicar-cobranca/'
+        conta_azul_nfse = False
+        conta_azul_sync_url = ''
+        if empresa_id:
+            try:
+                from dashboard.conta_azul.config import obter_ou_criar_config
+
+                cfg_ca = obter_ou_criar_config(Empresa.objects.get(pk=empresa_id))
+                conta_azul_nfse = cfg_ca.tem_refresh_token()
+                conta_azul_sync_url = reverse('empresa:conta_azul_sincronizar', kwargs={'pk': empresa_id})
+            except Exception:
+                pass
+
         context.update({
+            'conta_azul_nfse_disponivel': conta_azul_nfse,
+            'conta_azul_sync_url': conta_azul_sync_url,
             'search': search,
             'valor_filter': valor_filter,
             'status_filter': status_filter,
@@ -1939,6 +1953,56 @@ def portal_extensao_importar_pasta_mes(request):
 
     messages.info(request, "Nenhuma NFSe nova foi importada a partir da pasta (sem erros reportados).")
     return redirect("notasfiscais:portal_extensao_import")
+
+
+@login_required
+@require_POST
+def importar_nfse_conta_azul(request):
+    """Busca NFS-e de prestador na API Conta Azul (período do filtro da listagem)."""
+    from django.utils.dateparse import parse_date as django_parse_date
+
+    from dashboard.conta_azul.client import ContaAzulAPIError
+    from dashboard.conta_azul.config import obter_ou_criar_config
+    from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa para continuar.')
+        return redirect('empresa:lista')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    config = obter_ou_criar_config(empresa)
+    if not config.tem_refresh_token():
+        messages.error(
+            request,
+            'Conta Azul não conectada. Em Empresa → Configuração Conta Azul, clique em Conectar.',
+        )
+        return redirect('notasfiscais:list')
+
+    di = django_parse_date((request.POST.get('data_inicio') or '').strip())
+    df = django_parse_date((request.POST.get('data_fim') or '').strip())
+    if not di or not df:
+        messages.error(request, 'Informe o período (filtro de datas) antes de buscar no Conta Azul.')
+        return redirect('notasfiscais:list')
+    if di > df:
+        messages.error(request, 'A data inicial não pode ser maior que a data final.')
+        return redirect('notasfiscais:list')
+
+    try:
+        resultado = sincronizar_conta_azul(
+            empresa,
+            nfse_prestador=True,
+            data_de=di,
+            data_ate=df,
+        )
+        nivel, texto = mensagem_resultado_sync(resultado)
+        getattr(messages, nivel)(request, texto)
+    except ContaAzulAPIError as exc:
+        messages.error(request, f'Conta Azul: {exc}')
+    except Exception as exc:
+        messages.error(request, f'Erro ao buscar NFS-e: {exc}')
+
+    return redirect('notasfiscais:list')
 
 
 @method_decorator(csrf_exempt, name='dispatch')

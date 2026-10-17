@@ -40,6 +40,7 @@ from cobranca.models import Cobranca
 from contasapagar.models import ContasaPagar
 from contasareceber.models import ContaAReceber
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
+from dashboard.conta_azul.nfse_prestador import importar_nfse_prestador_conta_azul
 from extrato.models import Banco, ContaBancaria, Lancamento
 from fornecedor.models import Fornecedor
 
@@ -1620,6 +1621,7 @@ def sincronizar_conta_azul(
     receitas: bool = False,
     despesas: bool = False,
     transferencias: bool = False,
+    nfse_prestador: bool = False,
     data_de: date | None = None,
     data_ate: date | None = None,
     dry_run: bool = False,
@@ -1662,6 +1664,14 @@ def sincronizar_conta_azul(
                 resultado['transferencias'] = importar_transferencias(
                     empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
                 )
+            if nfse_prestador:
+                resultado['nfse_prestador'] = importar_nfse_prestador_conta_azul(
+                    empresa,
+                    client,
+                    data_de=data_de,
+                    data_ate=data_ate,
+                    dry_run=dry_run,
+                )
         cfg = getattr(empresa, 'conta_azul_config', None)
         if cfg and not dry_run:
             cfg.save(update_fields=['atualizado_em'])
@@ -1702,6 +1712,10 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["ignorados_nao_pagos"]} em aberto ignorados'
         if stats.get('ignorados_nao_recebidos'):
             ok[-1] += f', {stats["ignorados_nao_recebidos"]} em aberto ignorados'
+        if stats.get('ignorados_status'):
+            ok[-1] += f', {stats["ignorados_status"]} status ignorados'
+        if stats.get('ignorados_sem_numero'):
+            ok[-1] += f', {stats["ignorados_sem_numero"]} sem número'
         if stats.get('detalhes_limitados'):
             ok[-1] += f' (detalhe API limitado a {stats["detalhes_limitados"]} parcelas; rode de novo para completar NSU/cobrança)'
 

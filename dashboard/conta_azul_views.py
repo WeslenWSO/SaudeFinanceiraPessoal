@@ -381,6 +381,7 @@ def conta_azul_sincronizar(request, pk):
                 receitas='receitas' in request.POST,
                 despesas='despesas' in request.POST,
                 transferencias='transferencias' in request.POST,
+                nfse_prestador='nfse_prestador' in request.POST,
                 data_de=data_de,
                 data_ate=data_ate,
             )
@@ -389,12 +390,12 @@ def conta_azul_sincronizar(request, pk):
                 args=(empresa.pk, opcoes),
                 daemon=True,
             ).start()
-            messages.info(
-                request,
+            msg = (
                 'Sincronização Conta Azul iniciada em segundo plano. '
-                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar. '
-                'Use um mês por vez se houver muitos lançamentos.',
+                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar ou a lista de NFSe. '
+                'Use um mês por vez se houver muitos lançamentos.'
             )
+            messages.info(request, msg)
         except Exception as exc:
             messages.error(request, f'Não foi possível iniciar a sincronização: {exc}')
         return redirect('empresa:conta_azul_sincronizar', pk=pk)
