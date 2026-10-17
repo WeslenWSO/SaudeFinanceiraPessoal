@@ -32,4 +32,9 @@ urlpatterns = [
     path('aplicar_categoria/', views.aplicar_categoria, name='aplicar_categoria'),
     path('alterar-socio-lote/', views.alterar_socio_lote, name='alterar_socio_lote'),
     path('excluir-selecionados/', views.excluir_contas_selecionadas, name='excluir_selecionados'),
+    path(
+        'integrar-conta-azul/',
+        views.integrar_baixas_conta_azul,
+        name='integrar_conta_azul',
+    ),
 ]

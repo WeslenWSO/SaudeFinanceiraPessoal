@@ -649,6 +649,22 @@ def listar_contas_a_receber(request):
         del q_nav['page']
     filtros_query_sem_page = q_nav.urlencode()
 
+    conta_azul_integracao = False
+    contas_bancarias_ca = ContaBancaria.objects.none()
+    try:
+        from dashboard.conta_azul.config import obter_ou_criar_config
+
+        cfg_ca = obter_ou_criar_config(Empresa.objects.get(pk=empresa_id))
+        conta_azul_integracao = cfg_ca.tem_refresh_token()
+        if conta_azul_integracao:
+            contas_bancarias_ca = (
+                ContaBancaria.objects.filter(empresa_id=empresa_id)
+                .exclude(conta_azul_id='')
+                .order_by('descricao')
+            )
+    except Exception:
+        pass
+
     context = {
         'contas': page_obj,
         'page_obj': page_obj,
@@ -671,9 +687,76 @@ def listar_contas_a_receber(request):
         'resumo_val_receber': (request.GET.get('resumo_val_receber') or '').strip() == '1',
         'sort_col': sort_col,
         'sort_dir': sort_dir,
+        'conta_azul_integracao': conta_azul_integracao,
+        'contas_bancarias_ca': contas_bancarias_ca,
     }
 
     return render(request, 'contasareceber/listar.html', context)
+
+
+@login_required
+@require_POST
+def integrar_baixas_conta_azul(request):
+    """Importa baixas conciliadas no Conta Azul (extrato) para títulos SF vinculados à NF."""
+    from django.utils.dateparse import parse_date as django_parse_date
+
+    from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
+    from dashboard.conta_azul.config import obter_ou_criar_config
+    from dashboard.conta_azul.receber_conciliado import (
+        importar_baixas_receitas_conciliadas_conta_azul,
+        mensagem_resultado_baixas_ca,
+    )
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    config = obter_ou_criar_config(empresa)
+    if not config.tem_refresh_token():
+        messages.error(
+            request,
+            'Conta Azul não conectada. Configure OAuth em Empresa → Conta Azul.',
+        )
+        return redirect('contasareceber:crlistar')
+
+    rec_ini = django_parse_date((request.POST.get('recebimento_inicio') or '').strip())
+    rec_fim = django_parse_date((request.POST.get('recebimento_fim') or '').strip())
+    if not rec_ini or not rec_fim:
+        rec_ini = django_parse_date((request.POST.get('data_inicio') or '').strip())
+        rec_fim = django_parse_date((request.POST.get('data_fim') or '').strip())
+    if not rec_ini or not rec_fim:
+        messages.error(
+            request,
+            'Informe o período de recebimento (ou emissão) para buscar baixas no Conta Azul.',
+        )
+        return redirect('contasareceber:crlistar')
+    if rec_ini > rec_fim:
+        messages.error(request, 'Data inicial maior que a final.')
+        return redirect('contasareceber:crlistar')
+
+    conta_banco_id = None
+    raw_conta = (request.POST.get('conta_banco_ca') or '').strip()
+    if raw_conta.isdigit():
+        conta_banco_id = int(raw_conta)
+
+    try:
+        client = ContaAzulClient.para_empresa(empresa)
+        stats = importar_baixas_receitas_conciliadas_conta_azul(
+            empresa,
+            client,
+            data_de=rec_ini,
+            data_ate=rec_fim,
+            conta_banco_id=conta_banco_id,
+        )
+        nivel, texto = mensagem_resultado_baixas_ca(stats)
+        getattr(messages, nivel)(request, texto)
+    except ContaAzulAPIError as exc:
+        messages.error(request, f'Conta Azul: {exc}')
+    except Exception as exc:
+        messages.error(request, f'Erro na integração: {exc}')
+
+    return redirect('contasareceber:crlistar')
 
 
 @login_required

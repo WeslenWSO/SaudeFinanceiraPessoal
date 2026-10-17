@@ -109,11 +109,30 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3 class="card-title">Contas a Receber</h3>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
                         <a href="{% url 'contasareceber:criar' %}" class="btn btn-primary">Cadastrar Conta a Receber</a>
                         <a href="{% url 'contasareceber:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já recebidos">
                             <i class="fas fa-tags"></i> Categorizar baixados
                         </a>
+                        {% if conta_azul_integracao %}
+                        <form method="post" action="{% url 'contasareceber:integrar_conta_azul' %}" class="d-flex flex-wrap gap-2 align-items-center"
+                              onsubmit="return confirm('Importar baixas já conciliadas no extrato Conta Azul? Títulos gerados pela NFSe serão baixados sem duplicar parcela.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
+                            <input type="hidden" name="data_fim" value="{{ data_fim }}">
+                            <input type="hidden" name="recebimento_inicio" value="{{ filtros.recebimento_inicio|default:'' }}">
+                            <input type="hidden" name="recebimento_fim" value="{{ filtros.recebimento_fim|default:'' }}">
+                            <select name="conta_banco_ca" class="form-select form-select-sm" style="max-width: 14rem;" title="Banco (conta CA vinculada no SF)">
+                                <option value="">Todos os bancos</option>
+                                {% for cb in contas_bancarias_ca %}
+                                <option value="{{ cb.pk }}">{{ cb.descricao|default:cb }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-cloud-download-alt"></i> Integrar Conta Azul
+                            </button>
+                        </form>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-body">
