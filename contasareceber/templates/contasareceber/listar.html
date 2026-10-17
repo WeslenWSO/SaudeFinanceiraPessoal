@@ -107,33 +107,127 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title">Contas a Receber</h3>
-                    <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <a href="{% url 'contasareceber:criar' %}" class="btn btn-primary">Cadastrar Conta a Receber</a>
-                        <a href="{% url 'contasareceber:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já recebidos">
-                            <i class="fas fa-tags"></i> Categorizar baixados
-                        </a>
-                        {% if conta_azul_integracao %}
-                        <form method="post" action="{% url 'contasareceber:integrar_conta_azul' %}" class="d-flex flex-wrap gap-2 align-items-center"
-                              onsubmit="return confirm('Importar baixas já conciliadas no extrato Conta Azul? Títulos gerados pela NFSe serão baixados sem duplicar parcela.');">
-                            {% csrf_token %}
-                            <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
-                            <input type="hidden" name="data_fim" value="{{ data_fim }}">
-                            <input type="hidden" name="recebimento_inicio" value="{{ filtros.recebimento_inicio|default:'' }}">
-                            <input type="hidden" name="recebimento_fim" value="{{ filtros.recebimento_fim|default:'' }}">
-                            <select name="conta_banco_ca" class="form-select form-select-sm" style="max-width: 14rem;" title="Banco (conta CA vinculada no SF)">
-                                <option value="">Todos os bancos</option>
-                                {% for cb in contas_bancarias_ca %}
-                                <option value="{{ cb.pk }}">{{ cb.descricao|default:cb }}</option>
-                                {% endfor %}
-                            </select>
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">
-                                <i class="fas fa-cloud-download-alt"></i> Integrar Conta Azul
-                            </button>
-                        </form>
-                        {% endif %}
+                <div class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h3 class="card-title mb-0">Contas a Receber</h3>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <a href="{% url 'contasareceber:criar' %}" class="btn btn-primary">Cadastrar Conta a Receber</a>
+                            <a href="{% url 'contasareceber:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já recebidos">
+                                <i class="fas fa-tags"></i> Categorizar baixados
+                            </a>
+                        </div>
                     </div>
+                    {% if conta_azul_integracao %}
+                    <form id="formIntegrarContaAzul" method="post" action="{% url 'contasareceber:integrar_conta_azul' %}"
+                          class="border-top pt-3 mt-3">
+                        {% csrf_token %}
+                        <div class="row g-2 align-items-end">
+                            <div class="col-auto">
+                                <span class="form-label d-block small text-muted mb-1">Período (pagamento no CA)</span>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="ca_periodo_modo" id="caModoDia" value="dia" autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="caModoDia">Um dia</label>
+                                    <input type="radio" class="btn-check" name="ca_periodo_modo" id="caModoIntervalo" value="intervalo" checked autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="caModoIntervalo">Intervalo</label>
+                                </div>
+                            </div>
+                            <div class="col-auto ca-campo-dia" style="display: none;">
+                                <label class="form-label small mb-0" for="ca_periodo_dia">Dia</label>
+                                <input type="date" class="form-control form-control-sm" name="ca_periodo_dia" id="ca_periodo_dia"
+                                       value="{{ ca_periodo_dia_default }}">
+                            </div>
+                            <div class="col-auto ca-campo-intervalo">
+                                <label class="form-label small mb-0" for="ca_data_de">De</label>
+                                <input type="date" class="form-control form-control-sm" name="ca_data_de" id="ca_data_de"
+                                       value="{{ ca_data_de_default }}">
+                            </div>
+                            <div class="col-auto ca-campo-intervalo">
+                                <label class="form-label small mb-0" for="ca_data_ate">Até</label>
+                                <input type="date" class="form-control form-control-sm" name="ca_data_ate" id="ca_data_ate"
+                                       value="{{ ca_data_ate_default }}">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label small mb-0" for="conta_banco_ca">Banco</label>
+                                <select name="conta_banco_ca" id="conta_banco_ca" class="form-select form-select-sm" style="min-width: 11rem;">
+                                    <option value="">Todos</option>
+                                    {% for cb in contas_bancarias_ca %}
+                                    <option value="{{ cb.pk }}">{{ cb.descricao|default:cb }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-cloud-download-alt"></i> Integrar Conta Azul
+                                </button>
+                            </div>
+                            <div class="col-12">
+                                <p class="small text-muted mb-0 ca-campo-intervalo">Intervalo: no máximo <strong>31 dias</strong> (data de recebimento no Conta Azul).</p>
+                            </div>
+                        </div>
+                    </form>
+                    <script>
+                    (function () {
+                        const form = document.getElementById('formIntegrarContaAzul');
+                        if (!form) return;
+                        const modoDia = document.getElementById('caModoDia');
+                        const modoIntervalo = document.getElementById('caModoIntervalo');
+                        const camposDia = form.querySelectorAll('.ca-campo-dia');
+                        const camposIntervalo = form.querySelectorAll('.ca-campo-intervalo');
+                        const MAX_DIAS = 31;
+
+                        function toggleCampos() {
+                            const dia = modoDia && modoDia.checked;
+                            camposDia.forEach(function (el) { el.style.display = dia ? '' : 'none'; });
+                            camposIntervalo.forEach(function (el) { el.style.display = dia ? 'none' : ''; });
+                        }
+                        if (modoDia) modoDia.addEventListener('change', toggleCampos);
+                        if (modoIntervalo) modoIntervalo.addEventListener('change', toggleCampos);
+                        toggleCampos();
+
+                        function parseIso(s) {
+                            if (!s) return null;
+                            const p = s.split('-').map(Number);
+                            if (p.length !== 3) return null;
+                            return new Date(p[0], p[1] - 1, p[2]);
+                        }
+
+                        form.addEventListener('submit', function (e) {
+                            if (modoDia && modoDia.checked) {
+                                const d = document.getElementById('ca_periodo_dia').value;
+                                if (!d) {
+                                    alert('Informe o dia.');
+                                    e.preventDefault();
+                                    return;
+                                }
+                            } else {
+                                const de = document.getElementById('ca_data_de').value;
+                                const ate = document.getElementById('ca_data_ate').value;
+                                const d1 = parseIso(de);
+                                const d2 = parseIso(ate);
+                                if (!d1 || !d2) {
+                                    alert('Informe as duas datas do intervalo.');
+                                    e.preventDefault();
+                                    return;
+                                }
+                                if (d1 > d2) {
+                                    alert('A data «De» não pode ser maior que «Até».');
+                                    e.preventDefault();
+                                    return;
+                                }
+                                const dias = Math.round((d2 - d1) / 86400000) + 1;
+                                if (dias > MAX_DIAS) {
+                                    alert('O intervalo não pode passar de ' + MAX_DIAS + ' dias (você selecionou ' + dias + ').');
+                                    e.preventDefault();
+                                    return;
+                                }
+                            }
+                            if (!confirm('Importar baixas conciliadas no extrato Conta Azul neste período?')) {
+                                e.preventDefault();
+                            }
+                        });
+                    })();
+                    </script>
+                    {% endif %}
                 </div>
                 <div class="card-body">
 

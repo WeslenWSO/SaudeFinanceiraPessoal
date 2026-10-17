@@ -665,6 +665,18 @@ def listar_contas_a_receber(request):
     except Exception:
         pass
 
+    hoje_ca = timezone.now().date()
+    ca_periodo_dia_default = hoje_ca.isoformat()
+    ca_data_de_default = hoje_ca.replace(day=1).isoformat()
+    ca_data_ate_default = hoje_ca.isoformat()
+    rec_ini_ctx = (filtros.get('recebimento_inicio') or '').strip()
+    rec_fim_ctx = (filtros.get('recebimento_fim') or '').strip()
+    if rec_fim_ctx:
+        ca_periodo_dia_default = rec_fim_ctx
+    if rec_ini_ctx and rec_fim_ctx:
+        ca_data_de_default = rec_ini_ctx
+        ca_data_ate_default = rec_fim_ctx
+
     context = {
         'contas': page_obj,
         'page_obj': page_obj,
@@ -689,17 +701,27 @@ def listar_contas_a_receber(request):
         'sort_dir': sort_dir,
         'conta_azul_integracao': conta_azul_integracao,
         'contas_bancarias_ca': contas_bancarias_ca,
+        'ca_periodo_dia_default': ca_periodo_dia_default,
+        'ca_data_de_default': ca_data_de_default,
+        'ca_data_ate_default': ca_data_ate_default,
     }
 
     return render(request, 'contasareceber/listar.html', context)
+
+
+def _periodo_integracao_conta_azul_post(request) -> tuple[date | None, date | None, str | None]:
+    """Dia único ou intervalo (máx. 31 dias) para baixas conciliadas no CA."""
+    from django.utils.dateparse import parse_date as django_parse_date
+
+    from dashboard.conta_azul.receber_conciliado import parse_periodo_integracao_ca
+
+    return parse_periodo_integracao_ca(request.POST)
 
 
 @login_required
 @require_POST
 def integrar_baixas_conta_azul(request):
     """Importa baixas conciliadas no Conta Azul (extrato) para títulos SF vinculados à NF."""
-    from django.utils.dateparse import parse_date as django_parse_date
-
     from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
     from dashboard.conta_azul.config import obter_ou_criar_config
     from dashboard.conta_azul.receber_conciliado import (
@@ -720,20 +742,11 @@ def integrar_baixas_conta_azul(request):
         )
         return redirect('contasareceber:crlistar')
 
-    rec_ini = django_parse_date((request.POST.get('recebimento_inicio') or '').strip())
-    rec_fim = django_parse_date((request.POST.get('recebimento_fim') or '').strip())
-    if not rec_ini or not rec_fim:
-        rec_ini = django_parse_date((request.POST.get('data_inicio') or '').strip())
-        rec_fim = django_parse_date((request.POST.get('data_fim') or '').strip())
-    if not rec_ini or not rec_fim:
-        messages.error(
-            request,
-            'Informe o período de recebimento (ou emissão) para buscar baixas no Conta Azul.',
-        )
+    rec_ini, rec_fim, erro_periodo = _periodo_integracao_conta_azul_post(request)
+    if erro_periodo:
+        messages.error(request, erro_periodo)
         return redirect('contasareceber:crlistar')
-    if rec_ini > rec_fim:
-        messages.error(request, 'Data inicial maior que a final.')
-        return redirect('contasareceber:crlistar')
+    assert rec_ini is not None and rec_fim is not None
 
     conta_banco_id = None
     raw_conta = (request.POST.get('conta_banco_ca') or '').strip()
