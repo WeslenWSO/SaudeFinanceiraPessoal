@@ -40,6 +40,10 @@
             background-color: #f0f0f0;
             font-weight: bold;
         }
+        tr.subtotal-beneficiario td {
+            background-color: #e8e8e8;
+            font-weight: bold;
+        }
         .signature {
             margin-top: 50px;
             text-align: center;
@@ -90,8 +94,8 @@
                 </tr>
             </thead>
             <tbody>
-                {% for beneficiario, items_list in secao.grouped_items.items %}
-                    {% for item in items_list %}
+                {% for grupo in secao.grupos_beneficiario %}
+                    {% for item in grupo.items %}
                 <tr>
                     <td>{{ item.faturamento.guia|default:"-" }}</td>
                     <td>{% if item.faturamento.data %}{{ item.faturamento.data|date:"d/m/Y" }}{% else %}-{% endif %}</td>
@@ -106,6 +110,11 @@
                     <td>{{ item.faturamento.anestesista|default:"-" }}</td>
                 </tr>
                     {% endfor %}
+                <tr class="subtotal-beneficiario">
+                    <td colspan="8" style="text-align: right;">TOTAL BENEFICIÁRIO — {{ grupo.nome }}:</td>
+                    <td>R$ {{ grupo.total|moeda_br }}</td>
+                    <td colspan="2"></td>
+                </tr>
                     {% if not forloop.last %}
                 <tr>
                     <td colspan="11" style="border: none; height: 10px;"></td>

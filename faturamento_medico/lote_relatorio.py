@@ -227,12 +227,21 @@ def _montar_secao_lote(lote: Lote, *, layout: str):
         resumo_publico = _montar_resumo_publico(linhas)
         grouped_rows = linhas
         grouped_items = OrderedDict()
+        grupos_beneficiario = []
     else:
         grouped_items = OrderedDict()
         for item in items:
             beneficiario = item.faturamento.nome or 'Sem Nome'
             grouped_items.setdefault(beneficiario, []).append(item)
             total_geral += item.total or Decimal('0')
+        grupos_beneficiario = [
+            {
+                'nome': nome,
+                'items': lista,
+                'total': sum((i.total or Decimal('0') for i in lista), Decimal('0')),
+            }
+            for nome, lista in grouped_items.items()
+        ]
         grouped_rows = []
         linhas = []
 
@@ -244,6 +253,7 @@ def _montar_secao_lote(lote: Lote, *, layout: str):
         'periodo_fim': periodo_fim,
         'mes_referencia': _mes_referencia_label(periodo_fim or lote.data_lote),
         'grouped_items': grouped_items,
+        'grupos_beneficiario': grupos_beneficiario,
         'linhas': grouped_rows if layout == 'publico' else linhas,
         'resumo_publico': resumo_publico,
         'total_geral': total_geral,
