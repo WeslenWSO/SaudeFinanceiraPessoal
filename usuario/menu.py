@@ -66,10 +66,6 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='faturamento_medico:dashboard_exames', permissao='faturamento_medico',
     ),
     MenuItemDef(
-        'faturamento_acerto_caixa', 'Acerto de Caixa', 'fa-cash-register', 'faturamento',
-        url_name='faturamento_medico:acerto_caixa', permissao='faturamento_medico',
-    ),
-    MenuItemDef(
         'faturamento_relatorio_sedacao', 'Relatório Sedação Anestesista', 'fa-syringe', 'faturamento',
         url_name='faturamento_medico:relatorio_sedacao_anestesista', permissao='faturamento_medico',
     ),
@@ -117,6 +113,10 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='orcamento_compra:listar',
     ),
     MenuItemDef('contas_bancarias', 'Contas Bancárias', 'fa-university', 'financeiro', url_name='extrato:conta_bancaria_list'),
+    MenuItemDef(
+        'faturamento_acerto_caixa', 'Acerto de Caixa', 'fa-cash-register', 'financeiro',
+        url_name='faturamento_medico:acerto_caixa', permissao='faturamento_medico',
+    ),
     MenuItemDef('contas_pagar', 'Contas a Pagar', 'fa-money-check-alt', 'financeiro', url_name='contasapagar:listaAPagar'),
     MenuItemDef('categorizar_pagos', 'Categorizar pagos', 'fa-tags', 'financeiro', url_name='contasapagar:categorizar_baixados'),
     MenuItemDef('contas_receber', 'Contas a Receber', 'fa-hand-holding-usd', 'financeiro', url_name='contasareceber:crlistar'),
