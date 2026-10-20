@@ -2,7 +2,6 @@
 set -o errexit
 
 python manage.py migrate --noinput
-python manage.py collectstatic --noinput
 
 python - <<'PY'
 import os
@@ -31,20 +30,6 @@ if write_err:
     print(f"[startup] MEDIA_ROOT write error: {write_err}")
 print(f"[startup] ENGINE={engine.split('.')[-1]} HOST={host}")
 print(f"[startup] auth_user count: {User.objects.count()}")
-try:
-    from faturamento_medico.services.media_storage import diagnosticar_media_storage
-    st = diagnosticar_media_storage(limite_faltando=5)
-    print(
-        f"[startup] anexos total={st.total_anexos} ok={st.anexos_ok} "
-        f"faltando={st.anexos_faltando} hint={st.disk_mount_hint}"
-    )
-    for item in st.faltando[:3]:
-        print(
-            f"[startup] anexo_faltando doc={item['documento_id']} "
-            f"fat={item['faturamento_id']}"
-        )
-except Exception as exc:
-    print(f"[startup] anexo_diagnostico erro: {exc}")
 PY
 
 python - <<'PY'
