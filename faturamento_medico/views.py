@@ -192,6 +192,13 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
     else:
         status_conferencia = []
 
+    if 'exame' in g:
+        exames = _normalizar_exames_filtro(g.getlist('exame'))
+    elif use_session_fallback:
+        exames = _normalizar_exames_filtro(sess.get('exame'))
+    else:
+        exames = []
+
     hoje = date.today()
     data_inicio = pick('data_inicio')
     data_fim = pick('data_fim')
@@ -218,6 +225,7 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
         'data_fim': data_fim,
         'convenios': convenios,
         'codigo_relatorio': pick('codigo_relatorio'),
+        'exames': exames,
     }
 
 
@@ -235,6 +243,8 @@ def _query_export_faturamento(filtros):
         params.append(('status_conferencia', st))
     for conv in filtros.get('convenios') or []:
         params.append(('convenio', conv))
+    for ex in filtros.get('exames') or []:
+        params.append(('exame', ex))
     return urlencode(params)
 
 
@@ -261,7 +271,9 @@ def _tem_filtros_na_query(request):
     for key in _FAT_LISTAGEM_FILTER_KEYS:
         if key in request.GET:
             return True
-    return 'convenio' in request.GET
+    if 'convenio' in request.GET or 'exame' in request.GET:
+        return True
+    return False
 
 
 def _filtros_dict_from_session(sess):
@@ -276,6 +288,7 @@ def _filtros_dict_from_session(sess):
         'data_fim': sess.get('data_fim') or '',
         'codigo_relatorio': sess.get('codigo_relatorio') or '',
         'convenios': [c for c in (sess.get('convenio') or []) if c],
+        'exames': _normalizar_exames_filtro(sess.get('exame')),
     }
 
 
@@ -299,6 +312,7 @@ def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
         'data_fim': filtros.get('data_fim') or '',
         'convenio': filtros.get('convenios') or [],
         'codigo_relatorio': filtros.get('codigo_relatorio') or '',
+        'exame': filtros.get('exames') or [],
         'per_page': str(per_page),
     }
     request.session.modified = True
@@ -332,6 +346,7 @@ def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
     data_fim = filtros.get('data_fim') or ''
     convenios = filtros.get('convenios') or []
     codigo_relatorio = filtros.get('codigo_relatorio') or ''
+    exames = filtros.get('exames') or []
 
     if nome:
         qs = qs.filter(Q(nome__icontains=nome))
@@ -359,6 +374,17 @@ def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
         qs = qs.filter(lote=lote)
 
     qs = qs.exclude(_q_status_agendamento_cancelados())
+
+    if exames:
+        q_ex = Q()
+        for ex in exames:
+            ex = (ex or '').strip()
+            if not ex:
+                continue
+            q_ex |= Q(itens_servico__servico__iexact=ex)
+            q_ex |= Q(itens_servico__isnull=True, servico__iexact=ex)
+        if q_ex:
+            qs = qs.filter(q_ex).distinct()
 
     if status_conferencia:
         q_status = Q()
@@ -390,6 +416,37 @@ def _parse_codigos_relatorio_filtro(valor) -> list[str]:
         return []
     tokens = re.split(r'[,;\n\r\t]+', raw)
     return list(dict.fromkeys(t.strip() for t in tokens if t.strip()))
+
+
+def _normalizar_exames_filtro(valor) -> list[str]:
+    if valor is None:
+        return []
+    if isinstance(valor, (list, tuple)):
+        out = [str(v).strip() for v in valor if v and str(v).strip()]
+        return list(dict.fromkeys(out))
+    s = str(valor).strip()
+    return [s] if s else []
+
+
+def _item_passa_filtro_exame(nome_procedimento: str, exames: list[str]) -> bool:
+    if not exames:
+        return True
+    proc = (nome_procedimento or '').strip()
+    return any(proc.lower() == ex.strip().lower() for ex in exames if ex)
+
+
+def _exames_disponiveis_empresa(empresa_id) -> list[str]:
+    if not empresa_id:
+        return []
+    from faturamento_medico.models import ItemServico
+
+    return list(
+        ItemServico.objects.filter(faturamento__empresa_id=empresa_id)
+        .exclude(Q(servico__isnull=True) | Q(servico=''))
+        .values_list('servico', flat=True)
+        .distinct()
+        .order_by('servico')[:500]
+    )
 
 
 def _aplicar_filtro_codigo_relatorio(qs, valor):
@@ -2366,6 +2423,8 @@ def listar_faturamentos(request):
     data_fim = filtros['data_fim']
     convenios = filtros['convenios']
     codigo_relatorio = filtros['codigo_relatorio']
+    exames = filtros['exames']
+    exames_disponiveis = _exames_disponiveis_empresa(empresa_id)
 
     def _label_convenio_curto(nome, max_len=36):
         n = (nome or '').strip() or 'Não informado'
@@ -2489,6 +2548,8 @@ def listar_faturamentos(request):
             )
             if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
+            if not _item_passa_filtro_exame(faturamento.servico or '', exames):
+                continue
             grid_linhas.append({
                 'faturamento': faturamento,
                 'item': None,
@@ -2519,6 +2580,8 @@ def listar_faturamentos(request):
             continue
         itens_filtrados = []
         for item in itens:
+            if not _item_passa_filtro_exame(item.servico or '', exames):
+                continue
             status_label, status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
             )
@@ -2731,14 +2794,58 @@ def listar_faturamentos(request):
             'data_fim': data_fim,
             'convenio': convenios,
             'codigo_relatorio': codigo_relatorio,
+            'exame': exames,
             'per_page': str(per_page),
         },
+        'exames_disponiveis': exames_disponiveis,
         'export_query_string': _query_export_faturamento(filtros),
         'relatorio_sedacao_query_string': _query_relatorio_sedacao(filtros),
         'listagem_query_string': _query_listagem_faturamento(filtros, per_page=per_page),
+        'ranking_exames_query_string': _query_export_faturamento(filtros),
     }
 
     return render(request, 'faturamento_medico/listar.html', context)
+
+
+@login_required
+def ranking_exames_faturamento(request):
+    """Ranking de procedimentos e valores por convênio (mesmos filtros da listagem)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa para continuar.')
+        return redirect('faturamento_medico:ftlistar')
+
+    from empresa.models import Empresa
+    from faturamento_medico.ranking_exames import montar_ranking_exames_qs
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    tem_filtros_url = _tem_filtros_na_query(request)
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
+
+    qs = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
+    qs = _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=empresa_id)
+    dados = montar_ranking_exames_qs(qs, exames_filtro=filtros.get('exames'))
+
+    def _periodo_label(di: str, df: str) -> str:
+        try:
+            a = datetime.strptime(di, '%Y-%m-%d').strftime('%d/%m/%Y') if di else '—'
+            b = datetime.strptime(df, '%Y-%m-%d').strftime('%d/%m/%Y') if df else '—'
+            return f'{a} a {b}'
+        except ValueError:
+            return f'{di or "—"} a {df or "—"}'
+
+    context = {
+        'empresa': empresa,
+        'filtros': filtros,
+        'periodo_label': _periodo_label(
+            filtros.get('data_inicio') or '',
+            filtros.get('data_fim') or '',
+        ),
+        'exames_filtro': filtros.get('exames') or [],
+        'listagem_query_string': _query_export_faturamento(filtros),
+        **dados,
+    }
+    return render(request, 'faturamento_medico/ranking_exames.html', context)
 
 
 def listar_cancelados(request):
@@ -8020,6 +8127,7 @@ def sincronizar_medcloud(request):
         )
 
         acao = (request.POST.get('acao') or 'ambos').strip()
+        escopo = (request.POST.get('escopo') or 'todos').strip()
         convenio = (request.POST.get('convenio') or '').strip() or None
 
         def _parse_data_campo(nome, padrao):
@@ -8044,9 +8152,10 @@ def sincronizar_medcloud(request):
                     data_inicio,
                     data_fim,
                     convenio_nome=convenio,
+                    escopo=escopo,
                 )
                 partes_msg.append(
-                    f'Agendas: {stats["listadas"]} listadas, '
+                    f'Agendas ({escopo}): {stats["listadas"]} listadas, '
                     f'{stats.get("importadas", stats.get("concluidas", 0))} importadas, '
                     f'{stats["criadas"]} criadas, {stats["atualizadas"]} atualizadas, '
                     f'{stats["ignoradas"]} ignoradas.'

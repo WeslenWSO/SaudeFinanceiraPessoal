@@ -21,6 +21,27 @@ STATUS_AGENDA_CONCLUIDA = frozenset({
     'WAITING_FOR_CHECKOUT',
 })
 
+# Documentação RIS: agendamentos futuros / confirmados (não concluídos).
+STATUS_AGENDADOS_API: tuple[str, ...] = (
+    'NOT_CONFIRMED',
+    'CONFIRMED',
+    'ONLINE_SCHEDULED',
+    'ONLINE_CONFIRMED',
+)
+
+STATUS_CONCLUIDOS_API: tuple[str, ...] = (
+    'CONCLUDED',
+    'WAITING_FOR_BILLING',
+    'WAITING_FOR_CHECKOUT',
+)
+
+STATUS_CANCELADOS_API: tuple[str, ...] = (
+    'CANCELED',
+    'ONLINE_CANCELED',
+    'GIVE_UP',
+    'DELETED',
+)
+
 
 class MedcloudAPIError(Exception):
     def __init__(self, message: str, status_code: int | None = None):
@@ -131,17 +152,16 @@ class MedcloudRISClient:
             raise last_error
         return []
 
-    def list_schedules_periodo(
+    def list_schedules_por_statuses(
         self,
         data_inicio: date,
         data_fim: date,
+        statuses: tuple[str, ...] | list[str],
         *,
         partner_id: int | None = None,
+        incluir_sem_filtro_status: bool = False,
     ) -> list[dict]:
-        """
-        Lista agendas do período em todos os status relevantes
-        (concluídos, cancelados, desistência, deletados, etc.).
-        """
+        """Consulta GET /schedules (path configurável) para cada status informado."""
         vistos: dict[int, dict] = {}
 
         def _merge(items: list[dict]) -> None:
@@ -157,25 +177,15 @@ class MedcloudRISClient:
                 except (TypeError, ValueError):
                     vistos[id(item)] = item
 
-        try:
-            _merge(self.list_schedules(data_inicio, data_fim, status=None, partner_id=partner_id))
-        except MedcloudAPIError:
-            pass
+        if incluir_sem_filtro_status:
+            try:
+                _merge(self.list_schedules(data_inicio, data_fim, status=None, partner_id=partner_id))
+            except MedcloudAPIError:
+                pass
+            if vistos:
+                return list(vistos.values())
 
-        if vistos:
-            return list(vistos.values())
-
-        for status in (
-            'CONCLUDED',
-            'WAITING_FOR_BILLING',
-            'WAITING_FOR_CHECKOUT',
-            'CANCELED',
-            'ONLINE_CANCELED',
-            'GIVE_UP',
-            'DELETED',
-            'IN_PROGRESS',
-            'CONFIRMED',
-        ):
+        for status in statuses:
             try:
                 _merge(self.list_schedules(
                     data_inicio, data_fim, status=status, partner_id=partner_id,
@@ -184,6 +194,46 @@ class MedcloudRISClient:
                 continue
 
         return list(vistos.values())
+
+    def list_schedules_agendadas(
+        self,
+        data_inicio: date,
+        data_fim: date,
+        *,
+        partner_id: int | None = None,
+    ) -> list[dict]:
+        """Agendas confirmadas / agendadas online (exames ainda não concluídos)."""
+        return self.list_schedules_por_statuses(
+            data_inicio,
+            data_fim,
+            STATUS_AGENDADOS_API + ('IN_PROGRESS',),
+            partner_id=partner_id,
+        )
+
+    def list_schedules_periodo(
+        self,
+        data_inicio: date,
+        data_fim: date,
+        *,
+        partner_id: int | None = None,
+    ) -> list[dict]:
+        """
+        Lista agendas do período em todos os status relevantes
+        (concluídos, cancelados, desistência, deletados, etc.).
+        """
+        todos_status = (
+            STATUS_CONCLUIDOS_API
+            + STATUS_CANCELADOS_API
+            + STATUS_AGENDADOS_API
+            + ('IN_PROGRESS',)
+        )
+        return self.list_schedules_por_statuses(
+            data_inicio,
+            data_fim,
+            todos_status,
+            partner_id=partner_id,
+            incluir_sem_filtro_status=True,
+        )
 
     def get_patient(self, patient_id: int) -> dict | None:
         key = f'patient:{patient_id}'

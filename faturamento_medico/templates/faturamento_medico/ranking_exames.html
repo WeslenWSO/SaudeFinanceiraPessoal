@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load faturamento_extras %}
+
+{% block title %}Ranking por exames{% endblock %}
+
+{% block nav_%}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h3 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Ranking por exames</h3>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir
+                </button>
+                <a href="{% url 'faturamento_medico:ftlistar' %}?{{ listagem_query_string }}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Voltar à listagem
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                <strong>{{ empresa.razao|default:empresa.nome_fantasia }}</strong>
+                · Período: {{ periodo_label }}
+                {% if exames_filtro %}
+                · Exames filtrados: {{ exames_filtro|join:", " }}
+                {% endif %}
+                · Total: <strong>{{ total_quantidade }}</strong> procedimento(s) ·
+                <strong>R$ {{ total_valor|moeda_br }}</strong>
+            </p>
+
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <h5 class="border-bottom pb-2">Ranking por exame (procedimento)</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width:3rem">#</th>
+                                    <th>Exame / procedimento</th>
+                                    <th class="text-end">Qtd</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in ranking_exames %}
+                                <tr>
+                                    <td class="text-center">{{ forloop.counter }}</td>
+                                    <td>{{ linha.exame }}</td>
+                                    <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">R$ {{ linha.valor|moeda_br }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted">Nenhum exame no período/filtros.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-lg-6 mb-4">
+                    <h5 class="border-bottom pb-2">Por convênio / parceiro</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width:3rem">#</th>
+                                    <th>Convênio / parceiro</th>
+                                    <th class="text-end">Qtd</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in ranking_convenios %}
+                                <tr>
+                                    <td class="text-center">{{ forloop.counter }}</td>
+                                    <td>{{ linha.convenio }}</td>
+                                    <td class="text-end">{{ linha.quantidade }}</td>
+                                    <td class="text-end">R$ {{ linha.valor|moeda_br }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted">Nenhum dado.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="border-bottom pb-2 mt-2">Exame × convênio (detalhe)</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Exame / procedimento</th>
+                            <th>Convênio / parceiro</th>
+                            <th class="text-end">Qtd</th>
+                            <th class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in detalhe_exame_convenio %}
+                        <tr>
+                            <td>{{ linha.exame }}</td>
+                            <td>{{ linha.convenio }}</td>
+                            <td class="text-end">{{ linha.quantidade }}</td>
+                            <td class="text-end">R$ {{ linha.valor|moeda_br }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted">Nenhum detalhe.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+@media print {
+    .btn, nav, .card-header .d-flex { display: none !important; }
+}
+</style>
+{% endblock %}

@@ -53,20 +53,36 @@ def _texto(val, max_len: int | None = None) -> str | None:
     return s
 
 
-def _nome_paciente(ris: MedcloudRISClient, schedule: dict) -> str | None:
+def _dados_paciente(ris: MedcloudRISClient, schedule: dict) -> tuple[str | None, str | None]:
+    """Retorna (nome, cpf/documento)."""
+    cpf = None
     for key in ('patientName', 'patient_name', 'nomePaciente'):
         nome = _texto(schedule.get(key), 200)
         if nome:
-            return nome
+            return nome, cpf
     patient = schedule.get('patient')
     if isinstance(patient, dict):
-        return _texto(patient.get('name') or patient.get('nome'), 200)
+        nome = _texto(patient.get('name') or patient.get('nome'), 200)
+        cpf = _texto(
+            patient.get('personalIdentification') or patient.get('cpf'),
+            20,
+        )
+        if nome:
+            return nome, cpf
     patient_id = schedule.get('patientId')
     if patient_id:
         p = ris.get_patient(int(patient_id))
         if p:
-            return _texto(p.get('name'), 200)
-    return None
+            return (
+                _texto(p.get('name'), 200),
+                _texto(p.get('personalIdentification') or p.get('cpf'), 20),
+            )
+    return None, None
+
+
+def _nome_paciente(ris: MedcloudRISClient, schedule: dict) -> str | None:
+    nome, _ = _dados_paciente(ris, schedule)
+    return nome
 
 
 def _nome_procedimento(ris: MedcloudRISClient, schedule: dict) -> str | None:
@@ -125,6 +141,9 @@ def _status_agendamento_label(schedule: dict) -> str:
         'DELETED': 'Deletado',
         'IN_PROGRESS': 'Em andamento',
         'CONFIRMED': 'Confirmado',
+        'NOT_CONFIRMED': 'Não confirmado',
+        'ONLINE_SCHEDULED': 'Agendado online',
+        'ONLINE_CONFIRMED': 'Confirmado online',
         'WAITING_FOR_BILLING': 'Aguardando faturamento',
         'WAITING_FOR_CHECKOUT': 'Aguardando checkout',
     }
@@ -161,6 +180,63 @@ def _enriquecer_agenda(ris: MedcloudRISClient, schedule: dict) -> dict:
     return schedule
 
 
+def _listar_agendas_ris(
+    ris: MedcloudRISClient,
+    data_inicio: date,
+    data_fim: date,
+    *,
+    escopo: str,
+    partner_id: int | None,
+) -> list[dict]:
+    escopo = (escopo or 'todos').strip().lower()
+    if escopo == 'agendados':
+        return ris.list_schedules_agendadas(data_inicio, data_fim, partner_id=partner_id)
+    if escopo == 'concluidos':
+        from .client import STATUS_CONCLUIDOS_API
+
+        return ris.list_schedules_por_statuses(
+            data_inicio, data_fim, STATUS_CONCLUIDOS_API, partner_id=partner_id,
+        )
+    return ris.list_schedules_periodo(data_inicio, data_fim, partner_id=partner_id)
+
+
+def _atualizar_item_servico_agenda(
+    faturamento: FaturamentoMedico,
+    *,
+    procedimento: str,
+    valor: Decimal,
+    modalidade: str | None,
+) -> None:
+    item = faturamento.itens_servico.order_by('id').first()
+    if not item:
+        ItemServico.objects.create(
+            faturamento=faturamento,
+            codigo_servico='',
+            servico=procedimento,
+            modalidade=modalidade or '',
+            porte='',
+            qt=1,
+            valor=valor,
+            total=valor,
+        )
+        faturamento.atualizar_total()
+        return
+    alterou = False
+    if procedimento and item.servico != procedimento:
+        item.servico = procedimento
+        alterou = True
+    if valor > 0 and item.valor != valor:
+        item.valor = valor
+        item.total = valor
+        alterou = True
+    if modalidade and item.modalidade != modalidade:
+        item.modalidade = modalidade
+        alterou = True
+    if alterou:
+        item.save()
+        faturamento.atualizar_total()
+
+
 def sincronizar_agendas_concluidas(
     empresa,
     data_inicio: date,
@@ -168,11 +244,12 @@ def sincronizar_agendas_concluidas(
     *,
     convenio_nome: str | None = None,
     partner_id: int | None = None,
+    escopo: str = 'todos',
     dry_run: bool = False,
 ) -> dict:
     """
-    Importa agendas do MedCloud RIS para FaturamentoMedico (todos os status e convênios).
-    Cancelados, desistências e deletados entram com status_agendamento correspondente.
+    Importa agendas do MedCloud RIS para FaturamentoMedico.
+    escopo: agendados | concluidos | todos (padrão).
     """
     creds = credenciais_da_empresa(empresa)
     if not creds:
@@ -207,9 +284,11 @@ def sincronizar_agendas_concluidas(
     }
 
     try:
-        agendas = ris.list_schedules_periodo(
+        agendas = _listar_agendas_ris(
+            ris,
             data_inicio,
             data_fim,
+            escopo=escopo,
             partner_id=filtro_partner_id,
         )
     except MedcloudAPIError:
@@ -231,8 +310,10 @@ def sincronizar_agendas_concluidas(
 
             stats['importadas'] += 1
             schedule_id = schedule.get('id') or schedule.get('scheduleId')
-            nome = _nome_paciente(ris, schedule) or 'Sem nome'
+            nome, cpf = _dados_paciente(ris, schedule)
+            nome = nome or 'Sem nome'
             procedimento = _nome_procedimento(ris, schedule) or 'Procedimento MedCloud'
+            modalidade = _texto(schedule.get('modality'), 20)
             convenio = _nome_convenio(ris, schedule, partner_map) or convenio_nome or 'Particular'
 
             if convenio_nome and convenio.lower() != convenio_nome.lower():
@@ -274,6 +355,7 @@ def sincronizar_agendas_concluidas(
                     'nome_associado': nome,
                     'data': data_fat,
                     'convenio': convenio,
+                    'cpf': cpf,
                     'horario': horario or None,
                     'horario_inicio': start_time,
                     'horario_fim': end_time,
@@ -291,6 +373,12 @@ def sincronizar_agendas_concluidas(
                     existente.save()
                     stats['atualizadas'] += 1
                     faturamento = existente
+                    _atualizar_item_servico_agenda(
+                        faturamento,
+                        procedimento=procedimento,
+                        valor=valor,
+                        modalidade=modalidade,
+                    )
                 else:
                     faturamento = FaturamentoMedico.objects.create(
                         empresa=empresa,
@@ -301,7 +389,7 @@ def sincronizar_agendas_concluidas(
                         faturamento=faturamento,
                         codigo_servico='',
                         servico=procedimento,
-                        modalidade=_texto(schedule.get('modality'), 20),
+                        modalidade=modalidade or '',
                         porte='',
                         qt=1,
                         valor=valor,
@@ -311,7 +399,8 @@ def sincronizar_agendas_concluidas(
                     stats['criadas'] += 1
 
                 busca_laudo = (
-                    accession
+                    (escopo or 'todos').lower() != 'agendados'
+                    and accession
                     and creds.his_api_key
                     and not faturamento.link_laudo
                     and (

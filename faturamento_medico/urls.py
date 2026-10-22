@@ -42,6 +42,7 @@ urlpatterns = [
         views.exportar_lancamentos_solicitante_excel,
         name='exportar_lancamentos_solicitante_excel',
     ),
+    path('ranking-exames/', views.ranking_exames_faturamento, name='ranking_exames'),
     path('dashboard-exames/', views.dashboard_exames, name='dashboard_exames'),
     path('dashboard-exames/diario/', views.dashboard_exames_diario, name='dashboard_exames_diario'),
     path(

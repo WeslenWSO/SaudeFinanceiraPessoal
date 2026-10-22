@@ -41,6 +41,19 @@
                         </div>
 
                         <div class="form-group mb-3">
+                            <label for="escopo">Exames a buscar no RIS</label>
+                            <select class="form-control" id="escopo" name="escopo">
+                                <option value="agendados" selected>Agendados (confirmados / online — ainda não concluídos)</option>
+                                <option value="todos">Todos os status (agendados + concluídos + cancelados…)</option>
+                                <option value="concluidos">Somente concluídos / aguardando faturamento</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Usa a listagem <code>GET /schedules</code> da API RIS (path configurável no admin MedCloud).
+                                Cada agenda vira um registro no faturamento médico (paciente, procedimento, convênio, horário).
+                            </small>
+                        </div>
+
+                        <div class="form-group mb-3">
                             <label for="convenio">Convênio (opcional)</label>
                             <select class="form-control" id="convenio" name="convenio">
                                 <option value="">Todos / conforme configuração</option>
@@ -49,17 +62,16 @@
                                 {% endfor %}
                             </select>
                             <small class="form-text text-muted">
-                                Agendas: importa concluídos, cancelados, desistência e deletados, de todos os convênios.
-                                Laudos: apenas convênios com “exige laudo” no admin (inicialmente GEAP).
+                                Laudos (HIS): apenas convênios com “exige laudo” no admin (ex.: GEAP).
                             </small>
                         </div>
 
                         <div class="form-group mb-3">
                             <label for="acao">Ação</label>
                             <select class="form-control" id="acao" name="acao">
-                                <option value="ambos">Agendas (todos os status) + laudos (convênios marcados)</option>
-                                <option value="agendas">Somente agendas — todos convênios e status</option>
-                                <option value="laudos">Somente links de laudo (convênios com “exige laudo”, ex.: GEAP)</option>
+                                <option value="agendas" selected>Somente importar agendas → faturamento médico</option>
+                                <option value="ambos">Agendas + buscar links de laudo (convênios marcados)</option>
+                                <option value="laudos">Somente links de laudo (HIS)</option>
                             </select>
                         </div>
 

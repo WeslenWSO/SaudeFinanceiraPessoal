@@ -94,6 +94,10 @@
                         <a href="{% url 'faturamento_medico:fechamento_repasse' %}" class="btn btn-warning btn-sm">
                             <i class="fas fa-calendar-check"></i> Fechamento Repasse
                         </a>
+                        <a href="{% url 'faturamento_medico:ranking_exames' %}?{{ ranking_exames_query_string }}"
+                           class="btn btn-outline-info btn-sm" title="Ranking de exames e valores no período filtrado">
+                            <i class="fas fa-chart-bar"></i> Ranking por exames
+                        </a>
                         <a href="{% url 'faturamento_medico:exportar_excel' %}?{{ export_query_string }}" class="btn btn-success btn-sm">
                             <i class="fas fa-file-excel"></i> Exportar Excel
                         </a>
@@ -138,12 +142,21 @@
                                 <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
                             </div>
                             <div class="col-md-2">
-                                <select name="convenio" class="form-control" multiple>
+                                <select name="convenio" class="form-control" multiple title="Ctrl+clique para vários convênios">
                                     <option value="">Todos os Convênios</option>
                                     {% for convenio in convenios_disponiveis %}
                                         <option value="{{ convenio.nome }}" {% if convenio.nome in filtros.convenio %}selected{% endif %}>{{ convenio.nome }}</option>
                                     {% endfor %}
                                 </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select name="exame" class="form-control" multiple size="3"
+                                        title="Ctrl+clique para filtrar um ou mais tipos de exame">
+                                    {% for nome_ex in exames_disponiveis %}
+                                        <option value="{{ nome_ex }}" {% if nome_ex in filtros.exame %}selected{% endif %}>{{ nome_ex }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Exames (vários)</small>
                             </div>
                         </div>
                         <div class="row mt-2">
