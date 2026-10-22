@@ -149,15 +149,6 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <select name="exame" class="form-control" multiple size="3"
-                                        title="Ctrl+clique para filtrar um ou mais tipos de exame">
-                                    {% for nome_ex in exames_disponiveis %}
-                                        <option value="{{ nome_ex }}" {% if nome_ex in filtros.exame %}selected{% endif %}>{{ nome_ex }}</option>
-                                    {% endfor %}
-                                </select>
-                                <small class="text-muted">Exames (vários)</small>
-                            </div>
                         </div>
                         <div class="row mt-2">
                             <div class="col-md-2">
@@ -269,6 +260,7 @@
                                         <th class="grid-ris-th" data-col="modalidade">MODALIDADE</th>
                                         <th class="grid-ris-th" data-col="contraste">CONTRASTE</th>
                                         <th class="grid-ris-th" data-col="valor">VALOR</th>
+                                        <th class="grid-ris-th" data-col="valor_pago">VALOR PAGO</th>
                                         <th class="grid-ris-th-conf" data-col="conferencia">CONFERENCIA</th>
                                         <th class="grid-ris-th" data-col="status_conferencia">STATUS CONFERENCIA</th>
                                         <th class="grid-ris-th" data-col="convenio">CONVÊNIO</th>
@@ -311,6 +303,9 @@
                                             {% endif %}
                                         </td>
                                         <td class="text-end" data-col="valor">R$ {{ linha.valor_fmt }}</td>
+                                        <td class="text-end" data-col="valor_pago">
+                                            {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
+                                        </td>
                                         <td class="text-center" data-col="conferencia">
                                             {% if linha.item %}
                                             <input type="checkbox"
@@ -995,7 +990,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var LOCKED = { sel: true, acoes: true };
         var COLS = [
             'sel', 'data', 'paciente', 'nome_associado', 'guia', 'codigo_procedimento', 'procedimento',
-            'modalidade', 'contraste', 'valor', 'conferencia', 'status_conferencia',
+            'modalidade', 'contraste', 'valor', 'valor_pago', 'conferencia', 'status_conferencia',
             'convenio', 'anestesista', 'nf_pagamento', 'acoes'
         ];
         var LABELS = {
@@ -1009,6 +1004,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modalidade: 'Modalidade',
             contraste: 'Contraste',
             valor: 'Valor',
+            valor_pago: 'Valor pago',
             conferencia: 'Conferência',
             status_conferencia: 'Status conferência',
             convenio: 'Convênio',

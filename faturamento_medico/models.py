@@ -374,6 +374,14 @@ class ItemServico(models.Model):
         decimal_places=2,
         default=0,
     )
+    valor_pago = models.DecimalField(
+        verbose_name='Valor pago',
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Valor pago pelo paciente/convênio (coluna Valor pago do RIS).',
+    )
     percentual = models.DecimalField(
         verbose_name='Percentual',
         max_digits=5,

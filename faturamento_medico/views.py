@@ -243,8 +243,26 @@ def _query_export_faturamento(filtros):
         params.append(('status_conferencia', st))
     for conv in filtros.get('convenios') or []:
         params.append(('convenio', conv))
-    for ex in filtros.get('exames') or []:
-        params.append(('exame', ex))
+    return urlencode(params)
+
+
+def _query_ranking_exames(filtros, *, incluir_exames: bool = True):
+    """Query string para ranking (período/convênio; exames só na tela de ranking)."""
+    params = []
+    for key in (
+        'nome', 'guia', 'anestesista', 'status', 'lote',
+        'data_inicio', 'data_fim', 'codigo_relatorio',
+    ):
+        val = filtros.get(key)
+        if val:
+            params.append((key, val))
+    for st in _normalizar_status_conferencia_filtro(filtros.get('status_conferencia')):
+        params.append(('status_conferencia', st))
+    for conv in filtros.get('convenios') or []:
+        params.append(('convenio', conv))
+    if incluir_exames:
+        for ex in filtros.get('exames') or []:
+            params.append(('exame', ex))
     return urlencode(params)
 
 
@@ -271,9 +289,18 @@ def _tem_filtros_na_query(request):
     for key in _FAT_LISTAGEM_FILTER_KEYS:
         if key in request.GET:
             return True
-    if 'convenio' in request.GET or 'exame' in request.GET:
+    if 'convenio' in request.GET:
         return True
     return False
+
+
+def _tem_filtros_ranking_na_query(request):
+    if request.GET.get('limpar'):
+        return False
+    for key in _FAT_LISTAGEM_FILTER_KEYS:
+        if key in request.GET:
+            return True
+    return 'convenio' in request.GET or 'exame' in request.GET
 
 
 def _filtros_dict_from_session(sess):
@@ -288,7 +315,7 @@ def _filtros_dict_from_session(sess):
         'data_fim': sess.get('data_fim') or '',
         'codigo_relatorio': sess.get('codigo_relatorio') or '',
         'convenios': [c for c in (sess.get('convenio') or []) if c],
-        'exames': _normalizar_exames_filtro(sess.get('exame')),
+        'exames': [],
     }
 
 
@@ -312,7 +339,6 @@ def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
         'data_fim': filtros.get('data_fim') or '',
         'convenio': filtros.get('convenios') or [],
         'codigo_relatorio': filtros.get('codigo_relatorio') or '',
-        'exame': filtros.get('exames') or [],
         'per_page': str(per_page),
     }
     request.session.modified = True
@@ -334,7 +360,7 @@ def _redirect_ftlistar_com_filtros_sessao(request):
     return redirect(_url_ftlistar_com_filtros_sessao(request))
 
 
-def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
+def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None, *, aplicar_exames: bool = False):
     """Aplica os mesmos filtros da listagem ao queryset de faturamentos."""
     nome = filtros.get('nome') or ''
     guia = filtros.get('guia') or ''
@@ -375,7 +401,7 @@ def _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=None):
 
     qs = qs.exclude(_q_status_agendamento_cancelados())
 
-    if exames:
+    if aplicar_exames and exames:
         q_ex = Q()
         for ex in exames:
             ex = (ex or '').strip()
@@ -2423,8 +2449,6 @@ def listar_faturamentos(request):
     data_fim = filtros['data_fim']
     convenios = filtros['convenios']
     codigo_relatorio = filtros['codigo_relatorio']
-    exames = filtros['exames']
-    exames_disponiveis = _exames_disponiveis_empresa(empresa_id)
 
     def _label_convenio_curto(nome, max_len=36):
         n = (nome or '').strip() or 'Não informado'
@@ -2548,8 +2572,6 @@ def listar_faturamentos(request):
             )
             if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
-            if not _item_passa_filtro_exame(faturamento.servico or '', exames):
-                continue
             grid_linhas.append({
                 'faturamento': faturamento,
                 'item': None,
@@ -2580,8 +2602,6 @@ def listar_faturamentos(request):
             continue
         itens_filtrados = []
         for item in itens:
-            if not _item_passa_filtro_exame(item.servico or '', exames):
-                continue
             status_label, status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
             )
@@ -2590,6 +2610,7 @@ def listar_faturamentos(request):
             itens_filtrados.append((item, status_label, status_css))
         for idx, (item, status_label, status_css) in enumerate(itens_filtrados):
             valor_item = item.total if item.total is not None else (item.valor or 0)
+            valor_pago_item = _valor_pago_item_grid(item, valor_item)
             grid_linhas.append({
                 'faturamento': faturamento,
                 'item': item,
@@ -2600,6 +2621,9 @@ def listar_faturamentos(request):
                 'com_contraste': item.com_contraste,
                 'valor': valor_item,
                 'valor_fmt': _moeda_br(valor_item),
+                'valor_pago': valor_pago_item,
+                'valor_pago_fmt': _moeda_br(valor_pago_item) if valor_pago_item is not None else '',
+                'valor_pago_exibir': valor_pago_item is not None,
                 'conferido': item.conferido,
                 'status_conferencia': status_label,
                 'status_conferencia_css': status_css,
@@ -2794,14 +2818,12 @@ def listar_faturamentos(request):
             'data_fim': data_fim,
             'convenio': convenios,
             'codigo_relatorio': codigo_relatorio,
-            'exame': exames,
             'per_page': str(per_page),
         },
-        'exames_disponiveis': exames_disponiveis,
         'export_query_string': _query_export_faturamento(filtros),
         'relatorio_sedacao_query_string': _query_relatorio_sedacao(filtros),
         'listagem_query_string': _query_listagem_faturamento(filtros, per_page=per_page),
-        'ranking_exames_query_string': _query_export_faturamento(filtros),
+        'ranking_exames_query_string': _query_ranking_exames(filtros, incluir_exames=False),
     }
 
     return render(request, 'faturamento_medico/listar.html', context)
@@ -2819,11 +2841,55 @@ def ranking_exames_faturamento(request):
     from faturamento_medico.ranking_exames import montar_ranking_exames_qs
 
     empresa = get_object_or_404(Empresa, pk=empresa_id)
-    tem_filtros_url = _tem_filtros_na_query(request)
-    filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
+    if request.GET.get('limpar'):
+        request.session.pop('faturamento_ranking_exames', None)
+        request.session.modified = True
+        return redirect('faturamento_medico:ranking_exames')
+
+    tem_filtros_url = _tem_filtros_ranking_na_query(request)
+    if not tem_filtros_url:
+        sess_list = request.session.get('faturamento_filters') or {}
+        sess_rank = request.session.get('faturamento_ranking_exames') or {}
+        if sess_list or sess_rank:
+            merged = {**sess_list, **sess_rank}
+            qs_redirect = _query_ranking_exames(
+                {
+                    'nome': merged.get('nome') or '',
+                    'guia': merged.get('guia') or '',
+                    'anestesista': merged.get('anestesista') or '',
+                    'status': merged.get('status') or '',
+                    'status_conferencia': merged.get('status_conferencia') or [],
+                    'lote': merged.get('lote') or '',
+                    'data_inicio': merged.get('data_inicio') or '',
+                    'data_fim': merged.get('data_fim') or '',
+                    'codigo_relatorio': merged.get('codigo_relatorio') or '',
+                    'convenios': merged.get('convenio') or merged.get('convenios') or [],
+                    'exames': merged.get('exame') or merged.get('exames') or [],
+                },
+                incluir_exames=True,
+            )
+            url = reverse('faturamento_medico:ranking_exames')
+            return redirect(f'{url}?{qs_redirect}' if qs_redirect else url)
+
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=False)
+    if tem_filtros_url:
+        request.session['faturamento_ranking_exames'] = {
+            'exame': filtros.get('exames') or [],
+            'data_inicio': filtros.get('data_inicio') or '',
+            'data_fim': filtros.get('data_fim') or '',
+            'convenio': filtros.get('convenios') or [],
+        }
+        request.session.modified = True
+
+    from servicos_medicos.models import Convenio
+
+    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
+    exames_disponiveis = _exames_disponiveis_empresa(empresa_id)
 
     qs = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
-    qs = _aplicar_filtros_faturamento_qs(qs, filtros, empresa_id=empresa_id)
+    qs = _aplicar_filtros_faturamento_qs(
+        qs, filtros, empresa_id=empresa_id, aplicar_exames=True,
+    )
     dados = montar_ranking_exames_qs(qs, exames_filtro=filtros.get('exames'))
 
     def _periodo_label(di: str, df: str) -> str:
@@ -2842,7 +2908,10 @@ def ranking_exames_faturamento(request):
             filtros.get('data_fim') or '',
         ),
         'exames_filtro': filtros.get('exames') or [],
+        'convenios_disponiveis': convenios_disponiveis,
+        'exames_disponiveis': exames_disponiveis,
         'listagem_query_string': _query_export_faturamento(filtros),
+        'ranking_query_string': _query_ranking_exames(filtros, incluir_exames=True),
         **dados,
     }
     return render(request, 'faturamento_medico/ranking_exames.html', context)
@@ -3767,6 +3836,22 @@ def exportar_resumo_mes_solicitante_excel(request):
         filename=nome_arquivo,
     )
     return response
+
+
+def _valor_pago_item_grid(item, valor_tabela) -> Decimal | None:
+    """Valor pago na grade: campo RIS ou bruto − desconto quando não informado."""
+    if item is None:
+        return None
+    vp = getattr(item, 'valor_pago', None)
+    if vp is not None and vp > 0:
+        return vp
+    desconto = item.valor_desconto or Decimal('0')
+    if desconto > 0:
+        base = item.total if item.total is not None else item.valor
+        if base is not None:
+            calc = Decimal(str(base)) - Decimal(str(desconto))
+            return calc if calc > 0 else None
+    return None
 
 
 def _valor_desconto_linha(linha):

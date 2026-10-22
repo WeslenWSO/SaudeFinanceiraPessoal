@@ -22,6 +22,48 @@
             </div>
         </div>
         <div class="card-body">
+            <form method="get" class="card bg-light border mb-4">
+                <div class="card-body py-3">
+                    <h6 class="card-subtitle mb-3 text-muted">Filtros do ranking</h6>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0" for="rank_data_inicio">Data inicial</label>
+                            <input type="date" class="form-control form-control-sm" id="rank_data_inicio"
+                                   name="data_inicio" value="{{ filtros.data_inicio }}" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0" for="rank_data_fim">Data final</label>
+                            <input type="date" class="form-control form-control-sm" id="rank_data_fim"
+                                   name="data_fim" value="{{ filtros.data_fim }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-0" for="rank_convenio">Convênio (opcional)</label>
+                            <select name="convenio" id="rank_convenio" class="form-control form-control-sm" multiple
+                                    title="Ctrl+clique para vários">
+                                {% for c in convenios_disponiveis %}
+                                <option value="{{ c.nome }}" {% if c.nome in filtros.convenios %}selected{% endif %}>{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-0" for="rank_exame">Exames (vários)</label>
+                            <select name="exame" id="rank_exame" class="form-control form-control-sm" multiple size="6"
+                                    title="Ctrl+clique — deixe vazio para todos os exames do período">
+                                {% for nome_ex in exames_disponiveis %}
+                                <option value="{{ nome_ex }}" {% if nome_ex in exames_filtro %}selected{% endif %}>{{ nome_ex }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-auto d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-search"></i> Atualizar ranking
+                            </button>
+                            <a href="{% url 'faturamento_medico:ranking_exames' %}?limpar=1" class="btn btn-outline-secondary btn-sm">Limpar exames</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
             <p class="text-muted small mb-3">
                 <strong>{{ empresa.razao|default:empresa.nome_fantasia }}</strong>
                 · Período: {{ periodo_label }}
@@ -119,7 +161,7 @@
 </div>
 <style>
 @media print {
-    .btn, nav, .card-header .d-flex { display: none !important; }
+    .btn, nav, .card-header .d-flex, form.card { display: none !important; }
 }
 </style>
 {% endblock %}
