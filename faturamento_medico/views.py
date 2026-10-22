@@ -181,7 +181,7 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
     if 'convenio' in g:
         convenios = [c.strip() for c in g.getlist('convenio') if c and str(c).strip()]
     elif use_session_fallback:
-        convenios = [c for c in (sess.get('convenio') or []) if c and str(c).strip()]
+        convenios = _convenios_from_sess(sess.get('convenio'))
     else:
         convenios = []
 
@@ -303,6 +303,33 @@ def _tem_filtros_ranking_na_query(request):
     return 'convenio' in request.GET or 'exame' in request.GET
 
 
+def _convenios_from_sess(raw) -> list[str]:
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        s = raw.strip()
+        return [s] if s else []
+    if isinstance(raw, (list, tuple)):
+        return [str(c).strip() for c in raw if c and str(c).strip()]
+    return []
+
+
+def _sanear_sessao_filtros_faturamento(request) -> None:
+    """Remove chaves legadas da sessão (ex.: exame na listagem, convenio como string)."""
+    sess = request.session.get('faturamento_filters')
+    if not sess or not isinstance(sess, dict):
+        return
+    changed = False
+    if sess.pop('exame', None) is not None:
+        changed = True
+    conv = sess.get('convenio')
+    if isinstance(conv, str):
+        sess['convenio'] = _convenios_from_sess(conv)
+        changed = True
+    if changed:
+        request.session.modified = True
+
+
 def _filtros_dict_from_session(sess):
     return {
         'nome': sess.get('nome') or '',
@@ -314,7 +341,7 @@ def _filtros_dict_from_session(sess):
         'data_inicio': sess.get('data_inicio') or '',
         'data_fim': sess.get('data_fim') or '',
         'codigo_relatorio': sess.get('codigo_relatorio') or '',
-        'convenios': [c for c in (sess.get('convenio') or []) if c],
+        'convenios': _convenios_from_sess(sess.get('convenio')),
         'exames': [],
     }
 
@@ -2422,8 +2449,18 @@ def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
     if request.GET.get('limpar'):
         request.session.pop('faturamento_filters', None)
+        request.session.pop('faturamento_ranking_exames', None)
         request.session.modified = True
         return redirect('faturamento_medico:ftlistar')
+
+    _sanear_sessao_filtros_faturamento(request)
+
+    # Filtro por exame saiu da listagem — URL antiga vai para o ranking
+    if request.GET.getlist('exame'):
+        filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
+        qs = _query_ranking_exames(filtros, incluir_exames=True)
+        url = reverse('faturamento_medico:ranking_exames')
+        return redirect(f'{url}?{qs}' if qs else url)
 
     tem_filtros_url = _tem_filtros_na_query(request)
     if not tem_filtros_url:
