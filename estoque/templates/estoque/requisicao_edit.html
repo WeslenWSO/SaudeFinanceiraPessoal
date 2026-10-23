@@ -4,17 +4,39 @@
 <div class="container-fluid px-4 py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h4 mb-0">{{ descricao }}</h1>
-    <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-secondary btn-sm">← Lista</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'estoque:requisicao_nova' %}" class="btn btn-primary btn-sm">Nova requisição</a>
+      <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-secondary btn-sm">← Lista</a>
+    </div>
   </div>
 
   {% include 'parcial/_messages.html' %}
 
   {% if requisicao and not pode_editar %}
-  <p class="mb-3">
-    Status: <strong>{{ requisicao.get_status_display }}</strong>
+  <div class="alert {% if requisicao.status == 'cancelada' %}alert-secondary{% else %}alert-info{% endif %} mb-3">
+    <strong>Status: {{ requisicao.get_status_display }}</strong>
     {% if requisicao.setor_destino %} · Setor: {{ requisicao.get_setor_destino_display }}
     {% elif requisicao.tipo == 'baixa_setor' %} · Setor: {{ requisicao.get_setor_origem_display }}{% endif %}
-  </p>
+    <p class="mb-0 mt-2 small">
+      {% if requisicao.status == 'cancelada' %}
+        Requisição cancelada — não dá para incluir produtos nem editar o cabeçalho.
+        {% if pode_reabrir %}Use <strong>Reabrir rascunho</strong> abaixo para continuar esta requisição.{% else %}
+        Crie uma <a href="{% url 'estoque:requisicao_nova' %}">nova requisição</a>.
+        {% endif %}
+      {% elif requisicao.status == 'concluida' %}
+        Requisição concluída — estoque já foi movimentado. Para nova saída/transferência, abra uma nova requisição.
+      {% else %}
+        Esta requisição não está em rascunho.
+      {% endif %}
+    </p>
+    {% if pode_reabrir %}
+    <form method="post" class="mt-2">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="reabrir">
+      <button type="submit" class="btn btn-warning btn-sm">Reabrir rascunho</button>
+    </form>
+    {% endif %}
+  </div>
   {% endif %}
 
   <div class="card shadow-sm mb-4">
@@ -143,7 +165,15 @@
             {% empty %}
             <tr>
               <td colspan="{% if requisicao and pode_editar %}4{% else %}3{% endif %}" class="text-center text-muted py-4">
-                {% if requisicao %}Nenhum produto na grade. Use o formulário acima para incluir.{% else %}A grade será preenchida após o passo 1.{% endif %}
+                {% if not requisicao %}
+                  A grade será preenchida após o passo 1.
+                {% elif pode_editar %}
+                  Nenhum produto na grade. Selecione produto e quantidade acima e clique em «Incluir na grade».
+                {% elif requisicao.status == 'cancelada' %}
+                  Sem produtos — requisição cancelada antes de incluir itens.
+                {% else %}
+                  Nenhum produto registrado nesta requisição.
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

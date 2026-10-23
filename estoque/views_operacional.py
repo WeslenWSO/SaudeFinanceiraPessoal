@@ -200,6 +200,11 @@ def _contexto_requisicao_tela(
         'produtos': produtos,
         'descricao': descricao,
         'pode_editar': not requisicao or requisicao.status == RequisicaoEstoque.Status.RASCUNHO,
+        'pode_reabrir': bool(
+            requisicao
+            and requisicao.status == RequisicaoEstoque.Status.CANCELADA
+            and not requisicao.movimentos.exists()
+        ),
     }
 
 
@@ -270,6 +275,17 @@ def requisicao_edit(request, pk: int | None):
         if not requisicao:
             return redirect('estoque:requisicao_nova')
 
+        if acao == 'reabrir':
+            if requisicao.status != RequisicaoEstoque.Status.CANCELADA:
+                messages.error(request, 'Só é possível reabrir requisição cancelada.')
+            elif requisicao.movimentos.exists():
+                messages.error(request, 'Esta requisição já movimentou estoque; crie uma nova.')
+            else:
+                requisicao.status = RequisicaoEstoque.Status.RASCUNHO
+                requisicao.save(update_fields=['status'])
+                messages.success(request, 'Requisição reaberta. Inclua os produtos e conclua quando pronto.')
+            return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+
         if requisicao.status != RequisicaoEstoque.Status.RASCUNHO:
             messages.error(request, 'Requisição não está em rascunho.')
             return redirect('estoque:requisicao_detail', pk=requisicao.pk)
@@ -315,7 +331,7 @@ def requisicao_edit(request, pk: int | None):
         elif acao == 'cancelar':
             requisicao.status = RequisicaoEstoque.Status.CANCELADA
             requisicao.save(update_fields=['status'])
-            messages.info(request, 'Requisição cancelada.')
+            messages.info(request, 'Requisição cancelada. Você pode reabrir como rascunho se ainda não concluiu.')
 
         return redirect('estoque:requisicao_detail', pk=requisicao.pk)
 
