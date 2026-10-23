@@ -15,6 +15,7 @@ from openpyxl.styles import Font, PatternFill
 from io import BytesIO
 from decimal import Decimal, InvalidOperation
 import uuid
+import time
 import logging
 import json
 import os
@@ -2521,13 +2522,15 @@ def listar_faturamentos(request):
     lotes_disponiveis = []
     lotes_filtro = []
     if empresa_id:
-        lotes_disponiveis = [
-            lote for lote in Lote.objects.filter(empresa_id=empresa_id, baixado=False)
+        # Evita N+1 de aberto_para_adicionar() (2 queries por lote) na abertura da listagem
+        lotes_disponiveis = list(
+            Lote.objects.filter(empresa_id=empresa_id, baixado=False)
             .prefetch_related('linhas_extrato_pagamento')
-            .order_by('-id')
-            if lote.aberto_para_adicionar()
-        ]
-        lotes_filtro = list(Lote.objects.filter(empresa_id=empresa_id).order_by('-id'))
+            .order_by('-id')[:80]
+        )
+        lotes_filtro = list(
+            Lote.objects.filter(empresa_id=empresa_id).order_by('-id')[:250]
+        )
         # Inclui valores de lote vindos da importação RIS (texto livre)
         ids_lote = {str(l.id) for l in lotes_filtro}
         lotes_extras = (
@@ -2546,7 +2549,17 @@ def listar_faturamentos(request):
                 })())
 
     # Grid pós-filtragem (modelo RIS): uma linha por procedimento
-    faturamentos = faturamentos.prefetch_related('itens_servico', 'documentos_anexados')
+    _t_listar = time.perf_counter()
+
+    faturamentos = list(
+        faturamentos.prefetch_related('itens_servico', 'documentos_anexados')
+    )
+    logger.info(
+        'ftlistar empresa=%s faturamentos=%s elapsed=%.2fs (apos queryset)',
+        empresa_id,
+        len(faturamentos),
+        time.perf_counter() - _t_listar,
+    )
     grid_linhas = []
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     nf_cache: dict[int, dict] = {}
@@ -2557,7 +2570,16 @@ def listar_faturamentos(request):
         di_nf = _parse_data_filtro(data_inicio)
         df_nf = _parse_data_filtro(data_fim)
         if di_nf and df_nf:
-            notas_por_data = carregar_notas_por_data(empresa_id, di_nf, df_nf)
+            try:
+                notas_por_data = carregar_notas_por_data(empresa_id, di_nf, df_nf)
+            except Exception:
+                logger.exception(
+                    'ftlistar carregar_notas_por_data falhou empresa=%s %s..%s',
+                    empresa_id,
+                    di_nf,
+                    df_nf,
+                )
+                notas_por_data = {}
 
     # Cache de preços da tabela por empresa/convênio (código e descrição)
     precos_por_codigo = set()
@@ -2677,6 +2699,13 @@ def listar_faturamentos(request):
                     faturamento, notas_por_data, empresa_id, nf_cache, mostrar_celula=(idx == 0),
                 ),
             })
+
+    logger.info(
+        'ftlistar empresa=%s grid_linhas=%s elapsed=%.2fs (apos montar grade)',
+        empresa_id,
+        len(grid_linhas),
+        time.perf_counter() - _t_listar,
+    )
 
     # Resumo por modalidade (conforme filtros / grid de procedimentos)
     MODALIDADES_RESUMO = [
