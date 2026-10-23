@@ -16,7 +16,7 @@
           <td>{{ r.pk }}</td>
           <td>{{ r.get_tipo_display }}</td>
           <td>{{ r.get_status_display }}</td>
-          <td>{{ r.get_setor_destino_display|default:r.get_setor_consumo_display }}</td>
+          <td>{{ r.get_setor_destino_display|default:r.get_setor_origem_display }}</td>
           <td>{{ r.criado_em|date:"d/m/Y" }} — {{ r.criado_por }}</td>
           <td><a href="{% url 'estoque:requisicao_detail' r.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a></td>
         </tr>

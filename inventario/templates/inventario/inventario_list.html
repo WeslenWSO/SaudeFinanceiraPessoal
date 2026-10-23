@@ -4,10 +4,16 @@
 <div class="container-fluid px-4 py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h4 mb-0">{{ descricao }}</h1>
-    <a href="{% url 'inventario:inventario_create' %}" class="btn btn-primary btn-sm">
-      <i class="fas fa-plus me-1"></i> Novo inventário
-    </a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'estoque:farmacia_list' %}" class="btn btn-outline-secondary btn-sm">← Estoque farmácia</a>
+      <a href="{% url 'inventario:inventario_create' %}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus me-1"></i> Novo inventário
+      </a>
+    </div>
   </div>
+  <p class="small text-muted mb-3">
+    Contagem física da <strong>farmácia</strong> (quantidade em sistema). Ao aplicar, o saldo é ajustado e registrado no histórico de movimentos. Somente administradores.
+  </p>
 
   {% include 'parcial/_messages.html' %}
 

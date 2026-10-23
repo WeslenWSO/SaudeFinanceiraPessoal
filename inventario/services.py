@@ -57,10 +57,6 @@ def salvar_responsaveis(
 
 
 def usuario_pode_contar(inventario: Inventario, usuario: User, rodada: int) -> bool:
-    if usuario.is_superuser:
-        return True
-    return InventarioResponsavelContagem.objects.filter(
-        inventario=inventario,
-        rodada=rodada,
-        usuario=usuario,
-    ).exists()
+    from inventario.permissoes import usuario_pode_inventario
+
+    return usuario_pode_inventario(usuario)

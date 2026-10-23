@@ -59,6 +59,19 @@ class ProdutoEstoque(models.Model):
         default=0,
         verbose_name='Valor custo contábil',
     )
+    estoque_minimo = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+        verbose_name='Estoque mínimo',
+        help_text='Alerta quando a quantidade na farmácia ficar abaixo deste valor.',
+    )
+    dias_entrega_fornecedor = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Dias para entrega',
+        help_text='Prazo médio (dias) que o fornecedor demora para entregar.',
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -75,6 +88,13 @@ class ProdutoEstoque(models.Model):
 
     def __str__(self) -> str:
         return f'{self.codigo_produto} — {self.descricao}'
+
+    @property
+    def abaixo_estoque_minimo(self) -> bool:
+        minimo = self.estoque_minimo or 0
+        if minimo <= 0:
+            return False
+        return (self.quantidade_estoque or 0) < minimo
 
 
 class SaldoEstoqueSetor(models.Model):

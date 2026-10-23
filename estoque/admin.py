@@ -10,6 +10,8 @@ class ProdutoEstoqueAdmin(admin.ModelAdmin):
         'descricao',
         'marca',
         'quantidade_estoque',
+        'estoque_minimo',
+        'dias_entrega_fornecedor',
         'quantidade_estoque_contabil',
         'valor_custo_medio',
         'empresa',

@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-secondary btn-sm">← Lista</a>
+  </div>
+
+  {% include 'parcial/_messages.html' %}
+
+  {% if requisicao and not pode_editar %}
+  <p class="mb-3">
+    Status: <strong>{{ requisicao.get_status_display }}</strong>
+    {% if requisicao.setor_destino %} · Setor: {{ requisicao.get_setor_destino_display }}
+    {% elif requisicao.tipo == 'baixa_setor' %} · Setor: {{ requisicao.get_setor_origem_display }}{% endif %}
+  </p>
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header py-2"><strong>Cabeçalho</strong></div>
+    <div class="card-body">
+      {% if pode_editar %}
+      <form method="post" id="form-requisicao-estoque">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="cabecalho">
+        <div class="row g-3" style="max-width: 720px;">
+          {% for field in form %}
+          <div class="col-md-6 field-requisicao field-{{ field.name }}">
+            <label class="form-label small mb-0" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <p class="small text-muted mt-3 mb-2" id="ajuda-requisicao">
+          <strong>Transferência:</strong> farmácia → setor destino.
+          <strong>Baixa farmácia:</strong> setor destino = setor de uso.
+          <strong>Baixa setor:</strong> só setor de origem.
+        </p>
+        <button type="submit" class="btn btn-primary btn-sm">
+          {% if requisicao %}Atualizar cabeçalho{% else %}Salvar e incluir produtos{% endif %}
+        </button>
+      </form>
+      {% else %}
+      <dl class="row mb-0 small">
+        <dt class="col-sm-3">Tipo</dt><dd class="col-sm-9">{{ requisicao.get_tipo_display }}</dd>
+        {% if requisicao.setor_destino %}
+        <dt class="col-sm-3">Setor</dt><dd class="col-sm-9">{{ requisicao.get_setor_destino_display }}</dd>
+        {% elif requisicao.tipo == 'baixa_setor' %}
+        <dt class="col-sm-3">Setor</dt><dd class="col-sm-9">{{ requisicao.get_setor_origem_display }}</dd>
+        {% endif %}
+        {% if requisicao.observacao %}
+        <dt class="col-sm-3">Obs.</dt><dd class="col-sm-9">{{ requisicao.observacao }}</dd>
+        {% endif %}
+      </dl>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if requisicao %}
+  <div class="card shadow-sm">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+      <strong>Produtos</strong>
+      {% if pode_editar %}<span class="small text-muted">Inclua linhas na grade</span>{% endif %}
+    </div>
+    <div class="card-body p-0">
+      {% if pode_editar %}
+      <form method="post" class="p-3 border-bottom bg-light">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="add_item">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-7">
+            <label class="form-label small mb-0">Produto</label>
+            <select name="produto_id" class="form-select form-select-sm" required>
+              <option value="">— Selecione —</option>
+              {% for p in produtos %}
+              <option value="{{ p.pk }}">{{ p.codigo_produto }} — {{ p.descricao|truncatechars:70 }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small mb-0">Quantidade</label>
+            <input type="number" name="quantidade" step="0.001" min="0.001" class="form-control form-control-sm" required>
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+              <i class="fas fa-plus me-1"></i> Incluir na grade
+            </button>
+          </div>
+        </div>
+      </form>
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Produto</th>
+              <th class="text-end">Quantidade</th>
+              {% if pode_editar %}<th></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in itens %}
+            <tr>
+              <td><code>{{ i.produto.codigo_produto }}</code></td>
+              <td>{{ i.produto.descricao }}</td>
+              <td class="text-end">{{ i.quantidade }}</td>
+              {% if pode_editar %}
+              <td class="text-end">
+                <form method="post" class="d-inline" onsubmit="return confirm('Remover esta linha?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="acao" value="remover_item">
+                  <input type="hidden" name="item_id" value="{{ i.pk }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">Remover</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if pode_editar %}4{% else %}3{% endif %}" class="text-center text-muted py-4">
+                Nenhum produto. Use o formulário acima para incluir.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if pode_editar %}
+    <div class="card-footer d-flex flex-wrap gap-2">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="concluir">
+        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Confirmar movimentação de estoque?');">
+          Concluir requisição
+        </button>
+      </form>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="cancelar">
+        <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar requisição</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+<script>
+(function () {
+  const tipo = document.getElementById('id_tipo_requisicao');
+  const dest = document.getElementById('id_setor_destino');
+  const orig = document.getElementById('id_setor_origem');
+  if (!tipo || !dest || !orig) return;
+  const wrapDest = dest.closest('.field-setor_destino');
+  const wrapOrig = orig.closest('.field-setor_origem');
+  function sync() {
+    const baixaSetor = tipo.value === 'baixa_setor';
+    if (wrapDest) wrapDest.style.display = baixaSetor ? 'none' : '';
+    if (wrapOrig) wrapOrig.style.display = baixaSetor ? '' : 'none';
+    const lbl = wrapDest?.querySelector('label');
+    if (lbl && !baixaSetor) {
+      lbl.textContent = tipo.value === 'baixa_farmacia' ? 'Setor de uso' : 'Setor destino';
+    }
+  }
+  tipo.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

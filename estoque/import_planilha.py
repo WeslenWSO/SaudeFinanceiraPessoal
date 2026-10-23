@@ -15,6 +15,8 @@ COLUNAS_MODELO = (
     'Marca',
     'Quantidade em estoque',
     'Estoque contábil',
+    'Estoque mínimo',
+    'Dias para entrega',
     'Valor da última compra',
     'Valor custo médio',
     'Valor custo contábil',
@@ -33,6 +35,20 @@ def _norm_header(val) -> str:
         s = s.replace(old, new)
     s = ' '.join(s.split())
     return s
+
+
+def _parse_int_opcional(val) -> int | None:
+    if val is None or val == '':
+        return None
+    if isinstance(val, (int, float)):
+        return int(val)
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s.replace(',', '.')))
+    except (ValueError, TypeError):
+        return None
 
 
 def _parse_decimal(val, *, casas: int = 4) -> Decimal:
@@ -95,6 +111,17 @@ def _map_colunas(headers: list) -> dict[str, int | None]:
         'valor_custo_contabil': (
             'valor custo contabil',
             'custo contabil',
+        ),
+        'estoque_minimo': (
+            'estoque minimo',
+            'minimo',
+            'est minimo',
+        ),
+        'dias_entrega_fornecedor': (
+            'dias para entrega',
+            'dias entrega',
+            'prazo entrega',
+            'lead time',
         ),
     }
     out: dict[str, int | None] = {k: None for k in aliases}
@@ -169,6 +196,14 @@ def parse_planilha_produtos(content: bytes) -> tuple[list[dict], list[str]]:
                 'valor_ultima_compra': _parse_decimal(_celula(row, mapa['valor_ultima_compra'])),
                 'valor_custo_medio': _parse_decimal(_celula(row, mapa['valor_custo_medio'])),
                 'valor_custo_contabil': _parse_decimal(_celula(row, mapa['valor_custo_contabil'])),
+                'estoque_minimo': _parse_decimal(_celula(row, mapa['estoque_minimo']))
+                if mapa['estoque_minimo'] is not None
+                else None,
+                'dias_entrega_fornecedor': _parse_int_opcional(
+                    _celula(row, mapa['dias_entrega_fornecedor']),
+                )
+                if mapa['dias_entrega_fornecedor'] is not None
+                else None,
             },
         )
     return linhas, erros
@@ -207,6 +242,10 @@ def importar_produtos_estoque(
             obj.valor_ultima_compra = ln['valor_ultima_compra']
             obj.valor_custo_medio = ln['valor_custo_medio']
             obj.valor_custo_contabil = ln['valor_custo_contabil']
+            if ln.get('estoque_minimo') is not None:
+                obj.estoque_minimo = ln['estoque_minimo']
+            if ln.get('dias_entrega_fornecedor') is not None:
+                obj.dias_entrega_fornecedor = ln['dias_entrega_fornecedor']
             atualizar.append(obj)
             stats['atualizados'] += 1
         else:
@@ -218,6 +257,8 @@ def importar_produtos_estoque(
                     marca=ln['marca'],
                     quantidade_estoque=ln['quantidade_estoque'],
                     quantidade_estoque_contabil=ln['quantidade_estoque_contabil'],
+                    estoque_minimo=ln['estoque_minimo'] or 0,
+                    dias_entrega_fornecedor=ln.get('dias_entrega_fornecedor'),
                     valor_ultima_compra=ln['valor_ultima_compra'],
                     valor_custo_medio=ln['valor_custo_medio'],
                     valor_custo_contabil=ln['valor_custo_contabil'],
@@ -238,6 +279,8 @@ def importar_produtos_estoque(
                 'valor_ultima_compra',
                 'valor_custo_medio',
                 'valor_custo_contabil',
+                'estoque_minimo',
+                'dias_entrega_fornecedor',
             ],
         )
     return stats
@@ -248,7 +291,7 @@ def resposta_modelo_excel() -> bytes:
     ws = wb.active
     ws.title = 'Estoque'
     ws.append(list(COLUNAS_MODELO))
-    ws.append(['P001', 'Produto exemplo', 'Marca X', 10, 10, 12.5, 11, 11.2])
+    ws.append(['P001', 'Produto exemplo', 'Marca X', 10, 10, 5, 7, 12.5, 11, 11.2])
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()

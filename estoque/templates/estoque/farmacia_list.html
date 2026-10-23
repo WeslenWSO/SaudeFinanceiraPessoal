@@ -7,6 +7,9 @@
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-primary btn-sm">Requisições</a>
       <a href="{% url 'estoque:relatorio_movimentos' %}" class="btn btn-outline-secondary btn-sm">Relatórios</a>
+      {% if user.is_staff or user.is_superuser %}
+      <a href="{% url 'inventario:inventario_list' %}" class="btn btn-outline-warning btn-sm">Inventário (admin)</a>
+      {% endif %}
       <a href="{% url 'notafiscalentrada:produtos_comercio' %}" class="btn btn-success btn-sm">NF Comércio → estoque</a>
     </div>
   </div>
@@ -27,23 +30,32 @@
             <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qt (farmácia)</th>
+            <th class="text-end" title="Quantidade mínima desejada">Est. mín.</th>
+            <th class="text-end" title="Prazo médio do fornecedor (dias)">Dias entrega</th>
             <th class="text-end">Preço médio</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for p in object_list %}
-          <tr>
-            <td><code>{{ p.codigo_produto }}</code><br><span class="small">{{ p.descricao }}</span></td>
+          <tr class="{% if p.abaixo_estoque_minimo %}table-warning{% endif %}">
+            <td><code>{{ p.codigo_produto }}</code><br><span class="small">{{ p.descricao }}</span>
+              {% if p.abaixo_estoque_minimo %}<span class="badge bg-warning text-dark ms-1">Abaixo do mín.</span>{% endif %}
+            </td>
             <td>{{ p.marca|default:"—" }}</td>
             <td>{{ p.unidade_master|default:"—" }}</td>
             <td>{{ p.unidade|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
+            <td class="text-end">{% if p.estoque_minimo %}{{ p.estoque_minimo }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if p.dias_entrega_fornecedor != None %}{{ p.dias_entrega_fornecedor }}{% else %}—{% endif %}</td>
             <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
-            <td><a href="{% url 'estoque:produto_operacional_detail' p.pk %}" class="btn btn-outline-primary btn-sm">Histórico</a></td>
+            <td class="text-nowrap">
+              <a href="{% url 'estoque:produto_update' p.pk %}" class="btn btn-outline-secondary btn-sm">Editar</a>
+              <a href="{% url 'estoque:produto_operacional_detail' p.pk %}" class="btn btn-outline-primary btn-sm">Histórico</a>
+            </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center text-muted py-4">Nenhum produto. Gere entradas a partir das notas de comércio.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-4">Nenhum produto. Gere entradas a partir das notas de comércio.</td></tr>
           {% endfor %}
         </tbody>
       </table>

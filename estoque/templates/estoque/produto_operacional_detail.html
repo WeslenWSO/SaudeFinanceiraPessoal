@@ -6,7 +6,14 @@
     <a href="{% url 'estoque:farmacia_list' %}" class="btn btn-outline-secondary btn-sm">← Estoque</a>
   </div>
   <h1 class="h4">{{ produto.descricao }}</h1>
-  <p class="text-muted"><code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }} · Farmácia: <strong>{{ produto.quantidade_estoque }}</strong> · Preço médio: R$ {{ produto.valor_custo_medio|floatformat:4 }}</p>
+  <p class="text-muted">
+    <code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }}
+    · Farmácia: <strong>{{ produto.quantidade_estoque }}</strong>
+    · Est. mín.: {% if produto.estoque_minimo %}{{ produto.estoque_minimo }}{% else %}—{% endif %}
+    · Dias entrega (fornec.): {% if produto.dias_entrega_fornecedor != None %}{{ produto.dias_entrega_fornecedor }}{% else %}—{% endif %}
+    · Preço médio: R$ {{ produto.valor_custo_medio|floatformat:4 }}
+    · <a href="{% url 'estoque:produto_update' produto.pk %}">Editar cadastro</a>
+  </p>
 
   {% if saldos_setor %}
   <h2 class="h6 mt-4">Saldo nos setores</h2>

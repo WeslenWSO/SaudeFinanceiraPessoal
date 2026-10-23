@@ -8,7 +8,8 @@ from django.db import transaction
 from django.utils import timezone
 from openpyxl import Workbook
 
-from estoque.models import ProdutoEstoque
+from estoque.models import MovimentoEstoque, ProdutoEstoque
+from estoque.setores import SetorEstoque
 from inventario.models import EstoqueBackup, EstoqueBackupLinha, Inventario, InventarioItem
 
 
@@ -106,12 +107,28 @@ def aplicar_contagem_ao_estoque(inventario: Inventario, usuario: User) -> dict[s
         if produto is None:
             stats['ignorados'] += 1
             continue
+        q_ant = produto.quantidade_estoque
+        if q_ant != qtd:
+            MovimentoEstoque.objects.create(
+                empresa_id=inventario.empresa_id,
+                produto=produto,
+                tipo=MovimentoEstoque.Tipo.AJUSTE,
+                setor_destino=SetorEstoque.FARMACIA,
+                quantidade=abs(qtd - q_ant),
+                valor_unitario=produto.valor_custo_medio or 0,
+                valor_custo_medio_apos=produto.valor_custo_medio or 0,
+                usuario=usuario,
+                observacao=(
+                    f'Inventário «{inventario.descricao}» ({rodada}ª contagem): '
+                    f'{q_ant} → {qtd}'
+                )[:500],
+            )
         produto.quantidade_estoque = qtd
         atualizar.append(produto)
         stats['atualizados'] += 1
 
     if atualizar:
-        ProdutoEstoque.objects.bulk_update(atualizar, ['quantidade_estoque'])
+        ProdutoEstoque.objects.bulk_update(atualizar, ['quantidade_estoque', 'atualizado_em'])
 
     inventario.estoque_aplicado_em = timezone.now()
     inventario.estoque_aplicado_por = usuario

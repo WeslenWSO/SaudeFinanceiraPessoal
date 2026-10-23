@@ -1,6 +1,6 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from inventario.decorators import admin_inventario_required
+from inventario.mixins import RequerAdminInventarioMixin
 from django.db.utils import DatabaseError
 from django.forms import modelformset_factory
 from django.http import HttpResponse
@@ -44,27 +44,21 @@ class _EmpresaInventarioMixin:
         return qs
 
 
-class InventarioListView(LoginRequiredMixin, _EmpresaInventarioMixin, ListView):
+class InventarioListView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, ListView):
     model = Inventario
     paginate_by = 20
     template_name = 'inventario/inventario_list.html'
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['descricao'] = 'Inventário'
+        ctx['descricao'] = 'Inventário de estoque (farmácia)'
         return ctx
 
 
-class InventarioCreateView(LoginRequiredMixin, CreateView):
+class InventarioCreateView(RequerAdminInventarioMixin, CreateView):
     model = Inventario
     form_class = InventarioForm
     template_name = 'inventario/inventario_form.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        if not (request.user.is_superuser or request.user.is_staff):
-            messages.error(request, 'Inventário físico: somente administradores.')
-            return redirect('inventario:inventario_list')
-        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse('inventario:inventario_detail', kwargs={'pk': self.object.pk})
@@ -116,7 +110,7 @@ class InventarioCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class InventarioUpdateView(LoginRequiredMixin, _EmpresaInventarioMixin, UpdateView):
+class InventarioUpdateView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, UpdateView):
     model = Inventario
     form_class = InventarioForm
     template_name = 'inventario/inventario_form.html'
@@ -150,7 +144,7 @@ class InventarioUpdateView(LoginRequiredMixin, _EmpresaInventarioMixin, UpdateVi
         return ctx
 
 
-class InventarioDetailView(LoginRequiredMixin, _EmpresaInventarioMixin, DetailView):
+class InventarioDetailView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, DetailView):
     model = Inventario
     template_name = 'inventario/inventario_detail.html'
 
@@ -190,7 +184,7 @@ def _inventario_da_sessao(request, pk):
     return get_object_or_404(Inventario, pk=pk, empresa_id=empresa_id)
 
 
-@login_required
+@admin_inventario_required
 def inventario_contagem(request, pk, rodada):
     if rodada not in (1, 2, 3):
         messages.error(request, 'Rodada de contagem inválida.')
@@ -270,7 +264,7 @@ def inventario_contagem(request, pk, rodada):
     )
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_sincronizar_estoque(request, pk):
     inventario = _inventario_da_sessao(request, pk)
@@ -300,7 +294,7 @@ def inventario_sincronizar_estoque(request, pk):
     return redirect('inventario:inventario_detail', pk=pk)
 
 
-@login_required
+@admin_inventario_required
 def inventario_produtos(request, pk):
     inventario = _inventario_da_sessao(request, pk)
     if inventario is None:
@@ -337,7 +331,7 @@ def inventario_produtos(request, pk):
     )
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_remover_item(request, pk, item_id):
     inventario = _inventario_da_sessao(request, pk)
@@ -357,7 +351,7 @@ def inventario_remover_item(request, pk, item_id):
     return redirect('inventario:inventario_produtos', pk=pk)
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_backup_estoque(request, pk):
     inventario = _inventario_da_sessao(request, pk)
@@ -373,7 +367,7 @@ def inventario_backup_estoque(request, pk):
     return redirect('inventario:inventario_detail', pk=pk)
 
 
-@login_required
+@admin_inventario_required
 def inventario_backup_excel(request, pk, backup_id):
     inventario = _inventario_da_sessao(request, pk)
     if inventario is None:
@@ -391,7 +385,7 @@ def inventario_backup_excel(request, pk, backup_id):
     return response
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_definir_rodada_estoque(request, pk):
     inventario = _inventario_da_sessao(request, pk)
@@ -419,7 +413,7 @@ def inventario_definir_rodada_estoque(request, pk):
     return redirect('inventario:inventario_detail', pk=pk)
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_aplicar_estoque(request, pk):
     inventario = _inventario_da_sessao(request, pk)
@@ -444,7 +438,7 @@ def inventario_aplicar_estoque(request, pk):
     return redirect('inventario:inventario_detail', pk=pk)
 
 
-@login_required
+@admin_inventario_required
 @require_POST
 def inventario_fechar(request, pk):
     inventario = _inventario_da_sessao(request, pk)

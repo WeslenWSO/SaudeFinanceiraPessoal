@@ -40,8 +40,12 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'codigo_produto',
             'descricao',
             'marca',
+            'unidade_master',
+            'unidade',
             'quantidade_estoque',
             'quantidade_estoque_contabil',
+            'estoque_minimo',
+            'dias_entrega_fornecedor',
             'valor_ultima_compra',
             'valor_custo_medio',
             'valor_custo_contabil',
@@ -50,9 +54,21 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'codigo_produto': forms.TextInput(attrs={'class': _W, 'maxlength': 50}),
             'descricao': forms.TextInput(attrs={'class': _W, 'maxlength': 300}),
             'marca': forms.TextInput(attrs={'class': _W, 'maxlength': 120}),
+            'unidade_master': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
+            'unidade': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
             'quantidade_estoque': forms.NumberInput(attrs={'class': _W, 'step': '0.001'}),
             'quantidade_estoque_contabil': forms.NumberInput(attrs={'class': _W, 'step': '0.001'}),
+            'estoque_minimo': forms.NumberInput(attrs={'class': _W, 'step': '0.001', 'min': '0'}),
+            'dias_entrega_fornecedor': forms.NumberInput(
+                attrs={'class': _W, 'min': '0', 'placeholder': 'Ex.: 7'},
+            ),
             'valor_ultima_compra': forms.NumberInput(attrs={'class': _W, 'step': '0.0001'}),
             'valor_custo_medio': forms.NumberInput(attrs={'class': _W, 'step': '0.0001'}),
             'valor_custo_contabil': forms.NumberInput(attrs={'class': _W, 'step': '0.0001'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['dias_entrega_fornecedor'].help_text = (
+            'Quantos dias o fornecedor costuma demorar para entregar (informação de compras).'
+        )

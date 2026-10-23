@@ -193,7 +193,7 @@ def concluir_requisicao(requisicao: RequisicaoEstoque, *, usuario) -> None:
                 produto=produto,
                 tipo=MovimentoEstoque.Tipo.BAIXA,
                 setor_origem=SetorEstoque.FARMACIA,
-                setor_destino=requisicao.setor_consumo or '',
+                setor_destino=requisicao.setor_destino or requisicao.setor_consumo or '',
                 quantidade=q,
                 valor_unitario=p_med,
                 valor_custo_medio_apos=p_med,

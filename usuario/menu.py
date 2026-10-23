@@ -51,7 +51,6 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('empresa', 'Empresa', 'fa-building', 'cadastro', url_name='empresa:lista'),
     MenuItemDef('fornecedor', 'Fornecedor', 'fa-truck', 'cadastro', url_name='fornecedor:fornList'),
     MenuItemDef('estoque', 'Estoque', 'fa-boxes', 'cadastro', url_name='estoque:produto_list'),
-    MenuItemDef('inventario', 'Inventário', 'fa-clipboard-list', 'cadastro', url_name='inventario:inventario_list'),
     MenuItemDef('cliente', 'Cliente', 'fa-user-tie', 'cadastro', url_name='cliente:clieList'),
     MenuItemDef('cobranca', 'Cobrança', 'fa-credit-card', 'cadastro', url_name='cobranca:cobList'),
     MenuItemDef('categoria', 'Categoria', 'fa-tags', 'cadastro', url_name='categoria:catList'),
@@ -125,6 +124,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         'fa-chart-line',
         'fiscal',
         url_name='estoque:relatorio_movimentos',
+    ),
+    MenuItemDef(
+        'inventario',
+        'Inventário de estoque',
+        'fa-clipboard-list',
+        'fiscal',
+        url_name='inventario:inventario_list',
     ),
     MenuItemDef(
         'orcamento_compra',

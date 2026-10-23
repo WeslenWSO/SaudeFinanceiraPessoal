@@ -21,12 +21,11 @@ class GerarEstoqueNotaForm(forms.Form):
 class RequisicaoEstoqueForm(forms.ModelForm):
     class Meta:
         model = RequisicaoEstoque
-        fields = ['tipo', 'setor_origem', 'setor_destino', 'setor_consumo', 'observacao']
+        fields = ['tipo', 'setor_origem', 'setor_destino', 'observacao']
         widgets = {
-            'tipo': forms.Select(attrs={'class': 'form-select'}),
-            'setor_origem': forms.Select(attrs={'class': 'form-select'}),
-            'setor_destino': forms.Select(attrs={'class': 'form-select'}),
-            'setor_consumo': forms.Select(attrs={'class': 'form-select'}),
+            'tipo': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo_requisicao'}),
+            'setor_origem': forms.Select(attrs={'class': 'form-select', 'id': 'id_setor_origem'}),
+            'setor_destino': forms.Select(attrs={'class': 'form-select', 'id': 'id_setor_destino'}),
             'observacao': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
@@ -34,8 +33,45 @@ class RequisicaoEstoqueForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         destinos = [('', '—')] + list(SETOR_TRANSFERENCIA_DESTINOS)
         self.fields['setor_destino'].choices = destinos
-        consumo = [('', '—')] + list(SetorEstoque.choices)
-        self.fields['setor_consumo'].choices = consumo
+        self.fields['setor_destino'].label = 'Setor destino'
+
+        setores_origem = [('', '—')] + list(SETOR_TRANSFERENCIA_DESTINOS)
+        self.fields['setor_origem'].choices = setores_origem
+        self.fields['setor_origem'].label = 'Setor (estoque de origem)'
+
+        tipo = None
+        if self.data.get('tipo'):
+            tipo = self.data.get('tipo')
+        elif self.instance.pk:
+            tipo = self.instance.tipo
+
+        if tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+            self.fields['setor_destino'].required = False
+            self.fields['setor_destino'].widget = forms.HiddenInput()
+        else:
+            self.fields['setor_origem'].required = False
+            self.fields['setor_origem'].widget = forms.HiddenInput()
+            if not self.initial.get('setor_origem'):
+                self.initial['setor_origem'] = SetorEstoque.FARMACIA
+
+    def clean(self):
+        cleaned = super().clean()
+        tipo = cleaned.get('tipo')
+        destino = cleaned.get('setor_destino') or ''
+        origem = cleaned.get('setor_origem') or ''
+
+        if tipo in (RequisicaoEstoque.Tipo.TRANSFERENCIA, RequisicaoEstoque.Tipo.BAIXA_FARMACIA):
+            cleaned['setor_origem'] = SetorEstoque.FARMACIA
+            if not destino:
+                self.add_error(
+                    'setor_destino',
+                    'Informe o setor (destino da transferência ou setor de uso na baixa).',
+                )
+        elif tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+            cleaned['setor_destino'] = ''
+            if not origem or origem == SetorEstoque.FARMACIA:
+                self.add_error('setor_origem', 'Escolha o setor de onde sairá o material.')
+        return cleaned
 
 
 class RequisicaoItemForm(forms.ModelForm):

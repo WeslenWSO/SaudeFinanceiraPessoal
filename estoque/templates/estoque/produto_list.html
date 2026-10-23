@@ -34,6 +34,8 @@
             <th>Descrição</th>
             <th>Marca</th>
             <th class="text-end">Qtd.</th>
+            <th class="text-end">Est. mín.</th>
+            <th class="text-end">Dias entrega</th>
             <th class="text-end">Est. contábil</th>
             <th class="text-end">Últ. compra</th>
             <th class="text-end">Custo médio</th>
@@ -43,11 +45,13 @@
         </thead>
         <tbody>
           {% for p in object_list %}
-          <tr>
+          <tr class="{% if p.abaixo_estoque_minimo %}table-warning{% endif %}">
             <td><code>{{ p.codigo_produto }}</code></td>
             <td>{{ p.descricao }}</td>
             <td>{{ p.marca|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
+            <td class="text-end">{% if p.estoque_minimo %}{{ p.estoque_minimo }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if p.dias_entrega_fornecedor != None %}{{ p.dias_entrega_fornecedor }}{% else %}—{% endif %}</td>
             <td class="text-end">{{ p.quantidade_estoque_contabil }}</td>
             <td class="text-end">R$ {{ p.valor_ultima_compra|floatformat:4 }}</td>
             <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
@@ -62,7 +66,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="9" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
+            <td colspan="11" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>

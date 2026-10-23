@@ -139,54 +139,119 @@ class RequisicaoListView(LoginRequiredMixin, _EmpresaMixin, ListView):
         return ctx
 
 
+def _validar_permissao_requisicao(request, empresa_id: int, tipo: str, setor_origem: str) -> bool:
+    if tipo in (RequisicaoEstoque.Tipo.TRANSFERENCIA, RequisicaoEstoque.Tipo.BAIXA_FARMACIA):
+        if not usuario_pode_requisicao_farmacia(request.user):
+            messages.error(request, 'Sem permissão para requisição da farmácia.')
+            return False
+    if tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+        if not usuario_pode_baixa_setor(request.user, empresa_id, setor_origem):
+            messages.error(request, 'Você não é responsável por este setor.')
+            return False
+    return True
+
+
+def _aplicar_setores_requisicao(req: RequisicaoEstoque) -> None:
+    if req.tipo in (
+        RequisicaoEstoque.Tipo.TRANSFERENCIA,
+        RequisicaoEstoque.Tipo.BAIXA_FARMACIA,
+    ):
+        req.setor_origem = SetorEstoque.FARMACIA
+        req.setor_consumo = req.setor_destino
+    elif req.tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+        req.setor_destino = ''
+        req.setor_consumo = req.setor_origem
+
+
+def _contexto_requisicao_tela(
+    request,
+    *,
+    requisicao: RequisicaoEstoque | None,
+    form: RequisicaoEstoqueForm,
+    empresa_id: int,
+):
+    itens = []
+    produtos = ProdutoEstoque.objects.none()
+    if requisicao:
+        itens = requisicao.itens.select_related('produto')
+        produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:800]
+    descricao = 'Nova requisição' if not requisicao else f'Requisição #{requisicao.pk}'
+    return {
+        'requisicao': requisicao,
+        'form': form,
+        'itens': itens,
+        'produtos': produtos,
+        'descricao': descricao,
+        'pode_editar': not requisicao or requisicao.status == RequisicaoEstoque.Status.RASCUNHO,
+    }
+
+
 @login_required
 def requisicao_nova(request):
+    return requisicao_edit(request, pk=None)
+
+
+@login_required
+def requisicao_detail(request, pk: int):
+    return requisicao_edit(request, pk=pk)
+
+
+@login_required
+def requisicao_edit(request, pk: int | None):
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('estoque:requisicao_list')
 
-    if request.method == 'POST':
-        form = RequisicaoEstoqueForm(request.POST)
-        if form.is_valid():
-            tipo = form.cleaned_data['tipo']
-            if tipo in (RequisicaoEstoque.Tipo.TRANSFERENCIA, RequisicaoEstoque.Tipo.BAIXA_FARMACIA):
-                if not usuario_pode_requisicao_farmacia(request.user):
-                    messages.error(request, 'Sem permissão para requisição da farmácia.')
-                    return redirect('estoque:requisicao_list')
-            if tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
-                origem = form.cleaned_data['setor_origem']
-                if not usuario_pode_baixa_setor(request.user, empresa_id, origem):
-                    messages.error(request, 'Você não é responsável por este setor.')
-                    return redirect('estoque:requisicao_list')
-
-            req = form.save(commit=False)
-            req.empresa_id = empresa_id
-            req.criado_por = request.user
-            if req.tipo == RequisicaoEstoque.Tipo.TRANSFERENCIA:
-                req.setor_origem = SetorEstoque.FARMACIA
-            if req.tipo == RequisicaoEstoque.Tipo.BAIXA_FARMACIA:
-                req.setor_origem = SetorEstoque.FARMACIA
-            req.save()
-            return redirect('estoque:requisicao_detail', pk=req.pk)
-    else:
-        form = RequisicaoEstoqueForm(initial={'setor_origem': SetorEstoque.FARMACIA})
-
-    return render(
-        request,
-        'estoque/requisicao_form.html',
-        {'form': form, 'descricao': 'Nova requisição'},
-    )
-
-
-@login_required
-def requisicao_detail(request, pk: int):
-    empresa_id = request.session.get('empresa_id')
-    req = get_object_or_404(RequisicaoEstoque, pk=pk, empresa_id=empresa_id)
-    produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:500]
+    requisicao = None
+    if pk is not None:
+        requisicao = get_object_or_404(RequisicaoEstoque, pk=pk, empresa_id=empresa_id)
 
     if request.method == 'POST':
-        acao = request.POST.get('acao')
+        acao = (request.POST.get('acao') or 'cabecalho').strip()
+
+        if acao == 'cabecalho':
+            if requisicao and requisicao.status != RequisicaoEstoque.Status.RASCUNHO:
+                messages.error(request, 'Requisição não está em rascunho.')
+                return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+
+            form = RequisicaoEstoqueForm(request.POST, instance=requisicao)
+            if form.is_valid():
+                tipo = form.cleaned_data['tipo']
+                origem = form.cleaned_data.get('setor_origem') or ''
+                if not _validar_permissao_requisicao(request, empresa_id, tipo, origem):
+                    return redirect('estoque:requisicao_list')
+
+                req = form.save(commit=False)
+                req.empresa_id = empresa_id
+                if not requisicao:
+                    req.criado_por = request.user
+                _aplicar_setores_requisicao(req)
+                req.save()
+                if not pk:
+                    messages.success(request, 'Cabeçalho salvo. Inclua os produtos abaixo.')
+                    return redirect('estoque:requisicao_detail', pk=req.pk)
+                messages.success(request, 'Cabeçalho atualizado.')
+                return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+
+            return render(
+                request,
+                'estoque/requisicao_edit.html',
+                _contexto_requisicao_tela(
+                    request,
+                    requisicao=requisicao,
+                    form=form,
+                    empresa_id=empresa_id,
+                ),
+            )
+
+        if not requisicao:
+            return redirect('estoque:requisicao_nova')
+
+        if requisicao.status != RequisicaoEstoque.Status.RASCUNHO:
+            messages.error(request, 'Requisição não está em rascunho.')
+            return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+
         if acao == 'add_item':
             produto_id = request.POST.get('produto_id')
             qtd = request.POST.get('quantidade') or '0'
@@ -195,31 +260,44 @@ def requisicao_detail(request, pk: int):
             except Exception:
                 q = Decimal('0')
             produto = get_object_or_404(ProdutoEstoque, pk=produto_id, empresa_id=empresa_id)
-            if q > 0 and req.status == RequisicaoEstoque.Status.RASCUNHO:
-                RequisicaoEstoqueItem.objects.create(requisicao=req, produto=produto, quantidade=q)
-                messages.success(request, 'Item incluído.')
+            if q > 0:
+                RequisicaoEstoqueItem.objects.create(
+                    requisicao=requisicao,
+                    produto=produto,
+                    quantidade=q,
+                )
+                messages.success(request, 'Produto incluído na grade.')
+        elif acao == 'remover_item':
+            item_id = request.POST.get('item_id')
+            item = get_object_or_404(
+                RequisicaoEstoqueItem,
+                pk=item_id,
+                requisicao=requisicao,
+            )
+            item.delete()
+            messages.info(request, 'Linha removida.')
         elif acao == 'concluir':
             try:
-                concluir_requisicao(req, usuario=request.user)
+                concluir_requisicao(requisicao, usuario=request.user)
                 messages.success(request, 'Requisição concluída.')
             except EstoqueErro as exc:
                 messages.error(request, str(exc))
-        elif acao == 'cancelar' and req.status == RequisicaoEstoque.Status.RASCUNHO:
-            req.status = RequisicaoEstoque.Status.CANCELADA
-            req.save(update_fields=['status'])
+        elif acao == 'cancelar':
+            requisicao.status = RequisicaoEstoque.Status.CANCELADA
+            requisicao.save(update_fields=['status'])
             messages.info(request, 'Requisição cancelada.')
-        return redirect('estoque:requisicao_detail', pk=req.pk)
 
-    itens = req.itens.select_related('produto')
+        return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+
+    if requisicao:
+        form = RequisicaoEstoqueForm(instance=requisicao)
+    else:
+        form = RequisicaoEstoqueForm(initial={'setor_origem': SetorEstoque.FARMACIA})
+
     return render(
         request,
-        'estoque/requisicao_detail.html',
-        {
-            'requisicao': req,
-            'itens': itens,
-            'produtos': produtos,
-            'descricao': f'Requisição #{req.pk}',
-        },
+        'estoque/requisicao_edit.html',
+        _contexto_requisicao_tela(request, requisicao=requisicao, form=form, empresa_id=empresa_id),
     )
 
 
