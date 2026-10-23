@@ -25,7 +25,11 @@ def usuario_responsavel_setor(user: User, empresa_id: int, setor: str) -> bool:
 
 
 def usuario_pode_requisicao_farmacia(user: User) -> bool:
-    return usuario_e_admin_estoque(user)
+    if usuario_e_admin_estoque(user):
+        return True
+    from usuario.menu import usuario_pode_menu
+
+    return usuario_pode_menu(user, 'estoque_requisicoes')
 
 
 def usuario_pode_baixa_setor(user: User, empresa_id: int, setor: str) -> bool:

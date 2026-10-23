@@ -43,6 +43,12 @@
     <div class="card-header py-2"><strong>1. Cabeçalho</strong></div>
     <div class="card-body">
       {% if pode_editar %}
+      {% if form.errors %}
+      <div class="alert alert-danger py-2 small">
+        Corrija os campos abaixo para salvar o cabeçalho.
+        {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
       <form method="post" id="form-requisicao-estoque">
         {% csrf_token %}
         <input type="hidden" name="acao" value="cabecalho">

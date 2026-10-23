@@ -35,8 +35,10 @@ class RequisicaoEstoqueForm(forms.ModelForm):
         self.fields['setor_destino'].choices = destinos
         self.fields['setor_destino'].label = 'Setor destino'
 
-        setores_origem = [('', '—')] + list(SETOR_TRANSFERENCIA_DESTINOS)
-        self.fields['setor_origem'].choices = setores_origem
+        setores_origem_setor = [('', '—')] + list(SETOR_TRANSFERENCIA_DESTINOS)
+        setores_origem_farmacia = [(SetorEstoque.FARMACIA, 'Farmácia')] + list(
+            SETOR_TRANSFERENCIA_DESTINOS,
+        )
         self.fields['setor_origem'].label = 'Setor (estoque de origem)'
 
         tipo = None
@@ -46,13 +48,14 @@ class RequisicaoEstoqueForm(forms.ModelForm):
             tipo = self.instance.tipo
 
         if tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+            self.fields['setor_origem'].choices = setores_origem_setor
             self.fields['setor_destino'].required = False
             self.fields['setor_destino'].widget = forms.HiddenInput()
         else:
+            self.fields['setor_origem'].choices = setores_origem_farmacia
             self.fields['setor_origem'].required = False
             self.fields['setor_origem'].widget = forms.HiddenInput()
-            if not self.initial.get('setor_origem'):
-                self.initial['setor_origem'] = SetorEstoque.FARMACIA
+            self.fields['setor_origem'].initial = SetorEstoque.FARMACIA
 
     def clean(self):
         cleaned = super().clean()

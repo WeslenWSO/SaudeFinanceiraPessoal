@@ -242,7 +242,16 @@ def requisicao_edit(request, pk: int | None):
                 tipo = form.cleaned_data['tipo']
                 origem = form.cleaned_data.get('setor_origem') or ''
                 if not _validar_permissao_requisicao(request, empresa_id, tipo, origem):
-                    return redirect('estoque:requisicao_list')
+                    return render(
+                        request,
+                        'estoque/requisicao_edit.html',
+                        _contexto_requisicao_tela(
+                            request,
+                            requisicao=requisicao,
+                            form=form,
+                            empresa_id=empresa_id,
+                        ),
+                    )
 
                 req = form.save(commit=False)
                 req.empresa_id = empresa_id
