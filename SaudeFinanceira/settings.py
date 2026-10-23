@@ -506,6 +506,7 @@ NFSE_RIO_BRANCO_WS = {
 # API Key Google Gemini — .env local e variável no Render
 # Após comprar créditos: use chave nova do projeto com faturamento (chave gratuita mantém limite ~20/dia)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+MCP_API_TOKEN = os.environ.get('MCP_API_TOKEN', '').strip()
 # Tesseract OCR (Windows: caminho completo se não estiver no PATH)
 TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "").strip()
 # Modelo Gemini (com créditos: gemini-2.5-flash — igual ao app desktop Renome)

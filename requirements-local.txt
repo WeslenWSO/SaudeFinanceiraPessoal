@@ -122,3 +122,4 @@ google-cloud-vision==3.7.4
 gunicorn==23.0.0
 whitenoise==6.8.2
 dj-database-url==2.3.0
+mcp>=1.30.0,<2.0.0

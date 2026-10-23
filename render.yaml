@@ -47,3 +47,33 @@ services:
       name: media-uploads
       mountPath: /var/data
       sizeGB: 10
+
+  # MCP HTTP (consultas read-only — ver docs/MCP_FINANCAS.md)
+  - type: web
+    name: mcp-financas
+    runtime: python
+    plan: starter
+    buildCommand: bash build.sh
+    startCommand: python -m mcp_financas --transport streamable-http
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: DJANGO_SETTINGS_MODULE
+        value: SaudeFinanceira.settings
+      - key: DATABASE_URL
+        fromDatabase:
+          name: financas-db
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: saude-financeira
+          envVarKey: SECRET_KEY
+      - key: MCP_API_TOKEN
+        sync: false
+      - key: MCP_TRANSPORT
+        value: streamable-http
+      - key: MCP_STATELESS_HTTP
+        value: "true"
+      - key: RENDER
+        value: "true"

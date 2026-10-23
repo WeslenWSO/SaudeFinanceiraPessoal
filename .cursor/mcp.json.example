@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "saude-financeira": {
+      "command": "python",
+      "args": ["-m", "mcp_financas", "--transport", "stdio"],
+      "env": {
+        "MCP_API_TOKEN": "SUBSTITUA_PELO_TOKEN",
+        "DJANGO_SETTINGS_MODULE": "SaudeFinanceira.settings"
+      }
+    }
+  }
+}
