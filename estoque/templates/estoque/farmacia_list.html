@@ -10,15 +10,49 @@
       {% if user.is_staff or user.is_superuser %}
       <a href="{% url 'inventario:inventario_list' %}" class="btn btn-outline-warning btn-sm">Inventário (admin)</a>
       {% endif %}
+      {% if total_alertas_minimo and not somente_alertas %}
+      <a href="?somente_alertas=1" class="btn btn-warning btn-sm">
+        Alertas ({{ total_alertas_minimo }})
+      </a>
+      {% endif %}
       <a href="{% url 'notafiscalentrada:produtos_comercio' %}" class="btn btn-success btn-sm">NF Comércio → estoque</a>
     </div>
   </div>
   {% include 'parcial/_messages.html' %}
+
+  {% if total_alertas_minimo %}
+  <div class="alert alert-warning border-warning shadow-sm mb-3" role="alert">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <strong><i class="fas fa-exclamation-triangle me-1"></i> {{ total_alertas_minimo }} produto(s) abaixo do estoque mínimo</strong>
+        <ul class="small mb-0 mt-2 ps-3">
+          {% for p in alertas_amostra %}
+          <li><code>{{ p.codigo_produto }}</code> {{ p.descricao|truncatechars:50 }} — saldo <strong>{{ p.quantidade_estoque }}</strong> (mín. {{ p.estoque_minimo }})</li>
+          {% endfor %}
+          {% if alertas_restantes %}
+          <li class="text-muted">… e mais {{ alertas_restantes }} (use «Ver todos os alertas»)</li>
+          {% endif %}
+        </ul>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        {% if not somente_alertas %}
+        <a href="?somente_alertas=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}" class="btn btn-warning btn-sm">Ver todos os alertas</a>
+        {% else %}
+        <a href="{% url 'estoque:farmacia_list' %}{% if busca %}?q={{ busca|urlencode }}{% endif %}" class="btn btn-outline-secondary btn-sm">Ver estoque completo</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% elif somente_alertas %}
+  <div class="alert alert-success mb-3">Nenhum produto abaixo do estoque mínimo.</div>
+  {% endif %}
+
   <form method="get" class="row g-2 mb-3">
     <div class="col-md-6">
       <input type="search" name="q" class="form-control form-control-sm" placeholder="Produto, código ou marca" value="{{ busca }}">
     </div>
     <div class="col-auto"><button type="submit" class="btn btn-outline-secondary btn-sm">Buscar</button></div>
+    {% if somente_alertas %}<input type="hidden" name="somente_alertas" value="1">{% endif %}
   </form>
   <div class="card shadow-sm">
     <div class="table-responsive">

@@ -58,6 +58,9 @@
                class="smart-nav-link"
                {% if item.externo %}target="_blank" rel="noopener noreferrer"{% endif %}>
               <i class="fas {{ item.icon }} smart-nav-icon"></i> {{ item.rotulo }}
+              {% if item.codigo == 'estoque_farmacia' and estoque_alertas_abaixo_minimo %}
+              <span class="badge bg-warning text-dark ms-1">{{ estoque_alertas_abaixo_minimo }}</span>
+              {% endif %}
             </a>
           </li>
           {% endfor %}
@@ -84,3 +87,10 @@
     </ul>
   </div>
 </nav>
+{% if estoque_alertas_abaixo_minimo and estoque_alertas_url %}
+<div class="alert alert-warning py-2 px-3 mb-0 rounded-0 border-0 border-bottom text-center small" role="alert">
+  <i class="fas fa-exclamation-triangle me-1"></i>
+  <strong>{{ estoque_alertas_abaixo_minimo }}</strong> produto(s) abaixo do estoque mínimo —
+  <a href="{{ estoque_alertas_url }}" class="alert-link fw-semibold">Ver alertas</a>
+</div>
+{% endif %}

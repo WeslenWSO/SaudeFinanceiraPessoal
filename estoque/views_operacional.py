@@ -26,6 +26,7 @@ from estoque.permissoes import (
     usuario_pode_baixa_setor,
     usuario_pode_requisicao_farmacia,
 )
+from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
 from estoque.services.movimentacao import EstoqueErro, concluir_requisicao, gerar_entrada_desde_item_nota
 from estoque.setores import SetorEstoque
 from notafiscalentrada.models import NotaFiscalEntradaItem
@@ -45,7 +46,11 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _EmpresaMixin, ListView):
 
     def get_queryset(self):
         empresa_id = self.get_empresa_id()
-        qs = ProdutoEstoque.objects.filter(empresa_id=empresa_id) if empresa_id else ProdutoEstoque.objects.none()
+        somente_alertas = (self.request.GET.get('somente_alertas') or '').strip() in ('1', 'true', 'sim')
+        if somente_alertas and empresa_id:
+            qs = queryset_abaixo_estoque_minimo(empresa_id)
+        else:
+            qs = ProdutoEstoque.objects.filter(empresa_id=empresa_id) if empresa_id else ProdutoEstoque.objects.none()
         q = (self.request.GET.get('q') or '').strip()
         if q:
             qs = qs.filter(
@@ -57,8 +62,18 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _EmpresaMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        empresa_id = self.get_empresa_id()
         ctx['descricao'] = 'Estoque — Farmácia'
         ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        ctx['somente_alertas'] = (self.request.GET.get('somente_alertas') or '').strip() in (
+            '1',
+            'true',
+            'sim',
+        )
+        ctx['total_alertas_minimo'] = contar_abaixo_estoque_minimo(empresa_id)
+        amostra = list(queryset_abaixo_estoque_minimo(empresa_id)[:8])
+        ctx['alertas_amostra'] = amostra
+        ctx['alertas_restantes'] = max(0, ctx['total_alertas_minimo'] - len(amostra))
         return ctx
 
 
@@ -278,8 +293,16 @@ def requisicao_edit(request, pk: int | None):
             messages.info(request, 'Linha removida.')
         elif acao == 'concluir':
             try:
+                produto_ids = list(requisicao.itens.values_list('produto_id', flat=True))
                 concluir_requisicao(requisicao, usuario=request.user)
                 messages.success(request, 'Requisição concluída.')
+                abaixo = queryset_abaixo_estoque_minimo(empresa_id).filter(pk__in=produto_ids).count()
+                if abaixo:
+                    messages.warning(
+                        request,
+                        f'Alerta: {abaixo} produto(s) desta requisição ficaram abaixo do estoque mínimo. '
+                        f'Veja em Estoque (Farmácia) → Alertas.',
+                    )
             except EstoqueErro as exc:
                 messages.error(request, str(exc))
         elif acao == 'cancelar':

@@ -210,6 +210,7 @@ TEMPLATES = [
                 'agendador_tarefas.context_processors.tarefas_letreiro',
                 'SaudeFinanceira.context_processors.vencimentos_dia_popup',
                 'usuario.context_processors.menu_nav',
+                'estoque.context_processors.alertas_estoque_minimo',
             ],
         },
     },
