@@ -187,9 +187,10 @@ def _contexto_requisicao_tela(
 ):
     itens = []
     produtos = ProdutoEstoque.objects.none()
+    if empresa_id:
+        produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:800]
     if requisicao:
         itens = requisicao.itens.select_related('produto')
-        produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:800]
     descricao = 'Nova requisição' if not requisicao else f'Requisição #{requisicao.pk}'
     return {
         'requisicao': requisicao,
@@ -244,8 +245,13 @@ def requisicao_edit(request, pk: int | None):
                 _aplicar_setores_requisicao(req)
                 req.save()
                 if not pk:
-                    messages.success(request, 'Cabeçalho salvo. Inclua os produtos abaixo.')
-                    return redirect('estoque:requisicao_detail', pk=req.pk)
+                    messages.success(
+                        request,
+                        'Cabeçalho salvo. Escolha o produto e a quantidade na seção «Produtos» abaixo.',
+                    )
+                    return redirect(
+                        reverse('estoque:requisicao_detail', kwargs={'pk': req.pk}) + '#secao-produtos',
+                    )
                 messages.success(request, 'Cabeçalho atualizado.')
                 return redirect('estoque:requisicao_detail', pk=requisicao.pk)
 

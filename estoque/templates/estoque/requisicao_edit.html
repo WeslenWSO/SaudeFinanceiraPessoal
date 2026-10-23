@@ -18,7 +18,7 @@
   {% endif %}
 
   <div class="card shadow-sm mb-4">
-    <div class="card-header py-2"><strong>Cabeçalho</strong></div>
+    <div class="card-header py-2"><strong>1. Cabeçalho</strong></div>
     <div class="card-body">
       {% if pode_editar %}
       <form method="post" id="form-requisicao-estoque">
@@ -39,7 +39,7 @@
           <strong>Baixa setor:</strong> só setor de origem.
         </p>
         <button type="submit" class="btn btn-primary btn-sm">
-          {% if requisicao %}Atualizar cabeçalho{% else %}Salvar e incluir produtos{% endif %}
+          {% if requisicao %}Atualizar cabeçalho{% else %}Salvar cabeçalho (passo 1){% endif %}
         </button>
       </form>
       {% else %}
@@ -58,14 +58,35 @@
     </div>
   </div>
 
-  {% if requisicao %}
-  <div class="card shadow-sm">
+  <div class="card shadow-sm" id="secao-produtos">
     <div class="card-header py-2 d-flex justify-content-between align-items-center">
-      <strong>Produtos</strong>
-      {% if pode_editar %}<span class="small text-muted">Inclua linhas na grade</span>{% endif %}
+      <strong>2. Produtos</strong>
+      {% if requisicao and pode_editar %}
+      <span class="small text-muted">Selecione o produto, informe a quantidade e clique em Incluir na grade</span>
+      {% endif %}
     </div>
     <div class="card-body p-0">
-      {% if pode_editar %}
+      {% if not requisicao %}
+      <div class="alert alert-info m-3 mb-0">
+        <strong>Passo 2:</strong> depois de clicar em <em>Salvar cabeçalho (passo 1)</em>, esta área será liberada para
+        escolher o <strong>produto</strong>, a <strong>quantidade</strong> e incluir linhas na grade.
+      </div>
+      <div class="p-3 border-bottom bg-light opacity-50 pe-none user-select-none" aria-hidden="true">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-7">
+            <label class="form-label small mb-0">Produto</label>
+            <select class="form-select form-select-sm" disabled><option>— Será liberado após o passo 1 —</option></select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small mb-0">Quantidade</label>
+            <input type="number" class="form-control form-control-sm" disabled placeholder="0">
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-outline-primary btn-sm w-100" disabled>Incluir na grade</button>
+          </div>
+        </div>
+      </div>
+      {% elif pode_editar %}
       <form method="post" class="p-3 border-bottom bg-light">
         {% csrf_token %}
         <input type="hidden" name="acao" value="add_item">
@@ -99,7 +120,7 @@
               <th>Código</th>
               <th>Produto</th>
               <th class="text-end">Quantidade</th>
-              {% if pode_editar %}<th></th>{% endif %}
+              {% if requisicao and pode_editar %}<th></th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -121,8 +142,8 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="{% if pode_editar %}4{% else %}3{% endif %}" class="text-center text-muted py-4">
-                Nenhum produto. Use o formulário acima para incluir.
+              <td colspan="{% if requisicao and pode_editar %}4{% else %}3{% endif %}" class="text-center text-muted py-4">
+                {% if requisicao %}Nenhum produto na grade. Use o formulário acima para incluir.{% else %}A grade será preenchida após o passo 1.{% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -130,7 +151,7 @@
         </table>
       </div>
     </div>
-    {% if pode_editar %}
+    {% if requisicao and pode_editar %}
     <div class="card-footer d-flex flex-wrap gap-2">
       <form method="post" class="d-inline">
         {% csrf_token %}
@@ -147,7 +168,6 @@
     </div>
     {% endif %}
   </div>
-  {% endif %}
 </div>
 <script>
 (function () {
@@ -168,6 +188,9 @@
   }
   tipo.addEventListener('change', sync);
   sync();
+  if (window.location.hash === '#secao-produtos') {
+    document.getElementById('secao-produtos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 })();
 </script>
 {% endblock %}
