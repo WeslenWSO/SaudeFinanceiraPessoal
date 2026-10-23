@@ -138,12 +138,19 @@ def faturamento_tem_lote_interno(
     return lote in ids_internos
 
 
-def faturamento_elegivel_lote(faturamento: FaturamentoMedico, *, ids_internos: set[str] | None = None) -> bool:
+def faturamento_elegivel_lote(
+    faturamento: FaturamentoMedico,
+    *,
+    ids_internos: set[str] | None = None,
+    itens: list | None = None,
+) -> bool:
     """Pendente, sem lote interno, com itens conferidos."""
     if (faturamento.status or '').strip() != 'pendente':
         return False
     if faturamento_tem_lote_interno(faturamento, ids_internos=ids_internos):
         return False
+    if itens is not None:
+        return any(getattr(i, 'conferido', False) for i in itens)
     return faturamento.itens_servico.filter(conferido=True).exists()
 
 

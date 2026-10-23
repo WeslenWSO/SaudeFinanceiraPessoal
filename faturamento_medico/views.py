@@ -2469,10 +2469,11 @@ def listar_faturamentos(request):
             return redirect(_url_ftlistar_com_filtros_sessao(request))
 
     empresa_id = request.session.get('empresa_id')
-    if empresa_id:
-        faturamentos = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
-    else:
-        faturamentos = FaturamentoMedico.objects.all().order_by('-data')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa para continuar.')
+        return redirect('empresa:lista')
+
+    faturamentos = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
 
     filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
     faturamentos = _aplicar_filtros_faturamento_qs(faturamentos, filtros, empresa_id=empresa_id)
@@ -2603,6 +2604,12 @@ def listar_faturamentos(request):
 
     for faturamento in faturamentos:
         itens = list(faturamento.itens_servico.all())
+        tem_lote_interno = faturamento_tem_lote_interno(
+            faturamento, ids_internos=ids_lotes_int
+        )
+        elegivel_lote = faturamento_elegivel_lote(
+            faturamento, ids_internos=ids_lotes_int, itens=itens
+        )
         if not itens:
             status_label, status_css = _status_linha_faturamento(
                 faturamento, ids_internos=ids_lotes_int
@@ -2623,12 +2630,8 @@ def listar_faturamentos(request):
                 'status_conferencia': status_label,
                 'status_conferencia_css': status_css,
                 'mostrar_selecao_lote': True,
-                'tem_lote_interno': faturamento_tem_lote_interno(
-                    faturamento, ids_internos=ids_lotes_int
-                ),
-                'elegivel_lote': faturamento_elegivel_lote(
-                    faturamento, ids_internos=ids_lotes_int
-                ),
+                'tem_lote_interno': tem_lote_interno,
+                'elegivel_lote': elegivel_lote,
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
@@ -2665,12 +2668,8 @@ def listar_faturamentos(request):
                 'status_conferencia': status_label,
                 'status_conferencia_css': status_css,
                 'mostrar_selecao_lote': idx == 0,
-                'tem_lote_interno': faturamento_tem_lote_interno(
-                    faturamento, ids_internos=ids_lotes_int
-                ),
-                'elegivel_lote': faturamento_elegivel_lote(
-                    faturamento, ids_internos=ids_lotes_int
-                ),
+                'tem_lote_interno': tem_lote_interno,
+                'elegivel_lote': elegivel_lote,
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
