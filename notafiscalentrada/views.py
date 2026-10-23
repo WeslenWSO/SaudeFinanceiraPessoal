@@ -1261,6 +1261,16 @@ def listar_produtos_comercio(request):
     for item in page_itens:
         item.foto_exibir_url = fotos_arquivo.get(item.codigo_produto, '')
 
+    from estoque.models import EntradaEstoqueNota
+
+    ids = [i.id for i in page_itens]
+    entradas = {
+        e.nota_item_id: e
+        for e in EntradaEstoqueNota.objects.filter(nota_item_id__in=ids).select_related('produto')
+    }
+    for item in page_itens:
+        item.entrada_estoque = entradas.get(item.id)
+
     context = {
         'page_obj': page_obj,
         'itens': page_itens,

@@ -59,6 +59,13 @@ class InventarioCreateView(LoginRequiredMixin, CreateView):
     model = Inventario
     form_class = InventarioForm
     template_name = 'inventario/inventario_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not (request.user.is_superuser or request.user.is_staff):
+            messages.error(request, 'Inventário físico: somente administradores.')
+            return redirect('inventario:inventario_list')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         return reverse('inventario:inventario_detail', kwargs={'pk': self.object.pk})
 

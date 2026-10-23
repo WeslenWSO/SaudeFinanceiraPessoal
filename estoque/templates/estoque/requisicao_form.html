@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3" style="max-width: 640px;">
+  <h1 class="h4 mb-3">{{ descricao }}</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <p class="small text-muted">
+      <strong>Transferência:</strong> farmácia → setor (Ultrasson, Eletros, etc.).<br>
+      <strong>Baixa farmácia:</strong> consumo direto; informe o setor de uso.<br>
+      <strong>Baixa setor:</strong> responsável do setor baixa do estoque local.
+    </p>
+    <button type="submit" class="btn btn-primary">Continuar</button>
+    <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

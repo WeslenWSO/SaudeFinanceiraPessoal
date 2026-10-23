@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="mb-3">
+    <a href="{% url 'estoque:farmacia_list' %}" class="btn btn-outline-secondary btn-sm">← Estoque</a>
+  </div>
+  <h1 class="h4">{{ produto.descricao }}</h1>
+  <p class="text-muted"><code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }} · Farmácia: <strong>{{ produto.quantidade_estoque }}</strong> · Preço médio: R$ {{ produto.valor_custo_medio|floatformat:4 }}</p>
+
+  {% if saldos_setor %}
+  <h2 class="h6 mt-4">Saldo nos setores</h2>
+  <ul class="list-group list-group-flush mb-4" style="max-width: 24rem;">
+    {% for s in saldos_setor %}
+    <li class="list-group-item d-flex justify-content-between"><span>{{ s.get_setor_display }}</span><strong>{{ s.quantidade }}</strong></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2 class="h6">Entradas por nota fiscal</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm table-bordered">
+      <thead class="table-light"><tr><th>Data</th><th>NF</th><th>Qt</th><th>V. unit.</th><th>Validade</th></tr></thead>
+      <tbody>
+        {% for e in entradas_nota %}
+        <tr>
+          <td>{{ e.criado_em|date:"d/m/Y H:i" }}</td>
+          <td><a href="{% url 'notafiscalentrada:editar' e.nota_item.nota_fiscal_id %}">{{ e.nota_item.nota_fiscal.numero_nota }}</a></td>
+          <td>{{ e.quantidade }}</td>
+          <td>R$ {{ e.valor_unitario|floatformat:4 }}</td>
+          <td>{{ e.data_validade|date:"d/m/Y"|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted">Nenhuma entrada vinda de NF.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="h6">Movimentos (transferências e baixas)</h2>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped">
+      <thead class="table-light"><tr><th>Data</th><th>Tipo</th><th>Origem → Destino</th><th>Qt</th><th>Requisição</th><th>Usuário</th></tr></thead>
+      <tbody>
+        {% for m in movimentos %}
+        <tr>
+          <td>{{ m.criado_em|date:"d/m/Y H:i" }}</td>
+          <td>{{ m.get_tipo_display }}</td>
+          <td>{{ m.setor_origem|default:"—" }} → {{ m.setor_destino|default:"—" }}</td>
+          <td>{{ m.quantidade }}</td>
+          <td>{% if m.requisicao_id %}#{{ m.requisicao_id }}{% else %}—{% endif %}</td>
+          <td>{{ m.usuario|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">Sem movimentos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

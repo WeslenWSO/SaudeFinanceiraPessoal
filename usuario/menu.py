@@ -106,6 +106,27 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('portal_extensao', 'Portal (extensão)', 'fa-puzzle-piece', 'fiscal', url_name='notasfiscais:portal_extensao_import'),
     MenuItemDef('nf_entrada', 'NF Comércio e Tomador', 'fa-file-lines', 'fiscal', url_name='notafiscalentrada:listar'),
     MenuItemDef(
+        'estoque_farmacia',
+        'Estoque (Farmácia)',
+        'fa-boxes-stacked',
+        'fiscal',
+        url_name='estoque:farmacia_list',
+    ),
+    MenuItemDef(
+        'estoque_requisicoes',
+        'Requisições de estoque',
+        'fa-truck-medical',
+        'fiscal',
+        url_name='estoque:requisicao_list',
+    ),
+    MenuItemDef(
+        'estoque_relatorio',
+        'Relatório de estoque',
+        'fa-chart-line',
+        'fiscal',
+        url_name='estoque:relatorio_movimentos',
+    ),
+    MenuItemDef(
         'orcamento_compra',
         'Orçamento de compra',
         'fa-balance-scale',

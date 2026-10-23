@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <h1 class="h4 mb-3">{{ descricao }}</h1>
+  <form method="get" class="row g-2 mb-4 align-items-end">
+    <div class="col-md-3"><label class="form-label small">Produto / material</label>{{ form.produto }}</div>
+    <div class="col-md-2"><label class="form-label small">Setor</label>{{ form.setor }}</div>
+    <div class="col-md-2"><label class="form-label small">Início</label>{{ form.data_inicio }}</div>
+    <div class="col-md-2"><label class="form-label small">Fim</label>{{ form.data_fim }}</div>
+    <div class="col-auto"><button class="btn btn-primary btn-sm">Filtrar</button></div>
+  </form>
+
+  <h2 class="h6">Resumo de baixas (por produto e local)</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm table-bordered w-auto">
+      <thead class="table-light"><tr><th>Código</th><th>Produto</th><th>Setor uso</th><th>Total baixado</th></tr></thead>
+      <tbody>
+        {% for row in resumo_baixas %}
+        <tr>
+          <td><code>{{ row.produto__codigo_produto }}</code></td>
+          <td>{{ row.produto__descricao }}</td>
+          <td>{{ row.setor_destino }}</td>
+          <td>{{ row.total }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted">Sem baixas no filtro.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="h6">Movimentos no período</h2>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped">
+      <thead class="table-light"><tr><th>Data</th><th>Produto</th><th>Tipo</th><th>Setores</th><th>Qt</th></tr></thead>
+      <tbody>
+        {% for m in movimentos %}
+        <tr>
+          <td>{{ m.criado_em|date:"d/m/Y" }}</td>
+          <td>{{ m.produto.descricao|truncatechars:40 }}</td>
+          <td>{{ m.get_tipo_display }}</td>
+          <td>{{ m.setor_origem }} → {{ m.setor_destino }}</td>
+          <td>{{ m.quantidade }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted">Nenhum movimento.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

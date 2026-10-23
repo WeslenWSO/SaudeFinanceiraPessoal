@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'estoque:requisicao_nova' %}" class="btn btn-primary btn-sm">Nova requisição</a>
+  </div>
+  {% include 'parcial/_messages.html' %}
+  <div class="table-responsive card shadow-sm">
+    <table class="table table-sm mb-0">
+      <thead class="table-light"><tr><th>#</th><th>Tipo</th><th>Status</th><th>Destino / consumo</th><th>Criada</th><th></th></tr></thead>
+      <tbody>
+        {% for r in object_list %}
+        <tr>
+          <td>{{ r.pk }}</td>
+          <td>{{ r.get_tipo_display }}</td>
+          <td>{{ r.get_status_display }}</td>
+          <td>{{ r.get_setor_destino_display|default:r.get_setor_consumo_display }}</td>
+          <td>{{ r.criado_em|date:"d/m/Y" }} — {{ r.criado_por }}</td>
+          <td><a href="{% url 'estoque:requisicao_detail' r.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma requisição.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
