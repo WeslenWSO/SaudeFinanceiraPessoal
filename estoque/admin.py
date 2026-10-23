@@ -9,6 +9,7 @@ class ProdutoEstoqueAdmin(admin.ModelAdmin):
         'codigo_produto',
         'descricao',
         'marca',
+        'fornecedor',
         'quantidade_estoque',
         'estoque_minimo',
         'dias_entrega_fornecedor',

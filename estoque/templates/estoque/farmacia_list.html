@@ -61,6 +61,7 @@
           <tr>
             <th>Produto</th>
             <th>Marca</th>
+            <th>Fornecedor</th>
             <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qt (farmácia)</th>
@@ -77,6 +78,7 @@
               {% if p.abaixo_estoque_minimo %}<span class="badge bg-warning text-dark ms-1">Abaixo do mín.</span>{% endif %}
             </td>
             <td>{{ p.marca|default:"—" }}</td>
+            <td class="small">{{ p.fornecedor_rotulo|default:"—"|truncatechars:35 }}</td>
             <td>{{ p.unidade_master|default:"—" }}</td>
             <td>{{ p.unidade|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
@@ -89,7 +91,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="9" class="text-center text-muted py-4">Nenhum produto. Gere entradas a partir das notas de comércio.</td></tr>
+          <tr><td colspan="10" class="text-center text-muted py-4">Nenhum produto. Gere entradas a partir das notas de comércio.</td></tr>
           {% endfor %}
         </tbody>
       </table>

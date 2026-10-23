@@ -110,6 +110,8 @@ def gerar_entrada_desde_item_nota(
             produto.unidade = item.unidade[:20]
         if item.nome_produto and len(item.nome_produto) > len(produto.descricao or ''):
             produto.descricao = item.nome_produto[:300]
+    if item.nota_fiscal.fornecedor_id:
+        produto.fornecedor_id = item.nota_fiscal.fornecedor_id
 
     q_ent = item.quantidade or Decimal('0')
     p_ent = item.valor_unitario or Decimal('0')

@@ -42,7 +42,7 @@ class ProdutoEstoqueListView(LoginRequiredMixin, _EmpresaQuerysetMixin, ListView
                 | Q(descricao__icontains=q)
                 | Q(marca__icontains=q)
             )
-        return qs.order_by('codigo_produto', 'descricao')
+        return qs.select_related('fornecedor').order_by('codigo_produto', 'descricao')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -57,6 +57,11 @@ class ProdutoEstoqueCreateView(LoginRequiredMixin, CreateView):
     form_class = ProdutoEstoqueForm
     template_name = 'estoque/produto_form.html'
     success_url = reverse_lazy('estoque:produto_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['empresa_id'] = self.request.session.get('empresa_id')
+        return kwargs
 
     def form_valid(self, form):
         from empresa.models import Empresa
@@ -83,6 +88,11 @@ class ProdutoEstoqueUpdateView(LoginRequiredMixin, _EmpresaQuerysetMixin, Update
     form_class = ProdutoEstoqueForm
     template_name = 'estoque/produto_form.html'
     success_url = reverse_lazy('estoque:produto_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['empresa_id'] = self.request.session.get('empresa_id')
+        return kwargs
 
     def form_valid(self, form):
         messages.success(self.request, 'Produto atualizado com sucesso.')

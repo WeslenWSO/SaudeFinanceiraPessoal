@@ -8,6 +8,7 @@
   <h1 class="h4">{{ produto.descricao }}</h1>
   <p class="text-muted">
     <code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }}
+    · Fornecedor: {{ produto.fornecedor_rotulo|default:"—" }}
     · Farmácia: <strong>{{ produto.quantidade_estoque }}</strong>
     · Est. mín.: {% if produto.estoque_minimo %}{{ produto.estoque_minimo }}{% else %}—{% endif %}
     · Dias entrega (fornec.): {% if produto.dias_entrega_fornecedor != None %}{{ produto.dias_entrega_fornecedor }}{% else %}—{% endif %}

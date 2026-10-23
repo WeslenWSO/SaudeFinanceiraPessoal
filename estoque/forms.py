@@ -1,5 +1,7 @@
 from django import forms
 
+from fornecedor.models import Fornecedor
+
 from estoque.models import ProdutoEstoque
 
 XLSX_MIME = (
@@ -40,6 +42,7 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'codigo_produto',
             'descricao',
             'marca',
+            'fornecedor',
             'unidade_master',
             'unidade',
             'quantidade_estoque',
@@ -54,6 +57,7 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'codigo_produto': forms.TextInput(attrs={'class': _W, 'maxlength': 50}),
             'descricao': forms.TextInput(attrs={'class': _W, 'maxlength': 300}),
             'marca': forms.TextInput(attrs={'class': _W, 'maxlength': 120}),
+            'fornecedor': forms.Select(attrs={'class': 'form-select'}),
             'unidade_master': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
             'unidade': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
             'quantidade_estoque': forms.NumberInput(attrs={'class': _W, 'step': '0.001'}),
@@ -68,7 +72,14 @@ class ProdutoEstoqueForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        empresa_id = kwargs.pop('empresa_id', None)
         super().__init__(*args, **kwargs)
         self.fields['dias_entrega_fornecedor'].help_text = (
             'Quantos dias o fornecedor costuma demorar para entregar (informação de compras).'
         )
+        self.fields['fornecedor'].required = False
+        self.fields['fornecedor'].empty_label = '—'
+        qs = Fornecedor.objects.all().order_by('razao')
+        if empresa_id:
+            qs = qs.filter(empresa_id=empresa_id)
+        self.fields['fornecedor'].queryset = qs

@@ -15,6 +15,15 @@ class ProdutoEstoque(models.Model):
     codigo_produto = models.CharField(max_length=50, verbose_name='Código do produto')
     descricao = models.CharField(max_length=300, verbose_name='Descrição do produto')
     marca = models.CharField(max_length=120, blank=True, default='', verbose_name='Marca')
+    fornecedor = models.ForeignKey(
+        'fornecedor.Fornecedor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='produtos_estoque',
+        verbose_name='Fornecedor',
+        help_text='Fornecedor habitual (pode vir da última NF de compra).',
+    )
     unidade_master = models.CharField(
         max_length=20,
         blank=True,
@@ -88,6 +97,13 @@ class ProdutoEstoque(models.Model):
 
     def __str__(self) -> str:
         return f'{self.codigo_produto} — {self.descricao}'
+
+    @property
+    def fornecedor_rotulo(self) -> str:
+        if not self.fornecedor_id:
+            return ''
+        f = self.fornecedor
+        return (f.nome_fantasia or f.razao or '').strip()
 
     @property
     def abaixo_estoque_minimo(self) -> bool:

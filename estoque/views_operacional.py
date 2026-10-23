@@ -51,6 +51,7 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _EmpresaMixin, ListView):
             qs = queryset_abaixo_estoque_minimo(empresa_id)
         else:
             qs = ProdutoEstoque.objects.filter(empresa_id=empresa_id) if empresa_id else ProdutoEstoque.objects.none()
+        qs = qs.select_related('fornecedor')
         q = (self.request.GET.get('q') or '').strip()
         if q:
             qs = qs.filter(
