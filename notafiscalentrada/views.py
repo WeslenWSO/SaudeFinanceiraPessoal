@@ -1292,7 +1292,7 @@ def listar_produtos_comercio(request):
             'fornecedor': fornecedor,
         },
         'destino_estoque': destino_estoque,
-        'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+        'setores_imobilizado': list(SETOR_LOCALIZACAO_IMOBILIZADO),
         'totais': totais,
         'quantidade_registros': paginator.count,
     }

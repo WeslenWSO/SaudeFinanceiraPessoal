@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import IntegrityError, OperationalError
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -42,6 +43,16 @@ from notafiscalentrada.models import NotaFiscalEntradaItem
 class _EmpresaMixin:
     def get_empresa_id(self):
         return self.request.session.get('empresa_id')
+
+
+def _redirect_voltar_produtos_comercio(request, *, destino_estoque: str = ''):
+    referer = (request.META.get('HTTP_REFERER') or '').strip()
+    if referer and referer.startswith(('http://', 'https://')):
+        return redirect(referer)
+    url = reverse('notafiscalentrada:produtos_comercio')
+    if destino_estoque == 'imobilizado':
+        return redirect(url + '?destino_estoque=imobilizado')
+    return redirect(url)
 
 
 class _ProdutoEstoqueFiscalListMixin(_EmpresaMixin):
@@ -163,10 +174,17 @@ def gerar_estoque_item_nota(request, item_id: int):
         nota_fiscal__empresa_id=empresa_id,
         nota_fiscal__tipo_nota='comercio',
     )
+    destino_post = (request.POST.get('natureza') or '').strip()
     form = GerarEstoqueNotaForm(request.POST)
     if not form.is_valid():
-        messages.error(request, 'Dados inválidos para gerar estoque.')
-        return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
+        erros = '; '.join(
+            f'{campo}: {", ".join(lista)}' for campo, lista in form.errors.items()
+        )
+        messages.error(request, f'Não foi possível gerar estoque. {erros}')
+        return _redirect_voltar_produtos_comercio(
+            request,
+            destino_estoque='imobilizado' if destino_post == NaturezaEstoque.IMOBILIZADO else '',
+        )
 
     try:
         natureza = form.cleaned_data.get('natureza') or NaturezaEstoque.CONSUMIVEL
@@ -188,8 +206,21 @@ def gerar_estoque_item_nota(request, item_id: int):
         messages.success(request, f'Entrada no estoque ({destino}) para {item.codigo_produto}.')
     except EstoqueErro as exc:
         messages.warning(request, str(exc))
+    except IntegrityError:
+        messages.warning(request, 'Este item da NF já possui entrada de estoque registrada.')
+    except OperationalError:
+        messages.error(
+            request,
+            'Banco desatualizado (migrations pendentes no servidor). '
+            'Execute migrate estoque até 0009 no Render.',
+        )
+    except Exception as exc:
+        messages.error(request, f'Erro ao gerar estoque: {exc}')
 
-    return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
+    return _redirect_voltar_produtos_comercio(
+        request,
+        destino_estoque='imobilizado' if destino_post == NaturezaEstoque.IMOBILIZADO else '',
+    )
 
 
 @login_required
