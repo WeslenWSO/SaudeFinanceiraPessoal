@@ -77,6 +77,8 @@ def clonar_faturamento(
     prefixo_obs = f'Clonado do lançamento #{origem.pk}.'
     obs = (dados.get('observacao') or '').strip()
     dados['observacao'] = f'{prefixo_obs}\n{obs}'.strip() if obs else prefixo_obs
+    dados['lote'] = ''
+    dados['medcloud_schedule_id'] = None
 
     novo = FaturamentoMedico(
         empresa_id=origem.empresa_id,
@@ -88,10 +90,8 @@ def clonar_faturamento(
         data_fechamento=None,
         marcado_acerto_caixa=False,
         caixa_acerto='',
-        medcloud_schedule_id=None,
         valor_imposto=0,
         valor_comissao=0,
-        lote='',
         **dados,
     )
     novo.save()
