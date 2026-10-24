@@ -48,3 +48,12 @@ SETOR_LISTA_CEGA_FARMACIA = (
     (SetorEstoque.FARMACIA.value, SetorEstoque.FARMACIA.label),
     *SETOR_TRANSFERENCIA_DESTINOS,
 )
+
+_SETOR_ROTULO = dict(SetorEstoque.choices)
+
+
+def rotulo_setor(codigo: str) -> str:
+    c = (codigo or '').strip()
+    if not c:
+        return '—'
+    return _SETOR_ROTULO.get(c, c)

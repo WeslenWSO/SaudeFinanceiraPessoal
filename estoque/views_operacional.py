@@ -40,6 +40,7 @@ from estoque.setores import (
     SETOR_LISTA_CEGA_FARMACIA,
     SETOR_LOCALIZACAO_IMOBILIZADO,
     SetorEstoque,
+    rotulo_setor,
 )
 from empresa.models import Empresa
 from notafiscalentrada.models import NotaFiscalEntradaItem
@@ -166,12 +167,26 @@ class ProdutoEstoqueOperacionalDetailView(LoginRequiredMixin, _EmpresaMixin, Det
         )
         for e in entradas:
             e.pode_estornar = pode_estornar_entrada_nota(e)
+            dest = e.movimento.setor_destino if e.movimento_id else ''
+            if p.natureza == NaturezaEstoque.IMOBILIZADO:
+                e.setor_rotulo = (
+                    p.get_setor_localizacao_display()
+                    if p.setor_localizacao
+                    else rotulo_setor(dest)
+                )
+            else:
+                e.setor_rotulo = rotulo_setor(dest)
         ctx['entradas_nota'] = entradas
         ctx['movimentos'] = MovimentoEstoque.objects.filter(produto=p).select_related(
             'requisicao', 'usuario'
         )[:100]
         ctx['saldos_setor'] = SaldoEstoqueSetor.objects.filter(produto=p).exclude(quantidade=0)
         ctx['descricao'] = f'Estoque — {p.codigo_produto}'
+        ctx['voltar_estoque_url'] = (
+            reverse('estoque:imobilizado_list')
+            if p.natureza == NaturezaEstoque.IMOBILIZADO
+            else reverse('estoque:farmacia_list')
+        )
         return ctx
 
 
