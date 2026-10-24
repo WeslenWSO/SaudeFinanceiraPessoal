@@ -1264,12 +1264,18 @@ def listar_produtos_comercio(request):
     from estoque.models import EntradaEstoqueNota
 
     ids = [i.id for i in page_itens]
+    from estoque.services.movimentacao import pode_estornar_entrada_nota
+
     entradas = {
         e.nota_item_id: e
-        for e in EntradaEstoqueNota.objects.filter(nota_item_id__in=ids).select_related('produto')
+        for e in EntradaEstoqueNota.objects.filter(nota_item_id__in=ids).select_related(
+            'produto', 'movimento',
+        )
     }
     for item in page_itens:
-        item.entrada_estoque = entradas.get(item.id)
+        entrada = entradas.get(item.id)
+        item.entrada_estoque = entrada
+        item.pode_estornar_entrada = bool(entrada and pode_estornar_entrada_nota(entrada))
 
     destino_estoque = (request.GET.get('destino_estoque') or '').strip().lower()
     if destino_estoque not in ('imobilizado', 'consumivel', 'farmacia'):

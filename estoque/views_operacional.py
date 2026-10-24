@@ -28,7 +28,13 @@ from estoque.permissoes import (
     usuario_pode_requisicao_farmacia,
 )
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
-from estoque.services.movimentacao import EstoqueErro, concluir_requisicao, gerar_entrada_desde_item_nota
+from estoque.services.movimentacao import (
+    EstoqueErro,
+    concluir_requisicao,
+    estornar_entrada_desde_item_nota,
+    gerar_entrada_desde_item_nota,
+    pode_estornar_entrada_nota,
+)
 from estoque.setores import SetorEstoque
 from notafiscalentrada.models import NotaFiscalEntradaItem
 
@@ -121,11 +127,14 @@ class ProdutoEstoqueOperacionalDetailView(LoginRequiredMixin, _EmpresaMixin, Det
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         p = self.object
-        ctx['entradas_nota'] = (
+        entradas = list(
             EntradaEstoqueNota.objects.filter(produto=p)
-            .select_related('nota_item__nota_fiscal', 'criado_por')
-            .order_by('-criado_em')
+            .select_related('nota_item__nota_fiscal', 'criado_por', 'movimento')
+            .order_by('-criado_em'),
         )
+        for e in entradas:
+            e.pode_estornar = pode_estornar_entrada_nota(e)
+        ctx['entradas_nota'] = entradas
         ctx['movimentos'] = MovimentoEstoque.objects.filter(produto=p).select_related(
             'requisicao', 'usuario'
         )[:100]
@@ -172,6 +181,33 @@ def gerar_estoque_item_nota(request, item_id: int):
         messages.success(request, f'Entrada no estoque ({destino}) para {item.codigo_produto}.')
     except EstoqueErro as exc:
         messages.warning(request, str(exc))
+
+    return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
+
+
+@login_required
+@require_POST
+def estornar_estoque_nf_item(request, item_id: int):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('notafiscalentrada:produtos_comercio')
+
+    item = get_object_or_404(
+        NotaFiscalEntradaItem,
+        pk=item_id,
+        nota_fiscal__empresa_id=empresa_id,
+        nota_fiscal__tipo_nota='comercio',
+    )
+    try:
+        estornar_entrada_desde_item_nota(item, usuario=request.user)
+        messages.success(
+            request,
+            f'Entrada estornada para {item.codigo_produto}. '
+            'Na NF Comércio, use «Lançar imobilizado» (tela Estoque imobilizado).',
+        )
+    except EstoqueErro as exc:
+        messages.error(request, str(exc))
 
     return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
 

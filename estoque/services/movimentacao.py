@@ -178,6 +178,83 @@ def gerar_entrada_desde_item_nota(
     )
 
 
+def _motivo_bloqueio_estorno_entrada(entrada: EntradaEstoqueNota) -> str:
+    produto = entrada.produto
+    q_ent = entrada.quantidade or Decimal('0')
+    saldo = produto.quantidade_estoque or Decimal('0')
+    if saldo < q_ent:
+        return (
+            f'Saldo insuficiente na farmácia/patrimônio ({saldo}) para estornar {q_ent}. '
+            'Já houve saída ou transferência deste produto.'
+        )
+    outros = MovimentoEstoque.objects.filter(produto=produto).exclude(
+        pk=entrada.movimento_id,
+    )
+    if outros.filter(
+        tipo__in=(
+            MovimentoEstoque.Tipo.TRANSFERENCIA,
+            MovimentoEstoque.Tipo.BAIXA,
+            MovimentoEstoque.Tipo.AJUSTE,
+        ),
+    ).exists():
+        return 'Não é possível estornar: existem transferências, baixas ou ajustes após esta entrada.'
+    if SaldoEstoqueSetor.objects.filter(produto=produto).exclude(quantidade=0).exists():
+        return 'Não é possível estornar: ainda há saldo em setores (material já distribuído).'
+    return ''
+
+
+def pode_estornar_entrada_nota(entrada: EntradaEstoqueNota) -> bool:
+    return not _motivo_bloqueio_estorno_entrada(entrada)
+
+
+@transaction.atomic
+def estornar_entrada_desde_item_nota(
+    item: NotaFiscalEntradaItem,
+    *,
+    usuario,
+) -> None:
+    entrada = (
+        EntradaEstoqueNota.objects.filter(nota_item=item)
+        .select_related('produto', 'movimento')
+        .first()
+    )
+    if not entrada:
+        raise EstoqueErro('Este item não possui entrada de estoque para estornar.')
+
+    bloqueio = _motivo_bloqueio_estorno_entrada(entrada)
+    if bloqueio:
+        raise EstoqueErro(bloqueio)
+
+    produto = entrada.produto
+    q_ent = entrada.quantidade or Decimal('0')
+    p_ent = entrada.valor_unitario or Decimal('0')
+    q_depois = produto.quantidade_estoque or Decimal('0')
+    c_depois = produto.valor_custo_medio or Decimal('0')
+    q_antes = q_depois - q_ent
+
+    if q_antes > 0:
+        c_antes = (q_depois * c_depois - q_ent * p_ent) / q_antes
+    else:
+        c_antes = Decimal('0')
+
+    produto.quantidade_estoque = q_antes
+    produto.valor_custo_medio = c_antes
+    if q_antes <= 0:
+        produto.valor_ultima_compra = Decimal('0')
+    produto.save(update_fields=['quantidade_estoque', 'valor_custo_medio', 'valor_ultima_compra', 'atualizado_em'])
+
+    mov_id = entrada.movimento_id
+    produto_id = produto.pk
+    entrada.delete()
+    if mov_id:
+        MovimentoEstoque.objects.filter(pk=mov_id).delete()
+
+    restantes = EntradaEstoqueNota.objects.filter(produto_id=produto_id).exists()
+    tem_mov = MovimentoEstoque.objects.filter(produto_id=produto_id).exists()
+    if q_antes <= 0 and not restantes and not tem_mov:
+        ProdutoEstoque.objects.filter(pk=produto_id).delete()
+
+
 @transaction.atomic
 def concluir_requisicao(requisicao: RequisicaoEstoque, *, usuario) -> None:
     if requisicao.status != RequisicaoEstoque.Status.RASCUNHO:

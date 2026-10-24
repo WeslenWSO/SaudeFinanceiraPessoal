@@ -29,7 +29,7 @@
   <h2 class="h6">Entradas por nota fiscal</h2>
   <div class="table-responsive mb-4">
     <table class="table table-sm table-bordered">
-      <thead class="table-light"><tr><th>Data</th><th>NF</th><th>Qt</th><th>V. unit.</th><th>Validade</th></tr></thead>
+      <thead class="table-light"><tr><th>Data</th><th>NF</th><th>Qt</th><th>V. unit.</th><th>Validade</th><th></th></tr></thead>
       <tbody>
         {% for e in entradas_nota %}
         <tr>
@@ -38,9 +38,18 @@
           <td>{{ e.quantidade }}</td>
           <td>R$ {{ e.valor_unitario|floatformat:4 }}</td>
           <td>{{ e.data_validade|date:"d/m/Y"|default:"—" }}</td>
+          <td class="text-nowrap">
+            {% if e.pode_estornar %}
+            <form method="post" action="{% url 'estoque:estornar_estoque_nf_item' e.nota_item_id %}" class="d-inline"
+                  onsubmit="return confirm('Estornar esta entrada da NF?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">Estornar</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-muted">Nenhuma entrada vinda de NF.</td></tr>
+        <tr><td colspan="6" class="text-muted">Nenhuma entrada vinda de NF.</td></tr>
         {% endfor %}
       </tbody>
     </table>
