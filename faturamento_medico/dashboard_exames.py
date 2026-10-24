@@ -414,9 +414,23 @@ def _fmt_card_dashboard(card: dict) -> dict:
     return card
 
 
-def montar_contexto_dashboard_producao(request, empresa_id: int) -> dict:
-    """Contexto do painel Produção (convênio × status de conferência)."""
-    hoje = date.today()
+def _convenios_disponiveis_empresa(empresa_id: int):
+    from servicos_medicos.models import Convenio
+
+    convenios = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
+    if convenios:
+        return convenios
+    return [
+        type('Conv', (), {'nome': n})()
+        for n in (
+            'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
+            'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
+        )
+    ]
+
+
+def _parse_mes_ref_request(request, hoje: date | None = None) -> tuple[int, int]:
+    hoje = hoje or date.today()
     mes_param = (request.GET.get('mes') or '').strip()
     ano, mes = hoje.year, hoje.month
     if mes_param:
@@ -429,47 +443,67 @@ def montar_contexto_dashboard_producao(request, empresa_id: int) -> dict:
                     raise ValueError('mês inválido')
         except (TypeError, ValueError):
             pass
+    return ano, mes
 
+
+def _parse_dias_selecionados_request(request, ano: int, mes: int, hoje: date | None = None) -> list[int]:
+    hoje = hoje or date.today()
+    ultimo_mes = monthrange(ano, mes)[1]
+    dias_sel: list[int] = []
+    for raw in request.GET.getlist('dia'):
+        try:
+            d = int(raw)
+            if 1 <= d <= ultimo_mes:
+                dias_sel.append(d)
+        except (TypeError, ValueError):
+            continue
+    dias_sel = sorted(set(dias_sel))
+    if not dias_sel:
+        if ano == hoje.year and mes == hoje.month:
+            dias_sel = [min(hoje.day, ultimo_mes)]
+        else:
+            dias_sel = [1]
+    return dias_sel
+
+
+def montar_contexto_dashboard_producao(request, empresa_id: int) -> dict:
+    """Produção diária (régua do mês, usuário × convênio × status) — mesmo modelo da tela dedicada."""
+    hoje = date.today()
+    ano, mes = _parse_mes_ref_request(request, hoje)
+    dias_sel = _parse_dias_selecionados_request(request, ano, mes, hoje)
     convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
-    dados = montar_dashboard_exames(empresa_id, ano, mes, convenios=convenios_sel)
 
-    from servicos_medicos.models import Convenio
+    dados = montar_dashboard_exames_diario(
+        empresa_id, ano, mes, dias=dias_sel, convenios=convenios_sel,
+    )
 
-    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
-    if not convenios_disponiveis:
-        convenios_disponiveis = [
-            type('Conv', (), {'nome': n})()
-            for n in (
-                'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
-                'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
-            )
-        ]
-
-    totais = dict(dados['totais_gerais'])
-    totais['total_valor_fmt'] = _fmt_moeda_br(totais['total_valor'])
-    totais['status_linhas'] = [
-        {**linha, 'valor_fmt': _fmt_moeda_br(linha['valor'])}
-        for linha in totais['status_linhas']
-    ]
-
-    params_listagem = [
-        ('data_inicio', dados['data_inicio']),
-        ('data_fim', dados['data_fim']),
-    ]
+    params_base = [('mes', f'{ano:04d}-{mes:02d}')]
     for conv in convenios_sel:
-        params_listagem.append(('convenio', conv))
-
-    params_diario = [('mes', f'{ano:04d}-{mes:02d}')]
-    for conv in convenios_sel:
-        params_diario.append(('convenio', conv))
+        params_base.append(('convenio', conv))
+    for d in dados['dias_selecionados']:
+        params_base.append(('dia', d))
 
     return {
         'mes_filtro': f'{ano:04d}-{mes:02d}',
         'mes_label': dados['mes_label'],
-        'convenios_disponiveis': convenios_disponiveis,
+        'dias_selecionados': dados['dias_selecionados'],
+        'dia_label': dados['dia_label'],
+        'convenios_disponiveis': _convenios_disponiveis_empresa(empresa_id),
+        'filtros': {'convenios': convenios_sel},
         'filtros_producao': {'convenios': convenios_sel},
-        'cards_convenio': [_fmt_card_dashboard(c) for c in dados['cards']],
-        'totais_gerais': totais,
-        'url_listagem_mes': f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params_listagem)}",
-        'url_diario': f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(params_diario)}",
+        'cards_por_usuario': dados['cards_por_usuario'],
+        'status_colunas': dados['status_colunas'],
+        'eventos': dados['eventos'],
+        'total_quantidade': dados['total_quantidade'],
+        'total_itens': dados['total_itens'],
+        'total_clientes': dados['total_clientes'],
+        'regua_dias': [
+            {**d, 'ativo': d['dia'] in dados['dias_selecionados']}
+            for d in dados['regua_dias']
+        ],
+        'regua_max_quantidade': dados['regua_max_quantidade'],
+        'url_dashboard_mes': f"{reverse('faturamento_medico:dashboard_exames')}?{urlencode(params_base)}",
+        'url_producao_tela_cheia': (
+            f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(params_base)}"
+        ),
     }

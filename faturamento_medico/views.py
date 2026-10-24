@@ -4708,80 +4708,9 @@ def dashboard_exames_diario(request):
     if not empresa_id:
         return HttpResponse('Sessão expirada. Faça login novamente.')
 
-    hoje = date.today()
-    mes_param = (request.GET.get('mes') or '').strip()
-    ano, mes = hoje.year, hoje.month
-    if mes_param:
-        try:
-            partes = mes_param.split('-')
-            if len(partes) == 2:
-                ano = int(partes[0])
-                mes = int(partes[1])
-                if mes < 1 or mes > 12:
-                    raise ValueError('mês inválido')
-        except (TypeError, ValueError):
-            messages.warning(request, 'Mês inválido; usando o mês atual.')
+    from .dashboard_exames import montar_contexto_dashboard_producao
 
-    from calendar import monthrange
-
-    ultimo_mes = monthrange(ano, mes)[1]
-    dias_sel = []
-    for raw in request.GET.getlist('dia'):
-        try:
-            d = int(raw)
-            if 1 <= d <= ultimo_mes:
-                dias_sel.append(d)
-        except (TypeError, ValueError):
-            continue
-    dias_sel = sorted(set(dias_sel))
-    if not dias_sel:
-        if ano == hoje.year and mes == hoje.month:
-            dias_sel = [min(hoje.day, ultimo_mes)]
-        else:
-            dias_sel = [1]
-
-    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
-
-    from .dashboard_exames import montar_dashboard_exames_diario
-
-    dados = montar_dashboard_exames_diario(empresa_id, ano, mes, dias=dias_sel, convenios=convenios_sel)
-
-    convenios_disponiveis = []
-    from servicos_medicos.models import Convenio
-    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
-    if not convenios_disponiveis:
-        convenios_disponiveis = [
-            type('Conv', (), {'nome': n})()
-            for n in (
-                'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
-                'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
-            )
-        ]
-
-    params_base = [('mes', f'{ano:04d}-{mes:02d}')]
-    for conv in convenios_sel:
-        params_base.append(('convenio', conv))
-
-    context = {
-        'mes_filtro': f'{ano:04d}-{mes:02d}',
-        'mes_label': dados['mes_label'],
-        'dias_selecionados': dados['dias_selecionados'],
-        'dia_label': dados['dia_label'],
-        'convenios_disponiveis': convenios_disponiveis,
-        'filtros': {'convenios': convenios_sel},
-        'cards_por_usuario': dados['cards_por_usuario'],
-        'status_colunas': dados['status_colunas'],
-        'eventos': dados['eventos'],
-        'total_quantidade': dados['total_quantidade'],
-        'total_itens': dados['total_itens'],
-        'total_clientes': dados['total_clientes'],
-        'regua_dias': [
-            {**d, 'ativo': d['dia'] in dados['dias_selecionados']}
-            for d in dados['regua_dias']
-        ],
-        'regua_max_quantidade': dados['regua_max_quantidade'],
-        'url_dashboard_mes': f"{reverse('faturamento_medico:dashboard_exames')}?{urlencode(params_base)}",
-    }
+    context = montar_contexto_dashboard_producao(request, empresa_id)
     return render(request, 'faturamento_medico/dashboard_exames_diario.html', context)
 
 

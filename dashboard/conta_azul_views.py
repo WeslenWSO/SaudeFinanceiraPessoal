@@ -553,6 +553,9 @@ def _parse_mes_ano_dashboard(request, hoje: date) -> tuple[int, int]:
 
 def _url_mes_dashboard(request, ano: int, mes: int) -> str:
     q = request.GET.copy()
+    q._mutable = True
+    while q.pop('dia', None) is not None:
+        pass
     q['mes'] = f'{ano:04d}-{mes:02d}'
     q.pop('data_inicio', None)
     q.pop('data_fim', None)
