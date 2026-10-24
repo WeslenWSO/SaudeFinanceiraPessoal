@@ -107,8 +107,7 @@
             table-layout: fixed;
         }
         table.grid td:nth-child(2),
-        table.grid td:nth-child(3),
-        table.grid td:nth-child(10) {
+        table.grid td:nth-child(3) {
             word-wrap: break-word;
             overflow-wrap: anywhere;
         }
@@ -250,9 +249,6 @@
                 <th>NF</th>
                 <th>Forma pgto.</th>
                 <th class="text-end">Valor NF</th>
-                <th>Discriminação NF</th>
-                <th class="text-end">V. tabela</th>
-                <th class="text-end">Diferença</th>
                 <th>Status</th>
                 <th>Convênio</th>
             </tr>
@@ -275,15 +271,12 @@
                 </td>
                 <td>{{ linha.forma_pgto }}</td>
                 <td class="text-end">{{ linha.valor_nota_fmt }}</td>
-                <td>{{ linha.discriminacao }}</td>
-                <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
-                <td class="text-end">R$ {{ linha.diferenca_fmt }}</td>
                 <td>{{ linha.status_agendamento }}</td>
                 <td>{{ linha.convenio }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="13" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
+                <td colspan="10" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
             </tr>
             {% endfor %}
         </tbody>

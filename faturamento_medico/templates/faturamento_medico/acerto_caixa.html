@@ -86,7 +86,8 @@
                             {% endfor %}
                         </div>
                         <div class="form-text">
-                            Apenas caixas <strong>ativos</strong>. Inativos não aparecem aqui — marque na seção abaixo.
+                            Apenas caixas <strong>ativos</strong>.
+                            <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a> — «Inativo no acerto de caixa».
                         </div>
                     </div>
                     <div class="col-md-2">
@@ -129,41 +130,6 @@
                     </div>
                 </div>
             </form>
-
-            {% if caixas_config %}
-            <div class="card border-secondary mb-4">
-                <div class="card-body py-3">
-                    <h6 class="card-title mb-2">Caixas — marcar inativos</h6>
-                    <p class="small text-muted mb-2">
-                        Contas sincronizadas do Conta Azul (tipo Caixa, Outros ou descrição com “caixa”).
-                        Marcadas como <strong>inativas</strong> não aparecem no filtro acima e permanecem inativas após sincronizar cadastros.
-                    </p>
-                    <form method="post" action="{% url 'faturamento_medico:salvar_caixas_inativos_acerto' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="redirect_qs" value="{{ redirect_qs }}">
-                        <div class="row g-2">
-                            {% for cx in caixas_config %}
-                            <div class="col-md-4 col-lg-3">
-                                <label class="form-check small mb-0">
-                                    <input type="checkbox" class="form-check-input" name="caixa_inativo"
-                                           value="{{ cx.pk }}" {% if cx.inativo %}checked{% endif %}>
-                                    <span class="form-check-label">
-                                        {{ cx.rotulo }}
-                                        <span class="text-muted">({{ cx.tipo }})</span>
-                                        {% if cx.inativo %}<span class="badge bg-secondary ms-1">inativo</span>{% endif %}
-                                    </span>
-                                </label>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        <button type="submit" class="btn btn-outline-secondary btn-sm mt-3">
-                            <i class="fas fa-save"></i> Salvar caixas inativos
-                        </button>
-                        <a href="{% url 'extrato:conta_bancaria_list' %}" class="btn btn-link btn-sm mt-3">Contas bancárias</a>
-                    </form>
-                </div>
-            </div>
-            {% endif %}
 
             <div class="row g-3 mb-4">
                 <div class="col-lg-6">

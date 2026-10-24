@@ -41,19 +41,6 @@ def queryset_contas_caixa(empresa_id: int):
     )
 
 
-def listar_caixas_config_acerto(empresa_id: int) -> list[dict]:
-    rows = []
-    for conta in queryset_contas_caixa_cadastro(empresa_id):
-        rows.append({
-            'pk': conta.pk,
-            'rotulo': rotulo_conta_caixa(conta),
-            'tipo': conta.get_tipo_display(),
-            'inativo': conta.inativo_acerto_caixa,
-            'status': conta.get_status_display(),
-        })
-    return rows
-
-
 def rotulo_conta_caixa(conta: ContaBancaria) -> str:
     desc = (conta.descricao or '').strip()
     if desc:

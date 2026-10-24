@@ -19,7 +19,6 @@ from faturamento_medico.models import (
 from faturamento_medico.services.contas_caixa_acerto import (
     caixas_acerto_choices,
     caixas_acerto_valores,
-    listar_caixas_config_acerto,
 )
 from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
 from faturamento_medico.services.vincular_nota_solicitante import (
@@ -679,7 +678,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
-        'caixas_config': listar_caixas_config_acerto(empresa_id),
         'filtros': filtros_dict,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
