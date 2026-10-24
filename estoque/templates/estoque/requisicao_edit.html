@@ -15,6 +15,13 @@
 
   {% include 'parcial/_messages.html' %}
 
+  {% if requisicao and pode_editar %}
+  <div class="alert alert-warning py-2 small mb-3">
+    <strong>Rascunho</strong> — o estoque só é movimentado ao clicar em <em>Concluir requisição</em> (após conferir produtos e quantidades).
+    Use <em>Salvar rascunho</em> para sair e continuar depois pela lista.
+  </div>
+  {% endif %}
+
   {% if requisicao and not pode_editar %}
   <div class="alert {% if requisicao.status == 'cancelada' %}alert-secondary{% else %}alert-info{% endif %} mb-3">
     <strong>Status: {{ requisicao.get_status_display }}</strong>
@@ -54,7 +61,6 @@
       {% endif %}
       <form method="post" id="form-requisicao-estoque">
         {% csrf_token %}
-        <input type="hidden" name="acao" value="cabecalho">
         <div class="row g-3" style="max-width: 720px;">
           {% for field in form %}
           <div class="col-md-6 field-requisicao field-{{ field.name }}">
@@ -69,9 +75,14 @@
           <strong>Baixa farmácia:</strong> setor destino = setor de uso.
           <strong>Baixa setor:</strong> só setor de origem.
         </p>
-        <button type="submit" class="btn btn-primary btn-sm">
-          {% if requisicao %}Atualizar cabeçalho{% else %}Salvar cabeçalho (passo 1){% endif %}
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-primary btn-sm" name="acao" value="cabecalho">
+            {% if requisicao %}Atualizar e continuar{% else %}Salvar cabeçalho (passo 1){% endif %}
+          </button>
+          <button type="submit" class="btn btn-outline-secondary btn-sm" name="acao" value="cabecalho_rascunho">
+            Salvar rascunho e sair
+          </button>
+        </div>
       </form>
       {% else %}
       <dl class="row mb-0 small">
@@ -191,18 +202,25 @@
       </div>
     </div>
     {% if requisicao and pode_editar %}
-    <div class="card-footer d-flex flex-wrap gap-2">
+    <div class="card-footer d-flex flex-wrap align-items-center gap-2">
       <form method="post" class="d-inline">
         {% csrf_token %}
-        <input type="hidden" name="acao" value="concluir">
-        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Confirmar movimentação de estoque?');">
-          Concluir requisição
-        </button>
+        <input type="hidden" name="acao" value="salvar_rascunho">
+        <button type="submit" class="btn btn-primary btn-sm">Salvar rascunho</button>
       </form>
       <form method="post" class="d-inline">
         {% csrf_token %}
+        <input type="hidden" name="acao" value="concluir">
+        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Conferiu produtos e quantidades? Isso movimenta o estoque.');">
+          Concluir requisição (após conferência)
+        </button>
+      </form>
+      <form method="post" class="d-inline ms-auto">
+        {% csrf_token %}
         <input type="hidden" name="acao" value="cancelar">
-        <button type="submit" class="btn btn-outline-danger btn-sm">Cancelar requisição</button>
+        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Descartar esta requisição?');">
+          Cancelar requisição
+        </button>
       </form>
     </div>
     {% endif %}

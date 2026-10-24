@@ -192,7 +192,12 @@ def _contexto_requisicao_tela(
         produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:800]
     if requisicao:
         itens = requisicao.itens.select_related('produto')
-    descricao = 'Nova requisição' if not requisicao else f'Requisição #{requisicao.pk}'
+    if not requisicao:
+        descricao = 'Nova requisição'
+    elif requisicao.status == RequisicaoEstoque.Status.RASCUNHO:
+        descricao = f'Requisição #{requisicao.pk} · Rascunho'
+    else:
+        descricao = f'Requisição #{requisicao.pk}'
     return {
         'requisicao': requisicao,
         'form': form,
@@ -232,7 +237,7 @@ def requisicao_edit(request, pk: int | None):
     if request.method == 'POST':
         acao = (request.POST.get('acao') or 'cabecalho').strip()
 
-        if acao == 'cabecalho':
+        if acao in ('cabecalho', 'cabecalho_rascunho'):
             if requisicao and requisicao.status != RequisicaoEstoque.Status.RASCUNHO:
                 messages.error(request, 'Requisição não está em rascunho.')
                 return redirect('estoque:requisicao_detail', pk=requisicao.pk)
@@ -255,19 +260,27 @@ def requisicao_edit(request, pk: int | None):
 
                 req = form.save(commit=False)
                 req.empresa_id = empresa_id
+                req.status = RequisicaoEstoque.Status.RASCUNHO
                 if not requisicao:
                     req.criado_por = request.user
                 _aplicar_setores_requisicao(req)
                 req.save()
+                if acao == 'cabecalho_rascunho':
+                    messages.success(
+                        request,
+                        f'Requisição #{req.pk} salva como rascunho. '
+                        'Inclua os produtos e conclua após a conferência.',
+                    )
+                    return redirect('estoque:requisicao_list')
                 if not pk:
                     messages.success(
                         request,
-                        'Cabeçalho salvo. Escolha o produto e a quantidade na seção «Produtos» abaixo.',
+                        'Cabeçalho salvo em rascunho. Escolha o produto e a quantidade na seção «Produtos» abaixo.',
                     )
                     return redirect(
                         reverse('estoque:requisicao_detail', kwargs={'pk': req.pk}) + '#secao-produtos',
                     )
-                messages.success(request, 'Cabeçalho atualizado.')
+                messages.success(request, 'Cabeçalho atualizado (rascunho).')
                 return redirect('estoque:requisicao_detail', pk=requisicao.pk)
 
             return render(
@@ -323,6 +336,13 @@ def requisicao_edit(request, pk: int | None):
             )
             item.delete()
             messages.info(request, 'Linha removida.')
+        elif acao == 'salvar_rascunho':
+            messages.success(
+                request,
+                f'Requisição #{requisicao.pk} permanece em rascunho. '
+                'Abra na lista e use «Concluir requisição» após a conferência.',
+            )
+            return redirect('estoque:requisicao_list')
         elif acao == 'concluir':
             concluido_ok = False
             try:
