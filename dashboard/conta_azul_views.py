@@ -611,10 +611,25 @@ def _contexto_dashboard_intervalo(request):
 
 
 def _aba_dashboard(request) -> str:
-    aba = (request.GET.get('aba') or 'financeiro').strip().lower()
+    from dashboard.analises_catalogo import (
+        ABA_ANALISES_DASHBOARD_VISIVEL,
+        ABA_FINANCEIRO_DASHBOARD_VISIVEL,
+    )
+
+    padrao = 'financeiro' if ABA_FINANCEIRO_DASHBOARD_VISIVEL else 'analises'
+    if not ABA_FINANCEIRO_DASHBOARD_VISIVEL and not ABA_ANALISES_DASHBOARD_VISIVEL:
+        padrao = 'financeiro'
+
+    aba = (request.GET.get('aba') or padrao).strip().lower()
     if aba in ('producao', 'producao_conferencia'):
         aba = 'analises'
-    return aba if aba in ('financeiro', 'analises') else 'financeiro'
+    if aba == 'financeiro' and not ABA_FINANCEIRO_DASHBOARD_VISIVEL:
+        aba = 'analises' if ABA_ANALISES_DASHBOARD_VISIVEL else padrao
+    if aba == 'analises' and not ABA_ANALISES_DASHBOARD_VISIVEL:
+        aba = 'financeiro' if ABA_FINANCEIRO_DASHBOARD_VISIVEL else padrao
+    if aba not in ('financeiro', 'analises'):
+        aba = padrao
+    return aba
 
 
 def _url_aba_dashboard(request, aba: str) -> str:
@@ -632,9 +647,14 @@ def conta_azul_dashboard(request):
         return redirect('empresa:lista')
 
     aba_ativa = _aba_dashboard(request)
-    visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
+    visao = None
+    if aba_ativa == 'financeiro':
+        visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
 
-    from dashboard.analises_catalogo import ABA_ANALISES_DASHBOARD_VISIVEL
+    from dashboard.analises_catalogo import (
+        ABA_ANALISES_DASHBOARD_VISIVEL,
+        ABA_FINANCEIRO_DASHBOARD_VISIVEL,
+    )
     from dashboard.analises_montagem import montar_contexto_aba_analises
 
     analises_ctx: dict = {}
@@ -659,6 +679,7 @@ def conta_azul_dashboard(request):
             'url_aba_financeiro': _url_aba_dashboard(request, 'financeiro'),
             'url_aba_analises': _url_aba_dashboard(request, 'analises'),
             'aba_analises_visivel': ABA_ANALISES_DASHBOARD_VISIVEL,
+            'aba_financeiro_visivel': ABA_FINANCEIRO_DASHBOARD_VISIVEL,
             **analises_ctx,
             **ctx,
         },

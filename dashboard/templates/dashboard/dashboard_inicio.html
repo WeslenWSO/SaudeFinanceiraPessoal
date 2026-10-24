@@ -9,9 +9,11 @@
     {% include 'dashboard/_dashboard_navegacao_mes.html' %}
   </div>
 
-  {% include 'dashboard/_dashboard_area_tabs.html' %}
+  {% if aba_financeiro_visivel and aba_analises_visivel %}
+    {% include 'dashboard/_dashboard_area_tabs.html' %}
+  {% endif %}
 
-  <div class="dashboard-area-panel bg-white border border-top-0 rounded-bottom p-3 p-md-4 shadow-sm">
+  <div class="dashboard-area-panel bg-white border rounded p-3 p-md-4 shadow-sm{% if aba_financeiro_visivel and aba_analises_visivel %} border-top-0 rounded-bottom{% endif %}">
     {% if aba_ativa == 'analises' %}
       {% include 'dashboard/_dashboard_analises_conteudo.html' %}
     {% else %}
