@@ -140,13 +140,24 @@
     </div>
   </div>
 
+  <div class="an-evo-chart-wrap">
+    <div class="an-evo-chart-titulo">{{ titulo_grafico_rs_dia }}</div>
+    <p class="small text-muted text-center mb-2">Eixo horizontal: dias trabalhados no mês (passe o mouse para ver mês/ano).</p>
+    <div class="an-evo-chart-canvas">
+      <canvas id="chartEvolucaoRsDia"></canvas>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
   (function () {
     if (typeof Chart === 'undefined') return;
-    var labels = {{ chart_evolucao_labels_json|safe }};
+    var labelsMes = {{ chart_evolucao_labels_json|safe }};
+    var labelsDias = {{ chart_evolucao_labels_dias_json|safe }};
+    var diasNumeros = {{ chart_evolucao_dias_json|safe }};
     var valoresFat = {{ chart_evolucao_valores_json|safe }};
-    if (!labels.length) return;
+    var valoresRsDia = {{ chart_evolucao_rs_dia_json|safe }};
+    if (!labelsMes.length) return;
 
     function fmtMoeda(v) {
       return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -174,11 +185,11 @@
       };
     }
 
-    function criarGrafico(canvasId, valores, cor, pluginId) {
+    function criarGrafico(canvasId, valores, labelsX, cor, pluginId, tooltipMes) {
       new Chart(document.getElementById(canvasId), {
         type: 'line',
         data: {
-          labels: labels,
+          labels: labelsX,
           datasets: [{
             data: valores,
             borderColor: cor,
@@ -201,6 +212,13 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
+                title: function (items) {
+                  var i = items[0].dataIndex;
+                  if (tooltipMes) {
+                    return labelsMes[i] + ' · ' + diasNumeros[i] + ' dias trabalhados';
+                  }
+                  return labelsMes[i];
+                },
                 label: function (ctx) {
                   return fmtMoeda(ctx.raw || 0);
                 },
@@ -209,10 +227,15 @@
           },
           scales: {
             x: {
+              title: {
+                display: !!tooltipMes,
+                text: 'Dias trabalhados',
+                font: { size: 11, weight: '600' },
+              },
               grid: { display: false },
               ticks: {
                 maxRotation: 90,
-                minRotation: 45,
+                minRotation: 0,
                 font: { size: 10 },
               },
             },
@@ -234,7 +257,8 @@
       });
     }
 
-    criarGrafico('chartEvolucaoFaturamento', valoresFat, '#2563eb', 'evoRotulosFat');
+    criarGrafico('chartEvolucaoFaturamento', valoresFat, labelsMes, '#2563eb', 'evoRotulosFat', false);
+    criarGrafico('chartEvolucaoRsDia', valoresRsDia, labelsDias, '#0d9488', 'evoRotulosRsDia', true);
   })();
   </script>
   {% endif %}
