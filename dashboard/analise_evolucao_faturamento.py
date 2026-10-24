@@ -151,6 +151,7 @@ def montar_evolucao_faturamento(
             'dias_trabalhados': dias,
             'dias_trabalhados_fmt': str(dias),
             'valor': float(valor),
+            'rs_dia': float(rs_dia),
             'faturamento_fmt': _fmt_moeda(valor),
             'rs_dia_fmt': _fmt_moeda(rs_dia),
             'variacao_fmt': variacao_fmt,
@@ -162,13 +163,16 @@ def montar_evolucao_faturamento(
     subtitulo = f'{rotulo_de} a {rotulo_ate}'
     chart_labels = [linha['mes_ano_fmt'] for linha in linhas]
     chart_valores = [linha['valor'] for linha in linhas]
+    chart_rs_dia = [linha['rs_dia'] for linha in linhas]
     return {
         'titulo_relatorio': 'EVOLUÇÃO HISTÓRICA DO FATURAMENTO',
         'subtitulo_periodo': subtitulo,
         'titulo_grafico': f'Faturamento Bruto Mensal — {subtitulo}',
+        'titulo_grafico_rs_dia': f'Faturamento Bruto Médio Diário/Mês — {subtitulo}',
         'linhas_evolucao': linhas,
         'ev_periodo_de_value': f'{ano_de:04d}-{mes_de:02d}',
         'ev_periodo_ate_value': f'{ano_ate:04d}-{mes_ate:02d}',
         'chart_evolucao_labels_json': json.dumps(chart_labels, ensure_ascii=False),
         'chart_evolucao_valores_json': json.dumps(chart_valores),
+        'chart_evolucao_rs_dia_json': json.dumps(chart_rs_dia),
     }
