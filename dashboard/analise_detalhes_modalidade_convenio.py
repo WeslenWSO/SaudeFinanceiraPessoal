@@ -18,7 +18,6 @@ from dashboard.analise_faturamento_convenio import (
 )
 from dashboard.analise_faturamento_modalidade import (
     CORES_MODALIDADE,
-    ROTULOS_MODALIDADE,
     _codigo_modalidade,
     _fmt_percentual_1,
 )
