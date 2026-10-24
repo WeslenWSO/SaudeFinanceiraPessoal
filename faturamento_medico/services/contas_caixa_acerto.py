@@ -8,16 +8,50 @@ from extrato.models import ContaBancaria
 _TIPOS_ACERTO_CAIXA = ('CAIXA', 'OUTROS')
 
 
-def queryset_contas_caixa(empresa_id: int):
+def conta_elegivel_acerto_caixa(conta: ContaBancaria) -> bool:
+    if conta.tipo in _TIPOS_ACERTO_CAIXA:
+        return True
+    return 'caixa' in (conta.descricao or '').lower()
+
+
+def conta_ativa_no_acerto_caixa(conta: ContaBancaria) -> bool:
+    if not conta_elegivel_acerto_caixa(conta):
+        return False
+    if conta.inativo_acerto_caixa:
+        return False
+    return (conta.status or 'A') != 'I'
+
+
+def queryset_contas_caixa_cadastro(empresa_id: int):
+    """Todas as contas elegíveis ao acerto (inclui marcadas inativas)."""
     return (
-        ContaBancaria.objects.filter(
-            empresa_id=empresa_id,
-            status='A',
-        )
+        ContaBancaria.objects.filter(empresa_id=empresa_id)
         .filter(Q(tipo__in=_TIPOS_ACERTO_CAIXA) | Q(descricao__icontains='caixa'))
         .select_related('banco')
         .order_by('descricao', 'id')
     )
+
+
+def queryset_contas_caixa(empresa_id: int):
+    """Somente caixas ativos no acerto (inativos não entram no filtro)."""
+    return (
+        queryset_contas_caixa_cadastro(empresa_id)
+        .filter(inativo_acerto_caixa=False)
+        .exclude(status='I')
+    )
+
+
+def listar_caixas_config_acerto(empresa_id: int) -> list[dict]:
+    rows = []
+    for conta in queryset_contas_caixa_cadastro(empresa_id):
+        rows.append({
+            'pk': conta.pk,
+            'rotulo': rotulo_conta_caixa(conta),
+            'tipo': conta.get_tipo_display(),
+            'inativo': conta.inativo_acerto_caixa,
+            'status': conta.get_status_display(),
+        })
+    return rows
 
 
 def rotulo_conta_caixa(conta: ContaBancaria) -> str:
@@ -52,7 +86,7 @@ def rotulo_caixa_acerto_valor(valor: str, empresa_id: int) -> str:
     if not valor:
         return ''
     if valor.isdigit():
-        conta = queryset_contas_caixa(empresa_id).filter(pk=int(valor)).first()
+        conta = queryset_contas_caixa_cadastro(empresa_id).filter(pk=int(valor)).first()
         if conta:
             return rotulo_conta_caixa(conta)
     from faturamento_medico.models import CAIXAS_ACERTO_CHOICES

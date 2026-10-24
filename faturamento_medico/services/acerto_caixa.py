@@ -19,6 +19,7 @@ from faturamento_medico.models import (
 from faturamento_medico.services.contas_caixa_acerto import (
     caixas_acerto_choices,
     caixas_acerto_valores,
+    listar_caixas_config_acerto,
 )
 from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
 from faturamento_medico.services.vincular_nota_solicitante import (
@@ -353,11 +354,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         di, df = df, di
 
     checkin = (request.GET.get('checkin') or '').strip()
-    valores_caixa = caixas_acerto_valores(empresa_id) | CAIXAS_ACERTO_VALORES
+    valores_caixa_ativos = caixas_acerto_valores(empresa_id)
+    valores_caixa = valores_caixa_ativos | CAIXAS_ACERTO_VALORES
     caixas_sel = [
         c.strip()
         for c in request.GET.getlist('caixa')
-        if c and str(c).strip() in valores_caixa
+        if c
+        and (
+            str(c).strip() in valores_caixa_ativos
+            or str(c).strip() in CAIXAS_ACERTO_VALORES
+        )
     ]
     somente_marcados = request.GET.get('somente_marcados') == '1'
     hora_ini_str = (request.GET.get('hora_inicial') or '').strip()
@@ -673,6 +679,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'status_disponiveis': status_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
+        'caixas_config': listar_caixas_config_acerto(empresa_id),
         'filtros': filtros_dict,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,

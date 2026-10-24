@@ -56,6 +56,14 @@ class ContaBancaria(models.Model):
     )
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='CONTA_CORRENTE', verbose_name='Tipo')
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='A', verbose_name='Status')
+    inativo_acerto_caixa = models.BooleanField(
+        default=False,
+        verbose_name='Inativo no acerto de caixa',
+        help_text=(
+            'Oculta esta conta no Acerto de Caixa. '
+            'Permanece inativa aqui mesmo após sincronizar cadastros no Conta Azul.'
+        ),
+    )
     saldo_conta_azul = models.DecimalField(
         max_digits=14,
         decimal_places=2,
@@ -91,6 +99,16 @@ class ContaBancaria(models.Model):
     def __str__(self):
         base = f"{self.banco} {self.descricao} - {self.agencia}/{self.conta}".strip()
         return f"{self.get_tipo_display()} - {base}"
+
+    def elegivel_acerto_caixa(self) -> bool:
+        if self.tipo in ('CAIXA', 'OUTROS'):
+            return True
+        return 'caixa' in (self.descricao or '').lower()
+
+    def save(self, *args, **kwargs):
+        if self.elegivel_acerto_caixa() and self.status == 'I':
+            self.inativo_acerto_caixa = True
+        super().save(*args, **kwargs)
 
     def nome_curto(self) -> str:
         """Nome resumido para listagens (ex.: STONE, BRADESCO, SICOOB, CAIXA)."""

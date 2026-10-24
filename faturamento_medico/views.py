@@ -6194,6 +6194,56 @@ def acerto_caixa(request):
 
 @login_required
 @require_POST
+def salvar_caixas_inativos_acerto(request):
+    """Marca contas de caixa como inativas no acerto (preservado na sync Conta Azul)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('faturamento_medico:acerto_caixa')
+
+    from extrato.models import ContaBancaria
+    from faturamento_medico.services.contas_caixa_acerto import queryset_contas_caixa_cadastro
+
+    ids_inativos = {
+        int(x)
+        for x in request.POST.getlist('caixa_inativo')
+        if str(x).strip().isdigit()
+    }
+    atualizadas = 0
+    for conta in queryset_contas_caixa_cadastro(empresa_id):
+        inativo = conta.pk in ids_inativos
+        if conta.inativo_acerto_caixa == inativo:
+            continue
+        conta.inativo_acerto_caixa = inativo
+        update_fields = ['inativo_acerto_caixa']
+        if inativo:
+            if conta.status == 'A':
+                conta.status = 'I'
+                update_fields.append('status')
+        elif conta.status == 'I':
+            conta.status = 'A'
+            update_fields.append('status')
+        conta.save(update_fields=update_fields)
+        atualizadas += 1
+
+    if atualizadas:
+        messages.success(
+            request,
+            f'Configuração de caixas atualizada ({atualizadas} conta(s)). '
+            'Inativos não voltam no acerto após sincronizar o Conta Azul.',
+        )
+    else:
+        messages.info(request, 'Nenhuma alteração nos caixas.')
+
+    voltar_qs = (request.POST.get('redirect_qs') or '').strip()
+    url = reverse('faturamento_medico:acerto_caixa')
+    if voltar_qs:
+        return redirect(f'{url}?{voltar_qs}')
+    return redirect(url)
+
+
+@login_required
+@require_POST
 def salvar_acerto_caixa_faturamento(request):
     """AJAX: marca paciente para acerto de caixa e define o caixa."""
     empresa_id = request.session.get('empresa_id')

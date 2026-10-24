@@ -934,8 +934,13 @@ def _upsert_conta_bancaria(
         ).first()
 
     if obj:
+        preservar_inativo_acerto = bool(getattr(obj, 'inativo_acerto_caixa', False))
         for key, val in defaults.items():
+            if preservar_inativo_acerto and key == 'status':
+                continue
             setattr(obj, key, val)
+        if preservar_inativo_acerto:
+            obj.status = 'I'
         try:
             obj.save()
         except IntegrityError:

@@ -22,6 +22,7 @@
                   <th>Conta</th>
                   <th>Tipo</th>
                   <th>Status</th>
+                  <th>Acerto caixa</th>
                   <th>Conta Contábil</th>
                   <th>Descrição</th>
                   <th>Ações</th>
@@ -35,6 +36,17 @@
                   <td>{{ c.conta|default:"-" }}</td>
                   <td>{{ c.get_tipo_display }}</td>
                   <td><span class="badge {% if c.status == 'A' %}bg-success{% else %}bg-secondary{% endif %}">{{ c.get_status_display }}</span></td>
+                  <td>
+                    {% if c.tipo == 'CAIXA' or c.tipo == 'OUTROS' or 'caixa' in c.descricao|default:''|lower %}
+                      {% if c.inativo_acerto_caixa %}
+                      <span class="badge bg-secondary">Inativo</span>
+                      {% else %}
+                      <span class="badge bg-success">Ativo</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
                   <td>{{ c.conta_contabil|default:"-" }}</td>
                   <td>{{ c.descricao|default:"-"|truncatewords:5 }}</td>
                   <td>

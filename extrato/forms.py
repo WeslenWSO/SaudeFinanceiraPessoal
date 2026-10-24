@@ -108,6 +108,7 @@ class ContaBancariaForm(forms.ModelForm):
             "conta",
             "tipo",
             "status",
+            "inativo_acerto_caixa",
             "conta_contabil",
             "descricao",
             "saldo_inicial",
