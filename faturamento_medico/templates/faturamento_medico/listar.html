@@ -403,15 +403,7 @@
                                                     <i class="fas fa-file-alt"></i>
                                                 </a>
                                                 {% if linha.mostrar_selecao_lote %}
-                                                <form method="post"
-                                                      action="{% url 'faturamento_medico:clonar' linha.faturamento.pk %}"
-                                                      class="d-inline"
-                                                      onsubmit="return confirm('Clonar este lançamento? Uma cópia será aberta para edição (convênio, itens, guia etc.).');">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Clonar lançamento">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
-                                                </form>
+                                                {% include 'faturamento_medico/partials/btn_clonar_faturamento.html' with pk=linha.faturamento.pk btn_class='btn-sm btn-outline-secondary' %}
                                                 {% endif %}
                                                 <a href="{% url 'faturamento_medico:editar' linha.faturamento.pk %}"
                                                    class="btn btn-sm btn-outline-warning" title="Editar">
@@ -1854,4 +1846,5 @@ document.addEventListener('DOMContentLoaded', function() {
 </dialog>
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 {% endif %}
+{% include 'faturamento_medico/partials/script_clonar_faturamento.html' %}
 {% endblock %}

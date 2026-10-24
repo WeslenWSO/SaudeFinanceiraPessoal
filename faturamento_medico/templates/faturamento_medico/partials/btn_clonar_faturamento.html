@@ -1,0 +1,6 @@
+<button type="button"
+        class="btn {{ btn_class|default:'btn-outline-secondary btn-sm' }} js-clonar-faturamento"
+        data-url="{% url 'faturamento_medico:clonar' pk %}"
+        title="Clonar lançamento">
+    <i class="fas fa-copy"></i>{% if btn_label %} {{ btn_label }}{% endif %}
+</button>

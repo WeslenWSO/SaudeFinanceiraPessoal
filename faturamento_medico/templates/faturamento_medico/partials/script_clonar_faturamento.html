@@ -1,0 +1,38 @@
+<script>
+(function () {
+    if (window.__fmClonarInit) return;
+    window.__fmClonarInit = true;
+
+    function csrfToken() {
+        var el = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (el && el.value) return el.value;
+        var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    window.fmClonarFaturamento = function (url) {
+        if (!url) return;
+        if (!confirm('Clonar este lançamento? Uma cópia será aberta para edição (convênio, itens, guia etc.).')) {
+            return;
+        }
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        var csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = csrfToken();
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    };
+
+    document.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.js-clonar-faturamento');
+        if (!btn) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        fmClonarFaturamento(btn.getAttribute('data-url'));
+    });
+})();
+</script>

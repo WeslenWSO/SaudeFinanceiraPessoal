@@ -167,15 +167,7 @@
                         <a href="{% url 'faturamento_medico:anexar_documento' faturamento.pk %}" class="btn btn-info btn-sm">
                             <i class="fas fa-paperclip"></i> Anexar
                         </a>
-                        <form method="post"
-                              action="{% url 'faturamento_medico:clonar' faturamento.pk %}"
-                              class="d-inline"
-                              onsubmit="return confirm('Clonar este lançamento? Uma cópia será aberta para edição (convênio, itens, guia etc.).');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Clonar lançamento">
-                                <i class="fas fa-copy"></i> Clonar
-                            </button>
-                        </form>
+                        {% include 'faturamento_medico/partials/btn_clonar_faturamento.html' with pk=faturamento.pk btn_label='Clonar' %}
                         <a href="{% url 'faturamento_medico:editar' faturamento.pk %}" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit"></i> Editar
                         </a>
@@ -1018,4 +1010,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+{% include 'faturamento_medico/partials/script_clonar_faturamento.html' %}
 {% endblock %}
