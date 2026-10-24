@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# Aba no /dash/ — False oculta o link; acesso direto: ?aba=analises&modelo=...
+ABA_ANALISES_DASHBOARD_VISIVEL = False
+
 
 @dataclass(frozen=True)
 class AnaliseModeloDef:
