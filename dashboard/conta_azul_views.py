@@ -752,6 +752,16 @@ def analises_relatorio_pdf(request):
         messages.warning(request, str(exc))
         q = request.GET.urlencode()
         return redirect(f"{reverse('dashboard:analises_relatorio')}?{q}")
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception('analises_relatorio_pdf')
+        messages.error(
+            request,
+            'Erro ao gerar o PDF. Use «Apresentação» e imprima como PDF, ou tente novamente mais tarde.',
+        )
+        q = request.GET.urlencode()
+        return redirect(f"{reverse('dashboard:analises_relatorio')}?{q}")
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="analises-faturamento-{mes_filtro}.pdf"'

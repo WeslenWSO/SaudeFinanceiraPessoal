@@ -15,6 +15,7 @@ class AnaliseModeloDef:
     descricao: str
     icon: str = 'fa-chart-bar'
     template_partial: str = ''
+    exibir_aba: bool = True
 
 
 MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
@@ -24,6 +25,7 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
         'Status de conferência — o que entra ou não no faturamento das análises.',
         'fa-clipboard-check',
         'dashboard/partials/analise_modelo_validacao_conferencia.html',
+        exibir_aba=False,
     ),
     AnaliseModeloDef(
         'faturamento_convenio',
@@ -66,5 +68,10 @@ def modelo_analise_ativo(codigo: str | None) -> AnaliseModeloDef | None:
     return None
 
 
+def modelos_analise_aba() -> tuple[AnaliseModeloDef, ...]:
+    return tuple(m for m in MODELOS_ANALISE if m.exibir_aba)
+
+
 def modelo_analise_padrao() -> AnaliseModeloDef:
-    return MODELOS_ANALISE[0]
+    visiveis = modelos_analise_aba()
+    return visiveis[0] if visiveis else MODELOS_ANALISE[0]

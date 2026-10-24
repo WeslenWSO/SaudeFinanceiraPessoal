@@ -10,7 +10,7 @@ from dashboard.analise_detalhes_modalidade_convenio import montar_detalhes_modal
 from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
 from dashboard.analise_validacao_conferencia import montar_relatorio_validacao_conferencia
 from dashboard.analises_catalogo import (
-    MODELOS_ANALISE,
+    modelos_analise_aba,
     modelo_analise_ativo,
     modelo_analise_padrao,
 )
@@ -40,7 +40,7 @@ def montar_contexto_aba_analises(
     )
 
     ctx: dict = {
-        'modelos_analise': MODELOS_ANALISE,
+        'modelos_analise': modelos_analise_aba(),
         'modelo_analise': modelo.codigo,
         'modelo_analise_titulo': modelo.titulo,
         'modelo_analise_descricao': modelo.descricao,
