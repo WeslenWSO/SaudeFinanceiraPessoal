@@ -120,7 +120,9 @@ class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMi
     def get_queryset(self):
         qs = self._queryset_base()
         setor = (self.request.GET.get('setor') or '').strip()
-        if setor:
+        if setor == '__sem__':
+            qs = qs.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
+        elif setor:
             qs = qs.filter(setor_localizacao=setor)
         return self._aplicar_busca(qs)
 
@@ -130,6 +132,14 @@ class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMi
         ctx['busca'] = (self.request.GET.get('q') or '').strip()
         ctx['filtro_setor'] = (self.request.GET.get('setor') or '').strip()
         ctx['setores_imobilizado'] = SETOR_LOCALIZACAO_IMOBILIZADO
+        empresa_id = self.get_empresa_id()
+        if empresa_id:
+            ctx['total_sem_setor'] = ProdutoEstoque.objects.filter(
+                empresa_id=empresa_id,
+                natureza=NaturezaEstoque.IMOBILIZADO,
+            ).filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True)).count()
+        else:
+            ctx['total_sem_setor'] = 0
         return ctx
 
 
@@ -223,6 +233,44 @@ def gerar_estoque_item_nota(request, item_id: int):
         request,
         destino_estoque='imobilizado' if destino_post == NaturezaEstoque.IMOBILIZADO else '',
     )
+
+
+_SETOR_IMOBILIZADO_VALIDOS = frozenset(v for v, _ in SETOR_LOCALIZACAO_IMOBILIZADO)
+
+
+@login_required
+@require_POST
+def atualizar_setor_imobilizado(request, pk: int):
+    """Define setor clínico na grade de imobilizado (sem abrir cadastro completo)."""
+    empresa_id = request.session.get('empresa_id')
+    voltar = (request.POST.get('next') or '').strip()
+    if not voltar.startswith('/'):
+        voltar = reverse('estoque:imobilizado_list')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:imobilizado_list')
+
+    produto = get_object_or_404(
+        ProdutoEstoque,
+        pk=pk,
+        empresa_id=empresa_id,
+        natureza=NaturezaEstoque.IMOBILIZADO,
+    )
+    setor = (request.POST.get('setor_localizacao') or '').strip()
+    if setor and setor not in _SETOR_IMOBILIZADO_VALIDOS:
+        messages.error(request, 'Setor inválido.')
+        return redirect(voltar)
+
+    produto.setor_localizacao = setor[:32]
+    produto.save(update_fields=['setor_localizacao'])
+    if setor:
+        messages.success(
+            request,
+            f'Setor de {produto.codigo_produto} atualizado para {produto.get_setor_localizacao_display()}.',
+        )
+    else:
+        messages.success(request, f'Setor de {produto.codigo_produto} removido.')
+    return redirect(voltar)
 
 
 @login_required
@@ -627,7 +675,9 @@ def lista_cega_estoque(request):
         produtos = produtos.filter(quantidade_estoque__gt=0)
 
     filtro_setor = (request.GET.get('setor') or '').strip()
-    if natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor:
+    if natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor == '__sem__':
+        produtos = produtos.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
+    elif natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor:
         produtos = produtos.filter(setor_localizacao=filtro_setor)
 
     busca = (request.GET.get('q') or '').strip()

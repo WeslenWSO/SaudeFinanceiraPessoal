@@ -127,8 +127,6 @@ def gerar_entrada_desde_item_nota(
         else SetorEstoque.FARMACIA
     )
     setor_loc = (setor_localizacao or '').strip()
-    if natureza == NaturezaEstoque.IMOBILIZADO and not setor_loc:
-        raise EstoqueErro('Informe o setor de localização do imobilizado.')
 
     produto, created = ProdutoEstoque.objects.get_or_create(
         empresa=empresa,

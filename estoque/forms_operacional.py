@@ -60,12 +60,7 @@ class GerarEstoqueNotaForm(forms.Form):
     )
 
     def clean(self):
-        cleaned = super().clean()
-        natureza = cleaned.get('natureza') or NaturezaEstoque.CONSUMIVEL
-        setor = (cleaned.get('setor_localizacao') or '').strip()
-        if natureza == NaturezaEstoque.IMOBILIZADO and not setor:
-            self.add_error('setor_localizacao', 'Informe o setor onde ficará o imobilizado.')
-        return cleaned
+        return super().clean()
 
 
 class RequisicaoEstoqueForm(forms.ModelForm):

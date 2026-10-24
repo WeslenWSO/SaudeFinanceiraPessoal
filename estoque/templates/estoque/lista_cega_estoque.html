@@ -49,6 +49,7 @@
         <label>Setor</label><br>
         <select name="setor">
           <option value="">Todos</option>
+          <option value="__sem__" {% if filtro_setor == '__sem__' %}selected{% endif %}>Sem setor definido</option>
           {% for val, rotulo in setores_imobilizado %}
           <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
           {% endfor %}

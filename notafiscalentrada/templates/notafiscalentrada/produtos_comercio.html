@@ -186,12 +186,13 @@
                                     {% endif %}
                                     <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca / patrimônio">
                                     {% if destino_estoque == 'imobilizado' %}
-                                    <select name="setor_localizacao" class="form-select form-select-sm" required aria-label="Setor">
-                                      <option value="">— Setor —</option>
+                                    <select name="setor_localizacao" class="form-select form-select-sm" aria-label="Setor">
+                                      <option value="">— Setor (opcional) —</option>
                                       {% for val, rotulo in setores_imobilizado %}
                                       <option value="{{ val }}">{{ rotulo }}</option>
                                       {% endfor %}
                                     </select>
+                                    <small class="text-muted">Pode definir depois em Estoque imobilizado.</small>
                                     {% endif %}
                                     <button type="submit" class="btn btn-success btn-sm">
                                       {% if destino_estoque == 'imobilizado' %}Lançar imobilizado{% else %}Gerar estoque (farmácia){% endif %}

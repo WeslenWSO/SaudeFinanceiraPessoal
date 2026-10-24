@@ -17,6 +17,13 @@
   </div>
   {% include 'parcial/_messages.html' %}
 
+  {% if total_sem_setor %}
+  <div class="alert alert-warning py-2 small mb-3 d-flex flex-wrap align-items-center gap-2">
+    <span><strong>{{ total_sem_setor }}</strong> item(ns) sem setor de localização.</span>
+    <a href="?setor=__sem__" class="btn btn-outline-dark btn-sm">Ver na grade</a>
+  </div>
+  {% endif %}
+
   <form method="get" class="row g-2 mb-3 align-items-end">
     <div class="col-md-5">
       <label class="form-label small mb-0" for="q-imob">Busca</label>
@@ -26,6 +33,7 @@
       <label class="form-label small mb-0" for="setor-imob">Setor</label>
       <select id="setor-imob" name="setor" class="form-select form-select-sm">
         <option value="">Todos os setores</option>
+        <option value="__sem__" {% if filtro_setor == '__sem__' %}selected{% endif %}>Sem setor definido</option>
         {% for val, rotulo in setores_imobilizado %}
         <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
         {% endfor %}
@@ -60,7 +68,19 @@
             <td><code>{{ p.codigo_produto }}</code><br><span class="small">{{ p.descricao }}</span></td>
             <td>{{ p.marca|default:"—" }}</td>
             <td class="small">{{ p.fornecedor_rotulo|default:"—"|truncatechars:35 }}</td>
-            <td class="small">{% if p.setor_localizacao %}{{ p.get_setor_localizacao_display }}{% else %}—{% endif %}</td>
+            <td class="small" style="min-width: 11rem;">
+              <form method="post" action="{% url 'estoque:imobilizado_setor' p.pk %}" class="d-flex flex-column gap-1">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <select name="setor_localizacao" class="form-select form-select-sm" aria-label="Setor de {{ p.codigo_produto }}">
+                  <option value="" {% if not p.setor_localizacao %}selected{% endif %}>— Definir setor —</option>
+                  {% for val, rotulo in setores_imobilizado %}
+                  <option value="{{ val }}" {% if p.setor_localizacao == val %}selected{% endif %}>{{ rotulo }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary btn-sm align-self-start">Salvar setor</button>
+              </form>
+            </td>
             <td>{{ p.unidade|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
             <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
