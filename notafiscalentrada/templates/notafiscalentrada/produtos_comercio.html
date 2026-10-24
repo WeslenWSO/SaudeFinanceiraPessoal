@@ -163,7 +163,12 @@
                                     <input type="hidden" name="natureza" value="consumivel">
                                     {% endif %}
                                     {% if destino_estoque != 'imobilizado' %}
-                                    <input type="text" name="unidade_master" class="form-control form-control-sm" placeholder="Un. master">
+                                    <div class="input-group input-group-sm">
+                                      <input type="text" name="unidade_master" class="form-control" placeholder="Master (PCT)" aria-label="Unidade master">
+                                      <span class="input-group-text px-1">=</span>
+                                      <input type="number" name="quantidade_por_master" class="form-control" step="0.001" min="0" placeholder="Qtd" aria-label="Unidades por master" title="Ex.: 4 se 1 PCT tem 4 UN">
+                                      <span class="input-group-text px-1 small">{{ item.unidade|default:"un." }}</span>
+                                    </div>
                                     <input type="date" name="data_validade" class="form-control form-control-sm" title="Validade">
                                     {% endif %}
                                     <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca / patrimônio">

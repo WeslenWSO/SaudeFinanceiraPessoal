@@ -62,7 +62,7 @@
             <th>Produto</th>
             <th>Marca</th>
             <th>Fornecedor</th>
-            <th>Un. master</th>
+            <th>Un. master (fator)</th>
             <th>Un.</th>
             <th class="text-end">Qt (farmácia)</th>
             <th class="text-end" title="Quantidade mínima desejada">Est. mín.</th>
@@ -79,7 +79,7 @@
             </td>
             <td>{{ p.marca|default:"—" }}</td>
             <td class="small">{{ p.fornecedor_rotulo|default:"—"|truncatechars:35 }}</td>
-            <td>{{ p.unidade_master|default:"—" }}</td>
+            <td class="small">{% if p.rotulo_unidade_master %}{{ p.rotulo_unidade_master }}{% else %}—{% endif %}</td>
             <td>{{ p.unidade|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
             <td class="text-end">{% if p.estoque_minimo %}{{ p.estoque_minimo }}{% else %}—{% endif %}</td>

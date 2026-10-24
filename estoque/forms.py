@@ -44,6 +44,7 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'marca',
             'fornecedor',
             'unidade_master',
+            'quantidade_por_master',
             'unidade',
             'quantidade_estoque',
             'quantidade_estoque_contabil',
@@ -58,8 +59,11 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'descricao': forms.TextInput(attrs={'class': _W, 'maxlength': 300}),
             'marca': forms.TextInput(attrs={'class': _W, 'maxlength': 120}),
             'fornecedor': forms.Select(attrs={'class': 'form-select'}),
-            'unidade_master': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
-            'unidade': forms.TextInput(attrs={'class': _W, 'maxlength': 20}),
+            'unidade_master': forms.TextInput(attrs={'class': _W, 'maxlength': 20, 'placeholder': 'PCT'}),
+            'quantidade_por_master': forms.NumberInput(
+                attrs={'class': _W, 'step': '0.001', 'min': '0', 'placeholder': '4'},
+            ),
+            'unidade': forms.TextInput(attrs={'class': _W, 'maxlength': 20, 'placeholder': 'UN'}),
             'quantidade_estoque': forms.NumberInput(attrs={'class': _W, 'step': '0.001'}),
             'quantidade_estoque_contabil': forms.NumberInput(attrs={'class': _W, 'step': '0.001'}),
             'estoque_minimo': forms.NumberInput(attrs={'class': _W, 'step': '0.001', 'min': '0'}),
@@ -76,6 +80,9 @@ class ProdutoEstoqueForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['dias_entrega_fornecedor'].help_text = (
             'Quantos dias o fornecedor costuma demorar para entregar (informação de compras).'
+        )
+        self.fields['quantidade_por_master'].help_text = (
+            'Ex.: informe 4 quando 1 PCT (master) contém 4 UN (unidade de consumo).'
         )
         self.fields['fornecedor'].required = False
         self.fields['fornecedor'].empty_label = '—'

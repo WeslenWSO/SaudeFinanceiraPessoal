@@ -80,6 +80,7 @@ def gerar_entrada_desde_item_nota(
     usuario,
     marca: str = '',
     unidade_master: str = '',
+    quantidade_por_master=None,
     data_validade=None,
     natureza: str = NaturezaEstoque.CONSUMIVEL,
 ) -> EntradaEstoqueNota:
@@ -109,8 +110,10 @@ def gerar_entrada_desde_item_nota(
             'marca': (marca or '')[:120],
             'unidade': (item.unidade or '')[:20],
             'unidade_master': (unidade_master or '')[:20],
+            'quantidade_por_master': quantidade_por_master or Decimal('0'),
         },
     )
+    q_master = quantidade_por_master if quantidade_por_master is not None else None
     if not created:
         if produto.natureza != natureza:
             rotulo = produto.get_natureza_display()
@@ -122,6 +125,8 @@ def gerar_entrada_desde_item_nota(
             produto.marca = marca[:120]
         if unidade_master:
             produto.unidade_master = unidade_master[:20]
+        if q_master is not None and q_master > 0:
+            produto.quantidade_por_master = q_master
         if item.unidade:
             produto.unidade = item.unidade[:20]
         if item.nome_produto and len(item.nome_produto) > len(produto.descricao or ''):
@@ -166,6 +171,7 @@ def gerar_entrada_desde_item_nota(
         valor_unitario=p_ent,
         marca=(marca or produto.marca or '')[:120],
         unidade_master=(unidade_master or produto.unidade_master or '')[:20],
+        quantidade_por_master=produto.quantidade_por_master or Decimal('0'),
         data_validade=data_validade,
         movimento=mov,
         criado_por=usuario,

@@ -118,6 +118,19 @@ class ProdutoEstoque(models.Model):
         return f'{self.codigo_produto} — {self.descricao}'
 
     @property
+    def rotulo_unidade_master(self) -> str:
+        """Ex.: «1 PCT = 4 UN» ou só «PCT»."""
+        master = (self.unidade_master or '').strip()
+        if not master:
+            return ''
+        qtd = self.quantidade_por_master or 0
+        un = (self.unidade or '').strip()
+        if qtd > 0 and un:
+            q_fmt = f'{qtd:f}'.rstrip('0').rstrip('.')
+            return f'1 {master} = {q_fmt} {un}'
+        return master
+
+    @property
     def fornecedor_rotulo(self) -> str:
         if not self.fornecedor_id:
             return ''
@@ -189,6 +202,7 @@ class EntradaEstoqueNota(models.Model):
     valor_unitario = models.DecimalField(max_digits=12, decimal_places=4)
     marca = models.CharField(max_length=120, blank=True, default='')
     unidade_master = models.CharField(max_length=20, blank=True, default='')
+    quantidade_por_master = models.DecimalField(max_digits=14, decimal_places=3, default=0)
     data_validade = models.DateField(null=True, blank=True)
     movimento = models.OneToOneField(
         'MovimentoEstoque',

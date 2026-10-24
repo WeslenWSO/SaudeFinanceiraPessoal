@@ -160,6 +160,7 @@ def gerar_estoque_item_nota(request, item_id: int):
             usuario=request.user,
             marca=form.cleaned_data.get('marca') or '',
             unidade_master=form.cleaned_data.get('unidade_master') or '',
+            quantidade_por_master=form.cleaned_data.get('quantidade_por_master'),
             data_validade=form.cleaned_data.get('data_validade'),
             natureza=natureza,
         )

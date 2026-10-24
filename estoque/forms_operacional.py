@@ -16,7 +16,21 @@ class GerarEstoqueNotaForm(forms.Form):
         max_length=20,
         required=False,
         label='Un. master',
-        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'CX'}),
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'PCT'}),
+    )
+    quantidade_por_master = forms.DecimalField(
+        required=False,
+        min_value=0,
+        label='Un. por master',
+        widget=forms.NumberInput(
+            attrs={
+                'class': 'form-control form-control-sm',
+                'step': '0.001',
+                'min': '0',
+                'placeholder': '4',
+                'title': 'Quantas unidades de consumo em 1 master (ex.: 1 PCT = 4 UN)',
+            },
+        ),
     )
     data_validade = forms.DateField(
         required=False,
