@@ -777,6 +777,117 @@ def _agrupar_imobilizado_por_setor(produtos) -> list[dict]:
     return grupos
 
 
+def _agrupar_farmacia_por_setor(
+    produtos,
+    *,
+    filtro_setor: str = '',
+    somente_saldo: bool = False,
+) -> list[dict]:
+    """Agrupa consumíveis por setor (depósito farmácia + saldos clínicos)."""
+    from decimal import Decimal
+
+    grupos: list[dict] = []
+
+    def _append(setor_val: str, setor_rotulo: str, produto: ProdutoEstoque, quantidade) -> None:
+        for g in grupos:
+            if g['setor_val'] == setor_val:
+                g['linhas'].append({'produto': produto, 'quantidade': quantidade})
+                return
+        grupos.append(
+            {
+                'setor_val': setor_val,
+                'setor_rotulo': setor_rotulo,
+                'linhas': [{'produto': produto, 'quantidade': quantidade}],
+            },
+        )
+
+    for setor_val, setor_rotulo in SETOR_LISTA_CEGA_FARMACIA:
+        if filtro_setor and filtro_setor != setor_val:
+            continue
+
+        if setor_val == SetorEstoque.FARMACIA:
+            for p in produtos:
+                qtd = p.quantidade_estoque or Decimal('0')
+                if somente_saldo and qtd <= 0:
+                    continue
+                _append(setor_val, setor_rotulo, p, qtd)
+            continue
+
+        for p in produtos:
+            qtd = None
+            for saldo in p.saldos_setor.all():
+                if saldo.setor == setor_val:
+                    qtd = saldo.quantidade or Decimal('0')
+                    break
+            if qtd is None:
+                continue
+            if somente_saldo and qtd <= 0:
+                continue
+            _append(setor_val, setor_rotulo, p, qtd)
+
+    for g in grupos:
+        g['linhas'].sort(key=lambda row: (row['produto'].descricao or '', row['produto'].codigo_produto))
+    return [g for g in grupos if g['linhas']]
+
+
+@login_required
+def lista_farmacia_por_setor(request):
+    """Relação da farmácia agrupada por setor (qtd no setor + preço médio)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:farmacia_list')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    somente_saldo = (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
+    filtro_setor = (request.GET.get('setor') or '').strip()
+    busca = (request.GET.get('q') or '').strip()
+
+    saldo_qs = SaldoEstoqueSetor.objects.order_by('setor')
+    if somente_saldo:
+        saldo_qs = saldo_qs.filter(quantidade__gt=0)
+
+    produtos = (
+        ProdutoEstoque.objects.filter(
+            empresa_id=empresa_id,
+            natureza=NaturezaEstoque.CONSUMIVEL,
+        )
+        .select_related('fornecedor')
+        .prefetch_related(Prefetch('saldos_setor', queryset=saldo_qs))
+        .order_by('codigo_produto', 'descricao')
+    )
+    if busca:
+        produtos = produtos.filter(
+            Q(codigo_produto__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(marca__icontains=busca),
+        )
+
+    grupos = _agrupar_farmacia_por_setor(
+        list(produtos),
+        filtro_setor=filtro_setor,
+        somente_saldo=somente_saldo,
+    )
+    total_linhas = sum(len(g['linhas']) for g in grupos)
+    auto_print = (request.GET.get('auto') or '').strip() == '1'
+
+    return render(
+        request,
+        'estoque/farmacia_lista_setores.html',
+        {
+            'empresa': empresa,
+            'grupos': grupos,
+            'busca': busca,
+            'filtro_setor': filtro_setor,
+            'somente_saldo': somente_saldo,
+            'setores_farmacia': SETOR_LISTA_CEGA_FARMACIA,
+            'total_linhas': total_linhas,
+            'agora': timezone.now(),
+            'auto_print': auto_print,
+        },
+    )
+
+
 @login_required
 def lista_imobilizado_por_setor(request):
     """Relação de imobilizado agrupada por setor (com quantidades e preço médio)."""

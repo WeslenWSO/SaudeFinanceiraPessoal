@@ -7,6 +7,7 @@
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-primary btn-sm">Requisições</a>
       <a href="{% url 'estoque:relatorio_movimentos' %}" class="btn btn-outline-secondary btn-sm">Relatórios</a>
+      <a href="{% url 'estoque:farmacia_lista_setores' %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">Estoque por setor</a>
       <a href="{% url 'estoque:lista_cega' %}?tipo=farmacia" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener">Lista cega</a>
       {% if user.is_staff or user.is_superuser %}
       <a href="{% url 'inventario:inventario_list' %}" class="btn btn-outline-warning btn-sm">Inventário (admin)</a>

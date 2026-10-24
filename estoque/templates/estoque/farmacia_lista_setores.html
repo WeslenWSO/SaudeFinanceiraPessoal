@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Estoque farmácia — por setor</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    html { background: #e8e8e8; }
+    body {
+      font-family: Arial, sans-serif; font-size: 10px; color: #222;
+      box-sizing: border-box;
+      width: 210mm;
+      max-width: 100%;
+      margin: 12px auto;
+      padding: 12mm;
+      background: #fff;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);
+    }
+    h1 { font-size: 15px; text-align: center; margin: 0 0 6px; text-transform: uppercase; }
+    .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 10px; }
+    .meta { font-size: 9px; margin-bottom: 10px; line-height: 1.45; }
+    .grupo-setor { margin-top: 14px; break-inside: avoid; }
+    .grupo-setor h2 {
+      font-size: 12px; margin: 0 0 6px; padding: 4px 6px;
+      background: #333; color: #fff; text-transform: uppercase;
+    }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    th, td { border: 1px solid #999; padding: 4px 5px; vertical-align: top; }
+    th { background: #eee; font-size: 9px; }
+    .text-end { text-align: right; }
+    .no-print { margin-bottom: 12px; }
+    .no-print form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; font-size: 13px; }
+    @media print {
+      html { background: #fff; }
+      body { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      .no-print { display: none; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button type="button" onclick="window.print()">Imprimir</button>
+    <a href="{% url 'estoque:farmacia_list' %}">Voltar à farmácia</a>
+    <a href="{% url 'estoque:lista_cega' %}?tipo=farmacia{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}">Lista cega</a>
+    <form method="get" class="mt-2">
+      <div>
+        <label>Busca</label><br>
+        <input type="search" name="q" value="{{ busca }}" placeholder="Código, produto ou marca">
+      </div>
+      <div>
+        <label>Setor</label><br>
+        <select name="setor">
+          <option value="">Todos os setores</option>
+          {% for val, rotulo in setores_farmacia %}
+          <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" name="somente_saldo" value="1" {% if somente_saldo %}checked{% endif %}>
+          Só com quantidade &gt; 0 no setor
+        </label>
+      </div>
+      <button type="submit">Atualizar lista</button>
+      <a href="?{% if busca %}q={{ busca|urlencode }}&amp;{% endif %}{% if filtro_setor %}setor={{ filtro_setor|urlencode }}&amp;{% endif %}{% if somente_saldo %}somente_saldo=1&amp;{% endif %}auto=1">Gerar e imprimir</a>
+    </form>
+  </div>
+
+  <h1>Estoque — Farmácia</h1>
+  <p class="sub">Lista agrupada por setor (quantidade no setor)</p>
+  <div class="meta">
+    {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
+    <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ total_linhas }} linha(s) · {{ grupos|length }} setor(es)</div>
+  </div>
+
+  {% for grupo in grupos %}
+  <section class="grupo-setor">
+    <h2>{{ grupo.setor_rotulo }} <span style="font-weight:normal;font-size:10px;">({{ grupo.linhas|length }})</span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th style="width:5rem">Marca</th>
+          <th style="width:7rem">Fornecedor</th>
+          <th style="width:2.5rem">Un.</th>
+          <th class="text-end" style="width:4rem">Quantidade</th>
+          <th class="text-end" style="width:5rem">Preço médio</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in grupo.linhas %}
+        {% with p=row.produto %}
+        <tr>
+          <td><strong>{{ p.codigo_produto }}</strong> — {{ p.descricao }}</td>
+          <td>{{ p.marca|default:"" }}</td>
+          <td>{{ p.fornecedor_rotulo|default:""|truncatechars:32 }}</td>
+          <td>{{ p.unidade|default:"" }}</td>
+          <td class="text-end">{{ row.quantidade }}</td>
+          <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% empty %}
+  <p style="text-align:center;padding:16px;color:#666;">Nenhum item encontrado.</p>
+  {% endfor %}
+
+  {% if auto_print %}
+  <script>window.addEventListener('load', function () { window.print(); });</script>
+  {% endif %}
+</body>
+</html>
