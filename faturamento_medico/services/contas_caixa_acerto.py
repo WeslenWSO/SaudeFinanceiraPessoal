@@ -1,16 +1,20 @@
-"""Contas bancárias tipo Caixa usadas no Acerto de Caixa."""
+"""Contas bancárias usadas no Acerto de Caixa (Caixa local ou Outros no Conta Azul)."""
 from __future__ import annotations
 
+from django.db.models import Q
+
 from extrato.models import ContaBancaria
+
+_TIPOS_ACERTO_CAIXA = ('CAIXA', 'OUTROS')
 
 
 def queryset_contas_caixa(empresa_id: int):
     return (
         ContaBancaria.objects.filter(
             empresa_id=empresa_id,
-            tipo='CAIXA',
             status='A',
         )
+        .filter(Q(tipo__in=_TIPOS_ACERTO_CAIXA) | Q(descricao__icontains='caixa'))
         .select_related('banco')
         .order_by('descricao', 'id')
     )
@@ -48,10 +52,7 @@ def rotulo_caixa_acerto_valor(valor: str, empresa_id: int) -> str:
     if not valor:
         return ''
     if valor.isdigit():
-        conta = (
-            ContaBancaria.objects.filter(pk=int(valor), empresa_id=empresa_id, tipo='CAIXA')
-            .first()
-        )
+        conta = queryset_contas_caixa(empresa_id).filter(pk=int(valor)).first()
         if conta:
             return rotulo_conta_caixa(conta)
     from faturamento_medico.models import CAIXAS_ACERTO_CHOICES

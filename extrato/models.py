@@ -27,6 +27,7 @@ class ContaBancaria(models.Model):
         ('INVESTIMENTO', 'Investimento'),
         ('EMPRESTIMO', 'Empréstimo'),
         ('FATURA_CARTAO', 'Fatura de Cartão'),
+        ('OUTROS', 'Outros'),
     ]
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="contas")

@@ -191,6 +191,42 @@
                 {% endif %}
             </table>
         </div>
+        {% if resumo_por_caixa %}
+        <div class="resumo-box" style="flex: 1 1 100%;">
+            <h2>Resumo por caixa</h2>
+            {% for grupo in resumo_por_caixa %}
+            <div style="margin-bottom: 10px; page-break-inside: avoid;">
+                <div style="font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 4px;">{{ grupo.rotulo }}</div>
+                <table>
+                    {% for row in grupo.pagamentos %}
+                    <tr>
+                        <td>{{ row.rotulo }}</td>
+                        <td>R$ {{ row.total_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if grupo.pagamentos %}
+                    <tr class="resumo-grupo">
+                        <td>Subtotal NF</td>
+                        <td>R$ {{ grupo.total_pagamentos_fmt }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if grupo.aguardando %}
+                    <tr class="resumo-grupo">
+                        <td>Aguardando faturamento</td>
+                        <td>R$ {{ grupo.total_aguardando_fmt }}</td>
+                    </tr>
+                    {% for row in grupo.aguardando %}
+                    <tr class="resumo-sub">
+                        <td>{{ row.convenio }}</td>
+                        <td>R$ {{ row.total_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <p class="qtd-linhas"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>

@@ -80,12 +80,14 @@
                             </label>
                             {% empty %}
                             <span class="text-muted small">
-                                Nenhuma conta tipo Caixa ativa.
+                                Nenhuma conta de caixa ativa (tipo Caixa, Outros ou descrição com “caixa”).
                                 <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a>
                             </span>
                             {% endfor %}
                         </div>
-                        <div class="form-text">Contas com tipo <strong>Caixa</strong> no cadastro financeiro.</div>
+                        <div class="form-text">
+                            Contas tipo <strong>Caixa</strong> ou <strong>Outros</strong> (Conta Azul), ou com “caixa” na descrição — ex.: CAIXA - BEATRIZ.
+                        </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small mb-1" for="hora_inicial">Hora inicial</label>
@@ -132,6 +134,7 @@
                 <div class="col-lg-6">
                     <div class="acerto-resumo-card h-100">
                         <h6 class="mb-2">Resumo por forma de pagamento (NF)</h6>
+                        <p class="small text-muted mb-2">Total geral do filtro (todos os caixas).</p>
                         <table class="table table-sm table-borderless mb-0">
                             {% for row in resumo_pagamento %}
                             <tr>
@@ -206,6 +209,54 @@
                         <p class="text-muted small mb-0">
                             Marque um ou mais caixas no filtro acima para fechar ou reabrir o acerto.
                         </p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="acerto-resumo-card">
+                        <h6 class="mb-3">Resumo por caixa</h6>
+                        {% if resumo_por_caixa %}
+                        <div class="row g-3">
+                            {% for grupo in resumo_por_caixa %}
+                            <div class="col-lg-6 col-xl-4">
+                                <div class="border rounded p-2 h-100 bg-white">
+                                    <div class="fw-semibold small mb-2 border-bottom pb-1">{{ grupo.rotulo }}</div>
+                                    <table class="table table-sm table-borderless mb-0 small">
+                                        {% for row in grupo.pagamentos %}
+                                        <tr>
+                                            <td>{{ row.rotulo }}</td>
+                                            <td class="text-end">R$ {{ row.total_fmt }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        {% if not grupo.aguardando %}
+                                        <tr><td class="text-muted">Sem recebimentos NF no filtro.</td></tr>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% if grupo.pagamentos %}
+                                        <tr class="acerto-resumo-grupo">
+                                            <td class="fw-semibold pt-1">Subtotal NF</td>
+                                            <td class="text-end fw-semibold pt-1">R$ {{ grupo.total_pagamentos_fmt }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if grupo.aguardando %}
+                                        <tr class="acerto-resumo-grupo">
+                                            <td class="fw-semibold pt-2">Aguardando faturamento</td>
+                                            <td class="text-end fw-semibold pt-2">R$ {{ grupo.total_aguardando_fmt }}</td>
+                                        </tr>
+                                        {% for row in grupo.aguardando %}
+                                        <tr class="acerto-resumo-sub">
+                                            <td>{{ row.convenio|truncatechars:36 }}</td>
+                                            <td class="text-end">R$ {{ row.total_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                    </table>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">Sem dados no filtro.</p>
                         {% endif %}
                     </div>
                 </div>

@@ -52,7 +52,7 @@ TIPO_CONTA_MAP = {
     'INVESTIMENTO': 'INVESTIMENTO',
     'CARTAO_CREDITO': 'FATURA_CARTAO',
     'APLICACAO': 'INVESTIMENTO',
-    'OUTROS': 'CONTA_CORRENTE',
+    'OUTROS': 'OUTROS',
 }
 
 STATUS_RECEITA_MAP = {
@@ -903,7 +903,8 @@ def _upsert_conta_bancaria(
     conta_num = str(item.get('numero') or item.get('conta') or '').strip()[:30] or ''
     if not conta_num:
         conta_num = f'CA-{ca_id[:12]}'
-    tipo = TIPO_CONTA_MAP.get(str(item.get('tipo') or ''), 'CONTA_CORRENTE')
+    tipo_api = str(item.get('tipo') or '').strip().upper().replace('-', '_').replace(' ', '_')
+    tipo = TIPO_CONTA_MAP.get(tipo_api, 'CONTA_CORRENTE')
     defaults = {
         'banco': banco,
         'agencia': agencia or None,
