@@ -39,13 +39,6 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
         'dashboard/partials/analise_modelo_detalhes_modalidade_convenio.html',
     ),
     AnaliseModeloDef(
-        'exames_convenio',
-        'Exames por convênio e conferência',
-        'Tabelas por convênio: status, quantidade, clientes e valor no mês.',
-        'fa-layer-group',
-        'dashboard/partials/analise_modelo_exames_convenio.html',
-    ),
-    AnaliseModeloDef(
         'evolucao_faturamento',
         'Evolução',
         'Evolução histórica do faturamento — escolha até 12 meses.',
