@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, OperationalError
-from django.db.models import Q, Sum
+from django.db.models import Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -650,6 +650,71 @@ def relatorio_movimentos(request):
     )
 
 
+def _produtos_imobilizado_filtrados(
+    empresa_id: int,
+    *,
+    busca: str = '',
+    filtro_setor: str = '',
+    somente_saldo: bool = False,
+):
+    produtos = (
+        ProdutoEstoque.objects.filter(
+            empresa_id=empresa_id,
+            natureza=NaturezaEstoque.IMOBILIZADO,
+        )
+        .select_related('fornecedor')
+        .order_by('setor_localizacao', 'codigo_produto', 'descricao')
+    )
+    if somente_saldo:
+        produtos = produtos.filter(quantidade_estoque__gt=0)
+    if filtro_setor == '__sem__':
+        produtos = produtos.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
+    elif filtro_setor:
+        produtos = produtos.filter(setor_localizacao=filtro_setor)
+    if busca:
+        produtos = produtos.filter(
+            Q(codigo_produto__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(marca__icontains=busca),
+        )
+    return produtos
+
+
+def _historico_linhas_produto(produto: ProdutoEstoque) -> list[dict]:
+    linhas: list[dict] = []
+    for e in produto.entradas_nota.all():
+        nf = e.nota_item.nota_fiscal
+        linhas.append(
+            {
+                'data': e.criado_em,
+                'tipo': 'Entrada NF',
+                'referencia': f'NF {nf.numero_nota}' if nf else 'NF',
+                'fornecedor_nf': (nf.fornecedor_nome if nf else '') or '',
+                'quantidade': e.quantidade,
+                'valor_unitario': e.valor_unitario,
+                'observacao': (e.data_validade.strftime('%d/%m/%Y') if e.data_validade else ''),
+            },
+        )
+    for m in produto.movimentos.all():
+        if m.tipo == MovimentoEstoque.Tipo.ENTRADA_NF:
+            continue
+        origem = m.setor_origem or '—'
+        destino = m.setor_destino or '—'
+        linhas.append(
+            {
+                'data': m.criado_em,
+                'tipo': m.get_tipo_display(),
+                'referencia': f'{origem} → {destino}',
+                'fornecedor_nf': '',
+                'quantidade': m.quantidade,
+                'valor_unitario': m.valor_unitario,
+                'observacao': (m.observacao or '')[:120],
+            },
+        )
+    linhas.sort(key=lambda row: row['data'], reverse=True)
+    return linhas
+
+
 def _agrupar_imobilizado_por_setor(produtos) -> list[dict]:
     """Agrupa produtos imobilizado por setor_localizacao (ordem dos setores cadastrados)."""
     por_setor: dict[str, list] = {}
@@ -700,33 +765,15 @@ def lista_imobilizado_por_setor(request):
         return redirect('estoque:imobilizado_list')
 
     empresa = get_object_or_404(Empresa, pk=empresa_id)
-    produtos = (
-        ProdutoEstoque.objects.filter(
-            empresa_id=empresa_id,
-            natureza=NaturezaEstoque.IMOBILIZADO,
-        )
-        .select_related('fornecedor')
-        .order_by('setor_localizacao', 'codigo_produto', 'descricao')
-    )
-
     somente_saldo = (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
-    if somente_saldo:
-        produtos = produtos.filter(quantidade_estoque__gt=0)
-
     filtro_setor = (request.GET.get('setor') or '').strip()
-    if filtro_setor == '__sem__':
-        produtos = produtos.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
-    elif filtro_setor:
-        produtos = produtos.filter(setor_localizacao=filtro_setor)
-
     busca = (request.GET.get('q') or '').strip()
-    if busca:
-        produtos = produtos.filter(
-            Q(codigo_produto__icontains=busca)
-            | Q(descricao__icontains=busca)
-            | Q(marca__icontains=busca),
-        )
-
+    produtos = _produtos_imobilizado_filtrados(
+        empresa_id,
+        busca=busca,
+        filtro_setor=filtro_setor,
+        somente_saldo=somente_saldo,
+    )
     grupos = _agrupar_imobilizado_por_setor(list(produtos))
     total_itens = sum(len(g['produtos']) for g in grupos)
     auto_print = (request.GET.get('auto') or '').strip() == '1'
@@ -742,6 +789,68 @@ def lista_imobilizado_por_setor(request):
             'somente_saldo': somente_saldo,
             'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
             'total_itens': total_itens,
+            'agora': timezone.now(),
+            'auto_print': auto_print,
+        },
+    )
+
+
+@login_required
+def lista_imobilizado_por_historico(request):
+    """Imobilizado: um bloco por produto (resumo + linhas de histórico NF/movimentos)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:imobilizado_list')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    somente_saldo = (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
+    filtro_setor = (request.GET.get('setor') or '').strip()
+    busca = (request.GET.get('q') or '').strip()
+
+    produtos = _produtos_imobilizado_filtrados(
+        empresa_id,
+        busca=busca,
+        filtro_setor=filtro_setor,
+        somente_saldo=somente_saldo,
+    ).prefetch_related(
+        Prefetch(
+            'entradas_nota',
+            queryset=EntradaEstoqueNota.objects.select_related(
+                'nota_item__nota_fiscal',
+                'criado_por',
+            ).order_by('-criado_em'),
+        ),
+        Prefetch(
+            'movimentos',
+            queryset=MovimentoEstoque.objects.select_related('usuario', 'requisicao').order_by(
+                '-criado_em',
+            ),
+        ),
+    )
+
+    blocos = []
+    for p in produtos:
+        blocos.append(
+            {
+                'produto': p,
+                'historico': _historico_linhas_produto(p),
+            },
+        )
+
+    auto_print = (request.GET.get('auto') or '').strip() == '1'
+
+    return render(
+        request,
+        'estoque/imobilizado_lista_historico.html',
+        {
+            'empresa': empresa,
+            'blocos': blocos,
+            'busca': busca,
+            'filtro_setor': filtro_setor,
+            'somente_saldo': somente_saldo,
+            'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+            'total_itens': len(blocos),
             'agora': timezone.now(),
             'auto_print': auto_print,
         },

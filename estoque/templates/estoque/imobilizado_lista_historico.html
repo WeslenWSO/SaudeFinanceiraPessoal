@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Estoque imobilizado — lista por histórico</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    html { background: #e8e8e8; }
+    body {
+      font-family: Arial, sans-serif; font-size: 10px; color: #222;
+      box-sizing: border-box;
+      width: 210mm;
+      max-width: 100%;
+      margin: 12px auto;
+      padding: 12mm;
+      background: #fff;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);
+    }
+    h1 { font-size: 15px; text-align: center; margin: 0 0 6px; text-transform: uppercase; }
+    .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 10px; }
+    .meta { font-size: 9px; margin-bottom: 10px; line-height: 1.45; }
+    .bloco-produto { margin-top: 14px; break-inside: avoid; }
+    .resumo-produto {
+      font-size: 10px; margin: 0 0 4px; padding: 5px 6px;
+      background: #f0f0f0; border: 1px solid #999;
+    }
+    .resumo-produto strong { font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    th, td { border: 1px solid #999; padding: 3px 5px; vertical-align: top; }
+    th { background: #eee; font-size: 9px; }
+    .text-end { text-align: right; }
+    .hist-vazio { font-size: 9px; color: #666; font-style: italic; padding: 4px 0; }
+    .no-print { margin-bottom: 12px; }
+    .no-print form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; font-size: 13px; }
+    @media print {
+      html { background: #fff; }
+      body { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      .no-print { display: none; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button type="button" onclick="window.print()">Imprimir</button>
+    <a href="{% url 'estoque:imobilizado_list' %}">Voltar ao imobilizado</a>
+    <a href="{% url 'estoque:imobilizado_lista_setores' %}?{% if busca %}q={{ busca|urlencode }}&amp;{% endif %}{% if filtro_setor %}setor={{ filtro_setor|urlencode }}&amp;{% endif %}{% if somente_saldo %}somente_saldo=1&amp;{% endif %}">Lista por setor</a>
+    <form method="get" class="mt-2">
+      <div>
+        <label>Busca</label><br>
+        <input type="search" name="q" value="{{ busca }}" placeholder="Código, produto ou marca">
+      </div>
+      <div>
+        <label>Setor</label><br>
+        <select name="setor">
+          <option value="">Todos os setores</option>
+          <option value="__sem__" {% if filtro_setor == '__sem__' %}selected{% endif %}>Sem setor definido</option>
+          {% for val, rotulo in setores_imobilizado %}
+          <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" name="somente_saldo" value="1" {% if somente_saldo %}checked{% endif %}>
+          Só com quantidade &gt; 0
+        </label>
+      </div>
+      <button type="submit">Atualizar lista</button>
+      <a href="?{% if busca %}q={{ busca|urlencode }}&amp;{% endif %}{% if filtro_setor %}setor={{ filtro_setor|urlencode }}&amp;{% endif %}{% if somente_saldo %}somente_saldo=1&amp;{% endif %}auto=1">Gerar e imprimir</a>
+    </form>
+  </div>
+
+  <h1>Estoque — Imobilizado</h1>
+  <p class="sub">Lista por produto — resumo e histórico (NF e movimentos)</p>
+  <div class="meta">
+    {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
+    <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ total_itens }} produto(s)</div>
+  </div>
+
+  {% for bloco in blocos %}
+  {% with p=bloco.produto %}
+  <section class="bloco-produto">
+    <div class="resumo-produto">
+      <strong>{{ p.codigo_produto }}</strong> — {{ p.descricao }}
+      · Marca: {{ p.marca|default:"—" }}
+      · Fornecedor: {{ p.fornecedor_rotulo|default:"—"|truncatechars:40 }}
+      · Un.: {{ p.unidade|default:"—" }}
+      · Qtd.: <strong>{{ p.quantidade_estoque }}</strong>
+      · Preço médio: <strong>R$ {{ p.valor_custo_medio|floatformat:4 }}</strong>
+      {% if p.setor_localizacao %}· Setor: <strong>{{ p.get_setor_localizacao_display }}</strong>{% endif %}
+    </div>
+    {% if bloco.historico %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:6.5rem">Data</th>
+          <th style="width:5rem">Tipo</th>
+          <th>Referência</th>
+          <th class="text-end" style="width:3.5rem">Qt</th>
+          <th class="text-end" style="width:4.5rem">V. unit.</th>
+          <th>Obs.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in bloco.historico %}
+        <tr>
+          <td>{{ h.data|date:"d/m/Y H:i" }}</td>
+          <td>{{ h.tipo }}</td>
+          <td>{{ h.referencia }}{% if h.fornecedor_nf %}<br><span style="color:#555;">{{ h.fornecedor_nf|truncatechars:36 }}</span>{% endif %}</td>
+          <td class="text-end">{{ h.quantidade }}</td>
+          <td class="text-end">R$ {{ h.valor_unitario|floatformat:4 }}</td>
+          <td>{{ h.observacao|default:"" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="hist-vazio">Sem histórico registrado.</p>
+    {% endif %}
+  </section>
+  {% endwith %}
+  {% empty %}
+  <p style="text-align:center;padding:16px;color:#666;">Nenhum produto encontrado.</p>
+  {% endfor %}
+
+  {% if auto_print %}
+  <script>window.addEventListener('load', function () { window.print(); });</script>
+  {% endif %}
+</body>
+</html>

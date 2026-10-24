@@ -42,6 +42,7 @@
   <div class="no-print">
     <button type="button" onclick="window.print()">Imprimir</button>
     <a href="{% url 'estoque:imobilizado_list' %}">Voltar ao imobilizado</a>
+    <a href="{% url 'estoque:imobilizado_lista_historico' %}?{% if busca %}q={{ busca|urlencode }}&amp;{% endif %}{% if filtro_setor %}setor={{ filtro_setor|urlencode }}&amp;{% endif %}{% if somente_saldo %}somente_saldo=1&amp;{% endif %}">Lista por histórico</a>
     <form method="get" class="mt-2">
       <div>
         <label>Busca</label><br>
