@@ -990,6 +990,17 @@ def lista_imobilizado_por_historico(request):
     )
 
 
+def _linhas_branco_lista_cega(request) -> int:
+    raw = (request.GET.get('linhas_branco') or '').strip()
+    if not raw:
+        return 0
+    try:
+        n = int(raw)
+    except ValueError:
+        return 0
+    return max(0, min(n, 50))
+
+
 _CHECKLIST_FARMACIA_SETORES: dict[str, tuple[str, str]] = {
     'sedacao': (SetorEstoque.SEDACAO, 'Checklist — Sedação'),
     'carrinho-urgencia': (SetorEstoque.CARRINHO_URGENCIA, 'Checklist — Carrinho de Urgência'),
@@ -1039,6 +1050,7 @@ def checklist_farmacia_setor(request, setor_slug: str):
 
     auto_print = (request.GET.get('auto') or '').strip() == '1'
     setor_coluna_rotulo = rotulo_setor(setor_val)
+    linhas_branco = _linhas_branco_lista_cega(request)
 
     return render(
         request,
@@ -1058,6 +1070,8 @@ def checklist_farmacia_setor(request, setor_slug: str):
             'agora': timezone.now(),
             'auto_print': auto_print,
             'checklist_slug': setor_slug,
+            'linhas_branco': linhas_branco,
+            'linhas_branco_range': range(linhas_branco),
         },
     )
 
@@ -1123,6 +1137,7 @@ def lista_cega_estoque(request):
         )
 
     auto_print = (request.GET.get('auto') or '').strip() == '1'
+    linhas_branco = _linhas_branco_lista_cega(request)
 
     return render(
         request,
@@ -1141,5 +1156,7 @@ def lista_cega_estoque(request):
             'voltar_url': voltar_url,
             'agora': timezone.now(),
             'auto_print': auto_print,
+            'linhas_branco': linhas_branco,
+            'linhas_branco_range': range(linhas_branco),
         },
     )

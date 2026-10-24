@@ -69,6 +69,12 @@
       </div>
       {% endif %}
       <div>
+        <label for="linhas-branco">Linhas em branco</label><br>
+        <input type="number" id="linhas-branco" name="linhas_branco" min="0" max="50" step="1"
+               value="{{ linhas_branco|default:0 }}" style="width:4.5rem;"
+               title="Quantidade de linhas vazias na impressão para preenchimento manual">
+      </div>
+      <div>
         <label>
           {% if checklist_slug %}<input type="hidden" name="somente_saldo" value="0">{% endif %}
           <input type="checkbox" name="somente_saldo" value="1" {% if somente_saldo %}checked{% endif %}>
@@ -78,9 +84,9 @@
       </div>
       <button type="submit">Atualizar lista</button>
       {% if checklist_slug %}
-      <a href="{% url 'estoque:farmacia_checklist' checklist_slug %}?auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if not somente_saldo %}&amp;somente_saldo=0{% endif %}">Gerar e imprimir</a>
+      <a href="{% url 'estoque:farmacia_checklist' checklist_slug %}?auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if not somente_saldo %}&amp;somente_saldo=0{% endif %}{% if linhas_branco %}&amp;linhas_branco={{ linhas_branco }}{% endif %}">Gerar e imprimir</a>
       {% else %}
-      <a href="?tipo={{ tipo }}&amp;auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}">Gerar e imprimir</a>
+      <a href="?tipo={{ tipo }}&amp;auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}{% if linhas_branco %}&amp;linhas_branco={{ linhas_branco }}{% endif %}">Gerar e imprimir</a>
       {% endif %}
     </form>
   </div>
@@ -89,7 +95,7 @@
   <p class="sub">{% if checklist_slug %}Conferência do setor — preencha «Qtd contada» (saldo do sistema oculto){% else %}Contagem física — preencha «Qtd contada» (saldo do sistema oculto){% endif %}</p>
   <div class="meta">
     {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
-    <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ produtos|length }} produto(s) na lista</div>
+    <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ produtos|length }} produto(s) na lista{% if linhas_branco %} · {{ linhas_branco }} linha(s) em branco{% endif %}</div>
   </div>
 
   <table>
@@ -132,8 +138,30 @@
         <td class="col-un">{{ p.unidade|default:"" }}</td>
       </tr>
       {% empty %}
+      {% if not linhas_branco %}
       <tr><td colspan="{% if tipo == 'imobilizado' %}10{% else %}9{% endif %}" style="text-align:center;padding:12px;">Nenhum produto na lista.</td></tr>
+      {% endif %}
       {% endfor %}
+      {% with n_prod=produtos|length %}
+      {% for _ in linhas_branco_range %}
+      <tr>
+        <td>{{ n_prod|add:forloop.counter }}</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        {% if tipo == 'farmacia' %}
+        <td>{% if setor_coluna_rotulo %}{{ setor_coluna_rotulo }}{% else %}&nbsp;{% endif %}</td>
+        {% else %}
+        <td>&nbsp;</td>
+        {% endif %}
+        <td>&nbsp;</td>
+        {% if tipo == 'imobilizado' %}<td>&nbsp;</td>{% endif %}
+        <td class="col-num">&nbsp;</td>
+        <td class="col-num">&nbsp;</td>
+        <td class="col-contagem">&nbsp;</td>
+        <td class="col-un">&nbsp;</td>
+      </tr>
+      {% endfor %}
+      {% endwith %}
     </tbody>
   </table>
 
