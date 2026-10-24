@@ -34,11 +34,19 @@ def queryset_contas_caixa_cadastro(empresa_id: int):
 
 def queryset_contas_caixa(empresa_id: int):
     """Somente caixas ativos no acerto (inativos não entram no filtro)."""
-    return (
-        queryset_contas_caixa_cadastro(empresa_id)
-        .filter(inativo_acerto_caixa=False)
-        .exclude(status='I')
+    return queryset_contas_caixa_cadastro(empresa_id).filter(
+        inativo_acerto_caixa=False,
+        status='A',
     )
+
+
+def caixa_valor_ativo_no_acerto(empresa_id: int, valor: str) -> bool:
+    """True se o valor de caixa_acerto pode aparecer no filtro / select da grade."""
+    valor = (valor or '').strip()
+    if not valor or not valor.isdigit():
+        return False
+    conta = queryset_contas_caixa_cadastro(empresa_id).filter(pk=int(valor)).first()
+    return conta is not None and conta_ativa_no_acerto_caixa(conta)
 
 
 def rotulo_conta_caixa(conta: ContaBancaria) -> str:
@@ -53,7 +61,8 @@ def rotulo_conta_caixa(conta: ContaBancaria) -> str:
 def caixas_acerto_choices(empresa_id: int) -> list[tuple[str, str]]:
     return [
         (str(conta.pk), rotulo_conta_caixa(conta))
-        for conta in queryset_contas_caixa(empresa_id)
+        for conta in queryset_contas_caixa_cadastro(empresa_id)
+        if conta_ativa_no_acerto_caixa(conta)
     ]
 
 

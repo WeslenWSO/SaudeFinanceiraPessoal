@@ -17,6 +17,7 @@ from faturamento_medico.models import (
     rotulo_caixa_acerto,
 )
 from faturamento_medico.services.contas_caixa_acerto import (
+    caixa_valor_ativo_no_acerto,
     caixas_acerto_choices,
     caixas_acerto_valores,
 )
@@ -679,6 +680,14 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'total_aguardando_fmt': _moeda_br(total_ag_caixa),
             },
         )
+
+    resumo_por_caixa_lista = [
+        grupo
+        for grupo in resumo_por_caixa_lista
+        if not (grupo.get('caixa') or '').strip()
+        or caixa_valor_ativo_no_acerto(empresa_id, grupo['caixa'])
+        or str(grupo['caixa']).strip() in CAIXAS_ACERTO_VALORES
+    ]
 
     if caixas_sel:
         nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)

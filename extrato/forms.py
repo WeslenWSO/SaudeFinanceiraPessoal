@@ -128,6 +128,16 @@ class ContaBancariaForm(forms.ModelForm):
                 except Empresa.DoesNotExist:
                     pass
 
+    def clean(self):
+        cleaned = super().clean()
+        tipo = cleaned.get("tipo") or getattr(self.instance, "tipo", "")
+        descricao = cleaned.get("descricao") or getattr(self.instance, "descricao", "") or ""
+        status = cleaned.get("status") or getattr(self.instance, "status", "A")
+        elegivel = tipo in ("CAIXA", "OUTROS") or "caixa" in descricao.lower()
+        if elegivel and status == "I":
+            cleaned["inativo_acerto_caixa"] = True
+        return cleaned
+
 
 class TransferenciaForm(forms.Form):
     """Formulário para transferência baseada em lançamento do extrato bancário"""
