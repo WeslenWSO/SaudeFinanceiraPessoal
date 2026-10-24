@@ -646,6 +646,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         key=lambda x: (-x['total'], x['convenio'].lower()),
     )
     total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
+    total_pagamentos_nf = sum((row['total'] for row in resumo_pagamento_lista), Decimal('0'))
 
     resumo_por_caixa_lista: list[dict] = []
     for chave in sorted(
@@ -735,6 +736,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_por_caixa': resumo_por_caixa_lista,
         'resumo_aguardando_faturamento': resumo_aguardando_lista,
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
+        'total_pagamentos_nf_fmt': _moeda_br(total_pagamentos_nf),
         'status_disponiveis': status_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,

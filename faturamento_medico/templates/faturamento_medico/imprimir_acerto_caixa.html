@@ -62,6 +62,18 @@
             page-break-before: always;
             padding-top: 4px;
         }
+        .secao-resumo-final {
+            page-break-before: always;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        .secao-resumo-final .resumo-box {
+            max-width: 480px;
+            margin: 0 auto 12px;
+        }
+        .secao-resumo-final h1 {
+            margin-bottom: 8px;
+        }
         h1 {
             text-align: center;
             font-size: 14px;
@@ -156,6 +168,9 @@
             table.grid thead { display: table-header-group; }
             table.grid tr { page-break-inside: avoid; }
             .secao-caixa:not(:first-child) {
+                page-break-before: always;
+            }
+            .secao-resumo-final {
                 page-break-before: always;
             }
         }
@@ -273,5 +288,45 @@
     {% empty %}
     <p class="sem-dados">Nenhum procedimento no filtro.</p>
     {% endfor %}
+
+    {% if blocos_impressao %}
+    <section class="secao-resumo-final">
+        <h1>Resumo final — todos os caixas</h1>
+        <p class="periodo">Período: {{ periodo_fmt }} · <strong>{{ quantidade_linhas }}</strong> linha(s) no filtro</p>
+        <div class="resumo-box">
+            <h2>Totais somados (NF e aguardando faturamento)</h2>
+            <table>
+                {% for row in resumo_pagamento %}
+                <tr>
+                    <td>{{ row.rotulo }}</td>
+                    <td>R$ {{ row.total_fmt }}</td>
+                </tr>
+                {% empty %}
+                {% if not resumo_aguardando_faturamento %}
+                <tr><td colspan="2">Sem valores no período.</td></tr>
+                {% endif %}
+                {% endfor %}
+                {% if resumo_pagamento %}
+                <tr class="resumo-grupo">
+                    <td>Subtotal NF (todos os caixas)</td>
+                    <td>R$ {{ total_pagamentos_nf_fmt }}</td>
+                </tr>
+                {% endif %}
+                {% if resumo_aguardando_faturamento %}
+                <tr class="resumo-grupo">
+                    <td>Aguardando faturamento (todos os caixas)</td>
+                    <td>R$ {{ total_aguardando_faturamento_fmt }}</td>
+                </tr>
+                {% for row in resumo_aguardando_faturamento %}
+                <tr class="resumo-sub">
+                    <td>{{ row.convenio }}</td>
+                    <td>R$ {{ row.total_fmt }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </table>
+        </div>
+    </section>
+    {% endif %}
 </body>
 </html>
