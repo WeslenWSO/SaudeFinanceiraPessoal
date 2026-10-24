@@ -181,6 +181,14 @@
                                     <input type="date" name="data_validade" class="form-control form-control-sm" title="Validade">
                                     {% endif %}
                                     <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca / patrimônio">
+                                    {% if destino_estoque == 'imobilizado' %}
+                                    <select name="setor_localizacao" class="form-select form-select-sm" required aria-label="Setor">
+                                      <option value="">— Setor —</option>
+                                      {% for val, rotulo in setores_imobilizado %}
+                                      <option value="{{ val }}">{{ rotulo }}</option>
+                                      {% endfor %}
+                                    </select>
+                                    {% endif %}
                                     <button type="submit" class="btn btn-success btn-sm">
                                       {% if destino_estoque == 'imobilizado' %}Lançar imobilizado{% else %}Gerar estoque (farmácia){% endif %}
                                     </button>

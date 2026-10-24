@@ -2,7 +2,8 @@ from django import forms
 
 from fornecedor.models import Fornecedor
 
-from estoque.models import ProdutoEstoque
+from estoque.models import NaturezaEstoque, ProdutoEstoque
+from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO
 
 XLSX_MIME = (
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -43,6 +44,7 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'descricao',
             'marca',
             'fornecedor',
+            'setor_localizacao',
             'unidade_master',
             'quantidade_por_master',
             'unidade',
@@ -59,6 +61,7 @@ class ProdutoEstoqueForm(forms.ModelForm):
             'descricao': forms.TextInput(attrs={'class': _W, 'maxlength': 300}),
             'marca': forms.TextInput(attrs={'class': _W, 'maxlength': 120}),
             'fornecedor': forms.Select(attrs={'class': 'form-select'}),
+            'setor_localizacao': forms.Select(attrs={'class': 'form-select'}),
             'unidade_master': forms.TextInput(attrs={'class': _W, 'maxlength': 20, 'placeholder': 'PCT'}),
             'quantidade_por_master': forms.NumberInput(
                 attrs={'class': _W, 'step': '0.001', 'min': '0', 'placeholder': '4'},
@@ -90,3 +93,16 @@ class ProdutoEstoqueForm(forms.ModelForm):
         if empresa_id:
             qs = qs.filter(empresa_id=empresa_id)
         self.fields['fornecedor'].queryset = qs
+        self.fields['setor_localizacao'].required = False
+        self.fields['setor_localizacao'].choices = [('', '—')] + list(SETOR_LOCALIZACAO_IMOBILIZADO)
+        nat = None
+        if self.instance.pk:
+            nat = self.instance.natureza
+        if nat != NaturezaEstoque.IMOBILIZADO:
+            self.fields['setor_localizacao'].widget = forms.HiddenInput()
+        self.fields['setor_localizacao'].choices = [('', '—')] + list(SETOR_LOCALIZACAO_IMOBILIZADO)
+        self.fields['setor_localizacao'].required = False
+        if self.instance.pk and self.instance.natureza != NaturezaEstoque.IMOBILIZADO:
+            del self.fields['setor_localizacao']
+        else:
+            self.fields['setor_localizacao'].help_text = 'Setor clínico onde o bem está instalado.'

@@ -35,7 +35,7 @@ from estoque.services.movimentacao import (
     gerar_entrada_desde_item_nota,
     pode_estornar_entrada_nota,
 )
-from estoque.setores import SetorEstoque
+from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO, SetorEstoque
 from notafiscalentrada.models import NotaFiscalEntradaItem
 
 
@@ -82,22 +82,6 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin
             qs = self._queryset_base()
         return self._aplicar_busca(qs)
 
-
-class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
-    """Patrimônio / bens — entradas via NF comércio (Fiscal)."""
-
-    natureza_filtro = NaturezaEstoque.IMOBILIZADO
-    template_name = 'estoque/imobilizado_list.html'
-
-    def get_queryset(self):
-        return self._aplicar_busca(self._queryset_base())
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['descricao'] = 'Estoque — Imobilizado'
-        ctx['busca'] = (self.request.GET.get('q') or '').strip()
-        return ctx
-
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         empresa_id = self.get_empresa_id()
@@ -112,6 +96,28 @@ class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMi
         amostra = list(queryset_abaixo_estoque_minimo(empresa_id)[:8])
         ctx['alertas_amostra'] = amostra
         ctx['alertas_restantes'] = max(0, ctx['total_alertas_minimo'] - len(amostra))
+        return ctx
+
+
+class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
+    """Patrimônio / bens — entradas via NF comércio (Fiscal)."""
+
+    natureza_filtro = NaturezaEstoque.IMOBILIZADO
+    template_name = 'estoque/imobilizado_list.html'
+
+    def get_queryset(self):
+        qs = self._queryset_base()
+        setor = (self.request.GET.get('setor') or '').strip()
+        if setor:
+            qs = qs.filter(setor_localizacao=setor)
+        return self._aplicar_busca(qs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['descricao'] = 'Estoque — Imobilizado'
+        ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        ctx['filtro_setor'] = (self.request.GET.get('setor') or '').strip()
+        ctx['setores_imobilizado'] = SETOR_LOCALIZACAO_IMOBILIZADO
         return ctx
 
 
@@ -172,6 +178,7 @@ def gerar_estoque_item_nota(request, item_id: int):
             quantidade_por_master=form.cleaned_data.get('quantidade_por_master'),
             data_validade=form.cleaned_data.get('data_validade'),
             natureza=natureza,
+            setor_localizacao=form.cleaned_data.get('setor_localizacao') or '',
         )
         destino = (
             'imobilizado'

@@ -18,6 +18,7 @@ from .produto_foto import (
     placeholder_foto_svg,
     url_google_imagens,
 )
+from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO
 from empresa.models import Empresa
 from fornecedor.models import Fornecedor
 from regraConciliacao.models import RegraConciliacao
@@ -1291,6 +1292,7 @@ def listar_produtos_comercio(request):
             'fornecedor': fornecedor,
         },
         'destino_estoque': destino_estoque,
+        'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
         'totais': totais,
         'quantidade_registros': paginator.count,
     }

@@ -83,6 +83,7 @@ def gerar_entrada_desde_item_nota(
     quantidade_por_master=None,
     data_validade=None,
     natureza: str = NaturezaEstoque.CONSUMIVEL,
+    setor_localizacao: str = '',
 ) -> EntradaEstoqueNota:
     if item.nota_fiscal.tipo_nota != 'comercio':
         raise EstoqueErro('Somente itens de NF de comércio geram estoque.')
@@ -100,12 +101,16 @@ def gerar_entrada_desde_item_nota(
         if natureza == NaturezaEstoque.IMOBILIZADO
         else SetorEstoque.FARMACIA
     )
+    setor_loc = (setor_localizacao or '').strip()
+    if natureza == NaturezaEstoque.IMOBILIZADO and not setor_loc:
+        raise EstoqueErro('Informe o setor de localização do imobilizado.')
 
     produto, created = ProdutoEstoque.objects.get_or_create(
         empresa=empresa,
         codigo_produto=codigo,
         defaults={
             'natureza': natureza,
+            'setor_localizacao': setor_loc[:32] if setor_loc else '',
             'descricao': (item.nome_produto or codigo)[:300],
             'marca': (marca or '')[:120],
             'unidade': (item.unidade or '')[:20],
@@ -133,6 +138,8 @@ def gerar_entrada_desde_item_nota(
             produto.descricao = item.nome_produto[:300]
     if item.nota_fiscal.fornecedor_id:
         produto.fornecedor_id = item.nota_fiscal.fornecedor_id
+    if setor_loc:
+        produto.setor_localizacao = setor_loc[:32]
 
     q_ent = item.quantidade or Decimal('0')
     p_ent = item.valor_unitario or Decimal('0')

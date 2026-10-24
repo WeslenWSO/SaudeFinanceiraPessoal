@@ -1,7 +1,11 @@
 from django import forms
 
 from estoque.models import NaturezaEstoque, ProdutoEstoque, RequisicaoEstoque, RequisicaoEstoqueItem
-from estoque.setores import SETOR_TRANSFERENCIA_DESTINOS, SetorEstoque
+from estoque.setores import (
+    SETOR_LOCALIZACAO_IMOBILIZADO,
+    SETOR_TRANSFERENCIA_DESTINOS,
+    SetorEstoque,
+)
 
 
 class GerarEstoqueNotaForm(forms.Form):
@@ -36,6 +40,20 @@ class GerarEstoqueNotaForm(forms.Form):
         required=False,
         widget=forms.DateInput(attrs={'class': 'form-control form-control-sm', 'type': 'date'}),
     )
+    setor_localizacao = forms.ChoiceField(
+        required=False,
+        label='Setor',
+        choices=[('', '— Setor —')] + list(SETOR_LOCALIZACAO_IMOBILIZADO),
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        natureza = cleaned.get('natureza') or NaturezaEstoque.CONSUMIVEL
+        setor = (cleaned.get('setor_localizacao') or '').strip()
+        if natureza == NaturezaEstoque.IMOBILIZADO and not setor:
+            self.add_error('setor_localizacao', 'Informe o setor onde ficará o imobilizado.')
+        return cleaned
 
 
 class RequisicaoEstoqueForm(forms.ModelForm):

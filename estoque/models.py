@@ -24,6 +24,14 @@ class ProdutoEstoque(models.Model):
         verbose_name='Natureza',
         help_text='Consumível: farmácia e requisições. Imobilizado: patrimônio / bens.',
     )
+    setor_localizacao = models.CharField(
+        max_length=32,
+        choices=SetorEstoque.choices,
+        blank=True,
+        default='',
+        verbose_name='Setor (localização)',
+        help_text='Para imobilizado: setor clínico onde o bem está.',
+    )
     codigo_produto = models.CharField(max_length=50, verbose_name='Código do produto')
     descricao = models.CharField(max_length=300, verbose_name='Descrição do produto')
     marca = models.CharField(max_length=120, blank=True, default='', verbose_name='Marca')

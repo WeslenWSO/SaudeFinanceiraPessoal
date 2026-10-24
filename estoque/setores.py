@@ -20,3 +20,6 @@ SETOR_TRANSFERENCIA_DESTINOS = tuple(
     for c in SetorEstoque
     if c not in (SetorEstoque.FARMACIA, SetorEstoque.IMOBILIZADO)
 )
+
+# Onde o bem imobilizado está instalado / em uso (não é o depósito «Imobilizado»).
+SETOR_LOCALIZACAO_IMOBILIZADO = SETOR_TRANSFERENCIA_DESTINOS

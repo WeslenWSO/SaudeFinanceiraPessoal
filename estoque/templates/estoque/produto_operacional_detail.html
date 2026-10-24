@@ -9,6 +9,9 @@
   <p class="text-muted">
     <code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }}
     · Fornecedor: {{ produto.fornecedor_rotulo|default:"—" }}
+    {% if produto.natureza == 'imobilizado' and produto.setor_localizacao %}
+    · Setor: <strong>{{ produto.get_setor_localizacao_display }}</strong>
+    {% endif %}
     {% if produto.rotulo_unidade_master %}· Embalagem: <strong>{{ produto.rotulo_unidade_master }}</strong>{% endif %}
     · Farmácia: <strong>{{ produto.quantidade_estoque }}</strong> {{ produto.unidade }}
     · Est. mín.: {% if produto.estoque_minimo %}{{ produto.estoque_minimo }}{% else %}—{% endif %}

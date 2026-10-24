@@ -16,11 +16,26 @@
   </div>
   {% include 'parcial/_messages.html' %}
 
-  <form method="get" class="row g-2 mb-3">
-    <div class="col-md-6">
-      <input type="search" name="q" class="form-control form-control-sm" placeholder="Produto, código ou marca" value="{{ busca }}">
+  <form method="get" class="row g-2 mb-3 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small mb-0" for="q-imob">Busca</label>
+      <input type="search" id="q-imob" name="q" class="form-control form-control-sm" placeholder="Produto, código ou marca" value="{{ busca }}">
     </div>
-    <div class="col-auto"><button type="submit" class="btn btn-outline-secondary btn-sm">Buscar</button></div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0" for="setor-imob">Setor</label>
+      <select id="setor-imob" name="setor" class="form-select form-select-sm">
+        <option value="">Todos os setores</option>
+        {% for val, rotulo in setores_imobilizado %}
+        <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Filtrar</button>
+      {% if busca or filtro_setor %}
+      <a href="{% url 'estoque:imobilizado_list' %}" class="btn btn-link btn-sm">Limpar</a>
+      {% endif %}
+    </div>
   </form>
 
   <div class="card shadow-sm">
@@ -31,6 +46,7 @@
             <th>Produto</th>
             <th>Marca</th>
             <th>Fornecedor</th>
+            <th>Setor</th>
             <th>Un.</th>
             <th class="text-end">Quantidade</th>
             <th class="text-end">Preço médio</th>
@@ -43,6 +59,7 @@
             <td><code>{{ p.codigo_produto }}</code><br><span class="small">{{ p.descricao }}</span></td>
             <td>{{ p.marca|default:"—" }}</td>
             <td class="small">{{ p.fornecedor_rotulo|default:"—"|truncatechars:35 }}</td>
+            <td class="small">{% if p.setor_localizacao %}{{ p.get_setor_localizacao_display }}{% else %}—{% endif %}</td>
             <td>{{ p.unidade|default:"—" }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
             <td class="text-end">R$ {{ p.valor_custo_medio|floatformat:4 }}</td>
@@ -52,7 +69,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center text-muted py-4">Nenhum imobilizado. Use «NF Comércio → imobilizado» para lançar itens de nota.</td></tr>
+          <tr><td colspan="8" class="text-center text-muted py-4">Nenhum imobilizado. Use «NF Comércio → imobilizado» para lançar itens de nota.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -60,9 +77,9 @@
   </div>
   {% if is_paginated %}
   <nav class="mt-3"><ul class="pagination pagination-sm">
-    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ busca|urlencode }}">Anterior</a></li>{% endif %}
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;q={{ busca|urlencode }}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}">Anterior</a></li>{% endif %}
     <li class="page-item disabled"><span class="page-link">Pág. {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
-    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ busca|urlencode }}">Próxima</a></li>{% endif %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;q={{ busca|urlencode }}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}">Próxima</a></li>{% endif %}
   </ul></nav>
   {% endif %}
 </div>
