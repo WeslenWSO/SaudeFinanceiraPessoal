@@ -9,6 +9,11 @@ from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.services.valor_pago_exibicao import valor_agregacao_analises
 
 try:
+    from dashboard.analises_agendamento import agendamento_conta_faturamento_convenio
+except ImportError:
+    agendamento_conta_faturamento_convenio = None  # type: ignore[misc, assignment]
+
+try:
     from dashboard.analises_conferencia import item_conta_faturamento_analise
 except ImportError:
     item_conta_faturamento_analise = None  # type: ignore[misc, assignment]
@@ -59,6 +64,7 @@ def montar_ranking_exames_qs(
     exames_filtro: list[str] | None = None,
     modalidades_filtro: list[str] | None = None,
     somente_status_analise: bool = False,
+    somente_agendamento_faturamento_convenio: bool = False,
     ids_lotes_internos: set | None = None,
 ) -> dict:
     """
@@ -73,10 +79,16 @@ def montar_ranking_exames_qs(
     chaves_detalhe: dict[tuple[str, str], dict] = {}
 
     filtrar_conf = somente_status_analise and item_conta_faturamento_analise is not None
+    filtrar_ag = (
+        somente_agendamento_faturamento_convenio
+        and agendamento_conta_faturamento_convenio is not None
+    )
     ids_lotes = ids_lotes_internos if ids_lotes_internos is not None else set()
 
     qs = faturamentos_qs.prefetch_related('itens_servico').order_by('data', 'id')
     for fat in qs:
+        if filtrar_ag and not agendamento_conta_faturamento_convenio(fat):
+            continue
         conv = _label_convenio(fat.convenio)
         itens = list(fat.itens_servico.all())
         if not itens:

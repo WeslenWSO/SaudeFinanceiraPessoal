@@ -88,7 +88,7 @@
         <div>
             <h3 class="mb-1">Dashboard dos Exames</h3>
             <p class="text-muted mb-0 small">
-                Totalizações por convênio e status de conferência · {{ mes_label }}
+                Totalizações por convênio e status de agendamento (RIS) · {{ mes_label }}
                 {% if filtros.convenios %}
                     · {{ filtros.convenios|length }} convênio(s) selecionado(s)
                 {% endif %}
@@ -145,7 +145,7 @@
                         <table class="table dash-exames-tabela mb-0">
                             <thead>
                                 <tr>
-                                    <th>Status conferência</th>
+                                    <th>Status agendamento</th>
                                     <th class="text-end" style="width: 5rem;">Qtd.</th>
                                     <th class="text-end" style="width: 5rem;">Qt. clientes</th>
                                     <th class="text-end" style="width: 9rem;">Valor</th>
@@ -196,7 +196,7 @@
                         <table class="table dash-exames-tabela mb-0">
                             <thead>
                                 <tr>
-                                    <th>Status conferência</th>
+                                    <th>Status agendamento</th>
                                     <th class="text-end" style="width: 4rem;">Qtd.</th>
                                     <th class="text-end" style="width: 4rem;">Qt. clientes</th>
                                     <th class="text-end" style="width: 8rem;">Valor</th>

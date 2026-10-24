@@ -67,12 +67,22 @@ def _status_linha(faturamento, item=None, ids_internos=None):
     return 'PENDENTE', ItemServico.STATUS_CONFERENCIA_CSS['PENDENTE']
 
 
-def _link_listagem(data_inicio, data_fim, convenio='', status='', nome=''):
+def _link_listagem(
+    data_inicio,
+    data_fim,
+    convenio='',
+    status='',
+    nome='',
+    *,
+    status_agendamento='',
+):
     params = [
         ('data_inicio', data_inicio),
         ('data_fim', data_fim),
     ]
-    if status:
+    if status_agendamento:
+        params.append(('status_agendamento', status_agendamento))
+    elif status:
         params.append(('status_conferencia', status))
     if convenio and convenio != 'Não informado':
         params.append(('convenio', convenio))
@@ -102,7 +112,48 @@ def _q_convenio_filtro(nome: str) -> Q:
     return Q(convenio__iexact=conv)
 
 
+def _grupo_status_agendamento(faturamento):
+    from dashboard.analises_agendamento import (
+        css_badge_agendamento,
+        rotulo_exibicao_agendamento_dashboard,
+        status_agendamento_para_filtro_listagem,
+    )
+
+    raw = (faturamento.status_agendamento or '').strip() or 'Não informado'
+    label = rotulo_exibicao_agendamento_dashboard(raw)
+    css = css_badge_agendamento(raw)
+    filtro = status_agendamento_para_filtro_listagem(label, raw)
+    return label, css, filtro
+
+
+def _bucket_status_vazio():
+    return {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()}
+
+
+def _acumular_agendamento(stats, totais_gerais, convenio, chave_status, meta, valor, cliente_chave):
+    if chave_status not in stats[convenio]:
+        stats[convenio][chave_status] = _bucket_status_vazio()
+        stats[convenio][chave_status].update(meta)
+    bucket = stats[convenio][chave_status]
+    bucket['quantidade'] += 1
+    bucket['valor'] += valor
+    bucket['clientes'].add(cliente_chave)
+
+    if chave_status not in totais_gerais:
+        totais_gerais[chave_status] = _bucket_status_vazio()
+        totais_gerais[chave_status].update(meta)
+    g = totais_gerais[chave_status]
+    g['quantidade'] += 1
+    g['valor'] += valor
+    g['clientes'].add(cliente_chave)
+
+
 def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
+    from dashboard.analises_agendamento import (
+        ROTULO_PENDENCIA_PACS,
+        agendamento_conta_faturamento_convenio,
+    )
+
     inicio = date(ano, mes, 1)
     fim = date(ano, mes, monthrange(ano, mes)[1])
     data_inicio = inicio.isoformat()
@@ -121,45 +172,77 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
             q_conv |= _q_convenio_filtro(conv)
         qs = qs.filter(q_conv)
 
-    ids_internos = ids_lotes_internos(empresa_id)
-    stats = defaultdict(
-        lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()}),
+    stats = defaultdict(dict)
+    totais_gerais = {}
+    faturamento_por_card: dict[str, dict] = defaultdict(
+        lambda: {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()},
     )
-    totais_gerais = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()})
 
     for fat in qs:
         conv = (fat.convenio or '').strip() or 'Não informado'
         cliente_chave = _chave_cliente(fat)
+        status_label, status_css, filtro_ag = _grupo_status_agendamento(fat)
+        meta = {
+            'status': status_label,
+            'css': status_css,
+            'filtro_agendamento': filtro_ag,
+        }
+        chave_status = (status_label, filtro_ag)
         itens = list(fat.itens_servico.all())
         if not itens:
-            status_label, _ = _status_linha(fat, ids_internos=ids_internos)
             valor = valor_agregacao_analises(None, fat)
-            _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
+            _acumular_agendamento(stats, totais_gerais, conv, chave_status, meta, valor, cliente_chave)
+            if agendamento_conta_faturamento_convenio(fat):
+                faturamento_por_card[conv]['quantidade'] += 1
+                faturamento_por_card[conv]['valor'] += valor
+                faturamento_por_card[conv]['clientes'].add(cliente_chave)
             continue
         for item in itens:
-            status_label, _ = _status_linha(fat, item, ids_internos=ids_internos)
             valor = valor_agregacao_analises(item, fat)
-            _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
+            _acumular_agendamento(stats, totais_gerais, conv, chave_status, meta, valor, cliente_chave)
+            if agendamento_conta_faturamento_convenio(fat):
+                faturamento_por_card[conv]['quantidade'] += 1
+                faturamento_por_card[conv]['valor'] += valor
+                faturamento_por_card[conv]['clientes'].add(cliente_chave)
 
-    ordem_status = [c[0] for c in ItemServico.STATUS_CONFERENCIA_CHOICES]
+    from dashboard.analises_agendamento import (
+        eh_aguardando_faturamento_agendamento,
+        eh_concluido_agendamento,
+    )
+
+    def _ordem_key(st_label: str) -> tuple:
+        if eh_aguardando_faturamento_agendamento(st_label):
+            return (0, 0)
+        if eh_concluido_agendamento(st_label):
+            return (0, 1)
+        if st_label == ROTULO_PENDENCIA_PACS:
+            return (0, 2)
+        return (1, st_label.lower())
 
     def _montar_linhas(bloco, convenio=None):
         linhas = []
         total_q = 0
         total_v = Decimal('0')
         clientes_bloco: set[str] = set()
-        for st in ordem_status:
-            d = bloco.get(st)
+        chaves = sorted(bloco.keys(), key=lambda k: _ordem_key(bloco[k]['status']))
+        for chave_status in chaves:
+            d = bloco[chave_status]
             if not d or d['quantidade'] == 0:
                 continue
+            st = d['status']
             clientes_bloco |= d['clientes']
             linhas.append({
                 'status': st,
-                'css': ItemServico.STATUS_CONFERENCIA_CSS.get(st, 'secondary'),
+                'css': d.get('css', 'secondary'),
                 'quantidade': d['quantidade'],
                 'quantidade_clientes': len(d['clientes']),
                 'valor': d['valor'],
-                'url_listagem': _link_listagem(data_inicio, data_fim, convenio, st),
+                'url_listagem': _link_listagem(
+                    data_inicio,
+                    data_fim,
+                    convenio or '',
+                    status_agendamento=d.get('filtro_agendamento') or '',
+                ),
             })
             total_q += d['quantidade']
             total_v += d['valor']
@@ -167,18 +250,24 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
 
     cards = []
     for conv in stats.keys():
-        linhas, total_q, total_v, total_clientes = _montar_linhas(stats[conv], convenio=conv)
+        linhas, _, _, _ = _montar_linhas(stats[conv], convenio=conv)
+        fat_card = faturamento_por_card.get(conv, {'quantidade': 0, 'valor': Decimal('0'), 'clientes': set()})
         cards.append({
             'convenio': conv,
             'status_linhas': linhas,
-            'total_quantidade': total_q,
-            'total_clientes': total_clientes,
-            'total_valor': total_v,
+            'total_quantidade': fat_card['quantidade'],
+            'total_clientes': len(fat_card['clientes']),
+            'total_valor': fat_card['valor'],
             'url_listagem': _link_listagem(data_inicio, data_fim, conv, ''),
         })
     cards.sort(key=lambda c: (-c['total_quantidade'], c['convenio'].lower()))
 
-    geral_linhas, geral_q, geral_v, geral_clientes = _montar_linhas(totais_gerais)
+    geral_linhas, _, _, _ = _montar_linhas(totais_gerais)
+    geral_fat_q = sum(c['quantidade'] for c in faturamento_por_card.values())
+    geral_fat_v = sum((c['valor'] for c in faturamento_por_card.values()), Decimal('0'))
+    geral_fat_cli: set[str] = set()
+    for c in faturamento_por_card.values():
+        geral_fat_cli |= c['clientes']
 
     return {
         'data_inicio': data_inicio,
@@ -188,9 +277,9 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         'cards': cards,
         'totais_gerais': {
             'status_linhas': geral_linhas,
-            'total_quantidade': geral_q,
-            'total_clientes': geral_clientes,
-            'total_valor': geral_v,
+            'total_quantidade': geral_fat_q,
+            'total_clientes': len(geral_fat_cli),
+            'total_valor': geral_fat_v,
         },
     }
 

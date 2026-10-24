@@ -11,7 +11,13 @@ from faturamento_medico.dashboard_exames import MESES_PT, STATUS_AGENDAMENTO_CAN
 from faturamento_medico.models import FaturamentoMedico
 from faturamento_medico.ranking_exames import montar_ranking_exames_qs
 
-from dashboard.analises_conferencia import contar_dias_trabalhados_analise, kwargs_ranking_faturamento_analise
+from dashboard.analises_agendamento import (
+    ROTULO_PENDENCIA_PACS,
+    agendamento_conta_faturamento_convenio,
+    agendamento_pendencia_pacs_convenio,
+)
+from dashboard.analises_conferencia import kwargs_ranking_faturamento_analise
+from faturamento_medico.services.valor_pago_exibicao import valor_agregacao_analises
 
 
 def _q_cancelados():
@@ -46,6 +52,52 @@ def _fmt_percentual(parte: Decimal, total: Decimal) -> str:
     return f'{pct:.2f}'.replace('.', ',') + '%'
 
 
+def _contar_dias_trabalhados_convenio_agendamento(qs) -> int:
+    dias: set = set()
+    for fat in qs.prefetch_related('itens_servico'):
+        if not agendamento_conta_faturamento_convenio(fat):
+            continue
+        if fat.data:
+            dias.add(fat.data)
+    return len(dias)
+
+
+def _montar_pendencias_pacs_por_convenio(qs) -> list[dict]:
+    por_conv: dict[str, dict] = {}
+    for fat in qs.prefetch_related('itens_servico'):
+        if not agendamento_pendencia_pacs_convenio(fat):
+            continue
+        conv = _rotulo_convenio_exibicao(fat.convenio)
+        if conv not in por_conv:
+            por_conv[conv] = {'quantidade': 0, 'valor': Decimal('0')}
+        itens = list(fat.itens_servico.all())
+        if not itens:
+            por_conv[conv]['quantidade'] += 1
+            por_conv[conv]['valor'] += valor_agregacao_analises(None, fat)
+            continue
+        for item in itens:
+            por_conv[conv]['quantidade'] += 1
+            por_conv[conv]['valor'] += valor_agregacao_analises(item, fat)
+    linhas = []
+    for conv, d in sorted(por_conv.items(), key=lambda x: (-x[1]['valor'], x[0])):
+        linhas.append({
+            'convenio': conv,
+            'quantidade': d['quantidade'],
+            'quantidade_fmt': _fmt_numero_int(d['quantidade']),
+            'valor_fmt': _fmt_moeda_inteiro(d['valor']),
+        })
+    return linhas
+
+
+def kwargs_ranking_convenio_analise(empresa_id: int) -> dict:
+    base = kwargs_ranking_faturamento_analise(empresa_id)
+    return {
+        **base,
+        'somente_status_analise': False,
+        'somente_agendamento_faturamento_convenio': True,
+    }
+
+
 def _rotulo_convenio_exibicao(nome: str) -> str:
     n = (nome or '').strip()
     if not n:
@@ -68,9 +120,10 @@ def montar_relatorio_faturamento_convenio(empresa_id: int, ano: int, mes: int) -
         .exclude(_q_cancelados())
     )
 
-    dias_trabalhados = contar_dias_trabalhados_analise(qs, empresa_id)
+    dias_trabalhados = _contar_dias_trabalhados_convenio_agendamento(qs)
 
-    ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_faturamento_analise(empresa_id))
+    ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_convenio_analise(empresa_id))
+    pendencias_pacs = _montar_pendencias_pacs_por_convenio(qs)
     total_qtd = ranking['total_quantidade']
     total_valor = ranking['total_valor']
 
@@ -94,8 +147,11 @@ def montar_relatorio_faturamento_convenio(empresa_id: int, ano: int, mes: int) -
         'titulo_relatorio': f'RELATÓRIO DE FATURAMENTO — {mes_titulo}',
         'subtitulo_periodo': (
             f'{dias_trabalhados} dias trabalhados | '
-            f'Período: {inicio.strftime("%d/%m/%Y")} a {fim.strftime("%d/%m/%Y")}'
+            f'Período: {inicio.strftime("%d/%m/%Y")} a {fim.strftime("%d/%m/%Y")} | '
+            f'Faturamento: status agendamento Aguardando faturamento e Concluído (RIS)'
         ),
+        'pendencias_pacs_convenio': pendencias_pacs,
+        'rotulo_pendencia_pacs': ROTULO_PENDENCIA_PACS,
         'kpi_faturamento_total_fmt': _fmt_moeda_inteiro(total_valor),
         'kpi_atendimentos_fmt': _fmt_numero_int(total_qtd),
         'kpi_ticket_medio_fmt': _fmt_moeda_inteiro(ticket_medio),

@@ -139,4 +139,31 @@
             {% endif %}
         </table>
     </div>
+
+    {% if pendencias_pacs_convenio %}
+    <div class="mt-4">
+        <h6 class="fw-semibold text-secondary mb-2">{{ rotulo_pendencia_pacs }} (status Confirmado no RIS)</h6>
+        <p class="small text-muted mb-2">Não entram no faturamento acima — aguardam confirmação no PACS.</p>
+        <div class="table-responsive border rounded overflow-hidden">
+            <table class="an-fat-tabela mb-0">
+                <thead>
+                    <tr>
+                        <th>Convênio</th>
+                        <th class="num">Qtde</th>
+                        <th class="num">Valor ref. (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in pendencias_pacs_convenio %}
+                    <tr>
+                        <td>{{ linha.convenio }}</td>
+                        <td class="num">{{ linha.quantidade_fmt }}</td>
+                        <td class="num">{{ linha.valor_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
