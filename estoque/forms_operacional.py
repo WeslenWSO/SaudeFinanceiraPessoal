@@ -31,8 +31,20 @@ class GerarEstoqueNotaForm(forms.Form):
                 'class': 'form-control form-control-sm',
                 'step': '0.001',
                 'min': '0',
-                'placeholder': '4',
-                'title': 'Quantas unidades de consumo em 1 master (ex.: 1 PCT = 4 UN)',
+                'placeholder': '10',
+                'title': 'Quantas unidades de estoque vêm em 1 unidade da NF (ex.: 1 CX = 10 UN)',
+            },
+        ),
+    )
+    unidade_consumo = forms.CharField(
+        max_length=20,
+        required=False,
+        label='Un. estoque',
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'UN',
+                'title': 'Unidade de entrada no estoque (consumo)',
             },
         ),
     )

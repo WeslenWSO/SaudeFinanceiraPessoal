@@ -24,6 +24,30 @@ class EstoqueErro(ValueError):
     pass
 
 
+def converter_quantidade_nf_para_estoque(
+    q_nf: Decimal,
+    p_nf: Decimal,
+    *,
+    quantidade_por_master: Decimal | None,
+    unidade_master: str = '',
+    unidade_nf: str = '',
+    unidade_consumo: str = '',
+) -> tuple[Decimal, Decimal, str]:
+    """
+    Se informado fator (>0), trata q_nf como unidade master (ex.: 1 CX)
+    e retorna quantidade/preço na unidade de estoque (ex.: 10 UN, preço/UN).
+    """
+    fator = quantidade_por_master or Decimal('0')
+    if fator <= 0:
+        return q_nf, p_nf, ''
+    um = (unidade_master or unidade_nf or 'master').strip()
+    uc = (unidade_consumo or 'UN').strip()
+    q_est = q_nf * fator
+    p_est = p_nf / fator if fator else p_nf
+    det = f'{q_nf} {um} × {fator} → {q_est} {uc}'
+    return q_est, p_est, det
+
+
 def calcular_preco_medio(
     quantidade_atual: Decimal,
     custo_medio_atual: Decimal,
@@ -84,6 +108,7 @@ def gerar_entrada_desde_item_nota(
     data_validade=None,
     natureza: str = NaturezaEstoque.CONSUMIVEL,
     setor_localizacao: str = '',
+    unidade_consumo: str = '',
 ) -> EntradaEstoqueNota:
     if item.nota_fiscal.tipo_nota != 'comercio':
         raise EstoqueErro('Somente itens de NF de comércio geram estoque.')
@@ -132,8 +157,6 @@ def gerar_entrada_desde_item_nota(
             produto.unidade_master = unidade_master[:20]
         if q_master is not None and q_master > 0:
             produto.quantidade_por_master = q_master
-        if item.unidade:
-            produto.unidade = item.unidade[:20]
         if item.nome_produto and len(item.nome_produto) > len(produto.descricao or ''):
             produto.descricao = item.nome_produto[:300]
     if item.nota_fiscal.fornecedor_id:
@@ -141,10 +164,38 @@ def gerar_entrada_desde_item_nota(
     if setor_loc:
         produto.setor_localizacao = setor_loc[:32]
 
-    q_ent = item.quantidade or Decimal('0')
-    p_ent = item.valor_unitario or Decimal('0')
-    if q_ent <= 0:
+    q_nf = item.quantidade or Decimal('0')
+    p_nf = item.valor_unitario or Decimal('0')
+    if q_nf <= 0:
         raise EstoqueErro('Quantidade do item inválida.')
+
+    fator_master = (
+        quantidade_por_master
+        if quantidade_por_master is not None and quantidade_por_master > 0
+        else None
+    )
+
+    q_ent, p_ent, det_conv = converter_quantidade_nf_para_estoque(
+        q_nf,
+        p_nf,
+        quantidade_por_master=fator_master,
+        unidade_master=unidade_master or produto.unidade_master or '',
+        unidade_nf=(item.unidade or '')[:20],
+        unidade_consumo=unidade_consumo or produto.unidade or '',
+    )
+    if fator_master and fator_master > 0:
+        um = (unidade_master or item.unidade or produto.unidade_master or '')[:20]
+        if um:
+            produto.unidade_master = um
+        produto.quantidade_por_master = fator_master
+        uc = (unidade_consumo or produto.unidade or 'UN').strip()[:20]
+        if uc:
+            produto.unidade = uc
+    elif item.unidade:
+        produto.unidade = item.unidade[:20]
+
+    if q_ent <= 0:
+        raise EstoqueErro('Quantidade convertida inválida (verifique o fator master).')
 
     custo_novo = calcular_preco_medio(
         _quantidade_farmacia(produto),
@@ -168,7 +219,10 @@ def gerar_entrada_desde_item_nota(
         valor_custo_medio_apos=custo_novo,
         nota_item=item,
         usuario=usuario,
-        observacao=f'NF {item.nota_fiscal.numero_nota}',
+        observacao=(
+            f'NF {item.nota_fiscal.numero_nota}'
+            + (f' · {det_conv}' if det_conv else '')
+        ),
     )
 
     return EntradaEstoqueNota.objects.create(

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>{{ titulo }}</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    html { background: #e8e8e8; }
+    body {
+      font-family: Arial, sans-serif; font-size: 10px; color: #222;
+      box-sizing: border-box;
+      width: 210mm;
+      max-width: 100%;
+      margin: 12px auto;
+      padding: 12mm;
+      background: #fff;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);
+    }
+    h1 { font-size: 15px; text-align: center; margin: 0 0 6px; text-transform: uppercase; }
+    .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 10px; }
+    .meta { font-size: 9px; margin-bottom: 10px; line-height: 1.45; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 4px 5px; vertical-align: top; }
+    th { background: #eee; font-size: 9px; }
+    .col-contagem { width: 4.5rem; min-height: 1.2rem; }
+    .col-un { width: 2.5rem; }
+    .no-print { margin-bottom: 12px; }
+    .no-print form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; font-size: 13px; }
+    @media print {
+      html { background: #fff; }
+      body { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      .no-print { display: none; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button type="button" onclick="window.print()">Imprimir</button>
+    <a href="{{ voltar_url }}">Voltar ao estoque</a>
+    <form method="get" class="mt-2">
+      <input type="hidden" name="tipo" value="{{ tipo }}">
+      <div>
+        <label>Busca</label><br>
+        <input type="search" name="q" value="{{ busca }}" placeholder="Código, produto, marca">
+      </div>
+      {% if tipo == 'imobilizado' %}
+      <div>
+        <label>Setor</label><br>
+        <select name="setor">
+          <option value="">Todos</option>
+          {% for val, rotulo in setores_imobilizado %}
+          <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div>
+        <label>
+          <input type="checkbox" name="somente_saldo" value="1" {% if somente_saldo %}checked{% endif %}>
+          Só produtos com saldo &gt; 0 no sistema
+        </label>
+        <small style="color:#666;">(não exibe a qtd — só filtra a lista)</small>
+      </div>
+      <button type="submit">Atualizar lista</button>
+      <a href="?tipo={{ tipo }}&amp;auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}">Gerar e imprimir</a>
+    </form>
+  </div>
+
+  <h1>{{ titulo }}</h1>
+  <p class="sub">Contagem física — preencha «Qtd contada» (saldo do sistema oculto)</p>
+  <div class="meta">
+    {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
+    <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ produtos|length }} produto(s) na lista</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:2rem">#</th>
+        <th style="width:5.5rem">Código</th>
+        <th>Produto</th>
+        <th style="width:5rem">Marca</th>
+        <th style="width:7rem">Fornecedor</th>
+        {% if tipo == 'imobilizado' %}<th style="width:5rem">Setor</th>{% endif %}
+        <th class="col-contagem">Qtd contada</th>
+        <th class="col-un">Un.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in produtos %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><strong>{{ p.codigo_produto }}</strong></td>
+        <td>{{ p.descricao }}</td>
+        <td>{{ p.marca|default:"" }}</td>
+        <td>{{ p.fornecedor_rotulo|default:""|truncatechars:28 }}</td>
+        {% if tipo == 'imobilizado' %}
+        <td>{% if p.setor_localizacao %}{{ p.get_setor_localizacao_display }}{% endif %}</td>
+        {% endif %}
+        <td class="col-contagem">&nbsp;</td>
+        <td class="col-un">{{ p.unidade|default:"" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if tipo == 'imobilizado' %}8{% else %}7{% endif %}" style="text-align:center;padding:12px;">Nenhum produto na lista.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="meta" style="margin-top:16px;">
+    Responsável pela contagem: _____________________________ Data: ____/____/______
+  </p>
+
+  {% if auto_print %}
+  <script>window.addEventListener('load', function () { window.print(); });</script>
+  {% endif %}
+</body>
+</html>

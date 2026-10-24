@@ -172,12 +172,16 @@
                                     <input type="hidden" name="natureza" value="consumivel">
                                     {% endif %}
                                     {% if destino_estoque != 'imobilizado' %}
+                                    <small class="text-muted">NF: {{ item.quantidade }} {{ item.unidade|default:"—" }}</small>
                                     <div class="input-group input-group-sm">
-                                      <input type="text" name="unidade_master" class="form-control" placeholder="Master (PCT)" aria-label="Unidade master">
+                                      <span class="input-group-text px-1" title="Unidade na NF (master)">1</span>
+                                      <input type="text" name="unidade_master" class="form-control" value="{{ item.unidade|default:'' }}" placeholder="CX" aria-label="Unidade na NF">
+                                      <span class="input-group-text px-1">×</span>
+                                      <input type="number" name="quantidade_por_master" class="form-control" step="0.001" min="0" placeholder="10" aria-label="Unidades por master" title="Ex.: NF 1 CX e vêm 10 UN → informe 10">
                                       <span class="input-group-text px-1">=</span>
-                                      <input type="number" name="quantidade_por_master" class="form-control" step="0.001" min="0" placeholder="Qtd" aria-label="Unidades por master" title="Ex.: 4 se 1 PCT tem 4 UN">
-                                      <span class="input-group-text px-1 small">{{ item.unidade|default:"un." }}</span>
+                                      <input type="text" name="unidade_consumo" class="form-control" placeholder="UN" aria-label="Unidade no estoque" title="Unidade de consumo no estoque">
                                     </div>
+                                    <small class="text-muted">Deixe fator vazio se a NF já estiver na unidade de estoque.</small>
                                     <input type="date" name="data_validade" class="form-control form-control-sm" title="Validade">
                                     {% endif %}
                                     <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca / patrimônio">

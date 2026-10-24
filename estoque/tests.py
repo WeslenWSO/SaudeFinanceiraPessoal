@@ -9,6 +9,33 @@ from openpyxl import Workbook
 from empresa.models import Empresa
 from estoque.import_planilha import importar_produtos_estoque, parse_planilha_produtos
 from estoque.models import ProdutoEstoque
+from estoque.services.movimentacao import converter_quantidade_nf_para_estoque
+
+
+class ConverterUnidadeMasterTest(TestCase):
+    def test_cx_para_un(self):
+        q, p, det = converter_quantidade_nf_para_estoque(
+            Decimal('1'),
+            Decimal('100'),
+            quantidade_por_master=Decimal('10'),
+            unidade_master='CX',
+            unidade_nf='CX',
+            unidade_consumo='UN',
+        )
+        self.assertEqual(q, Decimal('10'))
+        self.assertEqual(p, Decimal('10'))
+        self.assertIn('CX', det)
+
+    def test_sem_fator_mantem_nf(self):
+        q, p, det = converter_quantidade_nf_para_estoque(
+            Decimal('5'),
+            Decimal('2'),
+            quantidade_por_master=Decimal('0'),
+            unidade_master='CX',
+        )
+        self.assertEqual(q, Decimal('5'))
+        self.assertEqual(p, Decimal('2'))
+        self.assertEqual(det, '')
 
 
 class ProdutoEstoqueModelTest(TestCase):

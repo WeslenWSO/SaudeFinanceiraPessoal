@@ -37,6 +37,7 @@ from estoque.services.movimentacao import (
     pode_estornar_entrada_nota,
 )
 from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO, SetorEstoque
+from empresa.models import Empresa
 from notafiscalentrada.models import NotaFiscalEntradaItem
 
 
@@ -194,6 +195,7 @@ def gerar_estoque_item_nota(request, item_id: int):
             marca=form.cleaned_data.get('marca') or '',
             unidade_master=form.cleaned_data.get('unidade_master') or '',
             quantidade_por_master=form.cleaned_data.get('quantidade_por_master'),
+            unidade_consumo=form.cleaned_data.get('unidade_consumo') or '',
             data_validade=form.cleaned_data.get('data_validade'),
             natureza=natureza,
             setor_localizacao=form.cleaned_data.get('setor_localizacao') or '',
@@ -592,5 +594,66 @@ def relatorio_movimentos(request):
             'movimentos': movimentos.order_by('-criado_em')[:500],
             'resumo_baixas': resumo,
             'descricao': 'Relatório de estoque',
+        },
+    )
+
+
+@login_required
+def lista_cega_estoque(request):
+    """Lista para contagem física — sem saldo do sistema."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:farmacia_list')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    tipo = (request.GET.get('tipo') or 'farmacia').strip().lower()
+    if tipo == 'imobilizado':
+        natureza = NaturezaEstoque.IMOBILIZADO
+        titulo = 'Lista cega de estoque — Imobilizado'
+        voltar_url = reverse('estoque:imobilizado_list')
+    else:
+        natureza = NaturezaEstoque.CONSUMIVEL
+        titulo = 'Lista cega de estoque — Farmácia'
+        voltar_url = reverse('estoque:farmacia_list')
+
+    produtos = (
+        ProdutoEstoque.objects.filter(empresa_id=empresa_id, natureza=natureza)
+        .select_related('fornecedor')
+        .order_by('codigo_produto', 'descricao')
+    )
+
+    if (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim'):
+        produtos = produtos.filter(quantidade_estoque__gt=0)
+
+    filtro_setor = (request.GET.get('setor') or '').strip()
+    if natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor:
+        produtos = produtos.filter(setor_localizacao=filtro_setor)
+
+    busca = (request.GET.get('q') or '').strip()
+    if busca:
+        produtos = produtos.filter(
+            Q(codigo_produto__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(marca__icontains=busca),
+        )
+
+    auto_print = (request.GET.get('auto') or '').strip() == '1'
+
+    return render(
+        request,
+        'estoque/lista_cega_estoque.html',
+        {
+            'empresa': empresa,
+            'titulo': titulo,
+            'tipo': tipo,
+            'produtos': produtos,
+            'busca': busca,
+            'filtro_setor': filtro_setor,
+            'somente_saldo': (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim'),
+            'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+            'voltar_url': voltar_url,
+            'agora': timezone.now(),
+            'auto_print': auto_print,
         },
     )
