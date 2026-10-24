@@ -6,7 +6,7 @@ from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
 from faturamento_medico.lote_relatorio import _modalidade_item
-from faturamento_medico.models import FaturamentoMedico
+from faturamento_medico.services.valor_pago_exibicao import valor_agregacao_analises
 
 
 def _label_convenio(nome: str | None) -> str:
@@ -19,12 +19,8 @@ def _label_convenio(nome: str | None) -> str:
 
 
 def _valor_item(item, faturamento) -> Decimal:
-    if item is not None:
-        raw = item.total if item.total is not None else item.valor
-    else:
-        raw = faturamento.total
     try:
-        return Decimal(str(raw or 0))
+        return valor_agregacao_analises(item, faturamento)
     except (InvalidOperation, ValueError, TypeError):
         return Decimal('0')
 

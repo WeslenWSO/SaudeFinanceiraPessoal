@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 
 from .lote_utils import faturamento_tem_lote_interno, ids_lotes_internos
 from .models import FaturamentoMedico, ItemServico, LogStatusConferenciaItem
+from .services.valor_pago_exibicao import valor_agregacao_analises
 
 STATUS_AGENDAMENTO_CANCELADOS = (
     'Cancelado',
@@ -132,14 +133,12 @@ def montar_dashboard_exames(empresa_id, ano, mes, convenios=None):
         itens = list(fat.itens_servico.all())
         if not itens:
             status_label, _ = _status_linha(fat, ids_internos=ids_internos)
-            valor = Decimal(str(fat.total or 0))
+            valor = valor_agregacao_analises(None, fat)
             _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
             continue
         for item in itens:
             status_label, _ = _status_linha(fat, item, ids_internos=ids_internos)
-            valor = item.total if item.total is not None else (item.valor or Decimal('0'))
-            if not isinstance(valor, Decimal):
-                valor = Decimal(str(valor))
+            valor = valor_agregacao_analises(item, fat)
             _acumular(stats, totais_gerais, conv, status_label, valor, cliente_chave)
 
     ordem_status = [c[0] for c in ItemServico.STATUS_CONFERENCIA_CHOICES]

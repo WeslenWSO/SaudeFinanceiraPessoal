@@ -44,6 +44,25 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
     return None
 
 
+def _decimal_campo(raw) -> Decimal | None:
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw))
+    except Exception:
+        return None
+
+
+def valor_agregacao_analises(item: ItemServico | None, faturamento) -> Decimal:
+    """Relatórios de faturamento: valor_pago; se vazio ou zerado, campo valor do item."""
+    alvo = item if item is not None else faturamento
+    vp = _decimal_campo(getattr(alvo, 'valor_pago', None))
+    if vp is not None and vp != 0:
+        return vp
+    val = _decimal_campo(getattr(alvo, 'valor', None))
+    return val if val is not None else Decimal('0')
+
+
 def sincronizar_valor_pago_apos_preco(item: ItemServico) -> None:
     """Após corrigir valor na tabela, alinha valor_pago ao total calculado."""
     total = item.total if item.total is not None else item.valor
