@@ -21,7 +21,7 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
     AnaliseModeloDef(
         'validacao_conferencia',
         'Validação conferência',
-        'Status confirmado — o que entra ou não no faturamento das análises.',
+        'Status de conferência — o que entra ou não no faturamento das análises.',
         'fa-clipboard-check',
         'dashboard/partials/analise_modelo_validacao_conferencia.html',
     ),
