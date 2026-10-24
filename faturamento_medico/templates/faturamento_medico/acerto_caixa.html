@@ -275,7 +275,7 @@
                             <th>Procedimento</th>
                             <th>Mod.</th>
                             <th>Contraste</th>
-                            <th class="text-end">Total item</th>
+                            <th class="text-end">Valor pago</th>
                             <th title="Incluir no acerto de caixa">Acerto</th>
                             <th>Caixa</th>
                             <th>NF</th>
@@ -295,7 +295,7 @@
                     <tbody>
                         {% for linha in linhas %}
                         <tr data-faturamento-id="{{ linha.faturamento_id }}"
-                            data-total-item="{{ linha.total_item }}"
+                            data-valor-pago="{{ linha.valor_pago|default:'' }}"
                             data-valor-tabela="{{ linha.valor_tabela }}"
                             {% if linha.caixa_bloqueado %}data-caixa-bloqueado="1"{% endif %}>
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
@@ -304,7 +304,9 @@
                             <td>{{ linha.procedimento|truncatechars:45 }}</td>
                             <td>{{ linha.modalidade }}</td>
                             <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                            <td class="text-end fm-celula-total-item">R$ {{ linha.total_item_fmt }}</td>
+                            <td class="text-end fm-celula-valor-pago">
+                                {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
+                            </td>
                             <td class="text-center fm-celula-acerto-flag">
                                 {% if linha.mostrar_acerto_celula %}
                                 <input type="checkbox"

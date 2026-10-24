@@ -238,7 +238,7 @@
                 <th>Paciente</th>
                 <th>Procedimento</th>
                 <th>Mod.</th>
-                <th class="text-end">Total item</th>
+                <th class="text-end">Valor pago</th>
                 <th>NF</th>
                 <th>Forma pgto.</th>
                 <th class="text-end">Valor NF</th>
@@ -258,7 +258,9 @@
                 <td>{{ linha.paciente }}</td>
                 <td>{{ linha.procedimento }}</td>
                 <td>{{ linha.modalidade }}</td>
-                <td class="text-end">R$ {{ linha.total_item_fmt }}</td>
+                <td class="text-end">
+                    {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
+                </td>
                 <td>
                     {% if linha.aguardando_faturamento %}—
                     {% elif linha.qtd_notas == 1 %}{{ linha.notas_vinculadas.0.numero }}
