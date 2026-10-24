@@ -10,6 +10,7 @@ class SetorEstoque(models.TextChoices):
     OUTROS = 'outros', 'Outros'
     SEDACAO = 'sedacao', 'Sedação'
     ENFERMAGEM = 'enfermagem', 'Enfermagem'
+    CARRINHO_URGENCIA = 'carrinho_urgencia', 'Carrinho de Urgência'
     RAIO_X = 'raio_x', 'Raio-X'
     MAMOGRAFIA = 'mamografia', 'Mamografia'
     IMOBILIZADO = 'imobilizado', 'Imobilizado'
