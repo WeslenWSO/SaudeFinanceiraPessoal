@@ -15,18 +15,25 @@ class AnaliseModeloDef:
 
 MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
     AnaliseModeloDef(
-        'exames_convenio',
-        'Exames por convênio e conferência',
-        'Total geral e tabelas por convênio: status, quantidade, clientes e valor no mês.',
-        'fa-layer-group',
-        'dashboard/partials/analise_modelo_exames_convenio.html',
+        'faturamento_convenio',
+        'Por convênio',
+        'Faturamento por convênio ou parceiros — relatório mensal.',
+        'fa-file-invoice-dollar',
+        'dashboard/partials/analise_modelo_faturamento_convenio.html',
     ),
     AnaliseModeloDef(
-        'producao_conferencia',
-        'Produção diária — log de conferência',
-        'Régua do mês e produção por usuário × convênio × status (data do log).',
-        'fa-calendar-day',
-        'dashboard/partials/analise_modelo_producao_conferencia.html',
+        'faturamento_modalidade',
+        'Por modalidade',
+        'Faturamento por modalidade — tabela, pizza e ticket médio.',
+        'fa-x-ray',
+        'dashboard/partials/analise_modelo_faturamento_modalidade.html',
+    ),
+    AnaliseModeloDef(
+        'exames_convenio',
+        'Exames por convênio e conferência',
+        'Tabelas por convênio: status, quantidade, clientes e valor no mês.',
+        'fa-layer-group',
+        'dashboard/partials/analise_modelo_exames_convenio.html',
     ),
 )
 

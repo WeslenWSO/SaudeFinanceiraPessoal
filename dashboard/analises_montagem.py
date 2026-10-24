@@ -5,6 +5,8 @@ from urllib.parse import urlencode
 
 from django.urls import reverse
 
+from dashboard.analise_faturamento_convenio import montar_relatorio_faturamento_convenio
+from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
 from dashboard.analises_catalogo import (
     MODELOS_ANALISE,
     modelo_analise_ativo,
@@ -14,7 +16,6 @@ from faturamento_medico.dashboard_exames import (
     _convenios_disponiveis_empresa,
     _fmt_card_dashboard,
     _fmt_moeda_br,
-    montar_contexto_dashboard_producao,
     montar_dashboard_exames,
 )
 
@@ -59,10 +60,12 @@ def montar_contexto_aba_analises(
     ctx['convenios_disponiveis'] = _convenios_disponiveis_empresa(empresa_id)
     ctx['filtros'] = {'convenios': convenios_sel}
 
-    if modelo.codigo == 'exames_convenio':
+    if modelo.codigo == 'faturamento_convenio':
+        ctx.update(montar_relatorio_faturamento_convenio(empresa_id, ano, mes))
+    elif modelo.codigo == 'faturamento_modalidade':
+        ctx.update(montar_relatorio_faturamento_modalidade(empresa_id, ano, mes))
+    elif modelo.codigo == 'exames_convenio':
         ctx.update(_contexto_exames_convenio(empresa_id, ano, mes, convenios_sel))
-    elif modelo.codigo == 'producao_conferencia':
-        ctx.update(_contexto_producao_conferencia(request, empresa_id, mes_filtro, regime))
 
     return ctx
 
@@ -96,25 +99,3 @@ def _contexto_exames_convenio(
         'totais_gerais': totais,
         'url_listagem_mes': f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params_listagem)}",
     }
-
-
-def _contexto_producao_conferencia(
-    request,
-    empresa_id: int,
-    mes_filtro: str,
-    regime: str,
-) -> dict:
-    prod = montar_contexto_dashboard_producao(request, empresa_id)
-    q = [('mes', mes_filtro)]
-    for conv in prod.get('filtros', {}).get('convenios') or []:
-        q.append(('convenio', conv))
-    for d in prod.get('dias_selecionados') or []:
-        q.append(('dia', d))
-    prod['url_producao_tela_cheia'] = (
-        f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(q)}"
-    )
-    prod['mes_filtro'] = mes_filtro
-    prod['regime'] = regime
-    prod['dash_aba'] = 'analises'
-    prod['modelo_analise'] = 'producao_conferencia'
-    return prod

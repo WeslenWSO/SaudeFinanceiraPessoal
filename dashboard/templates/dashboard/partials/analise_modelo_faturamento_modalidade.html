@@ -1,0 +1,193 @@
+<style>
+.an-mod-banner {
+    background: #1f3864;
+    color: #fff;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-radius: 0.25rem 0.25rem 0 0;
+    margin-bottom: 1rem;
+}
+.an-mod-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-bottom: 1.25rem;
+}
+.an-mod-tabela th {
+    background: #5b9bd5;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #4a8bc4;
+}
+.an-mod-tabela th.num { text-align: right; }
+.an-mod-tabela td {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #dee2e6;
+}
+.an-mod-tabela tbody tr:nth-child(even) { background: #faf8f5; }
+.an-mod-tabela td.num { text-align: right; white-space: nowrap; }
+.an-mod-tabela tfoot td {
+    background: #1f3864;
+    color: #fff;
+    font-weight: 700;
+    border-color: #1f3864;
+}
+.an-mod-tabela tfoot td.num { text-align: right; }
+.an-mod-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+@media (max-width: 992px) {
+    .an-mod-charts { grid-template-columns: 1fr; }
+}
+.an-mod-chart-box {
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    padding: 0.75rem;
+    background: #fff;
+}
+.an-mod-chart-box h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 0.5rem;
+    color: #495057;
+}
+.an-mod-chart-canvas-wrap {
+    position: relative;
+    height: 260px;
+}
+</style>
+
+<div class="an-mod-banner">{{ titulo_relatorio }}</div>
+
+<div class="table-responsive border rounded overflow-hidden">
+    <table class="an-mod-tabela mb-0">
+        <thead>
+            <tr>
+                <th>Modalidade</th>
+                <th class="num">Exames</th>
+                <th class="num">Faturamento (R$)</th>
+                <th class="num">Ticket Médio (R$)</th>
+                <th class="num">% Faturamento</th>
+                <th class="num">% Exames</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in linhas_modalidade %}
+            <tr>
+                <td>{{ linha.modalidade }}</td>
+                <td class="num">{{ linha.quantidade_fmt }}</td>
+                <td class="num">{{ linha.valor_fmt }}</td>
+                <td class="num">{{ linha.ticket_fmt }}</td>
+                <td class="num">{{ linha.pct_faturamento_fmt }}</td>
+                <td class="num">{{ linha.pct_exames_fmt }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-muted py-4">Sem exames no período.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if linhas_modalidade %}
+        <tfoot>
+            <tr>
+                <td>TOTAL</td>
+                <td class="num">{{ total_quantidade_fmt }}</td>
+                <td class="num">{{ total_valor_fmt }}</td>
+                <td class="num">{{ total_ticket_fmt }}</td>
+                <td class="num">{{ total_pct_faturamento_fmt }}</td>
+                <td class="num">{{ total_pct_exames_fmt }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if linhas_modalidade %}
+<div class="an-mod-charts">
+    <div class="an-mod-chart-box">
+        <h3>Faturamento (R$)</h3>
+        <div class="an-mod-chart-canvas-wrap">
+            <canvas id="chartFatModalidadePizza"></canvas>
+        </div>
+    </div>
+    <div class="an-mod-chart-box">
+        <h3>Ticket Médio por Modalidade (R$)</h3>
+        <div class="an-mod-chart-canvas-wrap">
+            <canvas id="chartFatModalidadeTicket"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (typeof Chart === 'undefined') return;
+  var labels = {{ chart_modalidade_labels_json|safe }};
+  var fatData = {{ chart_faturamento_data_json|safe }};
+  var ticketData = {{ chart_ticket_data_json|safe }};
+  var cores = {{ chart_cores_json|safe }};
+
+  new Chart(document.getElementById('chartFatModalidadePizza'), {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: fatData,
+        backgroundColor: cores,
+        borderWidth: 1,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) {
+              var v = ctx.raw || 0;
+              var tot = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+              var pct = tot ? (v / tot * 100).toFixed(1) : 0;
+              return ctx.label + ': R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' (' + pct + '%)';
+            },
+          },
+        },
+      },
+    },
+  });
+
+  new Chart(document.getElementById('chartFatModalidadeTicket'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Ticket médio',
+        data: ticketData,
+        backgroundColor: cores,
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function (v) {
+              return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 0 });
+            },
+          },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endif %}

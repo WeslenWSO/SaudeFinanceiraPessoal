@@ -607,7 +607,7 @@ def _contexto_dashboard_intervalo(request):
 
 def _aba_dashboard(request) -> str:
     aba = (request.GET.get('aba') or 'financeiro').strip().lower()
-    if aba == 'producao':
+    if aba in ('producao', 'producao_conferencia'):
         aba = 'analises'
     return aba if aba in ('financeiro', 'analises') else 'financeiro'
 

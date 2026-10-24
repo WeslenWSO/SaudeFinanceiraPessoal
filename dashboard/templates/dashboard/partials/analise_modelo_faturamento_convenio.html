@@ -1,0 +1,142 @@
+<style>
+.an-fat-relatorio { font-size: 0.9rem; color: #212529; }
+.an-fat-banner {
+    background: #1f3864;
+    color: #fff;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    border-radius: 0.25rem 0.25rem 0 0;
+}
+.an-fat-subtitulo {
+    background: #eef2f7;
+    border: 1px solid #c5cdd8;
+    border-top: 0;
+    text-align: center;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    color: #495057;
+}
+.an-fat-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+@media (max-width: 992px) {
+    .an-fat-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 576px) {
+    .an-fat-kpis { grid-template-columns: 1fr; }
+}
+.an-fat-kpi {
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    padding: 0.65rem 0.5rem;
+    text-align: center;
+    background: #fff;
+}
+.an-fat-kpi-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.25rem;
+}
+.an-fat-kpi-valor { font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
+.an-fat-kpi-valor.verde { color: #198754; }
+.an-fat-kpi-valor.laranja { color: #d97706; }
+.an-fat-kpi-valor.azul { color: #1f3864; }
+.an-fat-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.an-fat-tabela th {
+    background: #5b9bd5;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #4a8bc4;
+    text-align: left;
+}
+.an-fat-tabela th.num { text-align: right; }
+.an-fat-tabela td {
+    padding: 0.35rem 0.6rem;
+    border: 1px solid #dee2e6;
+}
+.an-fat-tabela tbody tr:nth-child(even) { background: #faf8f5; }
+.an-fat-tabela td.num { text-align: right; white-space: nowrap; }
+.an-fat-tabela tfoot td {
+    background: #1f3864;
+    color: #fff;
+    font-weight: 700;
+    border-color: #1f3864;
+    padding: 0.5rem 0.6rem;
+}
+.an-fat-tabela tfoot td.num { text-align: right; }
+</style>
+
+<div class="an-fat-relatorio">
+    <div class="an-fat-banner">{{ titulo_relatorio }}</div>
+    <div class="an-fat-subtitulo">{{ subtitulo_periodo }}</div>
+
+    <div class="an-fat-kpis">
+        <div class="an-fat-kpi">
+            <div class="an-fat-kpi-label">Faturamento total</div>
+            <div class="an-fat-kpi-valor azul">R$ {{ kpi_faturamento_total_fmt }}</div>
+        </div>
+        <div class="an-fat-kpi">
+            <div class="an-fat-kpi-label">Atendimentos</div>
+            <div class="an-fat-kpi-valor verde">{{ kpi_atendimentos_fmt }}</div>
+        </div>
+        <div class="an-fat-kpi">
+            <div class="an-fat-kpi-label">Ticket médio</div>
+            <div class="an-fat-kpi-valor laranja">R$ {{ kpi_ticket_medio_fmt }}</div>
+        </div>
+        <div class="an-fat-kpi">
+            <div class="an-fat-kpi-label">Média mensal R$ / dia</div>
+            <div class="an-fat-kpi-valor azul">R$ {{ kpi_media_dia_fmt }}</div>
+        </div>
+    </div>
+
+    <div class="table-responsive border rounded overflow-hidden">
+        <table class="an-fat-tabela mb-0">
+            <thead>
+                <tr>
+                    <th>Convênio</th>
+                    <th class="num">Qtde</th>
+                    <th class="num">Faturamento (R$)</th>
+                    <th class="num">% do Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas_convenio %}
+                <tr>
+                    <td>{{ linha.convenio }}</td>
+                    <td class="num">{{ linha.quantidade_fmt }}</td>
+                    <td class="num">{{ linha.valor_fmt }}</td>
+                    <td class="num">{{ linha.percentual_fmt }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">Sem faturamento no período.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if linhas_convenio %}
+            <tfoot>
+                <tr>
+                    <td>TOTAL</td>
+                    <td class="num">{{ total_quantidade_fmt }}</td>
+                    <td class="num">{{ total_valor_fmt }}</td>
+                    <td class="num">{{ total_percentual_fmt }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>

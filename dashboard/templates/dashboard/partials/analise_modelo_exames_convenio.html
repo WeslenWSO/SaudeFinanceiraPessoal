@@ -41,45 +41,6 @@
     </div>
 </div>
 
-{% if totais_gerais.total_quantidade %}
-<div class="card dash-exames-card dash-exames-resumo mb-4">
-    <div class="card-header d-flex flex-wrap justify-content-between gap-2">
-        <span>Total geral{% if filtros.convenios %} — convênios selecionados{% else %} — todos os convênios{% endif %}</span>
-        <span class="small fw-normal opacity-75">{{ mes_label }}</span>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table dash-exames-tabela mb-0">
-                <thead>
-                    <tr>
-                        <th>Status conferência</th>
-                        <th class="text-end">Qtd.</th>
-                        <th class="text-end">Qt. clientes</th>
-                        <th class="text-end">Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for linha in totais_gerais.status_linhas %}
-                    <tr>
-                        <td><a href="{{ linha.url_listagem }}" class="dash-exames-link">{{ linha.status }}</a></td>
-                        <td class="text-end">{{ linha.quantidade }}</td>
-                        <td class="text-end">{{ linha.quantidade_clientes }}</td>
-                        <td class="text-end">R$ {{ linha.valor_fmt }}</td>
-                    </tr>
-                    {% endfor %}
-                    <tr class="dash-exames-total-row">
-                        <td>Total</td>
-                        <td class="text-end">{{ totais_gerais.total_quantidade }}</td>
-                        <td class="text-end">{{ totais_gerais.total_clientes }}</td>
-                        <td class="text-end">R$ {{ totais_gerais.total_valor_fmt }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {% if cards_convenio %}
 <div class="row g-3">
     {% for card in cards_convenio %}

@@ -1,3 +1,4 @@
+{% if modelos_analise|length > 1 %}
 <ul class="nav nav-pills flex-wrap gap-1 mb-3">
   {% for m in modelos_analise %}
   <li class="nav-item">
@@ -9,6 +10,7 @@
   </li>
   {% endfor %}
 </ul>
+{% endif %}
 
 {% if modelo_analise_partial %}
   {% include modelo_analise_partial %}
