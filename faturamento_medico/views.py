@@ -3904,19 +3904,10 @@ def exportar_resumo_mes_solicitante_excel(request):
 
 
 def _valor_pago_item_grid(item, valor_tabela) -> Decimal | None:
-    """Valor pago na grade: campo RIS ou bruto − desconto quando não informado."""
-    if item is None:
-        return None
-    vp = getattr(item, 'valor_pago', None)
-    if vp is not None and vp > 0:
-        return vp
-    desconto = item.valor_desconto or Decimal('0')
-    if desconto > 0:
-        base = item.total if item.total is not None else item.valor
-        if base is not None:
-            calc = Decimal(str(base)) - Decimal(str(desconto))
-            return calc if calc > 0 else None
-    return None
+    """Valor pago na grade: campo RIS ou total conferido (ver valor_pago_exibicao)."""
+    from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
+
+    return valor_pago_para_exibicao(item)
 
 
 def _valor_desconto_linha(linha):
@@ -5150,6 +5141,11 @@ def verificar_corrigir_precos(request):
                 if cod_tab and not (item.codigo_servico or '').strip():
                     item.codigo_servico = cod_tab
                 item.save()
+                from faturamento_medico.services.valor_pago_exibicao import (
+                    sincronizar_valor_pago_apos_preco,
+                )
+
+                sincronizar_valor_pago_apos_preco(item)
                 faturamentos_atualizar.add(fat.id)
                 corrigidos += 1
 
@@ -6013,6 +6009,11 @@ def editar_item_servico(request, pk):
         if form.is_valid():
             logger.info("Salvando form")
             saved_item = form.save()
+            from faturamento_medico.services.valor_pago_exibicao import (
+                sincronizar_valor_pago_apos_preco,
+            )
+
+            sincronizar_valor_pago_apos_preco(saved_item)
             logger.info(f"Item salvo: {saved_item.id}, valor: {saved_item.valor}, qt: {saved_item.qt}, total: {saved_item.total}")
             # Atualiza o total do faturamento
             item.faturamento.atualizar_total()

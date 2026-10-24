@@ -20,6 +20,7 @@ from faturamento_medico.services.contas_caixa_acerto import (
     caixas_acerto_choices,
     caixas_acerto_valores,
 )
+from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
     notas_linha_para_json,
@@ -136,22 +137,6 @@ def _moeda_br(valor) -> str:
     except Exception:
         return '-'
     return f'{v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-
-
-def _valor_pago_item(item) -> Decimal | None:
-    """Valor pago (RIS): campo valor_pago ou bruto − desconto."""
-    if item is None:
-        return None
-    vp = getattr(item, 'valor_pago', None)
-    if vp is not None and vp > 0:
-        return vp
-    desconto = item.valor_desconto or Decimal('0')
-    if desconto > 0:
-        base = item.total if item.total is not None else item.valor
-        if base is not None:
-            calc = Decimal(str(base)) - Decimal(str(desconto))
-            return calc if calc > 0 else None
-    return None
 
 
 def _eh_aguardando_faturamento(status_txt: str) -> bool:
@@ -470,7 +455,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 com_contraste = item.com_contraste
                 total_item = item.total if item.total is not None else (item.valor or 0)
                 valor_tabela = item.valor or 0
-                valor_pago = _valor_pago_item(item)
+                valor_pago = valor_pago_para_exibicao(item)
             else:
                 procedimento = fat.servico or '-'
                 codigo = fat.codigo_servico or '-'
