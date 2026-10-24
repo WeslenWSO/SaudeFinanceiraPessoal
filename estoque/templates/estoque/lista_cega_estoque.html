@@ -57,6 +57,16 @@
           {% endfor %}
         </select>
       </div>
+      {% elif tipo == 'farmacia' %}
+      <div>
+        <label>Setor (contagem)</label><br>
+        <select name="setor">
+          <option value="">Todos os produtos</option>
+          {% for val, rotulo in setores_farmacia %}
+          <option value="{{ val }}" {% if filtro_setor == val %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
       {% endif %}
       <div>
         <label>
@@ -83,7 +93,11 @@
         <th style="width:2rem">#</th>
         <th style="width:5.5rem">Código</th>
         <th>Produto</th>
+        {% if tipo == 'farmacia' %}
+        <th style="width:5.5rem">Setor</th>
+        {% else %}
         <th style="width:5rem">Marca</th>
+        {% endif %}
         <th style="width:7rem">Fornecedor</th>
         {% if tipo == 'imobilizado' %}<th style="width:5rem">Setor</th>{% endif %}
         <th class="col-num" title="Estoque mínimo cadastrado">Qtd. mín.</th>
@@ -98,7 +112,11 @@
         <td>{{ forloop.counter }}</td>
         <td><strong>{{ p.codigo_produto }}</strong></td>
         <td>{{ p.descricao }}</td>
+        {% if tipo == 'farmacia' %}
+        <td>{% if setor_coluna_rotulo %}{{ setor_coluna_rotulo }}{% endif %}</td>
+        {% else %}
         <td>{{ p.marca|default:"" }}</td>
+        {% endif %}
         <td>{{ p.fornecedor_rotulo|default:""|truncatechars:28 }}</td>
         {% if tipo == 'imobilizado' %}
         <td>{% if p.setor_localizacao %}{{ p.get_setor_localizacao_display }}{% endif %}</td>

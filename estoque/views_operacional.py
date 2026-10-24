@@ -36,7 +36,11 @@ from estoque.services.movimentacao import (
     gerar_entrada_desde_item_nota,
     pode_estornar_entrada_nota,
 )
-from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO, SetorEstoque
+from estoque.setores import (
+    SETOR_LISTA_CEGA_FARMACIA,
+    SETOR_LOCALIZACAO_IMOBILIZADO,
+    SetorEstoque,
+)
 from empresa.models import Empresa
 from notafiscalentrada.models import NotaFiscalEntradaItem
 
@@ -671,14 +675,32 @@ def lista_cega_estoque(request):
         .order_by('codigo_produto', 'descricao')
     )
 
-    if (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim'):
+    somente_saldo = (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
+    filtro_setor = (request.GET.get('setor') or '').strip()
+
+    if natureza == NaturezaEstoque.CONSUMIVEL and filtro_setor:
+        if filtro_setor == SetorEstoque.FARMACIA:
+            if somente_saldo:
+                produtos = produtos.filter(quantidade_estoque__gt=0)
+        else:
+            saldo_qs = SaldoEstoqueSetor.objects.filter(
+                produto__empresa_id=empresa_id,
+                setor=filtro_setor,
+            )
+            if somente_saldo:
+                saldo_qs = saldo_qs.filter(quantidade__gt=0)
+            produtos = produtos.filter(pk__in=saldo_qs.values_list('produto_id', flat=True)).distinct()
+    elif somente_saldo:
         produtos = produtos.filter(quantidade_estoque__gt=0)
 
-    filtro_setor = (request.GET.get('setor') or '').strip()
     if natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor == '__sem__':
         produtos = produtos.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
     elif natureza == NaturezaEstoque.IMOBILIZADO and filtro_setor:
         produtos = produtos.filter(setor_localizacao=filtro_setor)
+
+    setor_coluna_rotulo = ''
+    if filtro_setor:
+        setor_coluna_rotulo = dict(SetorEstoque.choices).get(filtro_setor, filtro_setor)
 
     busca = (request.GET.get('q') or '').strip()
     if busca:
@@ -700,8 +722,10 @@ def lista_cega_estoque(request):
             'produtos': produtos,
             'busca': busca,
             'filtro_setor': filtro_setor,
-            'somente_saldo': (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim'),
+            'somente_saldo': somente_saldo,
             'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+            'setores_farmacia': SETOR_LISTA_CEGA_FARMACIA,
+            'setor_coluna_rotulo': setor_coluna_rotulo,
             'voltar_url': voltar_url,
             'agora': timezone.now(),
             'auto_print': auto_print,

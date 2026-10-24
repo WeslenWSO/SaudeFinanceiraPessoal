@@ -42,3 +42,9 @@ SETOR_TRANSFERENCIA_DESTINOS = tuple(
 SETOR_LOCALIZACAO_IMOBILIZADO = SETOR_TRANSFERENCIA_DESTINOS + tuple(
     (c.value, c.label) for c in _SETORES_APENAS_LOCALIZACAO_IMOBILIZADO
 )
+
+# Lista cega / contagem — depósito central + setores clínicos (requisições).
+SETOR_LISTA_CEGA_FARMACIA = (
+    (SetorEstoque.FARMACIA.value, SetorEstoque.FARMACIA.label),
+    *SETOR_TRANSFERENCIA_DESTINOS,
+)
