@@ -344,6 +344,54 @@ def montar_status_fechamentos_caixa(
     return status_list
 
 
+def montar_blocos_impressao_acerto_caixa(
+    linhas: list[dict],
+    resumo_por_caixa: list[dict],
+) -> list[dict]:
+    """Agrupa linhas e resumos por caixa para impressão (sem total geral agregado)."""
+    por_caixa: dict[str, list[dict]] = defaultdict(list)
+    for linha in linhas:
+        chave = (linha.get('caixa_acerto') or '').strip()
+        por_caixa[chave].append(linha)
+
+    blocos: list[dict] = []
+    vistos: set[str] = set()
+    for grupo in resumo_por_caixa:
+        chave = grupo['caixa']
+        vistos.add(chave)
+        linhas_caixa = por_caixa.get(chave, [])
+        blocos.append(
+            {
+                'rotulo': grupo['rotulo'],
+                'caixa': chave,
+                'linhas': linhas_caixa,
+                'resumo': grupo,
+                'quantidade_linhas': len(linhas_caixa),
+            },
+        )
+
+    for chave in sorted(
+        por_caixa.keys(),
+        key=lambda k: (
+            (por_caixa[k][0].get('caixa_exibicao') or '').lower() if por_caixa[k] else k.lower()
+        ),
+    ):
+        if chave in vistos:
+            continue
+        linhas_caixa = por_caixa[chave]
+        rotulo = (linhas_caixa[0].get('caixa_exibicao') if linhas_caixa else '') or 'Sem caixa definido'
+        blocos.append(
+            {
+                'rotulo': rotulo,
+                'caixa': chave,
+                'linhas': linhas_caixa,
+                'resumo': None,
+                'quantidade_linhas': len(linhas_caixa),
+            },
+        )
+    return blocos
+
+
 def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     hoje = date.today()
     di_padrao, df_padrao = _periodo_padrao(hoje)
@@ -668,10 +716,12 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     }
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
+    blocos_impressao = montar_blocos_impressao_acerto_caixa(linhas, resumo_por_caixa_lista)
 
     return {
         'linhas': linhas,
         'quantidade_linhas': len(linhas),
+        'blocos_impressao': blocos_impressao,
         'resumo_pagamento': resumo_pagamento_lista,
         'resumo_por_caixa': resumo_por_caixa_lista,
         'resumo_aguardando_faturamento': resumo_aguardando_lista,

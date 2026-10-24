@@ -55,6 +55,13 @@
             color: #555;
             margin: 3px 0 10px;
         }
+        .secao-caixa {
+            margin-bottom: 28px;
+        }
+        .secao-caixa:not(:first-child) {
+            page-break-before: always;
+            padding-top: 4px;
+        }
         h1 {
             text-align: center;
             font-size: 14px;
@@ -70,16 +77,11 @@
             font-size: 10px;
             margin-bottom: 12px;
         }
-        .resumos {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            margin-bottom: 14px;
-        }
         .resumo-box {
-            flex: 1 1 280px;
             border: 1px solid #ccc;
             padding: 8px 10px;
+            margin-bottom: 12px;
+            max-width: 420px;
         }
         .resumo-box h2 {
             font-size: 10px;
@@ -130,8 +132,8 @@
             font-size: 9px;
         }
         .rodape-assinatura {
-            margin-top: 32px;
-            padding-top: 16px;
+            margin-top: 24px;
+            padding-top: 12px;
             page-break-inside: avoid;
             font-size: 12px;
             letter-spacing: 0.02em;
@@ -143,11 +145,19 @@
             max-width: 95%;
             line-height: 1.45;
         }
+        .sem-dados {
+            text-align: center;
+            padding: 24px;
+            font-size: 11px;
+        }
         @media print {
             body { margin: 0; }
             .no-print { display: none !important; }
             table.grid thead { display: table-header-group; }
             table.grid tr { page-break-inside: avoid; }
+            .secao-caixa:not(:first-child) {
+                page-break-before: always;
+            }
         }
     </style>
 </head>
@@ -164,32 +174,40 @@
     {% endif %}
     {% endif %}
 
-    <h1>
-        Acerto de Caixa
-        {% if nome_caixa_acerto and nome_caixa_acerto != '—' %}
-        — <span class="titulo-caixa">{{ nome_caixa_acerto }}</span>
-        {% endif %}
-    </h1>
-    <p class="periodo">Período: {{ periodo_fmt }}</p>
+    {% for bloco in blocos_impressao %}
+    <section class="secao-caixa">
+        <h1>
+            Acerto de Caixa
+            — <span class="titulo-caixa">{{ bloco.rotulo }}</span>
+        </h1>
+        <p class="periodo">Período: {{ periodo_fmt }}</p>
 
-    <div class="resumos">
+        {% if bloco.resumo %}
         <div class="resumo-box">
-            <h2>Resumo por forma de pagamento (NF)</h2>
+            <h2>Resumo — {{ bloco.rotulo }}</h2>
             <table>
-                {% for row in resumo_pagamento %}
+                {% for row in bloco.resumo.pagamentos %}
                 <tr>
                     <td>{{ row.rotulo }}</td>
                     <td>R$ {{ row.total_fmt }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="2" class="text-muted">Sem dados.</td></tr>
+                {% if not bloco.resumo.aguardando %}
+                <tr><td colspan="2">Sem valores de NF no período.</td></tr>
+                {% endif %}
                 {% endfor %}
-                {% if resumo_aguardando_faturamento %}
+                {% if bloco.resumo.pagamentos %}
+                <tr class="resumo-grupo">
+                    <td>Subtotal NF</td>
+                    <td>R$ {{ bloco.resumo.total_pagamentos_fmt }}</td>
+                </tr>
+                {% endif %}
+                {% if bloco.resumo.aguardando %}
                 <tr class="resumo-grupo">
                     <td>Aguardando faturamento</td>
-                    <td>R$ {{ total_aguardando_faturamento_fmt }}</td>
+                    <td>R$ {{ bloco.resumo.total_aguardando_fmt }}</td>
                 </tr>
-                {% for row in resumo_aguardando_faturamento %}
+                {% for row in bloco.resumo.aguardando %}
                 <tr class="resumo-sub">
                     <td>{{ row.convenio }}</td>
                     <td>R$ {{ row.total_fmt }}</td>
@@ -198,94 +216,62 @@
                 {% endif %}
             </table>
         </div>
-        {% if resumo_por_caixa %}
-        <div class="resumo-box" style="flex: 1 1 100%;">
-            <h2>Resumo por caixa</h2>
-            {% for grupo in resumo_por_caixa %}
-            <div style="margin-bottom: 10px; page-break-inside: avoid;">
-                <div style="font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 4px;">{{ grupo.rotulo }}</div>
-                <table>
-                    {% for row in grupo.pagamentos %}
-                    <tr>
-                        <td>{{ row.rotulo }}</td>
-                        <td>R$ {{ row.total_fmt }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if grupo.pagamentos %}
-                    <tr class="resumo-grupo">
-                        <td>Subtotal NF</td>
-                        <td>R$ {{ grupo.total_pagamentos_fmt }}</td>
-                    </tr>
-                    {% endif %}
-                    {% if grupo.aguardando %}
-                    <tr class="resumo-grupo">
-                        <td>Aguardando faturamento</td>
-                        <td>R$ {{ grupo.total_aguardando_fmt }}</td>
-                    </tr>
-                    {% for row in grupo.aguardando %}
-                    <tr class="resumo-sub">
-                        <td>{{ row.convenio }}</td>
-                        <td>R$ {{ row.total_fmt }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% endif %}
-                </table>
-            </div>
-            {% endfor %}
-        </div>
         {% endif %}
-    </div>
 
-    <p class="qtd-linhas"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+        <p class="qtd-linhas"><strong>{{ bloco.quantidade_linhas }}</strong> linha(s) — {{ bloco.rotulo }}</p>
 
-    <table class="grid">
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Paciente</th>
-                <th>Procedimento</th>
-                <th>Mod.</th>
-                <th class="text-end">Valor pago</th>
-                <th>NF</th>
-                <th>Forma pgto.</th>
-                <th class="text-end">Valor NF</th>
-                <th>Status</th>
-                <th>Convênio</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for linha in linhas %}
-            <tr>
-                <td>{{ linha.data_fmt }}</td>
-                <td>{{ linha.paciente }}</td>
-                <td>{{ linha.procedimento }}</td>
-                <td>{{ linha.modalidade }}</td>
-                <td class="text-end">
-                    {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
-                </td>
-                <td>
-                    {% if linha.aguardando_faturamento %}—
-                    {% elif linha.qtd_notas == 1 %}{{ linha.notas_vinculadas.0.numero }}
-                    {% elif linha.nota_fiscal and linha.nota_fiscal != '-' %}{{ linha.nota_fiscal }}
-                    {% else %}—{% endif %}
-                </td>
-                <td>{{ linha.forma_pgto }}</td>
-                <td class="text-end">{{ linha.valor_nota_fmt }}</td>
-                <td>{{ linha.status_agendamento }}</td>
-                <td>{{ linha.convenio }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="10" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Paciente</th>
+                    <th>Procedimento</th>
+                    <th>Mod.</th>
+                    <th class="text-end">Valor pago</th>
+                    <th>NF</th>
+                    <th>Forma pgto.</th>
+                    <th class="text-end">Valor NF</th>
+                    <th>Status</th>
+                    <th>Convênio</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in bloco.linhas %}
+                <tr>
+                    <td>{{ linha.data_fmt }}</td>
+                    <td>{{ linha.paciente }}</td>
+                    <td>{{ linha.procedimento }}</td>
+                    <td>{{ linha.modalidade }}</td>
+                    <td class="text-end">
+                        {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if linha.aguardando_faturamento %}—
+                        {% elif linha.qtd_notas == 1 %}{{ linha.notas_vinculadas.0.numero }}
+                        {% elif linha.nota_fiscal and linha.nota_fiscal != '-' %}{{ linha.nota_fiscal }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ linha.forma_pgto }}</td>
+                    <td class="text-end">{{ linha.valor_nota_fmt }}</td>
+                    <td>{{ linha.status_agendamento }}</td>
+                    <td>{{ linha.convenio }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align:center;padding:12px;">Nenhum procedimento neste caixa.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <div class="rodape-assinatura">
-        <p>ASSINATURA ________________________________</p>
-        <p class="nome-caixa"><strong>NOME DO CAIXA:</strong> {{ nome_caixa_acerto }}</p>
-        <p>DATA ____/____/____</p>
-    </div>
+        <div class="rodape-assinatura">
+            <p>ASSINATURA ________________________________</p>
+            <p class="nome-caixa"><strong>NOME DO CAIXA:</strong> {{ bloco.rotulo }}</p>
+            <p>DATA ____/____/____</p>
+        </div>
+    </section>
+    {% empty %}
+    <p class="sem-dados">Nenhum procedimento no filtro.</p>
+    {% endfor %}
 </body>
 </html>
