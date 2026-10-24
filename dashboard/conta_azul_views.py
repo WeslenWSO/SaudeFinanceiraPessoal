@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from calendar import monthrange
 from datetime import date, timedelta
+
+from dateutil.relativedelta import relativedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -464,7 +467,7 @@ def conta_azul_sincronizar_dashboard(request):
         messages.error(request, f'Erro inesperado na sincronização: {exc}')
     from django.urls import reverse
 
-    return rd(reverse('dashboard:index') + f'?mes={mes}&ano={ano}')
+    return rd(reverse('dashboard:index') + f'?mes={ano:04d}-{mes:02d}')
 
 
 MESES_PT = (
@@ -522,34 +525,63 @@ def _parse_data_param(valor, fallback: date) -> date:
     return fallback
 
 
+def _parse_mes_ano_dashboard(request, hoje: date) -> tuple[int, int]:
+    """Mês de referência: ?mes=YYYY-MM, ?mes=N&ano=Y ou legado data_inicio."""
+    mes_raw = (request.GET.get('mes') or '').strip()
+    if mes_raw and '-' in mes_raw:
+        try:
+            partes = mes_raw.split('-', 1)
+            ano = int(partes[0])
+            mes = int(partes[1])
+            if 2000 <= ano <= 2100 and 1 <= mes <= 12:
+                return ano, mes
+        except (TypeError, ValueError, IndexError):
+            pass
+    if mes_raw.isdigit():
+        try:
+            mes = int(mes_raw)
+            ano = int(request.GET.get('ano') or hoje.year)
+            if 2000 <= ano <= 2100 and 1 <= mes <= 12:
+                return ano, mes
+        except (TypeError, ValueError):
+            pass
+    if request.GET.get('data_inicio'):
+        di = _parse_data_param(request.GET.get('data_inicio'), hoje)
+        return di.year, di.month
+    return hoje.year, hoje.month
+
+
+def _url_mes_dashboard(request, ano: int, mes: int) -> str:
+    q = request.GET.copy()
+    q['mes'] = f'{ano:04d}-{mes:02d}'
+    q.pop('data_inicio', None)
+    q.pop('data_fim', None)
+    q.pop('ano', None)
+    return '?' + q.urlencode()
+
+
 def _contexto_dashboard_intervalo(request):
-    """Empresa da sessão + intervalo de datas + regime (Visão Geral / Competência / Caixa)."""
+    """Empresa da sessão + mês de referência + regime (Visão Geral / Competência / Caixa)."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return None, None
 
     empresa = get_object_or_404(Empresa, pk=empresa_id)
     hoje = date.today()
-    ano_atual = hoje.year
+    ano_ref, mes_ref = _parse_mes_ano_dashboard(request, hoje)
 
-    data_inicio = _parse_data_param(
-        request.GET.get('data_inicio'),
-        date(ano_atual, 1, 1),
-    )
-    data_fim = _parse_data_param(
-        request.GET.get('data_fim'),
-        date(ano_atual, 12, 31),
-    )
-    if data_fim < data_inicio:
-        data_inicio, data_fim = data_fim, data_inicio
+    data_inicio = date(ano_ref, mes_ref, 1)
+    data_fim = date(ano_ref, mes_ref, monthrange(ano_ref, mes_ref)[1])
 
     regime = (request.GET.get('regime') or 'geral').strip().lower()
     if regime not in {r[0] for r in REGIMES}:
         regime = 'geral'
 
-    titulo_periodo = (
-        f'{data_inicio.strftime("%d/%m/%Y")} — {data_fim.strftime("%d/%m/%Y")}'
-    )
+    ref = date(ano_ref, mes_ref, 1)
+    ant = ref - relativedelta(months=1)
+    prox = ref + relativedelta(months=1)
+    titulo_mes_ref = f'{MESES_PT[mes_ref - 1]} de {ano_ref}'
+    mes_filtro = f'{ano_ref:04d}-{mes_ref:02d}'
 
     ctx = {
         'empresa': empresa,
@@ -557,9 +589,15 @@ def _contexto_dashboard_intervalo(request):
         'data_fim': data_fim,
         'data_inicio_str': data_inicio.isoformat(),
         'data_fim_str': data_fim.isoformat(),
+        'ano_ref': ano_ref,
+        'mes_ref': mes_ref,
+        'mes_filtro': mes_filtro,
+        'titulo_mes_ref': titulo_mes_ref,
+        'titulo_periodo': titulo_mes_ref,
+        'url_mes_anterior': _url_mes_dashboard(request, ant.year, ant.month),
+        'url_mes_proximo': _url_mes_dashboard(request, prox.year, prox.month),
         'regime': regime,
         'regimes': REGIMES,
-        'titulo_periodo': titulo_periodo,
     }
     return empresa, ctx
 

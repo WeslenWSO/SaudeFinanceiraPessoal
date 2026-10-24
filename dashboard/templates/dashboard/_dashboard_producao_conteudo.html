@@ -48,13 +48,7 @@
   <div class="card-body py-3">
     <form method="get" class="row g-2 align-items-end">
       <input type="hidden" name="aba" value="producao">
-      <input type="hidden" name="data_inicio" value="{{ data_inicio_str }}">
-      <input type="hidden" name="data_fim" value="{{ data_fim_str }}">
-      <input type="hidden" name="regime" value="{{ regime }}">
-      <div class="col-auto">
-        <label for="mes_producao" class="form-label small fw-semibold mb-1">Mês de referência</label>
-        <input type="month" id="mes_producao" name="mes" class="form-control form-control-sm" value="{{ mes_filtro }}">
-      </div>
+      <input type="hidden" name="mes" value="{{ mes_filtro }}">
       <div class="col-md-4 col-lg-3">
         <label for="convenio_producao" class="form-label small fw-semibold mb-1">Convênios</label>
         <select id="convenio_producao" name="convenio" class="form-select form-select-sm" multiple title="Ctrl+clique para vários">

@@ -1,0 +1,12 @@
+<nav class="dashboard-nav-mes d-flex align-items-stretch flex-wrap gap-1" aria-label="Mês de referência">
+  <a href="{{ url_mes_anterior }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+    <i class="fas fa-chevron-left me-1"></i> Anterior
+  </a>
+  <div class="btn btn-light border fw-semibold text-center px-3 d-flex align-items-center justify-content-center text-nowrap user-select-none"
+       style="min-width: 10rem;">
+    {{ titulo_mes_ref }}
+  </div>
+  <a href="{{ url_mes_proximo }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+    Próximo <i class="fas fa-chevron-right ms-1"></i>
+  </a>
+</nav>
