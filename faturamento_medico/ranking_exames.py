@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
+from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.models import FaturamentoMedico
 
 
@@ -35,16 +36,34 @@ def _exame_passa_filtro(nome_exame: str, exames_filtro: list[str]) -> bool:
     return any(ex.lower() == f.strip().lower() for f in exames_filtro if f and str(f).strip())
 
 
+def _codigo_modalidade_item(faturamento, item=None) -> str:
+    bruto = (_modalidade_item(faturamento, item) or '').strip().upper()
+    if bruto == 'RX':
+        bruto = 'CR'
+    if not bruto or bruto == '-':
+        return 'OUTROS'
+    return bruto
+
+
+def _modalidade_passa_filtro(faturamento, item, modalidades_filtro: list[str]) -> bool:
+    if not modalidades_filtro:
+        return True
+    cod = _codigo_modalidade_item(faturamento, item)
+    return cod in modalidades_filtro
+
+
 def montar_ranking_exames_qs(
     faturamentos_qs,
     *,
     exames_filtro: list[str] | None = None,
+    modalidades_filtro: list[str] | None = None,
 ) -> dict:
     """
     Agrega itens de serviço do queryset (já filtrado por data/convênio/etc.).
     Retorna ranking por exame, por convênio e detalhe exame × convênio.
     """
     exames_filtro = [e for e in (exames_filtro or []) if e and str(e).strip()]
+    modalidades_filtro = [m for m in (modalidades_filtro or []) if m and str(m).strip()]
     por_exame: dict[str, dict] = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
     por_convenio: dict[str, dict] = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
     detalhe: list[dict] = []
@@ -57,6 +76,8 @@ def montar_ranking_exames_qs(
         if not itens:
             proc = (getattr(fat, 'servico', None) or '').strip() or 'Não informado'
             if not _exame_passa_filtro(proc, exames_filtro):
+                continue
+            if not _modalidade_passa_filtro(fat, None, modalidades_filtro):
                 continue
             val = _valor_item(None, fat)
             por_exame[proc]['quantidade'] += 1
@@ -73,6 +94,8 @@ def montar_ranking_exames_qs(
         for item in itens:
             proc = (item.servico or '').strip() or 'Não informado'
             if not _exame_passa_filtro(proc, exames_filtro):
+                continue
+            if not _modalidade_passa_filtro(fat, item, modalidades_filtro):
                 continue
             val = _valor_item(item, fat)
             por_exame[proc]['quantidade'] += 1

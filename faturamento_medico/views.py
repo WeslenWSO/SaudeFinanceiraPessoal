@@ -264,6 +264,8 @@ def _query_ranking_exames(filtros, *, incluir_exames: bool = True):
     if incluir_exames:
         for ex in filtros.get('exames') or []:
             params.append(('exame', ex))
+    for mod in filtros.get('modalidades') or []:
+        params.append(('modalidade', mod))
     return urlencode(params)
 
 
@@ -301,7 +303,11 @@ def _tem_filtros_ranking_na_query(request):
     for key in _FAT_LISTAGEM_FILTER_KEYS:
         if key in request.GET:
             return True
-    return 'convenio' in request.GET or 'exame' in request.GET
+    return (
+        'convenio' in request.GET
+        or 'exame' in request.GET
+        or 'modalidade' in request.GET
+    )
 
 
 def _convenios_from_sess(raw) -> list[str]:
@@ -2930,6 +2936,7 @@ def ranking_exames_faturamento(request):
                     'codigo_relatorio': merged.get('codigo_relatorio') or '',
                     'convenios': merged.get('convenio') or merged.get('convenios') or [],
                     'exames': merged.get('exame') or merged.get('exames') or [],
+                    'modalidades': merged.get('modalidade') or merged.get('modalidades') or [],
                 },
                 incluir_exames=True,
             )
@@ -2937,9 +2944,16 @@ def ranking_exames_faturamento(request):
             return redirect(f'{url}?{qs_redirect}' if qs_redirect else url)
 
     filtros = _filtros_listagem_faturamento(request, use_session_fallback=False)
+    if 'modalidade' in request.GET:
+        modalidades_filtro = _parse_modalidades_filtro(request)
+    else:
+        modalidades_filtro = []
+    filtros['modalidades'] = modalidades_filtro
+
     if tem_filtros_url:
         request.session['faturamento_ranking_exames'] = {
             'exame': filtros.get('exames') or [],
+            'modalidade': modalidades_filtro,
             'data_inicio': filtros.get('data_inicio') or '',
             'data_fim': filtros.get('data_fim') or '',
             'convenio': filtros.get('convenios') or [],
@@ -2955,7 +2969,11 @@ def ranking_exames_faturamento(request):
     qs = _aplicar_filtros_faturamento_qs(
         qs, filtros, empresa_id=empresa_id, aplicar_exames=True,
     )
-    dados = montar_ranking_exames_qs(qs, exames_filtro=filtros.get('exames'))
+    dados = montar_ranking_exames_qs(
+        qs,
+        exames_filtro=filtros.get('exames'),
+        modalidades_filtro=modalidades_filtro,
+    )
 
     def _periodo_label(di: str, df: str) -> str:
         try:
@@ -2973,6 +2991,8 @@ def ranking_exames_faturamento(request):
             filtros.get('data_fim') or '',
         ),
         'exames_filtro': filtros.get('exames') or [],
+        'modalidades_filtro': modalidades_filtro,
+        'modalidades_opcoes': MODALIDADES_SOLICITANTE,
         'convenios_disponiveis': convenios_disponiveis,
         'exames_disponiveis': exames_disponiveis,
         'listagem_query_string': _query_export_faturamento(filtros),

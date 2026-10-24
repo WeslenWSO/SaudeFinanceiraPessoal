@@ -45,7 +45,21 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-0" for="rank_modalidade">Modalidade (várias)</label>
+                            <select name="modalidade" id="rank_modalidade" class="form-control form-control-sm" multiple size="6"
+                                    title="Ctrl+clique — vazio = todas (US, MR, CT, …)">
+                                {% for codigo, label in modalidades_opcoes %}
+                                <option value="{{ codigo }}" {% if codigo in modalidades_filtro %}selected{% endif %}>
+                                    {{ codigo }} — {{ label }}
+                                </option>
+                                {% endfor %}
+                                <option value="OUTROS" {% if 'OUTROS' in modalidades_filtro %}selected{% endif %}>
+                                    OUTROS
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label small mb-0" for="rank_exame">Exames (vários)</label>
                             <select name="exame" id="rank_exame" class="form-control form-control-sm" multiple size="6"
                                     title="Ctrl+clique — deixe vazio para todos os exames do período">
@@ -58,7 +72,7 @@
                             <button type="submit" class="btn btn-primary btn-sm">
                                 <i class="fas fa-search"></i> Atualizar ranking
                             </button>
-                            <a href="{% url 'faturamento_medico:ranking_exames' %}?limpar=1" class="btn btn-outline-secondary btn-sm">Limpar exames</a>
+                            <a href="{% url 'faturamento_medico:ranking_exames' %}?limpar=1" class="btn btn-outline-secondary btn-sm">Limpar filtros</a>
                         </div>
                     </div>
                 </div>
@@ -67,8 +81,11 @@
             <p class="text-muted small mb-3">
                 <strong>{{ empresa.razao|default:empresa.nome_fantasia }}</strong>
                 · Período: {{ periodo_label }}
+                {% if modalidades_filtro %}
+                · Modalidades: {{ modalidades_filtro|join:", " }}
+                {% endif %}
                 {% if exames_filtro %}
-                · Exames filtrados: {{ exames_filtro|join:", " }}
+                · Exames: {{ exames_filtro|join:", " }}
                 {% endif %}
                 · Total: <strong>{{ total_quantidade }}</strong> procedimento(s) ·
                 <strong>R$ {{ total_valor|moeda_br }}</strong>
