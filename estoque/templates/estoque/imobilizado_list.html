@@ -72,13 +72,15 @@
               <form method="post" action="{% url 'estoque:imobilizado_setor' p.pk %}" class="d-flex flex-column gap-1">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <select name="setor_localizacao" class="form-select form-select-sm" aria-label="Setor de {{ p.codigo_produto }}">
+                <select name="setor_localizacao" class="form-select form-select-sm js-setor-imob"
+                        aria-label="Setor de {{ p.codigo_produto }}"
+                        data-setor-inicial="{{ p.setor_localizacao|default:'' }}">
                   <option value="" {% if not p.setor_localizacao %}selected{% endif %}>— Definir setor —</option>
                   {% for val, rotulo in setores_imobilizado %}
                   <option value="{{ val }}" {% if p.setor_localizacao == val %}selected{% endif %}>{{ rotulo }}</option>
                   {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-outline-primary btn-sm align-self-start">Salvar setor</button>
+                <button type="submit" class="btn btn-outline-primary btn-sm align-self-start js-salvar-setor{% if p.setor_localizacao %} d-none{% endif %}">Salvar setor</button>
               </form>
             </td>
             <td>{{ p.unidade|default:"—" }}</td>
@@ -104,4 +106,29 @@
   </ul></nav>
   {% endif %}
 </div>
+<script>
+(function () {
+  function atualizarBotaoSalvarSetor(select) {
+    var form = select.closest('form');
+    if (!form) return;
+    var btn = form.querySelector('.js-salvar-setor');
+    if (!btn) return;
+    var inicial = select.dataset.setorInicial || '';
+    if (!inicial) {
+      btn.classList.remove('d-none');
+      return;
+    }
+    if ((select.value || '') === inicial) {
+      btn.classList.add('d-none');
+    } else {
+      btn.classList.remove('d-none');
+    }
+  }
+  document.querySelectorAll('.js-setor-imob').forEach(function (select) {
+    select.addEventListener('change', function () {
+      atualizarBotaoSalvarSetor(select);
+    });
+  });
+})();
+</script>
 {% endblock %}
