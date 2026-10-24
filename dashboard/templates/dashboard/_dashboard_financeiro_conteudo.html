@@ -1,0 +1,94 @@
+  {% include 'dashboard/_dashboard_regime_nav.html' %}
+
+  <p class="text-muted small mb-3">
+    Período: <strong>{{ titulo_periodo }}</strong>
+    · Base: <strong>{{ visao.legenda_receitas|lower }}</strong>
+  </p>
+
+  {% if not visao.tem_dados %}
+  <div class="alert alert-info">
+    Nenhum lançamento encontrado no período. Sincronize o Conta Azul ou cadastre contas a pagar/receber.
+  </div>
+  {% endif %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div style="position: relative; height: 340px;">
+            <canvas id="chartMensal" aria-label="Receitas e despesas por mês"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Contas a Vencer</div>
+        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+          <div style="position: relative; height: 280px; width: 100%; max-width: 320px;">
+            <canvas id="chartVencer" aria-label="Contas a pagar e receber"></canvas>
+          </div>
+          <div class="d-flex flex-wrap gap-3 justify-content-center mt-2 small">
+            <span><span class="badge rounded-pill" style="background:#fd7e14;">Receber</span> R$ {{ visao.contas_receber|floatformat:2 }}</span>
+            <span><span class="badge rounded-pill" style="background:#198754;">Pagar</span> R$ {{ visao.contas_pagar|floatformat:2 }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Entradas por Categoria</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartEntradas" aria-label="Entradas por categoria"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Custos/Despesas por Categoria</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartSaidas" aria-label="Despesas por categoria"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Receitas por Forma de Pagamento</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartReceitasForma" aria-label="Receitas por forma de pagamento"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Despesas por Forma de Pagamento</div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartDespesasForma" aria-label="Despesas por forma de pagamento"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="small text-muted mb-0">
+    <a href="{% url 'dashboard:por_tipo' %}">Receitas / Despesas / Inv. / DL</a>
+    ·
+    <a href="{% url 'dashboard:relatorio_mensal' %}">Relatório mensal</a>
+    ·
+    <a href="{% url 'dashboard:resumo_fechamento' %}">Resumo fechamento</a>
+    ·
+    <a href="{% url 'fluxo_de_caixa:fluxo_caixa_mensal' %}">Fluxo de caixa</a>
+  </p>

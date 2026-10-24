@@ -393,3 +393,83 @@ def montar_dashboard_exames_diario(empresa_id, ano, mes, dias=None, convenios=No
         'regua_dias': regua,
         'regua_max_quantidade': max_q,
     }
+
+
+def _fmt_moeda_br(valor) -> str:
+    try:
+        v = Decimal(str(valor or 0))
+    except Exception:
+        return '0,00'
+    s = f'{v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return s
+
+
+def _fmt_card_dashboard(card: dict) -> dict:
+    card = dict(card)
+    card['total_valor_fmt'] = _fmt_moeda_br(card['total_valor'])
+    card['status_linhas'] = [
+        {**linha, 'valor_fmt': _fmt_moeda_br(linha['valor'])}
+        for linha in card['status_linhas']
+    ]
+    return card
+
+
+def montar_contexto_dashboard_producao(request, empresa_id: int) -> dict:
+    """Contexto do painel Produção (convênio × status de conferência)."""
+    hoje = date.today()
+    mes_param = (request.GET.get('mes') or '').strip()
+    ano, mes = hoje.year, hoje.month
+    if mes_param:
+        try:
+            partes = mes_param.split('-')
+            if len(partes) == 2:
+                ano = int(partes[0])
+                mes = int(partes[1])
+                if mes < 1 or mes > 12:
+                    raise ValueError('mês inválido')
+        except (TypeError, ValueError):
+            pass
+
+    convenios_sel = [c.strip() for c in request.GET.getlist('convenio') if c and str(c).strip()]
+    dados = montar_dashboard_exames(empresa_id, ano, mes, convenios=convenios_sel)
+
+    from servicos_medicos.models import Convenio
+
+    convenios_disponiveis = list(Convenio.objects.filter(empresa_id=empresa_id).order_by('nome'))
+    if not convenios_disponiveis:
+        convenios_disponiveis = [
+            type('Conv', (), {'nome': n})()
+            for n in (
+                'CBSAUDE', 'PM', 'UNIMED', 'BRADESCO', 'GEAP', 'SAUDE CAIXA',
+                'POSTAL SAUDE', 'FUSEX', 'LIFE EMPRESARIAL', 'CASSI', 'GCARD', 'PERSONAL NET',
+            )
+        ]
+
+    totais = dict(dados['totais_gerais'])
+    totais['total_valor_fmt'] = _fmt_moeda_br(totais['total_valor'])
+    totais['status_linhas'] = [
+        {**linha, 'valor_fmt': _fmt_moeda_br(linha['valor'])}
+        for linha in totais['status_linhas']
+    ]
+
+    params_listagem = [
+        ('data_inicio', dados['data_inicio']),
+        ('data_fim', dados['data_fim']),
+    ]
+    for conv in convenios_sel:
+        params_listagem.append(('convenio', conv))
+
+    params_diario = [('mes', f'{ano:04d}-{mes:02d}')]
+    for conv in convenios_sel:
+        params_diario.append(('convenio', conv))
+
+    return {
+        'mes_filtro': f'{ano:04d}-{mes:02d}',
+        'mes_label': dados['mes_label'],
+        'convenios_disponiveis': convenios_disponiveis,
+        'filtros_producao': {'convenios': convenios_sel},
+        'cards_convenio': [_fmt_card_dashboard(c) for c in dados['cards']],
+        'totais_gerais': totais,
+        'url_listagem_mes': f"{reverse('faturamento_medico:ftlistar')}?{urlencode(params_listagem)}",
+        'url_diario': f"{reverse('faturamento_medico:dashboard_exames_diario')}?{urlencode(params_diario)}",
+    }

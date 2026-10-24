@@ -564,22 +564,42 @@ def _contexto_dashboard_intervalo(request):
     return empresa, ctx
 
 
+def _aba_dashboard(request) -> str:
+    aba = (request.GET.get('aba') or 'financeiro').strip().lower()
+    return aba if aba in ('financeiro', 'producao') else 'financeiro'
+
+
+def _url_aba_dashboard(request, aba: str) -> str:
+    q = request.GET.copy()
+    q['aba'] = aba
+    return '?' + q.urlencode()
+
+
 @login_required
 def conta_azul_dashboard(request):
-    """Dashboard principal — Visão Geral com gráficos financeiros."""
+    """Dashboard inicial — abas Financeiro e Produção."""
     empresa, ctx = _contexto_dashboard_intervalo(request)
     if not empresa:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('empresa:lista')
 
+    aba_ativa = _aba_dashboard(request)
     visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
+
+    from faturamento_medico.dashboard_exames import montar_contexto_dashboard_producao
+
+    producao_ctx = montar_contexto_dashboard_producao(request, empresa.pk)
+
     return render(
         request,
-        'dashboard/conta_azul_dashboard.html',
+        'dashboard/dashboard_inicio.html',
         {
             'titulo': 'Dashboard',
             'visao': visao,
-            'dashboard_ativo': 'geral',
+            'aba_ativa': aba_ativa,
+            'url_aba_financeiro': _url_aba_dashboard(request, 'financeiro'),
+            'url_aba_producao': _url_aba_dashboard(request, 'producao'),
+            **producao_ctx,
             **ctx,
         },
     )

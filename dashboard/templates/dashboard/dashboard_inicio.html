@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <div>
+      <h1 class="h3 mb-1"><i class="fas fa-chart-line me-2 text-primary"></i>{{ titulo }}</h1>
+      <p class="text-muted small mb-0">{{ empresa.razao }}</p>
+    </div>
+    {% if aba_ativa == 'financeiro' %}
+      {% include 'dashboard/_dashboard_periodo_intervalo.html' %}
+    {% endif %}
+  </div>
+
+  {% include 'dashboard/_dashboard_area_tabs.html' %}
+
+  <div class="dashboard-area-panel bg-white border border-top-0 rounded-bottom p-3 p-md-4 shadow-sm">
+    {% if aba_ativa == 'producao' %}
+      {% include 'dashboard/_dashboard_producao_conteudo.html' %}
+    {% else %}
+      {% include 'dashboard/_dashboard_financeiro_conteudo.html' %}
+    {% endif %}
+  </div>
+</div>
+
+{% if aba_ativa == 'financeiro' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (typeof Chart === 'undefined') return;
+
+  function fmtMoeda(v) {
+    if (v >= 1000) return 'R$ ' + (v / 1000).toFixed(2) + 'K';
+    return 'R$ ' + Number(v).toFixed(2);
+  }
+
+  var elMensal = document.getElementById('chartMensal');
+  if (elMensal) {
+    new Chart(elMensal, {
+      type: 'bar',
+      data: {
+        labels: {{ visao.chart_mensal_labels_json|safe }},
+        datasets: [
+          {
+            label: '{{ visao.legenda_receitas|escapejs }}',
+            data: {{ visao.chart_mensal_receitas_json|safe }},
+            backgroundColor: 'rgba(25, 135, 84, 0.85)',
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {
+            label: '{{ visao.legenda_despesas|escapejs }}',
+            data: {{ visao.chart_mensal_despesas_json|safe }},
+            backgroundColor: 'rgba(253, 126, 20, 0.85)',
+            borderRadius: 3,
+            yAxisID: 'y1',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return ctx.dataset.label + ': R$ ' + Number(ctx.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            position: 'left',
+            ticks: { callback: function (v) { return fmtMoeda(v); } },
+          },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { callback: function (v) { return fmtMoeda(v); } },
+          },
+        },
+      },
+    });
+  }
+
+  var elVencer = document.getElementById('chartVencer');
+  if (elVencer) {
+    new Chart(elVencer, {
+      type: 'doughnut',
+      data: {
+        labels: {{ visao.chart_vencer_labels_json|safe }},
+        datasets: [{
+          data: {{ visao.chart_vencer_data_json|safe }},
+          backgroundColor: ['#fd7e14', '#198754'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return ctx.label + ': R$ ' + Number(ctx.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function barHorizontal(id, labels, data, label, cor) {
+    var el = document.getElementById(id);
+    if (!el || !labels.length) return;
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: label,
+          data: data,
+          backgroundColor: cor,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return 'R$ ' + Number(ctx.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { callback: function (v) { return fmtMoeda(v); } },
+          },
+        },
+      },
+    });
+  }
+
+  barHorizontal(
+    'chartEntradas',
+    {{ visao.chart_entradas_labels_json|safe }},
+    {{ visao.chart_entradas_data_json|safe }},
+    '{{ visao.legenda_receitas|escapejs }}',
+    'rgba(13, 110, 253, 0.85)'
+  );
+  barHorizontal(
+    'chartSaidas',
+    {{ visao.chart_saidas_labels_json|safe }},
+    {{ visao.chart_saidas_data_json|safe }},
+    '{{ visao.legenda_despesas|escapejs }}',
+    'rgba(13, 110, 253, 0.85)'
+  );
+  barHorizontal(
+    'chartReceitasForma',
+    {{ visao.chart_receitas_forma_labels_json|safe }},
+    {{ visao.chart_receitas_forma_data_json|safe }},
+    '{{ visao.legenda_receitas|escapejs }}',
+    'rgba(25, 135, 84, 0.85)'
+  );
+  barHorizontal(
+    'chartDespesasForma',
+    {{ visao.chart_despesas_forma_labels_json|safe }},
+    {{ visao.chart_despesas_forma_data_json|safe }},
+    '{{ visao.legenda_despesas|escapejs }}',
+    'rgba(253, 126, 20, 0.85)'
+  );
+})();
+</script>
+{% endif %}
+{% endblock %}

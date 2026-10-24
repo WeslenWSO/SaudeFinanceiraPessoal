@@ -1,7 +1,7 @@
 <nav class="nav nav-pills flex-wrap gap-1 mb-3">
   {% for cod, rotulo in regimes %}
   <a class="nav-link py-1 px-3 {% if regime == cod %}active{% endif %}"
-     href="{% url 'dashboard:index' %}?regime={{ cod }}&data_inicio={{ data_inicio_str }}&data_fim={{ data_fim_str }}">
+     href="{% url 'dashboard:index' %}?aba=financeiro&amp;regime={{ cod }}&amp;data_inicio={{ data_inicio_str }}&amp;data_fim={{ data_fim_str }}">
     {{ rotulo }}
   </a>
   {% endfor %}
