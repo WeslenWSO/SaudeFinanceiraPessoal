@@ -157,8 +157,7 @@
                                 </span>
                                 <a href="{% url 'estoque:produto_operacional_detail' item.entrada_estoque.produto_id %}" class="btn btn-link btn-sm p-0">Histórico</a>
                                 {% if item.pode_estornar_entrada %}
-                                <form method="post" action="{% url 'estoque:estornar_estoque_nf_item' item.id %}" class="mt-1"
-                                      onsubmit="return confirm('Estornar esta entrada? O item da NF ficará livre para lançar de novo (ex.: imobilizado).');">
+                                <form method="post" action="{% url 'estoque:estornar_estoque_nf_item' item.id %}" class="mt-1 js-estornar-nf-form">
                                   {% csrf_token %}
                                   <button type="submit" class="btn btn-outline-danger btn-sm w-100">Estornar entrada</button>
                                 </form>
@@ -268,4 +267,5 @@
   }
 })();
 </script>
+{% include 'estoque/parcial/_modal_estorno_nf.html' %}
 {% endblock %}

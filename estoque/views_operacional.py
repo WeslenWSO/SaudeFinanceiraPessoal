@@ -27,6 +27,7 @@ from estoque.permissoes import (
     usuario_e_admin_estoque,
     usuario_pode_baixa_setor,
     usuario_pode_requisicao_farmacia,
+    validar_senha_aprovacao_estorno_nf,
 )
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
 from estoque.services.movimentacao import (
@@ -306,6 +307,11 @@ def estornar_estoque_nf_item(request, item_id: int):
         nota_fiscal__empresa_id=empresa_id,
         nota_fiscal__tipo_nota='comercio',
     )
+    senha_ok, msg_senha = validar_senha_aprovacao_estorno_nf(request.POST.get('senha_aprovacao'))
+    if not senha_ok:
+        messages.error(request, msg_senha)
+        return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
+
     try:
         estornar_entrada_desde_item_nota(item, usuario=request.user)
         messages.success(

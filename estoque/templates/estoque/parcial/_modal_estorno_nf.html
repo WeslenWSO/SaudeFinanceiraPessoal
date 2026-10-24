@@ -1,0 +1,91 @@
+<div class="modal fade" id="modalEstornoNf" tabindex="-1" aria-labelledby="modalEstornoNfLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalEstornoNfLabel">Confirmar estorno</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">O estorno desfaz a entrada de estoque deste item da NF. Informe a senha de aprovação.</p>
+        <label class="form-label" for="estornoNfSenha">Senha (Admin ou Saude)</label>
+        <input type="password" class="form-control" id="estornoNfSenha" autocomplete="current-password">
+        <div class="text-danger small mt-2 d-none" id="estornoNfErro"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger btn-sm" id="estornoNfConfirmar">Estornar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var modalEl = document.getElementById('modalEstornoNf');
+  if (!modalEl || typeof bootstrap === 'undefined') return;
+
+  var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  var inputSenha = document.getElementById('estornoNfSenha');
+  var btnConfirmar = document.getElementById('estornoNfConfirmar');
+  var erroEl = document.getElementById('estornoNfErro');
+  var formPendente = null;
+
+  function limparModal() {
+    if (inputSenha) inputSenha.value = '';
+    if (erroEl) {
+      erroEl.textContent = '';
+      erroEl.classList.add('d-none');
+    }
+    formPendente = null;
+  }
+
+  document.querySelectorAll('.js-estornar-nf-form').forEach(function (form) {
+    form.addEventListener('submit', function (ev) {
+      if (form.dataset.estornoSenhaOk === '1') {
+        form.dataset.estornoSenhaOk = '';
+        return;
+      }
+      ev.preventDefault();
+      formPendente = form;
+      limparModal();
+      if (inputSenha) inputSenha.value = '';
+      modal.show();
+      setTimeout(function () { if (inputSenha) inputSenha.focus(); }, 200);
+    });
+  });
+
+  if (btnConfirmar) {
+    btnConfirmar.addEventListener('click', function () {
+      if (!formPendente) return;
+      var senha = (inputSenha && inputSenha.value || '').trim();
+      if (!senha) {
+        if (erroEl) {
+          erroEl.textContent = 'Informe a senha do Admin ou Saude.';
+          erroEl.classList.remove('d-none');
+        }
+        return;
+      }
+      var hidden = formPendente.querySelector('input[name="senha_aprovacao"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'senha_aprovacao';
+        formPendente.appendChild(hidden);
+      }
+      hidden.value = senha;
+      formPendente.dataset.estornoSenhaOk = '1';
+      modal.hide();
+      formPendente.submit();
+    });
+  }
+
+  modalEl.addEventListener('hidden.bs.modal', limparModal);
+  if (inputSenha) {
+    inputSenha.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        btnConfirmar && btnConfirmar.click();
+      }
+    });
+  }
+})();
+</script>

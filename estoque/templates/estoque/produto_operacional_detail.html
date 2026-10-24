@@ -45,8 +45,7 @@
           <td>{{ e.data_validade|date:"d/m/Y"|default:"—" }}</td>
           <td class="text-nowrap">
             {% if e.pode_estornar %}
-            <form method="post" action="{% url 'estoque:estornar_estoque_nf_item' e.nota_item_id %}" class="d-inline"
-                  onsubmit="return confirm('Estornar esta entrada da NF?');">
+            <form method="post" action="{% url 'estoque:estornar_estoque_nf_item' e.nota_item_id %}" class="d-inline js-estornar-nf-form">
               {% csrf_token %}
               <button type="submit" class="btn btn-outline-danger btn-sm">Estornar</button>
             </form>
@@ -81,4 +80,5 @@
     </table>
   </div>
 </div>
+{% include 'estoque/parcial/_modal_estorno_nf.html' %}
 {% endblock %}
