@@ -69,7 +69,7 @@
         <tr>
           <td>{{ m.criado_em|date:"d/m/Y H:i" }}</td>
           <td>{{ m.get_tipo_display }}</td>
-          <td>{{ m.setor_origem|default:"—" }} → {{ m.setor_destino|default:"—" }}</td>
+          <td>{{ m.setor_origem|setor_rotulo }} → {{ m.setor_destino|setor_rotulo }}</td>
           <td>{{ m.quantidade }}</td>
           <td>{% if m.requisicao_id %}#{{ m.requisicao_id }}{% else %}—{% endif %}</td>
           <td>{{ m.usuario|default:"—" }}</td>
