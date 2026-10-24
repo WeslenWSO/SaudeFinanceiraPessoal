@@ -1,0 +1,20 @@
+<ul class="nav nav-pills flex-wrap gap-1 mb-3">
+  {% for m in modelos_analise %}
+  <li class="nav-item">
+    <a class="nav-link py-1 px-2 small {% if modelo_analise == m.codigo %}active{% endif %}"
+       href="{{ url_analise_modelo_base }}{{ m.codigo }}"
+       title="{{ m.descricao }}">
+      <i class="fas {{ m.icon }} me-1"></i>{{ m.titulo }}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if modelo_analise_partial %}
+  {% include modelo_analise_partial %}
+{% endif %}
+
+<p class="small text-muted mt-4 mb-0">
+  Período controlado pelos botões <strong>Anterior / Próximo</strong> acima (<code>?mes=AAAA-MM</code>).
+  Se os títulos não coincidirem com o PDF impresso, envie o arquivo ou prints para renomearmos e ajustarmos as colunas.
+</p>

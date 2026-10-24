@@ -607,7 +607,9 @@ def _contexto_dashboard_intervalo(request):
 
 def _aba_dashboard(request) -> str:
     aba = (request.GET.get('aba') or 'financeiro').strip().lower()
-    return aba if aba in ('financeiro', 'producao') else 'financeiro'
+    if aba == 'producao':
+        aba = 'analises'
+    return aba if aba in ('financeiro', 'analises') else 'financeiro'
 
 
 def _url_aba_dashboard(request, aba: str) -> str:
@@ -618,7 +620,7 @@ def _url_aba_dashboard(request, aba: str) -> str:
 
 @login_required
 def conta_azul_dashboard(request):
-    """Dashboard inicial — abas Financeiro e Produção."""
+    """Dashboard inicial — abas Financeiro e Análises."""
     empresa, ctx = _contexto_dashboard_intervalo(request)
     if not empresa:
         messages.error(request, 'Selecione uma empresa.')
@@ -627,9 +629,19 @@ def conta_azul_dashboard(request):
     aba_ativa = _aba_dashboard(request)
     visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
 
-    from faturamento_medico.dashboard_exames import montar_contexto_dashboard_producao
+    from dashboard.analises_montagem import montar_contexto_aba_analises
 
-    producao_ctx = montar_contexto_dashboard_producao(request, empresa.pk)
+    analises_ctx: dict = {}
+    if aba_ativa == 'analises':
+        modelo_codigo = (request.GET.get('modelo') or '').strip().lower()
+        analises_ctx = montar_contexto_aba_analises(
+            request,
+            empresa.pk,
+            ano=ctx['ano_ref'],
+            mes=ctx['mes_ref'],
+            regime=ctx['regime'],
+            modelo_codigo=modelo_codigo or None,
+        )
 
     return render(
         request,
@@ -639,8 +651,8 @@ def conta_azul_dashboard(request):
             'visao': visao,
             'aba_ativa': aba_ativa,
             'url_aba_financeiro': _url_aba_dashboard(request, 'financeiro'),
-            'url_aba_producao': _url_aba_dashboard(request, 'producao'),
-            **producao_ctx,
+            'url_aba_analises': _url_aba_dashboard(request, 'analises'),
+            **analises_ctx,
             **ctx,
         },
     )

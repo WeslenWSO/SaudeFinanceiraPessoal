@@ -1,0 +1,128 @@
+<style>
+.dash-exames-card { border: 1px solid #dee2e6; border-radius: 0.5rem; height: 100%; }
+.dash-exames-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #eef2f7 100%);
+    font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid #dee2e6;
+}
+.dash-exames-resumo { border: 2px solid #0d6efd; background: #f8fbff; }
+.dash-exames-resumo .card-header { background: #0d6efd; color: #fff; border-bottom: 0; }
+.dash-exames-tabela { font-size: 0.82rem; margin-bottom: 0; }
+.dash-exames-tabela th { font-size: 0.72rem; text-transform: uppercase; color: #6c757d; font-weight: 600; border-top: 0; }
+.dash-exames-total-row td { font-weight: 700; background: #f8f9fa; border-top: 2px solid #dee2e6; }
+.dash-exames-link { text-decoration: none; color: inherit; }
+.dash-exames-link:hover { text-decoration: underline; }
+.badge-status-conf { font-size: 0.68rem; white-space: normal; line-height: 1.2; }
+</style>
+
+<p class="text-muted small mb-3">{{ modelo_analise_descricao }} · <strong>{{ titulo_mes_ref }}</strong></p>
+
+<div class="card mb-3 border-0 shadow-sm">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end mb-0">
+            <input type="hidden" name="aba" value="analises">
+            <input type="hidden" name="modelo" value="{{ modelo_analise }}">
+            <input type="hidden" name="mes" value="{{ mes_filtro_analise }}">
+            {% if regime %}<input type="hidden" name="regime" value="{{ regime }}">{% endif %}
+            <div class="col-md-4 col-lg-3">
+                <label class="form-label small fw-semibold mb-1">Convênios</label>
+                <select name="convenio" class="form-select form-select-sm" multiple title="Ctrl+clique para vários">
+                    {% for convenio in convenios_disponiveis %}
+                    <option value="{{ convenio.nome }}" {% if convenio.nome in filtros.convenios %}selected{% endif %}>{{ convenio.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filtrar</button>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{{ url_listagem_mes }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-list"></i> Exames do mês</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if totais_gerais.total_quantidade %}
+<div class="card dash-exames-card dash-exames-resumo mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between gap-2">
+        <span>Total geral{% if filtros.convenios %} — convênios selecionados{% else %} — todos os convênios{% endif %}</span>
+        <span class="small fw-normal opacity-75">{{ mes_label }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table dash-exames-tabela mb-0">
+                <thead>
+                    <tr>
+                        <th>Status conferência</th>
+                        <th class="text-end">Qtd.</th>
+                        <th class="text-end">Qt. clientes</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in totais_gerais.status_linhas %}
+                    <tr>
+                        <td><a href="{{ linha.url_listagem }}" class="dash-exames-link">{{ linha.status }}</a></td>
+                        <td class="text-end">{{ linha.quantidade }}</td>
+                        <td class="text-end">{{ linha.quantidade_clientes }}</td>
+                        <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="dash-exames-total-row">
+                        <td>Total</td>
+                        <td class="text-end">{{ totais_gerais.total_quantidade }}</td>
+                        <td class="text-end">{{ totais_gerais.total_clientes }}</td>
+                        <td class="text-end">R$ {{ totais_gerais.total_valor_fmt }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if cards_convenio %}
+<div class="row g-3">
+    {% for card in cards_convenio %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card dash-exames-card">
+            <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                <a href="{{ card.url_listagem }}" class="dash-exames-link text-dark">{{ card.convenio }}</a>
+                <span class="badge bg-secondary">{{ card.total_quantidade }} ex.</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table dash-exames-tabela mb-0">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th class="text-end">Qtd.</th>
+                                <th class="text-end">Clientes</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linha in card.status_linhas %}
+                            <tr>
+                                <td><a href="{{ linha.url_listagem }}" class="dash-exames-link">{{ linha.status }}</a></td>
+                                <td class="text-end">{{ linha.quantidade }}</td>
+                                <td class="text-end">{{ linha.quantidade_clientes }}</td>
+                                <td class="text-end">R$ {{ linha.valor_fmt }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="dash-exames-total-row">
+                                <td>Total</td>
+                                <td class="text-end">{{ card.total_quantidade }}</td>
+                                <td class="text-end">{{ card.total_clientes }}</td>
+                                <td class="text-end">R$ {{ card.total_valor_fmt }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted text-center py-4 mb-0">Nenhum exame em {{ titulo_mes_ref }}.</p>
+{% endif %}

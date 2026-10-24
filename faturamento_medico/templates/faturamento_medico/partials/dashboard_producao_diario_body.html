@@ -66,8 +66,9 @@
     <div class="card-body py-3">
         <form method="get" id="{{ form_id }}" class="mb-0">
             {% if producao_no_dash %}
-            <input type="hidden" name="aba" value="producao">
+            <input type="hidden" name="aba" value="{{ dash_aba|default:'producao' }}">
             <input type="hidden" name="mes" value="{{ mes_filtro }}">
+            {% if modelo_analise %}<input type="hidden" name="modelo" value="{{ modelo_analise }}">{% endif %}
             {% if regime %}<input type="hidden" name="regime" value="{{ regime }}">{% endif %}
             {% endif %}
             <div class="row g-2 align-items-end mb-3">
