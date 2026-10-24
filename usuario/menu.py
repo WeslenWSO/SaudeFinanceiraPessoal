@@ -146,8 +146,11 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     ),
     MenuItemDef('contas_bancarias', 'Contas Bancárias', 'fa-university', 'financeiro', url_name='extrato:conta_bancaria_list'),
     MenuItemDef(
-        'faturamento_acerto_caixa', 'Acerto de Caixa', 'fa-cash-register', 'financeiro',
-        url_name='faturamento_medico:acerto_caixa', permissao='faturamento_medico',
+        'faturamento_acerto_caixa',
+        'Acerto de Caixa',
+        'fa-cash-register',
+        'financeiro',
+        url_name='faturamento_medico:acerto_caixa',
     ),
     MenuItemDef('contas_pagar', 'Contas a Pagar', 'fa-money-check-alt', 'financeiro', url_name='contasapagar:listaAPagar'),
     MenuItemDef('categorizar_pagos', 'Categorizar pagos', 'fa-tags', 'financeiro', url_name='contasapagar:categorizar_baixados'),
