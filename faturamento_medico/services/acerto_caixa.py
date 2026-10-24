@@ -6,14 +6,17 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 import re
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from faturamento_medico.lote_relatorio import _modalidade_item
+from faturamento_medico.log_status_conferencia import registrar_log_status_conferencia_item
 from faturamento_medico.models import (
     AcertoCaixaFechamento,
     CAIXAS_ACERTO_VALORES,
     FaturamentoMedico,
+    ItemServico,
     rotulo_caixa_acerto,
 )
 from faturamento_medico.services.contas_caixa_acerto import (
@@ -143,6 +146,78 @@ def _moeda_br(valor) -> str:
 def _eh_aguardando_faturamento(status_txt: str) -> bool:
     s = (status_txt or '').lower()
     return 'aguard' in s and 'fatur' in s
+
+
+def _item_conferencia_pendente(item: ItemServico) -> bool:
+    status = (item.status_conferencia or '').strip() or 'PENDENTE'
+    if item.conferido and status != 'LOTE OK':
+        return False
+    return status == 'PENDENTE'
+
+
+def _faturamentos_escopo_fechamento_caixa(
+    empresa_id: int,
+    caixa: str,
+    data_inicio: date,
+    data_fim: date,
+    filtros_snap: dict,
+):
+    status_sel = list(filtros_snap.get('status_agendamento') or [])
+    qs = (
+        FaturamentoMedico.objects.filter(
+            empresa_id=empresa_id,
+            data__gte=data_inicio,
+            data__lte=data_fim,
+            caixa_acerto=caixa,
+        )
+        .prefetch_related('itens_servico')
+        .order_by('pk')
+    )
+    qs = _filtrar_status(qs, status_sel)
+    checkin = (filtros_snap.get('checkin') or '').strip()
+    if checkin:
+        qs = qs.filter(checkin_por__icontains=checkin)
+    if filtros_snap.get('somente_marcados'):
+        qs = qs.filter(marcado_acerto_caixa=True)
+    return qs
+
+
+def conferir_itens_pendentes_ao_fechar_caixa(
+    request,
+    *,
+    empresa_id: int,
+    caixa: str,
+    data_inicio: date,
+    data_fim: date,
+    filtros_snap: dict,
+) -> int:
+    """
+    Ao fechar o caixa: itens com conferência PENDENTE passam a CONFERIDO,
+    exceto quando o status de agendamento é Aguardando faturamento (convênio).
+    """
+    hora_ini_min = _parse_hora_minutos(filtros_snap.get('hora_inicial'))
+    hora_fim_min = _parse_hora_minutos(filtros_snap.get('hora_final'))
+    atualizados = 0
+    for fat in _faturamentos_escopo_fechamento_caixa(
+        empresa_id, caixa, data_inicio, data_fim, filtros_snap
+    ):
+        mins = _parse_hora_minutos(fat.horario_inicio or fat.horario)
+        if hora_ini_min is not None and (mins is None or mins < hora_ini_min):
+            continue
+        if hora_fim_min is not None and (mins is None or mins > hora_fim_min):
+            continue
+        if _eh_aguardando_faturamento(fat.status_agendamento or ''):
+            continue
+        for item in fat.itens_servico.all():
+            if not _item_conferencia_pendente(item):
+                continue
+            status_anterior = (item.status_conferencia or '').strip() or 'PENDENTE'
+            item.aplicar_status_conferencia('CONFERIDO')
+            status_novo = (item.status_conferencia or '').strip() or 'PENDENTE'
+            if status_novo != status_anterior:
+                registrar_log_status_conferencia_item(request, item, status_novo)
+            atualizados += 1
+    return atualizados
 
 
 def _agrupar_forma_pagamento(forma: str) -> str:
@@ -295,16 +370,25 @@ def fechar_acertos_caixa(
             {'rotulo': row['rotulo'], 'total': str(row['total'])}
             for row in resumo
         ]
-        fech = AcertoCaixaFechamento.objects.create(
-            empresa_id=empresa_id,
-            caixa=caixa,
-            data_inicio=di,
-            data_fim=df,
-            saldo_total=saldo,
-            resumo_saldos=resumo_json,
-            filtros=snap,
-            fechado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
-        )
+        with transaction.atomic():
+            fech = AcertoCaixaFechamento.objects.create(
+                empresa_id=empresa_id,
+                caixa=caixa,
+                data_inicio=di,
+                data_fim=df,
+                saldo_total=saldo,
+                resumo_saldos=resumo_json,
+                filtros=snap,
+                fechado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
+            )
+            conferir_itens_pendentes_ao_fechar_caixa(
+                request,
+                empresa_id=empresa_id,
+                caixa=caixa,
+                data_inicio=di,
+                data_fim=df,
+                filtros_snap=snap,
+            )
         criados.append(fech)
     return criados, erros
 
