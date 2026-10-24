@@ -13,6 +13,8 @@ from faturamento_medico.dashboard_exames import STATUS_AGENDAMENTO_CANCELADOS
 from faturamento_medico.models import FaturamentoMedico
 from faturamento_medico.ranking_exames import montar_ranking_exames_qs
 
+from dashboard.analises_conferencia import contar_dias_trabalhados_analise, kwargs_ranking_faturamento_analise
+
 MESES_ABREV = (
     '',
     'jan',
@@ -138,8 +140,8 @@ def montar_evolucao_faturamento(
             )
             .exclude(_q_cancelados())
         )
-        dias = qs.values('data').distinct().count()
-        ranking = montar_ranking_exames_qs(qs)
+        dias = contar_dias_trabalhados_analise(qs, empresa_id)
+        ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_faturamento_analise(empresa_id))
         valor = ranking['total_valor']
         rs_dia = (valor / dias) if dias else Decimal('0')
 

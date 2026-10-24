@@ -13,6 +13,7 @@ from dashboard.analise_evolucao_faturamento import (
 )
 from dashboard.analise_faturamento_convenio import montar_relatorio_faturamento_convenio
 from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
+from dashboard.analise_validacao_conferencia import montar_relatorio_validacao_conferencia
 from dashboard.analises_catalogo import MODELOS_ANALISE
 
 
@@ -38,6 +39,8 @@ def urls_relatorio_analises(request, mes_filtro: str) -> dict[str, str]:
 
 
 def _contexto_modelo(empresa_id: int, request, ano: int, mes: int, codigo: str) -> dict:
+    if codigo == 'validacao_conferencia':
+        return montar_relatorio_validacao_conferencia(empresa_id, ano, mes)
     if codigo == 'faturamento_convenio':
         return montar_relatorio_faturamento_convenio(empresa_id, ano, mes)
     if codigo == 'faturamento_modalidade':

@@ -21,6 +21,7 @@ from dashboard.analise_faturamento_modalidade import (
     _codigo_modalidade,
     _fmt_percentual_1,
 )
+from dashboard.analises_conferencia import ids_lotes_empresa, item_conta_faturamento_analise
 
 TITULOS_BANNER = {
     'MR': 'RESSONÂNCIA MAGNÉTICA',
@@ -93,16 +94,21 @@ def montar_detalhes_modalidade_convenio(empresa_id: int, ano: int, mes: int) -> 
     por_mod_conv: dict[str, dict[str, dict]] = defaultdict(
         lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')}),
     )
+    ids_internos = ids_lotes_empresa(empresa_id)
 
     for fat in qs:
         itens = list(fat.itens_servico.all())
         conv = _convenio_exibicao(fat.convenio)
         if not itens:
+            if not item_conta_faturamento_analise(fat, None, ids_internos=ids_internos):
+                continue
             cod = _codigo_modalidade(fat, None)
             por_mod_conv[cod][conv]['quantidade'] += 1
             por_mod_conv[cod][conv]['valor'] += _valor_item(None, fat)
             continue
         for item in itens:
+            if not item_conta_faturamento_analise(fat, item, ids_internos=ids_internos):
+                continue
             cod = _codigo_modalidade(fat, item)
             por_mod_conv[cod][conv]['quantidade'] += 1
             por_mod_conv[cod][conv]['valor'] += _valor_item(item, fat)

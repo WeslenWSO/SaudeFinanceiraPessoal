@@ -8,6 +8,11 @@ from decimal import Decimal, InvalidOperation
 from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.services.valor_pago_exibicao import valor_agregacao_analises
 
+try:
+    from dashboard.analises_conferencia import item_conta_faturamento_analise
+except ImportError:
+    item_conta_faturamento_analise = None  # type: ignore[misc, assignment]
+
 
 def _label_convenio(nome: str | None) -> str:
     n = (nome or '').strip()
@@ -53,6 +58,8 @@ def montar_ranking_exames_qs(
     *,
     exames_filtro: list[str] | None = None,
     modalidades_filtro: list[str] | None = None,
+    somente_status_analise: bool = False,
+    ids_lotes_internos: set | None = None,
 ) -> dict:
     """
     Agrega itens de serviço do queryset (já filtrado por data/convênio/etc.).
@@ -65,11 +72,18 @@ def montar_ranking_exames_qs(
     detalhe: list[dict] = []
     chaves_detalhe: dict[tuple[str, str], dict] = {}
 
+    filtrar_conf = somente_status_analise and item_conta_faturamento_analise is not None
+    ids_lotes = ids_lotes_internos if ids_lotes_internos is not None else set()
+
     qs = faturamentos_qs.prefetch_related('itens_servico').order_by('data', 'id')
     for fat in qs:
         conv = _label_convenio(fat.convenio)
         itens = list(fat.itens_servico.all())
         if not itens:
+            if filtrar_conf and not item_conta_faturamento_analise(
+                fat, None, ids_internos=ids_lotes
+            ):
+                continue
             proc = (getattr(fat, 'servico', None) or '').strip() or 'Não informado'
             if not _exame_passa_filtro(proc, exames_filtro):
                 continue
@@ -88,6 +102,10 @@ def montar_ranking_exames_qs(
             continue
 
         for item in itens:
+            if filtrar_conf and not item_conta_faturamento_analise(
+                fat, item, ids_internos=ids_lotes
+            ):
+                continue
             proc = (item.servico or '').strip() or 'Não informado'
             if not _exame_passa_filtro(proc, exames_filtro):
                 continue

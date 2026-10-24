@@ -11,6 +11,8 @@ from faturamento_medico.dashboard_exames import MESES_PT, STATUS_AGENDAMENTO_CAN
 from faturamento_medico.models import FaturamentoMedico
 from faturamento_medico.ranking_exames import montar_ranking_exames_qs
 
+from dashboard.analises_conferencia import contar_dias_trabalhados_analise, kwargs_ranking_faturamento_analise
+
 
 def _q_cancelados():
     q = Q()
@@ -66,9 +68,9 @@ def montar_relatorio_faturamento_convenio(empresa_id: int, ano: int, mes: int) -
         .exclude(_q_cancelados())
     )
 
-    dias_trabalhados = qs.values('data').distinct().count()
+    dias_trabalhados = contar_dias_trabalhados_analise(qs, empresa_id)
 
-    ranking = montar_ranking_exames_qs(qs)
+    ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_faturamento_analise(empresa_id))
     total_qtd = ranking['total_quantidade']
     total_valor = ranking['total_valor']
 

@@ -17,6 +17,7 @@ from dashboard.analise_faturamento_convenio import (
     _fmt_numero_int,
     _q_cancelados,
 )
+from dashboard.analises_conferencia import ids_lotes_empresa, item_conta_faturamento_analise
 
 ROTULOS_MODALIDADE = {
     'MR': 'Ressonância Magnética',
@@ -84,15 +85,20 @@ def montar_relatorio_faturamento_modalidade(empresa_id: int, ano: int, mes: int)
     )
 
     por_mod: dict[str, dict] = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
+    ids_internos = ids_lotes_empresa(empresa_id)
 
     for fat in qs:
         itens = list(fat.itens_servico.all())
         if not itens:
+            if not item_conta_faturamento_analise(fat, None, ids_internos=ids_internos):
+                continue
             cod = _codigo_modalidade(fat, None)
             por_mod[cod]['quantidade'] += 1
             por_mod[cod]['valor'] += _valor_item(None, fat)
             continue
         for item in itens:
+            if not item_conta_faturamento_analise(fat, item, ids_internos=ids_internos):
+                continue
             cod = _codigo_modalidade(fat, item)
             por_mod[cod]['quantidade'] += 1
             por_mod[cod]['valor'] += _valor_item(item, fat)

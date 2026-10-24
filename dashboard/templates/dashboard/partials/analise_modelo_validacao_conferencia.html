@@ -1,0 +1,113 @@
+<style>
+.an-val-relatorio { font-size: 0.9rem; color: #212529; }
+.an-val-banner {
+    background: #1f3864;
+    color: #fff;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-radius: 0.25rem 0.25rem 0 0;
+}
+.an-val-subtitulo {
+    background: #eef2f7;
+    border: 1px solid #c5cdd8;
+    border-top: 0;
+    text-align: center;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    color: #495057;
+}
+.an-val-kpis {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+@media (max-width: 576px) {
+    .an-val-kpis { grid-template-columns: 1fr; }
+}
+.an-val-kpi {
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    padding: 0.65rem 0.5rem;
+    text-align: center;
+}
+.an-val-kpi.incluido { border-color: #198754; background: #f0fdf4; }
+.an-val-kpi.excluido { border-color: #fd7e14; background: #fff8f0; }
+.an-val-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.an-val-tabela th {
+    background: #1f3864;
+    color: #fff;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #163056;
+}
+.an-val-tabela td {
+    padding: 0.35rem 0.6rem;
+    border: 1px solid #dee2e6;
+}
+.an-val-tabela tbody tr:nth-child(even) { background: #f8f9fa; }
+.an-val-tabela td.num { text-align: right; white-space: nowrap; }
+.an-val-tabela .badge-sim { background: #198754; color: #fff; padding: 0.15rem 0.45rem; border-radius: 0.25rem; font-size: 0.72rem; }
+.an-val-tabela .badge-nao { background: #6c757d; color: #fff; padding: 0.15rem 0.45rem; border-radius: 0.25rem; font-size: 0.72rem; }
+</style>
+
+<div class="an-val-relatorio">
+    <div class="an-val-banner">{{ titulo_relatorio }}</div>
+    <div class="an-val-subtitulo">{{ subtitulo_periodo }}</div>
+
+    <div class="an-val-kpis">
+        <div class="an-val-kpi incluido">
+            <div class="small fw-semibold text-success">Incluídos nas análises de faturamento</div>
+            <div class="fs-5 fw-bold">{{ incluidos_quantidade_fmt }} exames</div>
+            <div class="text-muted">R$ {{ incluidos_valor_fmt }}</div>
+        </div>
+        <div class="an-val-kpi excluido">
+            <div class="small fw-semibold text-warning">Fora das análises (pendências / outros)</div>
+            <div class="fs-5 fw-bold">{{ excluidos_quantidade_fmt }} exames</div>
+            <div class="text-muted">R$ {{ excluidos_valor_fmt }}</div>
+        </div>
+    </div>
+
+    <div class="table-responsive border rounded overflow-hidden">
+        <table class="an-val-tabela mb-0">
+            <thead>
+                <tr>
+                    <th>Status conferência</th>
+                    <th>Entra no faturamento?</th>
+                    <th class="num">Exames</th>
+                    <th class="num">Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas_status %}
+                <tr>
+                    <td>
+                        <span class="fw-semibold">{{ linha.rotulo }}</span>
+                        {% if linha.rotulo != linha.status %}
+                        <span class="text-muted small">({{ linha.status }})</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if linha.incluido_analise %}
+                        <span class="badge-sim">Sim</span>
+                        {% else %}
+                        <span class="badge-nao">Não</span>
+                        {% endif %}
+                    </td>
+                    <td class="num">{{ linha.quantidade_fmt }}</td>
+                    <td class="num">{{ linha.valor_fmt }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">Sem movimento no mês.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

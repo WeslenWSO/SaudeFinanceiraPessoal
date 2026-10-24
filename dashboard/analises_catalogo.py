@@ -19,6 +19,13 @@ class AnaliseModeloDef:
 
 MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
     AnaliseModeloDef(
+        'validacao_conferencia',
+        'Validação conferência',
+        'Status confirmado — o que entra ou não no faturamento das análises.',
+        'fa-clipboard-check',
+        'dashboard/partials/analise_modelo_validacao_conferencia.html',
+    ),
+    AnaliseModeloDef(
         'faturamento_convenio',
         'Por convênio',
         'Faturamento por convênio ou parceiros — relatório mensal.',
