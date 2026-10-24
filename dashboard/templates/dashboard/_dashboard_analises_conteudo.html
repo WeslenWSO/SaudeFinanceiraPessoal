@@ -14,19 +14,6 @@
   <a class="btn btn-sm btn-outline-secondary" href="{{ url_analises_pdf }}" title="Baixar PDF">
     <i class="fas fa-file-pdf me-1"></i>PDF
   </a>
-  <form method="post" action="{{ url_analises_whatsapp }}" class="d-flex flex-wrap align-items-center gap-1 ms-auto">
-    {% csrf_token %}
-    <input type="hidden" name="mes" value="{{ mes_filtro_analise }}">
-    {% if regime %}<input type="hidden" name="regime" value="{{ regime }}">{% endif %}
-    <input type="hidden" name="ev_de" value="{{ ev_periodo_de_value }}">
-    <input type="hidden" name="ev_ate" value="{{ ev_periodo_ate_value }}">
-    <label class="visually-hidden" for="wa_telefone_analises">WhatsApp</label>
-    <input type="tel" class="form-control form-control-sm" id="wa_telefone_analises" name="telefone"
-           placeholder="WhatsApp (DDD + número)" value="{{ empresa.telefone|default:'' }}" style="min-width: 11rem;">
-    <button type="submit" class="btn btn-sm btn-success">
-      <i class="fab fa-whatsapp me-1"></i>Enviar
-    </button>
-  </form>
 </div>
 
 {% if modelos_analise|length > 1 %}
