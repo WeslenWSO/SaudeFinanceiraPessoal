@@ -40,8 +40,8 @@
   <div class="no-print">
     <button type="button" onclick="window.print()">Imprimir</button>
     <a href="{{ voltar_url }}">Voltar ao estoque</a>
-    <form method="get" class="mt-2">
-      <input type="hidden" name="tipo" value="{{ tipo }}">
+    <form method="get" class="mt-2"{% if checklist_slug %} action="{% url 'estoque:farmacia_checklist' checklist_slug %}"{% endif %}>
+      {% if not checklist_slug %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
       <div>
         <label>Busca</label><br>
         <input type="search" name="q" value="{{ busca }}" placeholder="Código, produto, marca">
@@ -57,7 +57,7 @@
           {% endfor %}
         </select>
       </div>
-      {% elif tipo == 'farmacia' %}
+      {% elif tipo == 'farmacia' and not checklist_slug %}
       <div>
         <label>Setor (contagem)</label><br>
         <select name="setor">
@@ -70,18 +70,23 @@
       {% endif %}
       <div>
         <label>
+          {% if checklist_slug %}<input type="hidden" name="somente_saldo" value="0">{% endif %}
           <input type="checkbox" name="somente_saldo" value="1" {% if somente_saldo %}checked{% endif %}>
-          Só produtos com saldo &gt; 0 no sistema
+          Só produtos com saldo &gt; 0 no setor
         </label>
         <small style="color:#666;">(não exibe a qtd — só filtra a lista)</small>
       </div>
       <button type="submit">Atualizar lista</button>
+      {% if checklist_slug %}
+      <a href="{% url 'estoque:farmacia_checklist' checklist_slug %}?auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if not somente_saldo %}&amp;somente_saldo=0{% endif %}">Gerar e imprimir</a>
+      {% else %}
       <a href="?tipo={{ tipo }}&amp;auto=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if filtro_setor %}&amp;setor={{ filtro_setor|urlencode }}{% endif %}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}">Gerar e imprimir</a>
+      {% endif %}
     </form>
   </div>
 
   <h1>{{ titulo }}</h1>
-  <p class="sub">Contagem física — preencha «Qtd contada» (saldo do sistema oculto)</p>
+  <p class="sub">{% if checklist_slug %}Conferência do setor — preencha «Qtd contada» (saldo do sistema oculto){% else %}Contagem física — preencha «Qtd contada» (saldo do sistema oculto){% endif %}</p>
   <div class="meta">
     {% if empresa %}<div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>{% endif %}
     <div>Emitida em: {{ agora|date:"d/m/Y H:i" }} · {{ produtos|length }} produto(s) na lista</div>

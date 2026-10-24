@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, OperationalError
 from django.db.models import Prefetch, Q, Sum
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -985,6 +986,78 @@ def lista_imobilizado_por_historico(request):
             'total_itens': len(blocos),
             'agora': timezone.now(),
             'auto_print': auto_print,
+        },
+    )
+
+
+_CHECKLIST_FARMACIA_SETORES: dict[str, tuple[str, str]] = {
+    'sedacao': (SetorEstoque.SEDACAO, 'Checklist — Sedação'),
+    'carrinho-urgencia': (SetorEstoque.CARRINHO_URGENCIA, 'Checklist — Carrinho de Urgência'),
+}
+
+
+@login_required
+def checklist_farmacia_setor(request, setor_slug: str):
+    """Lista cega fixa por setor (Sedação, Carrinho de Urgência, etc.)."""
+    cfg = _CHECKLIST_FARMACIA_SETORES.get(setor_slug)
+    if not cfg:
+        raise Http404
+
+    setor_val, titulo = cfg
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:farmacia_list')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    busca = (request.GET.get('q') or '').strip()
+    somente_saldo = (request.GET.get('somente_saldo') or '').strip() not in ('0', 'false', 'nao', 'não')
+
+    produtos = (
+        ProdutoEstoque.objects.filter(
+            empresa_id=empresa_id,
+            natureza=NaturezaEstoque.CONSUMIVEL,
+        )
+        .select_related('fornecedor')
+        .order_by('codigo_produto', 'descricao')
+    )
+
+    saldo_qs = SaldoEstoqueSetor.objects.filter(
+        produto__empresa_id=empresa_id,
+        setor=setor_val,
+    )
+    if somente_saldo:
+        saldo_qs = saldo_qs.filter(quantidade__gt=0)
+    produtos = produtos.filter(pk__in=saldo_qs.values_list('produto_id', flat=True)).distinct()
+
+    if busca:
+        produtos = produtos.filter(
+            Q(codigo_produto__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(marca__icontains=busca),
+        )
+
+    auto_print = (request.GET.get('auto') or '').strip() == '1'
+    setor_coluna_rotulo = rotulo_setor(setor_val)
+
+    return render(
+        request,
+        'estoque/lista_cega_estoque.html',
+        {
+            'empresa': empresa,
+            'titulo': titulo,
+            'tipo': 'farmacia',
+            'produtos': produtos,
+            'busca': busca,
+            'filtro_setor': setor_val,
+            'somente_saldo': somente_saldo,
+            'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+            'setores_farmacia': SETOR_LISTA_CEGA_FARMACIA,
+            'setor_coluna_rotulo': setor_coluna_rotulo,
+            'voltar_url': reverse('estoque:farmacia_list'),
+            'agora': timezone.now(),
+            'auto_print': auto_print,
+            'checklist_slug': setor_slug,
         },
     )
 

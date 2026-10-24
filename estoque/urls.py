@@ -9,6 +9,7 @@ from estoque.views import (
     produto_modelo_excel,
 )
 from estoque.views_operacional import (
+    checklist_farmacia_setor,
     EstoqueFarmaciaListView,
     EstoqueImobilizadoListView,
     ProdutoEstoqueOperacionalDetailView,
@@ -31,6 +32,11 @@ app_name = 'estoque'
 urlpatterns = [
     path('farmacia/', EstoqueFarmaciaListView.as_view(), name='farmacia_list'),
     path('farmacia/lista-setor/', lista_farmacia_por_setor, name='farmacia_lista_setores'),
+    path(
+        'farmacia/checklist/<slug:setor_slug>/',
+        checklist_farmacia_setor,
+        name='farmacia_checklist',
+    ),
     path('imobilizado/', EstoqueImobilizadoListView.as_view(), name='imobilizado_list'),
     path(
         'imobilizado/<int:pk>/setor/',
