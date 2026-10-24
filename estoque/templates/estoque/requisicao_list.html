@@ -9,7 +9,7 @@
   {% include 'parcial/_messages.html' %}
   <div class="table-responsive card shadow-sm">
     <table class="table table-sm mb-0">
-      <thead class="table-light"><tr><th>#</th><th>Tipo</th><th>Status</th><th>Destino / consumo</th><th>Criada</th><th></th></tr></thead>
+      <thead class="table-light"><tr><th>#</th><th>Tipo</th><th>Status</th><th>Destino / consumo</th><th>Observação</th><th>Criada</th><th></th></tr></thead>
       <tbody>
         {% for r in object_list %}
         <tr>
@@ -17,6 +17,7 @@
           <td>{{ r.get_tipo_display }}</td>
           <td>{{ r.get_status_display }}</td>
           <td>{{ r.get_setor_destino_display|default:r.get_setor_origem_display }}</td>
+          <td class="small"{% if r.observacao %} title="{{ r.observacao }}"{% endif %}>{{ r.observacao|default:"—"|truncatechars:80 }}</td>
           <td>{{ r.criado_em|date:"d/m/Y" }} — {{ r.criado_por }}</td>
           <td class="text-nowrap">
             <a href="{% url 'estoque:requisicao_detail' r.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a>
@@ -24,7 +25,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma requisição.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-3">Nenhuma requisição.</td></tr>
         {% endfor %}
       </tbody>
     </table>
