@@ -163,6 +163,15 @@
                         <a href="{% url 'faturamento_medico:detalhes' form.instance.pk %}" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-eye"></i> Ver detalhes
                         </a>
+                        <form method="post"
+                              action="{% url 'faturamento_medico:clonar' form.instance.pk %}"
+                              class="d-inline"
+                              onsubmit="return confirm('Clonar este lançamento? Uma cópia será aberta para edição (convênio, itens, guia etc.).');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Clonar lançamento">
+                                <i class="fas fa-copy"></i> Clonar
+                            </button>
+                        </form>
                         {% if form.instance.documentos_anexados.exists %}
                         <button type="button" class="btn btn-info btn-sm js-abrir-album-anexos">
                             <i class="fas fa-eye"></i> Anexos ({{ form.instance.documentos_anexados.count }})

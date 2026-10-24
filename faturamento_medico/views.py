@@ -5406,6 +5406,26 @@ def criar_faturamento(request):
     return render(request, 'faturamento_medico/form.html', context)
 
 
+@require_POST
+def clonar_faturamento_view(request, pk):
+    """Duplica um lançamento (paciente/atendimento) para editar convênio, itens, guia etc."""
+    empresa_id = request.session.get('empresa_id')
+    qs = FaturamentoMedico.objects.prefetch_related('itens_servico')
+    if empresa_id:
+        qs = qs.filter(empresa_id=empresa_id)
+    origem = get_object_or_404(qs, pk=pk)
+
+    from faturamento_medico.services.clonar_faturamento import clonar_faturamento
+
+    novo = clonar_faturamento(origem)
+    messages.success(
+        request,
+        f'Lançamento clonado (#{origem.pk} → #{novo.pk}). '
+        'Ajuste convênio, procedimentos, guia e NF no lançamento novo.',
+    )
+    return redirect('faturamento_medico:editar', pk=novo.pk)
+
+
 def editar_faturamento(request, pk):
     """Edita um faturamento médico existente"""
     faturamento = get_object_or_404(
