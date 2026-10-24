@@ -77,11 +77,14 @@ def resolver_periodo_evolucao(
     Retorna (ano_de, mes_de, ano_ate, mes_ate, aviso).
     Intervalo inclusivo, no máximo MAX_MESES_EVOLUCAO meses.
     """
-    ate = _parse_ano_mes(request.GET.get('ev_ate')) or _parse_ano_mes(request.GET.get('mes'))
+    def _param(nome: str) -> str | None:
+        return request.GET.get(nome) or request.POST.get(nome)
+
+    ate = _parse_ano_mes(_param('ev_ate')) or _parse_ano_mes(_param('mes'))
     if not ate:
         ate = (ano_ref, mes_ref)
 
-    de = _parse_ano_mes(request.GET.get('ev_de'))
+    de = _parse_ano_mes(_param('ev_de'))
     if not de:
         ref_ate = date(ate[0], ate[1], 1)
         ref_de = ref_ate - relativedelta(months=MAX_MESES_EVOLUCAO - 1)

@@ -68,6 +68,7 @@
 </style>
 
 <div class="an-evo-relatorio">
+  {% if not apresentacao %}
   <form method="get" class="an-evo-filtro">
     <input type="hidden" name="aba" value="analises">
     <input type="hidden" name="modelo" value="evolucao_faturamento">
@@ -95,8 +96,9 @@
       </div>
     </div>
   </form>
+  {% endif %}
 
-  {% if ev_periodo_aviso %}
+  {% if ev_periodo_aviso and not apresentacao %}
   <div class="alert alert-warning py-2 small mb-3">{{ ev_periodo_aviso }}</div>
   {% endif %}
 

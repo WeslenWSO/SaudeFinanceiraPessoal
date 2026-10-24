@@ -13,6 +13,7 @@ from dashboard.analises_catalogo import (
     modelo_analise_ativo,
     modelo_analise_padrao,
 )
+from dashboard.analises_relatorio_apresentacao import urls_relatorio_analises
 def montar_contexto_aba_analises(
     request,
     empresa_id: int,
@@ -47,6 +48,9 @@ def montar_contexto_aba_analises(
         'mes_filtro_analise': mes_filtro,
         'regime': regime,
         'dash_aba': 'analises',
+        'ev_periodo_de_value': f'{ev_de:04d}-{ev_mes_de:02d}',
+        'ev_periodo_ate_value': f'{ev_ate:04d}-{ev_mes_ate:02d}',
+        **urls_relatorio_analises(request, mes_filtro),
     }
 
     if modelo.codigo == 'faturamento_convenio':

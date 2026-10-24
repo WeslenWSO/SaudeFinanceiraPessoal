@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import threading
+import uuid
 from calendar import monthrange
 from datetime import date, timedelta
+from urllib.parse import quote
 
 from dateutil.relativedelta import relativedelta
 
@@ -14,8 +16,11 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, OperationalError
 from django.db.utils import ProgrammingError
 from django.db.models import Q
-from django.http import JsonResponse
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from dashboard.conta_azul.dashboards import montar_dashboard_por_tipo
@@ -527,7 +532,7 @@ def _parse_data_param(valor, fallback: date) -> date:
 
 def _parse_mes_ano_dashboard(request, hoje: date) -> tuple[int, int]:
     """Mês de referência: ?mes=YYYY-MM, ?mes=N&ano=Y ou legado data_inicio."""
-    mes_raw = (request.GET.get('mes') or '').strip()
+    mes_raw = (request.GET.get('mes') or request.POST.get('mes') or '').strip()
     if mes_raw and '-' in mes_raw:
         try:
             partes = mes_raw.split('-', 1)
@@ -658,6 +663,148 @@ def conta_azul_dashboard(request):
             **ctx,
         },
     )
+
+
+def _normalizar_telefone_whatsapp(raw: str) -> str:
+    dig = ''.join(c for c in (raw or '') if c.isdigit())
+    if len(dig) < 10:
+        return ''
+    if not dig.startswith('55'):
+        dig = '55' + dig
+    return dig
+
+
+def _gerar_bytes_pdf_analises(request, empresa, ano: int, mes: int) -> bytes:
+    from dashboard.analises_pdf import html_para_pdf_bytes
+    from dashboard.analises_relatorio_apresentacao import montar_html_relatorio_apresentacao
+
+    html = montar_html_relatorio_apresentacao(request, empresa, ano, mes)
+    return html_para_pdf_bytes(html, base_url=request.build_absolute_uri('/'))
+
+
+def _registrar_pdf_analises_sessao(request, empresa_id: int, pdf_bytes: bytes, mes_filtro: str) -> str:
+    token = uuid.uuid4().hex
+    path = f'analises_apresentacao/{empresa_id}/{token}.pdf'
+    default_storage.save(path, ContentFile(pdf_bytes))
+    request.session[f'analises_pdf_{token}'] = {
+        'empresa_id': empresa_id,
+        'path': path,
+        'filename': f'analises-faturamento-{mes_filtro}.pdf',
+    }
+    return token
+
+
+@login_required
+@require_GET
+def analises_relatorio_apresentacao(request):
+    empresa, ctx = _contexto_dashboard_intervalo(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão para esta empresa.')
+        return redirect('dashboard:index')
+
+    from dashboard.analises_relatorio_apresentacao import montar_html_relatorio_apresentacao
+
+    html = montar_html_relatorio_apresentacao(
+        request, empresa, ctx['ano_ref'], ctx['mes_ref']
+    )
+    return HttpResponse(html)
+
+
+@login_required
+@require_GET
+def analises_relatorio_pdf(request):
+    empresa, ctx = _contexto_dashboard_intervalo(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão para esta empresa.')
+        return redirect('dashboard:index')
+
+    mes_filtro = ctx['mes_filtro']
+    try:
+        pdf_bytes = _gerar_bytes_pdf_analises(request, empresa, ctx['ano_ref'], ctx['mes_ref'])
+    except RuntimeError as exc:
+        messages.warning(request, str(exc))
+        q = request.GET.urlencode()
+        return redirect(f"{reverse('dashboard:analises_relatorio')}?{q}")
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="analises-faturamento-{mes_filtro}.pdf"'
+    return response
+
+
+@login_required
+@require_GET
+def analises_relatorio_download(request, token):
+    meta = request.session.get(f'analises_pdf_{token}')
+    if not meta:
+        messages.error(request, 'Link expirado ou inválido.')
+        return redirect('dashboard:index')
+    empresa_id = request.session.get('empresa_id')
+    if meta.get('empresa_id') != empresa_id:
+        messages.error(request, 'Sem permissão para este arquivo.')
+        return redirect('dashboard:index')
+    path = meta.get('path') or ''
+    if not default_storage.exists(path):
+        messages.error(request, 'Arquivo não encontrado.')
+        return redirect('dashboard:index')
+    filename = meta.get('filename') or 'analises-faturamento.pdf'
+    fh = default_storage.open(path, 'rb')
+    return FileResponse(fh, as_attachment=True, filename=filename)
+
+
+@login_required
+@require_POST
+def analises_relatorio_whatsapp(request):
+    empresa, ctx = _contexto_dashboard_intervalo(request)
+    if not empresa:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    if not _empresa_autorizada(request, empresa):
+        messages.error(request, 'Sem permissão para esta empresa.')
+        return redirect('dashboard:index')
+
+    telefone = _normalizar_telefone_whatsapp(request.POST.get('telefone', ''))
+    if not telefone:
+        messages.error(request, 'Informe um número de WhatsApp válido (DDD + número).')
+        return redirect(_url_voltar_analises(request, ctx['mes_filtro']))
+
+    mes_filtro = ctx['mes_filtro']
+    try:
+        pdf_bytes = _gerar_bytes_pdf_analises(request, empresa, ctx['ano_ref'], ctx['mes_ref'])
+        token = _registrar_pdf_analises_sessao(request, empresa.pk, pdf_bytes, mes_filtro)
+        url_pdf = request.build_absolute_uri(
+            reverse('dashboard:analises_relatorio_download', args=[token])
+        )
+        texto = (
+            f'Relatório de análises de faturamento ({mes_filtro}) — {empresa.razao}.\n'
+            f'Baixar PDF: {url_pdf}'
+        )
+    except RuntimeError:
+        url_pdf = request.build_absolute_uri(
+            f"{reverse('dashboard:analises_relatorio')}?{request.GET.urlencode()}"
+        )
+        texto = (
+            f'Relatório de análises de faturamento ({mes_filtro}) — {empresa.razao}.\n'
+            f'Abrir apresentação: {url_pdf}'
+        )
+
+    wa_url = f'https://api.whatsapp.com/send?phone={telefone}&text={quote(texto)}'
+    return redirect(wa_url)
+
+
+def _url_voltar_analises(request, mes_filtro: str) -> str:
+    q = request.GET.copy()
+    q._mutable = True
+    q['aba'] = 'analises'
+    q['mes'] = mes_filtro
+    if not q.get('modelo'):
+        q['modelo'] = 'faturamento_convenio'
+    return reverse('dashboard:index') + '?' + q.urlencode()
 
 
 @login_required

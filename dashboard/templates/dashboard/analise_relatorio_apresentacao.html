@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Análises de faturamento — {{ empresa.razao }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    body { font-size: 14px; color: #212529; background: #fff; }
+    .apresentacao-capa {
+      text-align: center;
+      padding: 2rem 1rem 1.5rem;
+      border-bottom: 3px solid #1f3864;
+      margin-bottom: 1.5rem;
+    }
+    .apresentacao-capa h1 { font-size: 1.35rem; font-weight: 700; color: #1f3864; }
+    .secao-apresentacao {
+      margin-bottom: 2.5rem;
+      page-break-inside: avoid;
+    }
+    .secao-apresentacao + .secao-apresentacao {
+      page-break-before: always;
+      padding-top: 0.5rem;
+    }
+    .secao-apresentacao-titulo {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #495057;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .toolbar-apresentacao {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      padding: 0.5rem 1rem;
+    }
+    @media print {
+      .toolbar-apresentacao { display: none !important; }
+      .secao-apresentacao + .secao-apresentacao { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar-apresentacao d-print-none d-flex flex-wrap gap-2 align-items-center">
+    <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">
+      Imprimir / Salvar PDF
+    </button>
+    <a class="btn btn-sm btn-outline-secondary" href="javascript:window.close()">Fechar</a>
+  </div>
+
+  <div class="container-fluid py-3">
+    <div class="apresentacao-capa">
+      <h1>Relatório de análises de faturamento</h1>
+      <p class="mb-0 text-muted">{{ empresa.razao }} · referência {{ mes_filtro }}</p>
+    </div>
+
+    {% for sec in secoes %}
+    <section class="secao-apresentacao">
+      <div class="secao-apresentacao-titulo">{{ sec.titulo_pill }}</div>
+      {{ sec.html|safe }}
+    </section>
+    {% endfor %}
+  </div>
+</body>
+</html>
