@@ -43,19 +43,32 @@
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h3 class="card-title mb-0">Produtos comprados — NF Comércio</h3>
-                <small class="text-muted">Itens das notas de entrada tipo comércio · foto buscada na internet (cache por código do produto)</small>
+                <small class="text-muted">
+                  {% if destino_estoque == 'imobilizado' %}
+                  Lançamento para <strong>estoque imobilizado</strong> · itens de NF de comércio
+                  {% else %}
+                  Itens das notas de entrada tipo comércio · foto buscada na internet (cache por código do produto)
+                  {% endif %}
+                </small>
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-outline-info btn-sm" id="btnBuscarFotosPagina">
                     <i class="fas fa-images"></i> Buscar fotos desta página
                 </button>
+                {% if destino_estoque == 'imobilizado' %}
+                <a href="{% url 'estoque:imobilizado_list' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Estoque imobilizado
+                </a>
+                {% else %}
                 <a href="{% url 'notafiscalentrada:listar' %}?tipo_nota=comercio" class="btn btn-secondary btn-sm">
                     <i class="fas fa-arrow-left"></i> Voltar às notas
                 </a>
+                {% endif %}
             </div>
         </div>
         <div class="card-body">
             <form method="get" class="mb-4">
+                {% if destino_estoque %}<input type="hidden" name="destino_estoque" value="{{ destino_estoque }}">{% endif %}
                 <div class="row g-2 align-items-end">
                     <div class="col-md-2">
                         <label class="form-label small mb-1" for="data_inicio">Data início</label>
@@ -144,10 +157,19 @@
                                 {% else %}
                                 <form method="post" action="{% url 'estoque:gerar_estoque_nf_item' item.id %}" class="d-flex flex-column gap-1" style="min-width: 9rem;">
                                     {% csrf_token %}
+                                    {% if destino_estoque == 'imobilizado' %}
+                                    <input type="hidden" name="natureza" value="imobilizado">
+                                    {% else %}
+                                    <input type="hidden" name="natureza" value="consumivel">
+                                    {% endif %}
+                                    {% if destino_estoque != 'imobilizado' %}
                                     <input type="text" name="unidade_master" class="form-control form-control-sm" placeholder="Un. master">
-                                    <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca">
                                     <input type="date" name="data_validade" class="form-control form-control-sm" title="Validade">
-                                    <button type="submit" class="btn btn-success btn-sm">Gerar estoque</button>
+                                    {% endif %}
+                                    <input type="text" name="marca" class="form-control form-control-sm" placeholder="Marca / patrimônio">
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                      {% if destino_estoque == 'imobilizado' %}Lançar imobilizado{% else %}Gerar estoque (farmácia){% endif %}
+                                    </button>
                                 </form>
                                 {% endif %}
                             </td>

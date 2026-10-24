@@ -16,6 +16,7 @@ from estoque.forms_operacional import GerarEstoqueNotaForm, RelatorioEstoqueForm
 from estoque.models import (
     EntradaEstoqueNota,
     MovimentoEstoque,
+    NaturezaEstoque,
     ProdutoEstoque,
     RequisicaoEstoque,
     RequisicaoEstoqueItem,
@@ -37,29 +38,59 @@ class _EmpresaMixin:
         return self.request.session.get('empresa_id')
 
 
-class EstoqueFarmaciaListView(LoginRequiredMixin, _EmpresaMixin, ListView):
-    """Visão operacional — farmácia (Fiscal)."""
-
+class _ProdutoEstoqueFiscalListMixin(_EmpresaMixin):
     model = ProdutoEstoque
     paginate_by = 30
-    template_name = 'estoque/farmacia_list.html'
+    natureza_filtro = NaturezaEstoque.CONSUMIVEL
 
-    def get_queryset(self):
+    def _queryset_base(self):
         empresa_id = self.get_empresa_id()
-        somente_alertas = (self.request.GET.get('somente_alertas') or '').strip() in ('1', 'true', 'sim')
-        if somente_alertas and empresa_id:
-            qs = queryset_abaixo_estoque_minimo(empresa_id)
-        else:
-            qs = ProdutoEstoque.objects.filter(empresa_id=empresa_id) if empresa_id else ProdutoEstoque.objects.none()
-        qs = qs.select_related('fornecedor')
+        if not empresa_id:
+            return ProdutoEstoque.objects.none()
+        return ProdutoEstoque.objects.filter(
+            empresa_id=empresa_id,
+            natureza=self.natureza_filtro,
+        ).select_related('fornecedor')
+
+    def _aplicar_busca(self, qs):
         q = (self.request.GET.get('q') or '').strip()
         if q:
             qs = qs.filter(
                 Q(codigo_produto__icontains=q)
                 | Q(descricao__icontains=q)
-                | Q(marca__icontains=q)
+                | Q(marca__icontains=q),
             )
         return qs.order_by('descricao')
+
+
+class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
+    """Visão operacional — farmácia (Fiscal)."""
+
+    template_name = 'estoque/farmacia_list.html'
+
+    def get_queryset(self):
+        somente_alertas = (self.request.GET.get('somente_alertas') or '').strip() in ('1', 'true', 'sim')
+        if somente_alertas:
+            qs = queryset_abaixo_estoque_minimo(self.get_empresa_id())
+        else:
+            qs = self._queryset_base()
+        return self._aplicar_busca(qs)
+
+
+class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
+    """Patrimônio / bens — entradas via NF comércio (Fiscal)."""
+
+    natureza_filtro = NaturezaEstoque.IMOBILIZADO
+    template_name = 'estoque/imobilizado_list.html'
+
+    def get_queryset(self):
+        return self._aplicar_busca(self._queryset_base())
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['descricao'] = 'Estoque — Imobilizado'
+        ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        return ctx
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -123,14 +154,21 @@ def gerar_estoque_item_nota(request, item_id: int):
         return redirect(request.META.get('HTTP_REFERER') or reverse('notafiscalentrada:produtos_comercio'))
 
     try:
+        natureza = form.cleaned_data.get('natureza') or NaturezaEstoque.CONSUMIVEL
         gerar_entrada_desde_item_nota(
             item,
             usuario=request.user,
             marca=form.cleaned_data.get('marca') or '',
             unidade_master=form.cleaned_data.get('unidade_master') or '',
             data_validade=form.cleaned_data.get('data_validade'),
+            natureza=natureza,
         )
-        messages.success(request, f'Estoque atualizado para {item.codigo_produto}.')
+        destino = (
+            'imobilizado'
+            if natureza == NaturezaEstoque.IMOBILIZADO
+            else 'farmácia'
+        )
+        messages.success(request, f'Entrada no estoque ({destino}) para {item.codigo_produto}.')
     except EstoqueErro as exc:
         messages.warning(request, str(exc))
 
@@ -189,7 +227,13 @@ def _contexto_requisicao_tela(
     itens = []
     produtos = ProdutoEstoque.objects.none()
     if empresa_id:
-        produtos = ProdutoEstoque.objects.filter(empresa_id=empresa_id).order_by('descricao')[:800]
+        produtos = (
+            ProdutoEstoque.objects.filter(
+                empresa_id=empresa_id,
+                natureza=NaturezaEstoque.CONSUMIVEL,
+            )
+            .order_by('descricao')[:800]
+        )
     if requisicao:
         itens = requisicao.itens.select_related('produto')
     if not requisicao:

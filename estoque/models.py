@@ -5,12 +5,24 @@ from empresa.models import Empresa
 from estoque.setores import SetorEstoque
 
 
+class NaturezaEstoque(models.TextChoices):
+    CONSUMIVEL = 'consumivel', 'Consumível (farmácia / materiais)'
+    IMOBILIZADO = 'imobilizado', 'Imobilizado'
+
+
 class ProdutoEstoque(models.Model):
     empresa = models.ForeignKey(
         Empresa,
         on_delete=models.CASCADE,
         related_name='produtos_estoque',
         verbose_name='Empresa',
+    )
+    natureza = models.CharField(
+        max_length=16,
+        choices=NaturezaEstoque.choices,
+        default=NaturezaEstoque.CONSUMIVEL,
+        verbose_name='Natureza',
+        help_text='Consumível: farmácia e requisições. Imobilizado: patrimônio / bens.',
     )
     codigo_produto = models.CharField(max_length=50, verbose_name='Código do produto')
     descricao = models.CharField(max_length=300, verbose_name='Descrição do produto')
@@ -29,7 +41,14 @@ class ProdutoEstoque(models.Model):
         blank=True,
         default='',
         verbose_name='Unidade master',
-        help_text='Ex.: CX, FD (embalagem maior)',
+        help_text='Ex.: PCT, CX (embalagem maior)',
+    )
+    quantidade_por_master = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+        verbose_name='Unidades por master',
+        help_text='Quantas unidades de consumo vêm em 1 unidade master (ex.: 1 PCT = 4 UN → informe 4).',
     )
     unidade = models.CharField(
         max_length=20,

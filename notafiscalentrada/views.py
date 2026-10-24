@@ -1271,6 +1271,10 @@ def listar_produtos_comercio(request):
     for item in page_itens:
         item.entrada_estoque = entradas.get(item.id)
 
+    destino_estoque = (request.GET.get('destino_estoque') or '').strip().lower()
+    if destino_estoque not in ('imobilizado', 'consumivel', 'farmacia'):
+        destino_estoque = ''
+
     context = {
         'page_obj': page_obj,
         'itens': page_itens,
@@ -1280,6 +1284,7 @@ def listar_produtos_comercio(request):
             'produto': produto,
             'fornecedor': fornecedor,
         },
+        'destino_estoque': destino_estoque,
         'totais': totais,
         'quantidade_registros': paginator.count,
     }

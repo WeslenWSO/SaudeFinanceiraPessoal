@@ -10,6 +10,7 @@ from django.utils import timezone
 from estoque.models import (
     EntradaEstoqueNota,
     MovimentoEstoque,
+    NaturezaEstoque,
     ProdutoEstoque,
     RequisicaoEstoque,
     RequisicaoEstoqueItem,
@@ -80,6 +81,7 @@ def gerar_entrada_desde_item_nota(
     marca: str = '',
     unidade_master: str = '',
     data_validade=None,
+    natureza: str = NaturezaEstoque.CONSUMIVEL,
 ) -> EntradaEstoqueNota:
     if item.nota_fiscal.tipo_nota != 'comercio':
         raise EstoqueErro('Somente itens de NF de comércio geram estoque.')
@@ -90,11 +92,19 @@ def gerar_entrada_desde_item_nota(
     codigo = (item.codigo_produto or '').strip()
     if not codigo:
         raise EstoqueErro('Item sem código de produto.')
+    if natureza not in NaturezaEstoque.values:
+        natureza = NaturezaEstoque.CONSUMIVEL
+    setor_entrada = (
+        SetorEstoque.IMOBILIZADO
+        if natureza == NaturezaEstoque.IMOBILIZADO
+        else SetorEstoque.FARMACIA
+    )
 
     produto, created = ProdutoEstoque.objects.get_or_create(
         empresa=empresa,
         codigo_produto=codigo,
         defaults={
+            'natureza': natureza,
             'descricao': (item.nome_produto or codigo)[:300],
             'marca': (marca or '')[:120],
             'unidade': (item.unidade or '')[:20],
@@ -102,6 +112,12 @@ def gerar_entrada_desde_item_nota(
         },
     )
     if not created:
+        if produto.natureza != natureza:
+            rotulo = produto.get_natureza_display()
+            raise EstoqueErro(
+                f'Código {codigo} já está cadastrado como {rotulo}. '
+                'Use a tela correta de estoque ou outro código.',
+            )
         if marca:
             produto.marca = marca[:120]
         if unidade_master:
@@ -134,7 +150,7 @@ def gerar_entrada_desde_item_nota(
         produto=produto,
         tipo=MovimentoEstoque.Tipo.ENTRADA_NF,
         setor_origem='',
-        setor_destino=SetorEstoque.FARMACIA,
+        setor_destino=setor_entrada,
         quantidade=q_ent,
         valor_unitario=p_ent,
         valor_custo_medio_apos=custo_novo,

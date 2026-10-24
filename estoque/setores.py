@@ -12,10 +12,11 @@ class SetorEstoque(models.TextChoices):
     ENFERMAGEM = 'enfermagem', 'Enfermagem'
     RAIO_X = 'raio_x', 'Raio-X'
     MAMOGRAFIA = 'mamografia', 'Mamografia'
+    IMOBILIZADO = 'imobilizado', 'Imobilizado'
 
 
 SETOR_TRANSFERENCIA_DESTINOS = tuple(
     (c.value, c.label)
     for c in SetorEstoque
-    if c != SetorEstoque.FARMACIA
+    if c not in (SetorEstoque.FARMACIA, SetorEstoque.IMOBILIZADO)
 )

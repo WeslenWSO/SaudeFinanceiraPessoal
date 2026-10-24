@@ -1,10 +1,16 @@
 from django import forms
 
-from estoque.models import ProdutoEstoque, RequisicaoEstoque, RequisicaoEstoqueItem
+from estoque.models import NaturezaEstoque, ProdutoEstoque, RequisicaoEstoque, RequisicaoEstoqueItem
 from estoque.setores import SETOR_TRANSFERENCIA_DESTINOS, SetorEstoque
 
 
 class GerarEstoqueNotaForm(forms.Form):
+    natureza = forms.ChoiceField(
+        choices=NaturezaEstoque.choices,
+        initial=NaturezaEstoque.CONSUMIVEL,
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     marca = forms.CharField(max_length=120, required=False, widget=forms.TextInput(attrs={'class': 'form-control form-control-sm'}))
     unidade_master = forms.CharField(
         max_length=20,

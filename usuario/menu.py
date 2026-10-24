@@ -112,6 +112,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='estoque:farmacia_list',
     ),
     MenuItemDef(
+        'estoque_imobilizado',
+        'Estoque imobilizado',
+        'fa-warehouse',
+        'fiscal',
+        url_name='estoque:imobilizado_list',
+    ),
+    MenuItemDef(
         'estoque_requisicoes',
         'Requisições de estoque',
         'fa-truck-medical',

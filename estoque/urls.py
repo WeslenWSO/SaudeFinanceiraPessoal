@@ -10,6 +10,7 @@ from estoque.views import (
 )
 from estoque.views_operacional import (
     EstoqueFarmaciaListView,
+    EstoqueImobilizadoListView,
     ProdutoEstoqueOperacionalDetailView,
     RequisicaoListView,
     gerar_estoque_item_nota,
@@ -23,6 +24,7 @@ app_name = 'estoque'
 
 urlpatterns = [
     path('farmacia/', EstoqueFarmaciaListView.as_view(), name='farmacia_list'),
+    path('imobilizado/', EstoqueImobilizadoListView.as_view(), name='imobilizado_list'),
     path('farmacia/produto/<int:pk>/', ProdutoEstoqueOperacionalDetailView.as_view(), name='produto_operacional_detail'),
     path('nf-item/<int:item_id>/gerar-estoque/', gerar_estoque_item_nota, name='gerar_estoque_nf_item'),
     path('requisicoes/', RequisicaoListView.as_view(), name='requisicao_list'),
