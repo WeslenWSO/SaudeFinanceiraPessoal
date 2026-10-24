@@ -650,6 +650,104 @@ def relatorio_movimentos(request):
     )
 
 
+def _agrupar_imobilizado_por_setor(produtos) -> list[dict]:
+    """Agrupa produtos imobilizado por setor_localizacao (ordem dos setores cadastrados)."""
+    por_setor: dict[str, list] = {}
+    for p in produtos:
+        chave = (p.setor_localizacao or '').strip()
+        por_setor.setdefault(chave, []).append(p)
+
+    rotulos = dict(SETOR_LOCALIZACAO_IMOBILIZADO)
+    grupos: list[dict] = []
+    usados: set[str] = set()
+
+    for val, rotulo in SETOR_LOCALIZACAO_IMOBILIZADO:
+        if val not in por_setor:
+            continue
+        grupos.append({'setor_val': val, 'setor_rotulo': rotulo, 'produtos': por_setor[val]})
+        usados.add(val)
+
+    if '' in por_setor:
+        grupos.append(
+            {
+                'setor_val': '',
+                'setor_rotulo': 'Sem setor definido',
+                'produtos': por_setor[''],
+            },
+        )
+        usados.add('')
+
+    for chave, itens in por_setor.items():
+        if chave in usados:
+            continue
+        grupos.append(
+            {
+                'setor_val': chave,
+                'setor_rotulo': rotulos.get(chave, chave),
+                'produtos': itens,
+            },
+        )
+
+    return grupos
+
+
+@login_required
+def lista_imobilizado_por_setor(request):
+    """Relação de imobilizado agrupada por setor (com quantidades e preço médio)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:imobilizado_list')
+
+    empresa = get_object_or_404(Empresa, pk=empresa_id)
+    produtos = (
+        ProdutoEstoque.objects.filter(
+            empresa_id=empresa_id,
+            natureza=NaturezaEstoque.IMOBILIZADO,
+        )
+        .select_related('fornecedor')
+        .order_by('setor_localizacao', 'codigo_produto', 'descricao')
+    )
+
+    somente_saldo = (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
+    if somente_saldo:
+        produtos = produtos.filter(quantidade_estoque__gt=0)
+
+    filtro_setor = (request.GET.get('setor') or '').strip()
+    if filtro_setor == '__sem__':
+        produtos = produtos.filter(Q(setor_localizacao='') | Q(setor_localizacao__isnull=True))
+    elif filtro_setor:
+        produtos = produtos.filter(setor_localizacao=filtro_setor)
+
+    busca = (request.GET.get('q') or '').strip()
+    if busca:
+        produtos = produtos.filter(
+            Q(codigo_produto__icontains=busca)
+            | Q(descricao__icontains=busca)
+            | Q(marca__icontains=busca),
+        )
+
+    grupos = _agrupar_imobilizado_por_setor(list(produtos))
+    total_itens = sum(len(g['produtos']) for g in grupos)
+    auto_print = (request.GET.get('auto') or '').strip() == '1'
+
+    return render(
+        request,
+        'estoque/imobilizado_lista_setores.html',
+        {
+            'empresa': empresa,
+            'grupos': grupos,
+            'busca': busca,
+            'filtro_setor': filtro_setor,
+            'somente_saldo': somente_saldo,
+            'setores_imobilizado': SETOR_LOCALIZACAO_IMOBILIZADO,
+            'total_itens': total_itens,
+            'agora': timezone.now(),
+            'auto_print': auto_print,
+        },
+    )
+
+
 @login_required
 def lista_cega_estoque(request):
     """Lista para contagem física — sem saldo do sistema."""
