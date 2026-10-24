@@ -13,7 +13,11 @@ from faturamento_medico.dashboard_exames import STATUS_AGENDAMENTO_CANCELADOS
 from faturamento_medico.models import FaturamentoMedico
 from faturamento_medico.ranking_exames import montar_ranking_exames_qs
 
-from dashboard.analises_conferencia import contar_dias_trabalhados_analise, kwargs_ranking_faturamento_analise
+from dashboard.analises_agendamento import (
+    LEGENDA_FILTRO_ANALISES,
+    contar_dias_trabalhados_analise_agendamento,
+    kwargs_ranking_faturamento_analises,
+)
 
 MESES_ABREV = (
     '',
@@ -140,8 +144,8 @@ def montar_evolucao_faturamento(
             )
             .exclude(_q_cancelados())
         )
-        dias = contar_dias_trabalhados_analise(qs, empresa_id)
-        ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_faturamento_analise(empresa_id))
+        dias = contar_dias_trabalhados_analise_agendamento(qs)
+        ranking = montar_ranking_exames_qs(qs, **kwargs_ranking_faturamento_analises(empresa_id))
         valor = ranking['total_valor']
         rs_dia = (valor / dias) if dias else Decimal('0')
 
@@ -173,7 +177,7 @@ def montar_evolucao_faturamento(
     chart_labels_dias = [f'{d} dias' for d in chart_dias]
     return {
         'titulo_relatorio': 'EVOLUÇÃO HISTÓRICA DO FATURAMENTO',
-        'subtitulo_periodo': subtitulo,
+        'subtitulo_periodo': f'{subtitulo} · {LEGENDA_FILTRO_ANALISES}',
         'titulo_grafico': f'Faturamento Bruto Mensal — {subtitulo}',
         'titulo_grafico_rs_dia': f'Faturamento Bruto Médio Diário/Mês — {subtitulo}',
         'linhas_evolucao': linhas,

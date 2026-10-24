@@ -21,7 +21,10 @@ from dashboard.analise_faturamento_modalidade import (
     _codigo_modalidade,
     _fmt_percentual_1,
 )
-from dashboard.analises_conferencia import ids_lotes_empresa, item_conta_faturamento_analise
+from dashboard.analises_agendamento import (
+    LEGENDA_FILTRO_ANALISES,
+    agendamento_conta_faturamento_analises,
+)
 
 TITULOS_BANNER = {
     'MR': 'RESSONÂNCIA MAGNÉTICA',
@@ -94,21 +97,17 @@ def montar_detalhes_modalidade_convenio(empresa_id: int, ano: int, mes: int) -> 
     por_mod_conv: dict[str, dict[str, dict]] = defaultdict(
         lambda: defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')}),
     )
-    ids_internos = ids_lotes_empresa(empresa_id)
-
     for fat in qs:
+        if not agendamento_conta_faturamento_analises(fat):
+            continue
         itens = list(fat.itens_servico.all())
         conv = _convenio_exibicao(fat.convenio)
         if not itens:
-            if not item_conta_faturamento_analise(fat, None, ids_internos=ids_internos):
-                continue
             cod = _codigo_modalidade(fat, None)
             por_mod_conv[cod][conv]['quantidade'] += 1
             por_mod_conv[cod][conv]['valor'] += _valor_item(None, fat)
             continue
         for item in itens:
-            if not item_conta_faturamento_analise(fat, item, ids_internos=ids_internos):
-                continue
             cod = _codigo_modalidade(fat, item)
             por_mod_conv[cod][conv]['quantidade'] += 1
             por_mod_conv[cod][conv]['valor'] += _valor_item(item, fat)
@@ -181,6 +180,7 @@ def montar_detalhes_modalidade_convenio(empresa_id: int, ano: int, mes: int) -> 
 
     return {
         'titulo_relatorio': f'DETALHES POR MODALIDADE E CONVÊNIO — {mes_titulo}',
+        'subtitulo_filtro': LEGENDA_FILTRO_ANALISES,
         'secoes_modalidade': secoes,
         'charts_detalhes_json': json.dumps(charts_boot, ensure_ascii=False),
     }

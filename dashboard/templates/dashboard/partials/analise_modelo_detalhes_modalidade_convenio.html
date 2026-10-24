@@ -70,6 +70,7 @@
 </style>
 
 <div class="an-det-banner">{{ titulo_relatorio }}</div>
+{% if subtitulo_filtro %}<p class="small text-muted text-center mb-3">{{ subtitulo_filtro }}</p>{% endif %}
 
 {% for sec in secoes_modalidade %}
 <section class="an-det-secao">

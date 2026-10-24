@@ -17,7 +17,10 @@ from dashboard.analise_faturamento_convenio import (
     _fmt_numero_int,
     _q_cancelados,
 )
-from dashboard.analises_conferencia import ids_lotes_empresa, item_conta_faturamento_analise
+from dashboard.analises_agendamento import (
+    LEGENDA_FILTRO_ANALISES,
+    agendamento_conta_faturamento_analises,
+)
 
 ROTULOS_MODALIDADE = {
     'MR': 'Ressonância Magnética',
@@ -85,20 +88,17 @@ def montar_relatorio_faturamento_modalidade(empresa_id: int, ano: int, mes: int)
     )
 
     por_mod: dict[str, dict] = defaultdict(lambda: {'quantidade': 0, 'valor': Decimal('0')})
-    ids_internos = ids_lotes_empresa(empresa_id)
 
     for fat in qs:
+        if not agendamento_conta_faturamento_analises(fat):
+            continue
         itens = list(fat.itens_servico.all())
         if not itens:
-            if not item_conta_faturamento_analise(fat, None, ids_internos=ids_internos):
-                continue
             cod = _codigo_modalidade(fat, None)
             por_mod[cod]['quantidade'] += 1
             por_mod[cod]['valor'] += _valor_item(None, fat)
             continue
         for item in itens:
-            if not item_conta_faturamento_analise(fat, item, ids_internos=ids_internos):
-                continue
             cod = _codigo_modalidade(fat, item)
             por_mod[cod]['quantidade'] += 1
             por_mod[cod]['valor'] += _valor_item(item, fat)
@@ -141,6 +141,7 @@ def montar_relatorio_faturamento_modalidade(empresa_id: int, ano: int, mes: int)
     mes_titulo = f'{MESES_PT[mes].upper()} {ano}'
     return {
         'titulo_relatorio': f'FATURAMENTO POR MODALIDADE — {mes_titulo}',
+        'subtitulo_filtro': LEGENDA_FILTRO_ANALISES,
         'linhas_modalidade': linhas,
         'total_quantidade_fmt': _fmt_numero_int(total_qtd),
         'total_valor_fmt': _fmt_moeda(total_valor),

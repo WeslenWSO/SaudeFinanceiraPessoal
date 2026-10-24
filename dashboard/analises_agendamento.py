@@ -1,4 +1,4 @@
-"""Regras de status de agendamento (RIS/MedCloud) para análise por convênio."""
+"""Regras de status de agendamento (RIS/MedCloud) para relatórios da aba Análises."""
 from __future__ import annotations
 
 ROTULO_PENDENCIA_PACS = 'Pendência confirmação PACS'
@@ -38,9 +38,38 @@ def eh_confirmado_pendencia_pacs(status: str | None) -> bool:
     return 'conclu' not in s
 
 
-def agendamento_conta_faturamento_convenio(faturamento) -> bool:
+def agendamento_conta_faturamento_analises(faturamento) -> bool:
     st = _norm(getattr(faturamento, 'status_agendamento', None))
     return eh_aguardando_faturamento_agendamento(st) or eh_concluido_agendamento(st)
+
+
+# Alias usado em ranking e convênio
+agendamento_conta_faturamento_convenio = agendamento_conta_faturamento_analises
+
+
+def contar_dias_trabalhados_analise_agendamento(qs) -> int:
+    dias: set = set()
+    for fat in qs.prefetch_related('itens_servico'):
+        if not agendamento_conta_faturamento_analises(fat):
+            continue
+        if fat.data:
+            dias.add(fat.data)
+    return len(dias)
+
+
+def kwargs_ranking_faturamento_analises(empresa_id: int) -> dict:
+    """Filtro padrão das abas Análises (exceto validação — só na tela Conferência)."""
+    del empresa_id  # reservado para extensões futuras
+    return {
+        'somente_status_analise': False,
+        'somente_agendamento_faturamento_convenio': True,
+    }
+
+
+LEGENDA_FILTRO_ANALISES = (
+    'Faturamento: status de agendamento (RIS) — Aguardando faturamento e Concluído. '
+    'Confirmado: pendência PACS (tela Conferência).'
+)
 
 
 def agendamento_pendencia_pacs_convenio(faturamento) -> bool:
