@@ -5,6 +5,10 @@ from urllib.parse import urlencode
 
 from django.urls import reverse
 
+from dashboard.analise_evolucao_faturamento import (
+    montar_evolucao_faturamento,
+    resolver_periodo_evolucao,
+)
 from dashboard.analise_faturamento_convenio import montar_relatorio_faturamento_convenio
 from dashboard.analise_detalhes_modalidade_convenio import montar_detalhes_modalidade_convenio
 from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
@@ -45,6 +49,10 @@ def montar_contexto_aba_analises(
     q_base.pop('modelo', None)
     url_analise_modelo_base = '?' + q_base.urlencode() + '&modelo='
 
+    ev_de, ev_mes_de, ev_ate, ev_mes_ate, ev_aviso = resolver_periodo_evolucao(
+        request, ano_ref=ano, mes_ref=mes
+    )
+
     ctx: dict = {
         'modelos_analise': MODELOS_ANALISE,
         'modelo_analise': modelo.codigo,
@@ -69,6 +77,11 @@ def montar_contexto_aba_analises(
         ctx.update(montar_detalhes_modalidade_convenio(empresa_id, ano, mes))
     elif modelo.codigo == 'exames_convenio':
         ctx.update(_contexto_exames_convenio(empresa_id, ano, mes, convenios_sel))
+    elif modelo.codigo == 'evolucao_faturamento':
+        ctx.update(
+            montar_evolucao_faturamento(empresa_id, ev_de, ev_mes_de, ev_ate, ev_mes_ate)
+        )
+        ctx['ev_periodo_aviso'] = ev_aviso
 
     return ctx
 

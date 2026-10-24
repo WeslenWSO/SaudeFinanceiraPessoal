@@ -42,6 +42,13 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
         'fa-layer-group',
         'dashboard/partials/analise_modelo_exames_convenio.html',
     ),
+    AnaliseModeloDef(
+        'evolucao_faturamento',
+        'Evolução',
+        'Evolução histórica do faturamento — escolha até 12 meses.',
+        'fa-chart-line',
+        'dashboard/partials/analise_modelo_evolucao_faturamento.html',
+    ),
 )
 
 

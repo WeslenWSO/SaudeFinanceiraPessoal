@@ -16,7 +16,9 @@
   {% include modelo_analise_partial %}
 {% endif %}
 
+{% if modelo_analise != 'evolucao_faturamento' %}
 <p class="small text-muted mt-4 mb-0">
   Período controlado pelos botões <strong>Anterior / Próximo</strong> acima (<code>?mes=AAAA-MM</code>).
   Se os títulos não coincidirem com o PDF impresso, envie o arquivo ou prints para renomearmos e ajustarmos as colunas.
 </p>
+{% endif %}
