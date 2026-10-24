@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<style>
+.conf-card { border: 1px solid #dee2e6; border-radius: 0.5rem; }
+.conf-card-header { background: #f8f9fa; font-weight: 600; padding: 0.65rem 1rem; border-bottom: 1px solid #dee2e6; }
+.conf-tabela { font-size: 0.85rem; margin-bottom: 0; }
+.conf-tabela th { background: #1f3864; color: #fff; font-size: 0.78rem; }
+.conf-tabela td.num { text-align: right; white-space: nowrap; }
+.conf-kpi { border: 1px solid #fd7e14; background: #fff8f0; border-radius: 0.35rem; padding: 0.75rem; text-align: center; }
+</style>
+
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h3 class="mb-1">Conferência</h3>
+            <p class="text-muted small mb-0">{{ titulo }} · {{ periodo_fmt }}</p>
+            {% if empresa %}<p class="small mb-0"><strong>{{ empresa.razao }}</strong></p>{% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Faturamento
+            </a>
+            <a href="{% url 'faturamento_medico:acerto_caixa' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-cash-register"></i> Acerto de caixa
+            </a>
+        </div>
+    </div>
+
+    <div class="card conf-card mb-4">
+        <div class="card-body py-3">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label for="mes" class="form-label small mb-1">Mês de referência</label>
+                    <input type="month" id="mes" name="mes" class="form-control form-control-sm" value="{{ mes_filtro_input }}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="conf-kpi mb-4">
+        <div class="small fw-semibold text-warning">Total de pendências no mês</div>
+        <div class="fs-5 fw-bold">{{ total_pendencias_quantidade_fmt }} exames</div>
+        <div class="text-muted">R$ {{ total_pendencias_valor_fmt }}</div>
+    </div>
+
+    <div class="card conf-card mb-4">
+        <div class="conf-card-header">
+            Status de conferência — fora do faturamento das análises
+            <span class="badge bg-secondary ms-1">{{ total_conferencia_quantidade_fmt }} ex. · R$ {{ total_conferencia_valor_fmt }}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table conf-tabela table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th class="num">Exames</th>
+                        <th class="num">Valor (R$)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas_conferencia %}
+                    <tr>
+                        <td>
+                            <span class="fw-semibold">{{ linha.rotulo }}</span>
+                            {% if linha.rotulo != linha.status %}
+                            <span class="text-muted small">({{ linha.status }})</span>
+                            {% endif %}
+                        </td>
+                        <td class="num">{{ linha.quantidade_fmt }}</td>
+                        <td class="num">{{ linha.valor_fmt }}</td>
+                        <td class="text-end">
+                            <a href="{{ linha.url_listagem }}" class="btn btn-outline-primary btn-sm py-0">Ver na listagem</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma pendência de conferência neste mês.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card conf-card mb-4">
+        <div class="conf-card-header">
+            Status de agendamento (RIS) — {{ rotulo_agendamento_confirmado }}
+            <span class="badge bg-info text-dark ms-1">{{ total_agendamento_quantidade_fmt }} ex. · R$ {{ total_agendamento_valor_fmt }}</span>
+        </div>
+        <p class="small text-muted px-3 pt-2 mb-0">Aguardam confirmação no PACS — não entram no faturamento das análises.</p>
+        <div class="table-responsive">
+            <table class="table conf-tabela table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Convênio</th>
+                        <th class="num">Exames</th>
+                        <th class="num">Valor ref. (R$)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas_agendamento_confirmado %}
+                    <tr>
+                        <td>{{ linha.convenio }}</td>
+                        <td class="num">{{ linha.quantidade_fmt }}</td>
+                        <td class="num">{{ linha.valor_fmt }}</td>
+                        <td class="text-end">
+                            <a href="{{ linha.url_listagem }}" class="btn btn-outline-primary btn-sm py-0">Ver na listagem</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-3">Nenhum exame Confirmado (RIS) neste mês.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if linhas_agendamento_confirmado %}
+        <div class="px-3 py-2 border-top">
+            <a href="{{ url_listagem_confirmado_mes }}" class="small">Ver todos Confirmados do mês na listagem</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

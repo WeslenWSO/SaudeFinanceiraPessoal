@@ -68,6 +68,8 @@ def montar_relatorio_validacao_conferencia(empresa_id: int, ano: int, mes: int) 
             'status': status,
             'rotulo': rotulo_status_analise(status),
             'incluido_analise': status in STATUS_CONFERENCIA_INCLUIDOS_ANALISE,
+            'quantidade': dados['quantidade'],
+            'valor': dados['valor'],
             'quantidade_fmt': _fmt_numero_int(dados['quantidade']),
             'valor_fmt': _fmt_moeda(dados['valor']),
         })

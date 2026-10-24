@@ -68,6 +68,7 @@ urlpatterns = [
     path('<int:pk>/excluir/', views.excluir_faturamento, name='excluir'),
     path('<int:pk>/detalhes/', views.detalhes_faturamento, name='detalhes'),
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
+    path('conferencia/', views.conferencia_faturamento, name='conferencia'),
     path('acerto-caixa/', views.acerto_caixa, name='acerto_caixa'),
     path('acerto-caixa/imprimir/', views.imprimir_acerto_caixa, name='imprimir_acerto_caixa'),
     path(

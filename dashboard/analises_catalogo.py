@@ -16,6 +16,7 @@ class AnaliseModeloDef:
     icon: str = 'fa-chart-bar'
     template_partial: str = ''
     exibir_aba: bool = True
+    exibir_apresentacao: bool = True
 
 
 MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
@@ -26,6 +27,7 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
         'fa-clipboard-check',
         'dashboard/partials/analise_modelo_validacao_conferencia.html',
         exibir_aba=False,
+        exibir_apresentacao=False,
     ),
     AnaliseModeloDef(
         'faturamento_convenio',
@@ -70,6 +72,10 @@ def modelo_analise_ativo(codigo: str | None) -> AnaliseModeloDef | None:
 
 def modelos_analise_aba() -> tuple[AnaliseModeloDef, ...]:
     return tuple(m for m in MODELOS_ANALISE if m.exibir_aba)
+
+
+def modelos_analise_apresentacao() -> tuple[AnaliseModeloDef, ...]:
+    return tuple(m for m in MODELOS_ANALISE if m.exibir_apresentacao)
 
 
 def modelo_analise_padrao() -> AnaliseModeloDef:

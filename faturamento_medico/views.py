@@ -6103,6 +6103,40 @@ def marcar_lancamento_anestesista_pago(request, pk):
 
 
 @login_required
+def conferencia_faturamento(request):
+    """Pendências de status de conferência e agendamento Confirmado (RIS / PACS)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    from datetime import date
+
+    from empresa.models import Empresa
+    from faturamento_medico.services.conferencia_pendencias import montar_conferencia_pendencias
+
+    hoje = date.today()
+    ano, mes = hoje.year, hoje.month
+    mes_param = (request.GET.get('mes') or '').strip()
+    if mes_param:
+        try:
+            partes = mes_param.split('-')
+            if len(partes) == 2:
+                ano = int(partes[0])
+                mes = int(partes[1])
+                if mes < 1 or mes > 12:
+                    raise ValueError('mês inválido')
+        except (TypeError, ValueError):
+            messages.warning(request, 'Mês inválido; usando o mês atual.')
+
+    empresa = Empresa.objects.filter(pk=empresa_id).first()
+    ctx = montar_conferencia_pendencias(empresa_id, ano, mes)
+    ctx['empresa'] = empresa
+    ctx['mes_filtro_input'] = ctx['mes_filtro']
+    return render(request, 'faturamento_medico/conferencia.html', ctx)
+
+
+@login_required
 def acerto_caixa(request):
     """Fechamento / acerto de caixa — procedimentos, NF e resumos de pagamento/aguardando faturamento."""
     empresa_id = request.session.get('empresa_id')

@@ -65,7 +65,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         'Conferência',
         'fa-clipboard-check',
         'faturamento',
-        url_name='faturamento_medico:acerto_caixa',
+        url_name='faturamento_medico:conferencia',
     ),
     MenuItemDef(
         'faturamento_dashboard_exames', 'Dashboard dos Exames', 'fa-chart-pie', 'faturamento',

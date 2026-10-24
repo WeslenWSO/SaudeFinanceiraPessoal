@@ -14,7 +14,7 @@ from dashboard.analise_evolucao_faturamento import (
 from dashboard.analise_faturamento_convenio import montar_relatorio_faturamento_convenio
 from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
 from dashboard.analise_validacao_conferencia import montar_relatorio_validacao_conferencia
-from dashboard.analises_catalogo import MODELOS_ANALISE
+from dashboard.analises_catalogo import MODELOS_ANALISE, modelos_analise_apresentacao
 
 
 def params_query_relatorio_analises(request, mes_filtro: str) -> str:
@@ -59,7 +59,7 @@ def _contexto_modelo(empresa_id: int, request, ano: int, mes: int, codigo: str) 
 
 def montar_html_relatorio_apresentacao(request, empresa, ano: int, mes: int) -> str:
     secoes: list[dict] = []
-    for modelo in MODELOS_ANALISE:
+    for modelo in modelos_analise_apresentacao():
         ctx = _contexto_modelo(empresa.pk, request, ano, mes, modelo.codigo)
         ctx['apresentacao'] = True
         html = render_to_string(modelo.template_partial, ctx, request=request)
