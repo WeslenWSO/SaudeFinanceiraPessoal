@@ -24,6 +24,8 @@
     th { background: #eee; font-size: 9px; }
     .col-contagem { width: 4.5rem; min-height: 1.2rem; }
     .col-un { width: 2.5rem; }
+    .col-num { width: 3rem; text-align: right; white-space: nowrap; }
+    th.col-num { text-align: center; }
     .no-print { margin-bottom: 12px; }
     .no-print form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; font-size: 13px; }
     @media print {
@@ -84,6 +86,8 @@
         <th style="width:5rem">Marca</th>
         <th style="width:7rem">Fornecedor</th>
         {% if tipo == 'imobilizado' %}<th style="width:5rem">Setor</th>{% endif %}
+        <th class="col-num" title="Estoque mínimo cadastrado">Qtd. mín.</th>
+        <th class="col-num" title="Prazo médio de entrega do fornecedor">Dias entrega</th>
         <th class="col-contagem">Qtd contada</th>
         <th class="col-un">Un.</th>
       </tr>
@@ -99,11 +103,13 @@
         {% if tipo == 'imobilizado' %}
         <td>{% if p.setor_localizacao %}{{ p.get_setor_localizacao_display }}{% endif %}</td>
         {% endif %}
+        <td class="col-num">{% if p.estoque_minimo %}{{ p.estoque_minimo|floatformat:-3 }}{% endif %}</td>
+        <td class="col-num">{% if p.dias_entrega_fornecedor %}{{ p.dias_entrega_fornecedor }}{% endif %}</td>
         <td class="col-contagem">&nbsp;</td>
         <td class="col-un">{{ p.unidade|default:"" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="{% if tipo == 'imobilizado' %}8{% else %}7{% endif %}" style="text-align:center;padding:12px;">Nenhum produto na lista.</td></tr>
+      <tr><td colspan="{% if tipo == 'imobilizado' %}10{% else %}9{% endif %}" style="text-align:center;padding:12px;">Nenhum produto na lista.</td></tr>
       {% endfor %}
     </tbody>
   </table>
