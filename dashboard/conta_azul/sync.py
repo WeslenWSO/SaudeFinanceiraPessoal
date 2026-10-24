@@ -873,10 +873,23 @@ def _atualizar_saldo_conta_api(conta: ContaBancaria, client: ContaAzulClient) ->
     return True
 
 
+def _conta_preservar_na_sync_conta_azul(conta: ContaBancaria) -> bool:
+    """Caixa inativo no acerto: cadastro local não é sobrescrito pela sync."""
+    if getattr(conta, 'inativo_acerto_caixa', False):
+        return True
+    if (conta.status or 'A') != 'I':
+        return False
+    if conta.tipo in ('CAIXA', 'OUTROS'):
+        return True
+    return 'caixa' in (conta.descricao or '').lower()
+
+
 def importar_saldos_contas(empresa, client: ContaAzulClient, *, dry_run: bool = False) -> dict:
     stats = {'criados': 0, 'atualizados': 0, 'erros': 0}
     contas = ContaBancaria.objects.filter(empresa=empresa).exclude(conta_azul_id='')
     for conta in contas:
+        if _conta_preservar_na_sync_conta_azul(conta):
+            continue
         if dry_run:
             stats['atualizados'] += 1
             continue
@@ -934,13 +947,10 @@ def _upsert_conta_bancaria(
         ).first()
 
     if obj:
-        preservar_inativo_acerto = bool(getattr(obj, 'inativo_acerto_caixa', False))
+        if _conta_preservar_na_sync_conta_azul(obj):
+            return False, True
         for key, val in defaults.items():
-            if preservar_inativo_acerto and key == 'status':
-                continue
             setattr(obj, key, val)
-        if preservar_inativo_acerto:
-            obj.status = 'I'
         try:
             obj.save()
         except IntegrityError:
