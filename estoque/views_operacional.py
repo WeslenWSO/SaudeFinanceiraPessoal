@@ -337,6 +337,8 @@ def requisicao_edit(request, pk: int | None):
                     )
             except EstoqueErro as exc:
                 messages.error(request, str(exc))
+            except ValueError as exc:
+                messages.error(request, f'Não foi possível concluir: {exc}')
         elif acao == 'cancelar':
             requisicao.status = RequisicaoEstoque.Status.CANCELADA
             requisicao.save(update_fields=['status'])

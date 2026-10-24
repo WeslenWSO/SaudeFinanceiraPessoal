@@ -69,7 +69,7 @@ def _ajustar_setor(produto: ProdutoEstoque, setor: str, delta: Decimal) -> None:
     if nova < 0:
         raise EstoqueErro(f'Saldo insuficiente no setor {setor}.')
     saldo.quantidade = nova
-    saldo.save(update_fields=['quantidade', 'atualizado_em'])
+    saldo.save(update_fields=['quantidade'])
 
 
 @transaction.atomic
