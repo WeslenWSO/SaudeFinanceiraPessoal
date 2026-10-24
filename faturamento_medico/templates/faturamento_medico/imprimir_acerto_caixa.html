@@ -6,8 +6,8 @@
     <title>Acerto de Caixa — impressão</title>
     <style>
         @page {
-            size: A4 landscape;
-            margin: 10mm;
+            size: A4;
+            margin: 12mm 10mm;
         }
         * { box-sizing: border-box; }
         body {
@@ -16,6 +16,7 @@
             font-size: 9px;
             color: #000;
             background: #fff;
+            max-width: 210mm;
         }
         .barra-acoes {
             display: flex;
@@ -102,7 +103,14 @@
         table.grid {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8px;
+            font-size: 7.5px;
+            table-layout: fixed;
+        }
+        table.grid td:nth-child(2),
+        table.grid td:nth-child(3),
+        table.grid td:nth-child(10) {
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
         }
         table.grid th,
         table.grid td {
@@ -242,8 +250,6 @@
                 <th>NF</th>
                 <th>Forma pgto.</th>
                 <th class="text-end">Valor NF</th>
-                <th>Caixa</th>
-                <th>Check-in</th>
                 <th>Discriminação NF</th>
                 <th class="text-end">V. tabela</th>
                 <th class="text-end">Diferença</th>
@@ -269,8 +275,6 @@
                 </td>
                 <td>{{ linha.forma_pgto }}</td>
                 <td class="text-end">{{ linha.valor_nota_fmt }}</td>
-                <td>{% if linha.marcado_acerto_caixa %}✓{% else %}—{% endif %} {{ linha.caixa_exibicao|default:linha.caixa }}</td>
-                <td>{{ linha.checkin_por }}</td>
                 <td>{{ linha.discriminacao }}</td>
                 <td class="text-end">R$ {{ linha.valor_tabela_fmt }}</td>
                 <td class="text-end">R$ {{ linha.diferenca_fmt }}</td>
@@ -279,7 +283,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="15" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
+                <td colspan="13" style="text-align:center;padding:12px;">Nenhum procedimento no filtro.</td>
             </tr>
             {% endfor %}
         </tbody>
