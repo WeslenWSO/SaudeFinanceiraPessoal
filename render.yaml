@@ -31,6 +31,8 @@ services:
         sync: false
       - key: MEDIA_ROOT
         value: /var/data/media
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/src/.playwright-browsers
       - key: RENDER
         value: "true"
       - key: GEMINI_UPLOAD_TIMEOUT
