@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from django.urls import reverse
 
 from dashboard.analise_faturamento_convenio import montar_relatorio_faturamento_convenio
+from dashboard.analise_detalhes_modalidade_convenio import montar_detalhes_modalidade_convenio
 from dashboard.analise_faturamento_modalidade import montar_relatorio_faturamento_modalidade
 from dashboard.analises_catalogo import (
     MODELOS_ANALISE,
@@ -64,6 +65,8 @@ def montar_contexto_aba_analises(
         ctx.update(montar_relatorio_faturamento_convenio(empresa_id, ano, mes))
     elif modelo.codigo == 'faturamento_modalidade':
         ctx.update(montar_relatorio_faturamento_modalidade(empresa_id, ano, mes))
+    elif modelo.codigo == 'detalhes_modalidade_convenio':
+        ctx.update(montar_detalhes_modalidade_convenio(empresa_id, ano, mes))
     elif modelo.codigo == 'exames_convenio':
         ctx.update(_contexto_exames_convenio(empresa_id, ano, mes, convenios_sel))
 

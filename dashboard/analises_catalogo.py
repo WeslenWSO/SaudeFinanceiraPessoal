@@ -29,6 +29,13 @@ MODELOS_ANALISE: tuple[AnaliseModeloDef, ...] = (
         'dashboard/partials/analise_modelo_faturamento_modalidade.html',
     ),
     AnaliseModeloDef(
+        'detalhes_modalidade_convenio',
+        'Modalidade × convênio',
+        'Detalhes por modalidade e convênio — tabela e TOP 5/10.',
+        'fa-th-list',
+        'dashboard/partials/analise_modelo_detalhes_modalidade_convenio.html',
+    ),
+    AnaliseModeloDef(
         'exames_convenio',
         'Exames por convênio e conferência',
         'Tabelas por convênio: status, quantidade, clientes e valor no mês.',

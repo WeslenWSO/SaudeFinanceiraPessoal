@@ -1,0 +1,175 @@
+<style>
+.an-det-banner {
+    background: #1f3864;
+    color: #fff;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1.25rem;
+}
+.an-det-secao {
+    margin-bottom: 2rem;
+    page-break-inside: avoid;
+}
+.an-det-mod-header {
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.25rem 0.25rem 0 0;
+}
+.an-det-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+.an-det-tabela th {
+    background: #5b9bd5;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #4a8bc4;
+    font-size: 0.72rem;
+}
+.an-det-tabela th.num { text-align: right; }
+.an-det-tabela td {
+    padding: 0.28rem 0.45rem;
+    border: 1px solid #dee2e6;
+}
+.an-det-tabela tbody tr:nth-child(even) { background: #faf8f5; }
+.an-det-tabela td.num { text-align: right; white-space: nowrap; }
+.an-det-tabela tfoot td {
+    color: #fff;
+    font-weight: 700;
+    padding: 0.4rem 0.45rem;
+}
+.an-det-tabela tfoot td.num { text-align: right; }
+.an-det-chart-box {
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    padding: 0.65rem;
+    height: 100%;
+    min-height: 280px;
+    background: #fff;
+}
+.an-det-chart-box h4 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 0.35rem;
+    color: #495057;
+}
+.an-det-chart-wrap {
+    position: relative;
+    height: calc(100% - 1.5rem);
+    min-height: 240px;
+}
+</style>
+
+<div class="an-det-banner">{{ titulo_relatorio }}</div>
+
+{% for sec in secoes_modalidade %}
+<section class="an-det-secao">
+    <div class="row g-3 align-items-stretch">
+        <div class="col-lg-7">
+            <div class="an-det-mod-header" style="background: {{ sec.cor_header }};">{{ sec.titulo }}</div>
+            <div class="table-responsive border border-top-0 rounded-bottom overflow-hidden">
+                <table class="an-det-tabela mb-0">
+                    <thead>
+                        <tr>
+                            <th>Convênio</th>
+                            <th class="num">Exames</th>
+                            <th class="num">Faturamento (R$)</th>
+                            <th class="num">Ticket Méd.</th>
+                            <th class="num">% Modal.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in sec.linhas %}
+                        <tr>
+                            <td>{{ linha.convenio }}</td>
+                            <td class="num">{{ linha.quantidade_fmt }}</td>
+                            <td class="num">{{ linha.valor_fmt }}</td>
+                            <td class="num">{{ linha.ticket_fmt }}</td>
+                            <td class="num">{{ linha.pct_modal_fmt }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: {{ sec.cor_footer }};">
+                            <td>{{ sec.titulo_total }}</td>
+                            <td class="num">{{ sec.total_quantidade_fmt }}</td>
+                            <td class="num">{{ sec.total_valor_fmt }}</td>
+                            <td class="num">{{ sec.total_ticket_fmt }}</td>
+                            <td class="num">{{ sec.total_pct_fmt }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="an-det-chart-box">
+                <h4>{{ sec.chart_titulo }}</h4>
+                <div class="an-det-chart-wrap">
+                    <canvas id="chartModDet{{ sec.codigo }}"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% empty %}
+<p class="text-muted text-center py-4">Sem faturamento por modalidade em {{ titulo_mes_ref }}.</p>
+{% endfor %}
+
+{% if secoes_modalidade %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (typeof Chart === 'undefined') return;
+  var charts = {{ charts_detalhes_json|safe }};
+  charts.forEach(function (cfg) {
+    var el = document.getElementById(cfg.canvas_id);
+    if (!el) return;
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: cfg.labels,
+        datasets: [{
+          data: cfg.data,
+          backgroundColor: cfg.cores,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return 'R$ ' + Number(ctx.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              callback: function (v) {
+                if (v >= 1000) return 'R$ ' + (v / 1000).toFixed(0) + 'k';
+                return 'R$ ' + v;
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+})();
+</script>
+{% endif %}
