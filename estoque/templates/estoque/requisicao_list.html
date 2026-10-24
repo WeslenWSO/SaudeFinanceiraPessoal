@@ -18,7 +18,10 @@
           <td>{{ r.get_status_display }}</td>
           <td>{{ r.get_setor_destino_display|default:r.get_setor_origem_display }}</td>
           <td>{{ r.criado_em|date:"d/m/Y" }} — {{ r.criado_por }}</td>
-          <td><a href="{% url 'estoque:requisicao_detail' r.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a></td>
+          <td class="text-nowrap">
+            <a href="{% url 'estoque:requisicao_detail' r.pk %}" class="btn btn-outline-primary btn-sm">Abrir</a>
+            <a href="{% url 'estoque:requisicao_imprimir' r.pk %}" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">Imprimir</a>
+          </td>
         </tr>
         {% empty %}
         <tr><td colspan="6" class="text-center text-muted py-3">Nenhuma requisição.</td></tr>

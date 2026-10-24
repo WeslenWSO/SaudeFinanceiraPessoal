@@ -324,9 +324,11 @@ def requisicao_edit(request, pk: int | None):
             item.delete()
             messages.info(request, 'Linha removida.')
         elif acao == 'concluir':
+            concluido_ok = False
             try:
                 produto_ids = list(requisicao.itens.values_list('produto_id', flat=True))
                 concluir_requisicao(requisicao, usuario=request.user)
+                concluido_ok = True
                 messages.success(request, 'Requisição concluída.')
                 abaixo = queryset_abaixo_estoque_minimo(empresa_id).filter(pk__in=produto_ids).count()
                 if abaixo:
@@ -339,6 +341,10 @@ def requisicao_edit(request, pk: int | None):
                 messages.error(request, str(exc))
             except ValueError as exc:
                 messages.error(request, f'Não foi possível concluir: {exc}')
+            if concluido_ok:
+                return redirect(
+                    reverse('estoque:requisicao_imprimir', kwargs={'pk': requisicao.pk}) + '?auto=1',
+                )
         elif acao == 'cancelar':
             requisicao.status = RequisicaoEstoque.Status.CANCELADA
             requisicao.save(update_fields=['status'])
@@ -355,6 +361,43 @@ def requisicao_edit(request, pk: int | None):
         request,
         'estoque/requisicao_edit.html',
         _contexto_requisicao_tela(request, requisicao=requisicao, form=form, empresa_id=empresa_id),
+    )
+
+
+def _setor_rotulo_requisicao(requisicao: RequisicaoEstoque) -> str:
+    if requisicao.setor_destino:
+        return requisicao.get_setor_destino_display()
+    if requisicao.tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+        return requisicao.get_setor_origem_display()
+    return ''
+
+
+@login_required
+def requisicao_imprimir(request, pk: int):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('estoque:requisicao_list')
+
+    requisicao = get_object_or_404(RequisicaoEstoque, pk=pk, empresa_id=empresa_id)
+    itens = requisicao.itens.select_related('produto').order_by('produto__descricao')
+
+    from empresa.models import Empresa
+
+    empresa = Empresa.objects.filter(pk=empresa_id).first()
+    auto_print = (request.GET.get('auto') or '').strip() in ('1', 'true', 'sim')
+
+    return render(
+        request,
+        'estoque/requisicao_imprimir.html',
+        {
+            'requisicao': requisicao,
+            'itens': itens,
+            'empresa': empresa,
+            'setor_rotulo': _setor_rotulo_requisicao(requisicao),
+            'agora': timezone.now(),
+            'auto_print': auto_print,
+        },
     )
 
 

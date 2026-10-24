@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Requisição #{{ requisicao.pk }} — impressão</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 0; padding: 12px; }
+    h1 { font-size: 16px; text-align: center; margin: 0 0 4px; text-transform: uppercase; }
+    .sub { text-align: center; font-size: 10px; color: #555; margin-bottom: 14px; }
+    .meta { margin-bottom: 12px; font-size: 10px; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #ccc; padding: 5px 6px; vertical-align: top; }
+    th { background: #f0f0f0; }
+    .text-end { text-align: right; }
+    .no-print { margin-bottom: 12px; }
+    .assinatura { margin-top: 28px; display: flex; gap: 24px; }
+    .assinatura div { flex: 1; border-top: 1px solid #333; padding-top: 4px; font-size: 10px; text-align: center; }
+    @media print { .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button type="button" onclick="window.print()">Imprimir</button>
+    <a href="{% url 'estoque:requisicao_detail' requisicao.pk %}">Voltar à requisição</a>
+    <a href="{% url 'estoque:requisicao_list' %}">Lista</a>
+  </div>
+
+  <h1>Requisição de estoque</h1>
+  <p class="sub">Nº {{ requisicao.pk }} · {{ requisicao.get_status_display }}</p>
+
+  <div class="meta">
+    {% if empresa %}
+    <div><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</div>
+    {% endif %}
+    <div><strong>Tipo:</strong> {{ requisicao.get_tipo_display }}</div>
+    {% if setor_rotulo %}
+    <div><strong>Setor:</strong> {{ setor_rotulo }}</div>
+    {% endif %}
+    {% if requisicao.observacao %}
+    <div><strong>Observação:</strong> {{ requisicao.observacao }}</div>
+    {% endif %}
+    <div><strong>Criada em:</strong> {{ requisicao.criado_em|date:"d/m/Y H:i" }}{% if requisicao.criado_por %} · {{ requisicao.criado_por.get_full_name|default:requisicao.criado_por.username }}{% endif %}</div>
+    {% if requisicao.concluida_em %}
+    <div><strong>Concluída em:</strong> {{ requisicao.concluida_em|date:"d/m/Y H:i" }}{% if requisicao.concluida_por %} · {{ requisicao.concluida_por.get_full_name|default:requisicao.concluida_por.username }}{% endif %}</div>
+    {% endif %}
+    <div><strong>Impresso em:</strong> {{ agora|date:"d/m/Y H:i" }}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Código</th>
+        <th>Produto</th>
+        <th class="text-end">Quantidade</th>
+        <th>Un.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in itens %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ i.produto.codigo_produto }}</td>
+        <td>{{ i.produto.descricao }}</td>
+        <td class="text-end">{{ i.quantidade_atendida|default:i.quantidade }}</td>
+        <td>{{ i.produto.unidade|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-center">Sem itens.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="assinatura">
+    <div>Entregue / separado (Farmácia)</div>
+    <div>Recebido (Setor)</div>
+  </div>
+
+  {% if auto_print %}
+  <script>window.addEventListener('load', function () { window.print(); });</script>
+  {% endif %}
+</body>
+</html>

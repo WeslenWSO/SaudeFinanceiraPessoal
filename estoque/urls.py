@@ -15,6 +15,7 @@ from estoque.views_operacional import (
     gerar_estoque_item_nota,
     relatorio_movimentos,
     requisicao_detail,
+    requisicao_imprimir,
     requisicao_nova,
 )
 
@@ -27,6 +28,7 @@ urlpatterns = [
     path('requisicoes/', RequisicaoListView.as_view(), name='requisicao_list'),
     path('requisicoes/nova/', requisicao_nova, name='requisicao_nova'),
     path('requisicoes/<int:pk>/', requisicao_detail, name='requisicao_detail'),
+    path('requisicoes/<int:pk>/imprimir/', requisicao_imprimir, name='requisicao_imprimir'),
     path('relatorios/movimentos/', relatorio_movimentos, name='relatorio_movimentos'),
     path('', ProdutoEstoqueListView.as_view(), name='produto_list'),
     path('importar/', produto_importar_excel, name='produto_import'),
