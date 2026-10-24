@@ -101,8 +101,6 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('apuracao_simples', 'Apuração Simples', 'fa-scale-balanced', 'fiscal', url_name='notasfiscais:apuracao_simples'),
     MenuItemDef('import_xml', 'Importar XML', 'fa-file-import', 'fiscal', url_name='notasfiscais:import'),
     MenuItemDef('import_cancelamentos', 'Importar cancelamentos (Eventos)', 'fa-ban', 'fiscal', url_name='notasfiscais:import_evento_cancelamento'),
-    MenuItemDef('portal_nacional', 'Portal Nacional (SEFIN / DPS)', 'fa-cloud-download-alt', 'fiscal', url_name='notasfiscais:portal_nacional_import'),
-    MenuItemDef('portal_extensao', 'Portal (extensão)', 'fa-puzzle-piece', 'fiscal', url_name='notasfiscais:portal_extensao_import'),
     MenuItemDef('nf_entrada', 'NF Comércio e Tomador', 'fa-file-lines', 'fiscal', url_name='notafiscalentrada:listar'),
     MenuItemDef(
         'estoque_farmacia',
