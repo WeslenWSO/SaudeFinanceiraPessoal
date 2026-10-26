@@ -1,37 +1,24 @@
 {% load menu_tags %}
 {% montar_menu_nav_tag as menu_nav %}
 <style id="smart-nav-critical">
-  /* Evita flash: no mobile o drawer começa fora da tela */
-  @media (min-width: 992px) {
-    #smart-nav .smart-nav-toggler { display: none !important; }
-    #smart-nav .smart-nav-backdrop { display: none !important; }
-    #smart-nav .smart-nav-drawer-head { display: none !important; }
-  }
   @media (max-width: 991px) {
-    #smart-nav .smart-nav-menu {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: min(86vw, 320px) !important;
-      height: 100vh !important;
-      height: 100dvh !important;
-      transform: translateX(-105%) !important;
-      z-index: 1050 !important;
-      background: #fff !important;
-      display: flex !important;
-      flex-direction: column !important;
-      margin: 0 !important;
-      overflow-y: auto !important;
+    #smart-nav .smart-nav-menu,
+    #smart-nav .smart-nav-sidebar-foot {
+      transform: translateX(-105%);
     }
-    #smart-nav.is-mobile-open .smart-nav-menu {
-      transform: translateX(0) !important;
+    #smart-nav.is-mobile-open .smart-nav-menu,
+    #smart-nav.is-mobile-open .smart-nav-sidebar-foot {
+      transform: translateX(0);
     }
   }
 </style>
-<nav id="smart-nav" class="smart-nav" role="navigation" aria-label="Menu principal">
+<nav id="smart-nav" class="smart-nav smart-nav-sidebar" role="navigation" aria-label="Menu principal">
   <div class="smart-nav-backdrop" id="smart-nav-backdrop" hidden></div>
   <div class="smart-nav-inner">
-    <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">Saúde Financeira</a>
+    <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">
+      Saúde Financeira
+      <span class="smart-nav-brand-sub">Gestão</span>
+    </a>
     <button type="button" class="smart-nav-toggler" aria-label="Abrir menu" aria-expanded="false" aria-controls="smart-nav-menu" id="smart-nav-toggler">
       <i class="fas fa-bars smart-nav-toggler-fa" aria-hidden="true"></i>
     </button>
@@ -67,30 +54,26 @@
         </ul>
       </li>
       {% endfor %}
-      <li class="smart-nav-item smart-nav-spacer"></li>
-      <li class="smart-nav-item smart-nav-has-dropdown">
-        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-empresa" id="trigger-empresa"><i class="fas fa-building smart-nav-icon"></i> {% if request.session.empresa_nome %}{{ request.session.empresa_nome|truncatechars:15 }}{% else %}Empresa{% endif %}</button>
-        <ul class="smart-nav-dropdown" id="dropdown-empresa" role="menu" aria-labelledby="trigger-empresa">
-          <li role="none"><a href="{% url 'empresa:lista' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-list smart-nav-icon"></i> Ver Empresas</a></li>
-          <li role="none"><a href="{% url 'empresa:trocar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sync-alt smart-nav-icon"></i> Trocar Empresa</a></li>
-          {% if request.session.empresa_id %}
-          <li role="none"><a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}" role="menuitem" class="smart-nav-link"><i class="fas fa-plug smart-nav-icon"></i> Configuração de integração</a></li>
-          {% endif %}
-        </ul>
-      </li>
-      <li class="smart-nav-item smart-nav-has-dropdown">
-        <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-user" id="trigger-user"><i class="fas fa-user smart-nav-icon"></i> {% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</button>
-        <ul class="smart-nav-dropdown" id="dropdown-user" role="menu" aria-labelledby="trigger-user">
-          <li role="none"><a href="{% url 'accounts:logout' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sign-out-alt smart-nav-icon"></i> Sair</a></li>
-        </ul>
-      </li>
     </ul>
+    <div class="smart-nav-sidebar-foot">
+      <ul class="smart-nav-menu" style="padding:0;overflow:visible;flex:none;">
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-empresa" id="trigger-empresa"><i class="fas fa-building smart-nav-icon"></i> {% if request.session.empresa_nome %}{{ request.session.empresa_nome|truncatechars:18 }}{% else %}Empresa{% endif %}</button>
+          <ul class="smart-nav-dropdown" id="dropdown-empresa" role="menu" aria-labelledby="trigger-empresa">
+            <li role="none"><a href="{% url 'empresa:lista' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-list smart-nav-icon"></i> Ver empresas</a></li>
+            <li role="none"><a href="{% url 'empresa:trocar' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sync-alt smart-nav-icon"></i> Trocar empresa</a></li>
+            {% if request.session.empresa_id %}
+            <li role="none"><a href="{% url 'empresa:empresa_integracao' request.session.empresa_id %}" role="menuitem" class="smart-nav-link"><i class="fas fa-plug smart-nav-icon"></i> Integração</a></li>
+            {% endif %}
+          </ul>
+        </li>
+        <li class="smart-nav-item smart-nav-has-dropdown">
+          <button type="button" class="smart-nav-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dropdown-user" id="trigger-user"><i class="fas fa-user smart-nav-icon"></i> {% if request.user.get_full_name %}{{ request.user.get_full_name|truncatechars:18 }}{% else %}{{ request.user.username }}{% endif %}</button>
+          <ul class="smart-nav-dropdown" id="dropdown-user" role="menu" aria-labelledby="trigger-user">
+            <li role="none"><a href="{% url 'accounts:logout' %}" role="menuitem" class="smart-nav-link"><i class="fas fa-sign-out-alt smart-nav-icon"></i> Sair</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
   </div>
 </nav>
-{% if estoque_alertas_abaixo_minimo and estoque_alertas_url %}
-<div class="alert alert-warning py-2 px-3 mb-0 rounded-0 border-0 border-bottom text-center small" role="alert">
-  <i class="fas fa-exclamation-triangle me-1"></i>
-  <strong>{{ estoque_alertas_abaixo_minimo }}</strong> produto(s) abaixo do estoque mínimo —
-  <a href="{{ estoque_alertas_url }}" class="alert-link fw-semibold">Ver alertas</a>
-</div>
-{% endif %}

@@ -140,7 +140,7 @@ main.container {
 /* ========== Layout principal ========== */
 #app-wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 100vh;
 }
 

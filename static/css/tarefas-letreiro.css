@@ -108,7 +108,13 @@ body.has-tarefas-letreiro .login-container {
 }
 
 body.has-tarefas-letreiro .app-content-with-nav {
-  padding-top: calc(var(--smart-nav-height) + var(--tarefas-letreiro-height));
+  padding-top: var(--tarefas-letreiro-height);
+}
+
+@media (max-width: 991px) {
+  body.has-tarefas-letreiro .app-content-with-nav {
+    padding-top: calc(var(--smart-nav-mobile-bar, 52px) + var(--tarefas-letreiro-height));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
