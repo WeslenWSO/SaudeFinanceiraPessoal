@@ -76,6 +76,11 @@ urlpatterns = [
         views.salvar_acerto_caixa_faturamento,
         name='salvar_acerto_caixa_faturamento',
     ),
+    path(
+        'acerto-caixa/salvar-pagamentos/',
+        views.salvar_pagamentos_acerto_caixa,
+        name='salvar_pagamentos_acerto_caixa',
+    ),
     path('acerto-caixa/fechar/', views.fechar_acerto_caixa, name='fechar_acerto_caixa'),
     path('acerto-caixa/reabrir/', views.reabrir_acerto_caixa, name='reabrir_acerto_caixa'),
     path('relatorio-sedacao-anestesista/', views.relatorio_sedacao_anestesista, name='relatorio_sedacao_anestesista'),

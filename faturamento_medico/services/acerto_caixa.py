@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from cobranca.models import Cobranca
 from faturamento_medico.lote_relatorio import _modalidade_item
 from faturamento_medico.log_status_conferencia import registrar_log_status_conferencia_item
 from faturamento_medico.models import (
@@ -562,10 +563,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             fat.nota_fiscal,
         )
         nota = _primeira_nota(notas)
-        forma_pgto = (
-            (nota.get('forma_pagamento_exibicao') or nota.get('forma_pagamento') or '-')
-            if nota else '-'
+        from faturamento_medico.services.pagamentos_acerto_caixa import (
+            pagamentos_efetivos_faturamento,
+            pagamentos_para_resumo,
+            pagamentos_manuais_faturamento,
+            serializar_pagamentos_json,
+            texto_forma_pgto,
         )
+
+        pagamentos_efetivos = pagamentos_efetivos_faturamento(fat, nota)
+        forma_pgto = texto_forma_pgto(pagamentos_efetivos)
         pagamentos_nf = (nota.get('pagamentos_detalhados') or []) if nota else []
         valor_nota = None
         if nota:
@@ -615,18 +622,13 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
             if not pagamento_contabilizado:
                 if not aguardando_faturamento:
-                    if len(pagamentos_nf) >= 2:
-                        for p in pagamentos_nf:
-                            rotulo = p.get('rotulo') or 'Outros'
-                            val = p.get('valor')
-                            if val is not None:
-                                val_dec = Decimal(str(val))
-                                resumo_pagamento[rotulo] += val_dec
-                                bucket['pagamento'][rotulo] += val_dec
+                    pares_resumo = pagamentos_para_resumo(pagamentos_efetivos)
+                    if pares_resumo:
+                        for chave_pag, val_dec in pares_resumo:
+                            resumo_pagamento[chave_pag] += val_dec
+                            bucket['pagamento'][chave_pag] += val_dec
                     else:
-                        chave_pag = _agrupar_forma_pagamento(
-                            nota.get('forma_pagamento') if nota else forma_pgto
-                        )
+                        chave_pag = _agrupar_forma_pagamento(forma_pgto)
                         if valor_nota is not None:
                             val_dec = Decimal(str(valor_nota))
                         else:
@@ -691,6 +693,11 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'valor_tabela': valor_tabela,
                 'nota_fiscal': numero_nf or '-',
                 'forma_pgto': forma_linha,
+                'pagamentos_acerto_json': serializar_pagamentos_json(
+                    pagamentos_manuais_faturamento(fat)
+                ),
+                'pagamentos_acerto': pagamentos_efetivos,
+                'mostrar_forma_pgto_celula': mostrar_nf,
                 'valor_nota': valor_nota_linha,
                 'valor_nota_fmt': valor_nota_fmt_linha,
                 'caixa': caixa_exib,
@@ -828,4 +835,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
         'nome_caixa_acerto': nome_caixa_acerto,
+        'formas_pagamento_acerto': list(
+            Cobranca.objects.all().order_by('descricao').values('id', 'descricao')
+        ),
     }

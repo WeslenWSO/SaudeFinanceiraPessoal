@@ -6203,6 +6203,73 @@ def salvar_acerto_caixa_faturamento(request):
 
 
 @login_required
+@require_POST
+def salvar_pagamentos_acerto_caixa(request):
+    """AJAX: rateio manual de formas de pagamento no acerto de caixa."""
+    import json
+    from decimal import Decimal
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    try:
+        faturamento_id = int(request.POST.get('faturamento_id') or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Faturamento inválido.'}, status=400)
+    if not faturamento_id:
+        return JsonResponse({'error': 'Informe o faturamento.'}, status=400)
+
+    from faturamento_medico.models import FaturamentoMedico
+    from faturamento_medico.services.acerto_caixa import faturamento_caixa_bloqueado
+    from faturamento_medico.services.pagamentos_acerto_caixa import (
+        pagamentos_manuais_faturamento,
+        serializar_pagamentos_json,
+        texto_forma_pgto,
+        validar_e_normalizar_pagamentos,
+    )
+    from faturamento_medico.services.vincular_nota_solicitante import (
+        buscar_nota_manual_salva,
+        serializar_nota_linha,
+    )
+
+    faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
+    if faturamento_caixa_bloqueado(faturamento):
+        return JsonResponse(
+            {'error': 'Caixa fechado neste período. Reabra o caixa para alterar.'},
+            status=403,
+        )
+    try:
+        linhas = json.loads(request.POST.get('pagamentos') or '[]')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON de pagamentos inválido.'}, status=400)
+
+    valor_esperado = None
+    nota = buscar_nota_manual_salva(empresa_id, faturamento.nota_fiscal)
+    if nota:
+        valor_esperado = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    if valor_esperado is None:
+        valor_esperado = faturamento.total or Decimal('0')
+
+    normalizado, erro = validar_e_normalizar_pagamentos(linhas, valor_esperado=valor_esperado)
+    if erro:
+        return JsonResponse({'error': erro}, status=400)
+    assert normalizado is not None
+
+    faturamento.pagamentos_acerto_json = [
+        {'cobranca_id': row['cobranca_id'], 'valor': str(row['valor'])}
+        for row in normalizado
+    ]
+    faturamento.save(update_fields=['pagamentos_acerto_json'])
+    pagamentos = pagamentos_manuais_faturamento(faturamento)
+    forma_texto = texto_forma_pgto(pagamentos)
+    return JsonResponse({
+        'ok': True,
+        'forma_pgto': forma_texto,
+        'pagamentos_acerto_json': serializar_pagamentos_json(pagamentos),
+    })
+
+
+@login_required
 def imprimir_acerto_caixa(request):
     """Versão para impressão do Acerto de Caixa (mesmos filtros da tela)."""
     empresa_id = request.session.get('empresa_id')

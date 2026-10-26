@@ -135,6 +135,12 @@ class FaturamentoMedico(models.Model):
         default='',
         help_text='ID da conta bancária tipo Caixa (cadastro em Contas Bancárias).',
     )
+    pagamentos_acerto_json = models.JSONField(
+        verbose_name='Pagamentos (acerto de caixa)',
+        default=list,
+        blank=True,
+        help_text='Rateio manual: lista {cobranca_id, valor}.',
+    )
     agendado_por = models.CharField(verbose_name='Agendado Por', max_length=200, blank=True, null=True)
     tag = models.CharField(verbose_name='Tag', max_length=100, blank=True, null=True)
     indicacao_clinica = models.TextField(verbose_name='Indicação Clínica', blank=True, null=True)

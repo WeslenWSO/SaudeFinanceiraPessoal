@@ -91,6 +91,7 @@ def clonar_faturamento(
         data_fechamento=None,
         marcado_acerto_caixa=False,
         caixa_acerto='',
+        pagamentos_acerto_json=[],
         valor_imposto=0,
         valor_comissao=0,
         **dados,

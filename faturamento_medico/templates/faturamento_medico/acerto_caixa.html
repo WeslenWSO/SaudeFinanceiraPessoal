@@ -393,7 +393,28 @@
                                 {% endif %}
                             </td>
                             <td class="fm-celula-forma-pgto"
-                                {% if linha.forma_pgto and linha.forma_pgto != '-' %}title="{{ linha.forma_pgto }}"{% endif %}>{{ linha.forma_pgto|truncatechars:28 }}</td>
+                                data-faturamento-id="{{ linha.faturamento_id }}"
+                                data-valor-nf="{{ linha.valor_nota|default:'' }}"
+                                data-pagamentos="{{ linha.pagamentos_acerto_json|escape }}">
+                                {% if linha.mostrar_forma_pgto_celula and not linha.aguardando_faturamento %}
+                                <div class="d-flex flex-column gap-1">
+                                    <span class="fm-forma-pgto-text small"
+                                          {% if linha.forma_pgto and linha.forma_pgto != '-' %}title="{{ linha.forma_pgto }}"{% endif %}>
+                                        {{ linha.forma_pgto|truncatechars:32 }}
+                                    </span>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm py-0 px-1 js-editar-pagamento-acerto"
+                                            data-faturamento-id="{{ linha.faturamento_id }}"
+                                            {% if linha.caixa_bloqueado %}disabled title="Caixa fechado"{% endif %}>
+                                        Pagamento
+                                    </button>
+                                </div>
+                                {% elif linha.aguardando_faturamento %}
+                                A FATURAR
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
                             <td class="fm-celula-checkin">{{ linha.checkin_por|truncatechars:20 }}</td>
                             <td class="fm-celula-discriminacao"
@@ -418,6 +439,31 @@
     </div>
 </div>
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
+
+{{ formas_pagamento_acerto|json_script:"formas-pagamento-acerto-data" }}
+<div class="modal fade" id="modalPagamentoAcerto" tabindex="-1" aria-labelledby="modalPagamentoAcertoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPagamentoAcertoTitulo">Formas de pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">
+                    Valor da NF: <strong id="pagamentoAcertoValorNf">—</strong>.
+                    Some os valores das formas (ex.: Dinheiro R$ 500 + Cartão R$ 1.000).
+                </p>
+                <div id="pagamentoAcertoLinhas"></div>
+                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="btnPagamentoAcertoAddLinha">+ Forma</button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnPagamentoAcertoSalvar">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function initFecharAcertoCaixa() {
     var chk = document.getElementById('chkValoresConferidos');
@@ -549,6 +595,139 @@
             alert('Erro ao salvar caixa.');
         });
     });
+})();
+
+(function initPagamentoAcertoCaixa() {
+    var formasEl = document.getElementById('formas-pagamento-acerto-data');
+    var formas = formasEl ? JSON.parse(formasEl.textContent) : [];
+    var salvarPagUrl = "{% url 'faturamento_medico:salvar_pagamentos_acerto_caixa' %}";
+    var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    var csrfToken = csrfEl ? csrfEl.value : '';
+    var modalEl = document.getElementById('modalPagamentoAcerto');
+    var linhasEl = document.getElementById('pagamentoAcertoLinhas');
+    var valorNfEl = document.getElementById('pagamentoAcertoValorNf');
+    var ctx = { faturamentoId: null, valorNf: null };
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function optionsFormas(selectedId) {
+        var html = '<option value="">—</option>';
+        formas.forEach(function(f) {
+            var sel = String(f.id) === String(selectedId) ? ' selected' : '';
+            html += '<option value="' + escapeHtml(f.id) + '"' + sel + '>' + escapeHtml(f.descricao) + '</option>';
+        });
+        return html;
+    }
+
+    function addLinha(cobrancaId, valor) {
+        var row = document.createElement('div');
+        row.className = 'row g-2 align-items-center mb-2 pagamento-acerto-linha';
+        row.innerHTML =
+            '<div class="col-7"><select class="form-select form-select-sm js-pag-cobranca">' +
+            optionsFormas(cobrancaId) + '</select></div>' +
+            '<div class="col-4"><input type="text" class="form-control form-control-sm js-pag-valor" ' +
+            'inputmode="decimal" placeholder="0,00" value="' + escapeHtml(valor || '') + '"></div>' +
+            '<div class="col-1"><button type="button" class="btn btn-outline-danger btn-sm py-0 js-pag-remover" title="Remover">×</button></div>';
+        linhasEl.appendChild(row);
+    }
+
+    function abrirModal(btn) {
+        ctx.faturamentoId = btn.getAttribute('data-faturamento-id');
+        var cel = document.querySelector('.fm-celula-forma-pgto[data-faturamento-id="' + ctx.faturamentoId + '"]');
+        ctx.valorNf = cel ? cel.getAttribute('data-valor-nf') : '';
+        var raw = cel ? cel.getAttribute('data-pagamentos') : '[]';
+        var pag = [];
+        try { pag = JSON.parse(raw || '[]'); } catch (e) { pag = []; }
+        linhasEl.innerHTML = '';
+        if (pag.length) {
+            pag.forEach(function(p) {
+                var v = p.valor != null ? String(p.valor).replace('.', ',') : '';
+                addLinha(p.cobranca_id, v);
+            });
+        } else {
+            addLinha('', '');
+        }
+        if (valorNfEl) {
+            var vn = parseFloat(ctx.valorNf);
+            valorNfEl.textContent = isNaN(vn) ? '—' : ('R$ ' + vn.toFixed(2).replace('.', ','));
+        }
+        if (modalEl && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    }
+
+    function coletarPagamentos() {
+        var out = [];
+        linhasEl.querySelectorAll('.pagamento-acerto-linha').forEach(function(row) {
+            var cob = row.querySelector('.js-pag-cobranca');
+            var val = row.querySelector('.js-pag-valor');
+            if (!cob || !val || !cob.value) return;
+            out.push({ cobranca_id: parseInt(cob.value, 10), valor: val.value.trim() });
+        });
+        return out;
+    }
+
+    function atualizarTextoForma(faturamentoId, texto) {
+        document.querySelectorAll('.fm-celula-forma-pgto[data-faturamento-id="' + faturamentoId + '"]').forEach(function(td) {
+            var span = td.querySelector('.fm-forma-pgto-text');
+            if (span) {
+                span.textContent = texto || '—';
+                span.title = texto || '';
+            }
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.js-editar-pagamento-acerto');
+        if (btn) {
+            abrirModal(btn);
+            return;
+        }
+        if (e.target.closest('.js-pag-remover')) {
+            var linha = e.target.closest('.pagamento-acerto-linha');
+            if (linha) linha.remove();
+        }
+    });
+
+    var btnAdd = document.getElementById('btnPagamentoAcertoAddLinha');
+    if (btnAdd) btnAdd.addEventListener('click', function() { addLinha('', ''); });
+
+    var btnSalvar = document.getElementById('btnPagamentoAcertoSalvar');
+    if (btnSalvar) {
+        btnSalvar.addEventListener('click', function() {
+            if (!ctx.faturamentoId) return;
+            var pagamentos = coletarPagamentos();
+            var body = new URLSearchParams({
+                faturamento_id: String(ctx.faturamentoId),
+                pagamentos: JSON.stringify(pagamentos)
+            });
+            fetch(salvarPagUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: body.toString()
+            }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+              .then(function(res) {
+                  if (!res.data.ok) {
+                      alert(res.data.error || 'Não foi possível salvar.');
+                      return;
+                  }
+                  var cel = document.querySelector('.fm-celula-forma-pgto[data-faturamento-id="' + ctx.faturamentoId + '"]');
+                  if (cel) cel.setAttribute('data-pagamentos', res.data.pagamentos_acerto_json || '[]');
+                  atualizarTextoForma(ctx.faturamentoId, res.data.forma_pgto);
+                  if (modalEl && window.bootstrap) {
+                      bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                  }
+              }).catch(function() { alert('Erro ao salvar pagamentos.'); });
+        });
+    }
 })();
 </script>
 {% endblock %}
