@@ -59,6 +59,7 @@ _CAMPOS_ITEM = (
     'qt',
     'valor',
     'valor_desconto',
+    'valor_acrescimo',
     'valor_pago',
     'percentual',
     'modalidade',

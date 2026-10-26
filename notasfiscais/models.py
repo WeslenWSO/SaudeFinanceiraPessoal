@@ -444,7 +444,12 @@ class NotaFiscalServico(models.Model):
         if not self.base_servico or self.base_servico == 'NORMAL':
             self.base_servico = self.determinar_base_servico()
         if not self.forma_pagamento and self.discriminacao:
-            payment_method = self.extract_payment_method_from_description()
+            from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+            valor_ref = self.valor_liquido if self.valor_liquido is not None else self.valor_bruto
+            payment_method = None
+            if discriminacao_valor_coerente(self.discriminacao, valor_ref):
+                payment_method = self.extract_payment_method_from_description()
             if payment_method:
                 try:
                     from cobranca.models import Cobranca

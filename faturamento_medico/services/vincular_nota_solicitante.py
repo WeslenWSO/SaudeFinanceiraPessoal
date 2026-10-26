@@ -102,7 +102,40 @@ def _nota_coincide_paciente(nota: NotaFiscalServico, nome_paciente: str) -> bool
     return _similaridade(nome_paciente, paciente_nota) >= SIMILARIDADE_MIN_PACIENTE
 
 
+def _forma_pagamento_car_nota(nota: NotaFiscalServico) -> str:
+    """Forma de pagamento do título (ex.: baixa Conta Azul / caixa), quando a NF está inconsistente."""
+    from contasareceber.models import ContaAReceber
+
+    valor = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    if valor is None or not nota.data_emissao or not nota.empresa_id:
+        return ''
+    cliente_nf = (nota.cliente or '').strip()
+    qs = (
+        ContaAReceber.objects.filter(
+            empresa_id=nota.empresa_id,
+            valor_a_receber=valor,
+            data_emissao=nota.data_emissao,
+        )
+        .select_related('forma_pagamento', 'conta_banco')
+        .order_by('-pk')
+    )
+    for car in qs:
+        if cliente_nf and _similaridade(car.cliente or '', cliente_nf) < SIMILARIDADE_MIN_PACIENTE:
+            continue
+        if car.forma_pagamento_id and car.forma_pagamento:
+            return (car.forma_pagamento.descricao or '').strip()
+    return ''
+
+
 def _forma_pagamento_nota(nota: NotaFiscalServico) -> str:
+    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+    valor_ref = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    if not discriminacao_valor_coerente(nota.discriminacao, valor_ref):
+        forma_car = _forma_pagamento_car_nota(nota)
+        if forma_car:
+            return forma_car
+        return '-'
     if nota.forma_pagamento_id and nota.forma_pagamento:
         return (nota.forma_pagamento.descricao or '').strip()
     return (nota.extract_payment_method_from_description() or '').strip()

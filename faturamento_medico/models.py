@@ -374,6 +374,13 @@ class ItemServico(models.Model):
         decimal_places=2,
         default=0,
     )
+    valor_acrescimo = models.DecimalField(
+        verbose_name='Acréscimo',
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text='Acréscimo informado no RIS (coluna Acréscimo/Desconto quando positivo).',
+    )
     valor_pago = models.DecimalField(
         verbose_name='Valor pago',
         max_digits=10,

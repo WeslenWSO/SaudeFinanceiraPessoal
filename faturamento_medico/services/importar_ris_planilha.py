@@ -101,6 +101,7 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
         valor_pago = _parse_valor_ris(valor_pago_raw) if valor_pago_raw not in (None, '') else None
         acrescimo = _parse_valor_ris(get(row, 'acrescimo_desconto'))
         valor_desconto = abs(acrescimo) if acrescimo < 0 else Decimal('0')
+        valor_acrescimo = acrescimo if acrescimo > 0 else Decimal('0')
         if _eh_status_agendamento_cancelado(status_raw):
             linhas_canceladas += 1
 
@@ -161,6 +162,7 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
             'valor': valor,
             'total': valor,
             'valor_desconto': valor_desconto,
+            'valor_acrescimo': valor_acrescimo,
             'valor_pago': valor_pago,
         })
 
@@ -274,6 +276,7 @@ def importar_ris_planilha(
                         valor=servico['valor'],
                         total=servico['total'],
                         valor_desconto=servico.get('valor_desconto') or Decimal('0'),
+                        valor_acrescimo=servico.get('valor_acrescimo') or Decimal('0'),
                         valor_pago=servico.get('valor_pago'),
                     ))
 

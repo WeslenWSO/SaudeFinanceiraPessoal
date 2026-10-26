@@ -73,24 +73,36 @@ def _decimal_valor(raw: Any) -> Decimal:
         return Decimal('0')
 
 
+def _ca_id_em_observacoes(observacoes: str | None) -> str:
+    if not observacoes:
+        return ''
+    m = re.search(rf'{re.escape(CA_NFSE_ID_PREFIX)}\s*(\S+)', observacoes)
+    return (m.group(1).strip() if m else '')
+
+
 def _localizar_nfse(empresa, ca_id: str, numero_nota: str, serie: str) -> NotaFiscalServico | None:
-    marcador = _marcador_ca_id(ca_id)
-    obj = (
-        NotaFiscalServico.objects.filter(empresa=empresa, observacoes__contains=marcador)
-        .order_by('-pk')
-        .first()
-    )
-    if obj:
-        return obj
-    return (
+    if ca_id:
+        marcador = _marcador_ca_id(ca_id)
+        obj = (
+            NotaFiscalServico.objects.filter(empresa=empresa, observacoes__contains=marcador)
+            .order_by('-pk')
+            .first()
+        )
+        if obj:
+            return obj
+    for obj in (
         NotaFiscalServico.objects.filter(
             empresa=empresa,
             numero_nota=numero_nota,
             serie=serie,
         )
         .order_by('-pk')
-        .first()
-    )
+    ):
+        ca_existente = _ca_id_em_observacoes(obj.observacoes)
+        if ca_existente and ca_id and ca_existente != ca_id:
+            continue
+        return obj
+    return None
 
 
 def _campos_de_item_ca(item: dict, *, empresa) -> dict[str, Any] | None:
@@ -221,8 +233,23 @@ def importar_nfse_prestador_conta_azul(
             )
             try:
                 if existente:
+                    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+                    valor_ca = campos.get('valor_liquido') or campos.get('valor_bruto')
+                    disc_incoerente = not discriminacao_valor_coerente(
+                        existente.discriminacao,
+                        valor_ca,
+                    )
                     for k, v in campos.items():
-                        if k == 'discriminacao' and (existente.discriminacao or '').strip():
+                        if k == 'discriminacao':
+                            if disc_incoerente and (v or '').strip():
+                                setattr(existente, k, v)
+                                existente.forma_pagamento = None
+                                existente.nsu = ''
+                            elif (existente.discriminacao or '').strip():
+                                continue
+                            else:
+                                setattr(existente, k, v)
                             continue
                         setattr(existente, k, v)
                     existente.save()
