@@ -71,31 +71,54 @@ def _discriminacao_texto(valor) -> str:
 
 
 @lru_cache(maxsize=8192)
-def _nome_paciente_nota_cached(nota_pk: int, discriminacao: str, cliente: str) -> str:
+def _nome_paciente_nota_cached(
+    nota_pk: int,
+    discriminacao: str,
+    cliente: str,
+    valor_liquido: str,
+) -> str:
     """Cache por NFSe — evita reparse da discriminação na grade de faturamento."""
+    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+    cliente = (cliente or '').strip()
+    valor_ref = None
+    if valor_liquido:
+        try:
+            valor_ref = Decimal(valor_liquido)
+        except Exception:
+            valor_ref = None
+    if not discriminacao_valor_coerente(discriminacao, valor_ref):
+        return cliente
     paciente = _extrair_paciente_discriminacao(discriminacao)
     if paciente:
         return paciente
-    return (cliente or '').strip()
+    return cliente
 
 
 def _nome_paciente_nota(nota: NotaFiscalServico) -> str:
-    """Nome do paciente na NF: prioriza discriminação (PACIENTE…PARCERIA), senão cliente."""
+    """Nome do paciente na NF: discriminação coerente; senão tomador (cliente)."""
+    cliente = (nota.cliente or '').strip()
+    disc = _discriminacao_texto(nota.discriminacao)
+    valor = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    valor_str = str(valor) if valor is not None else ''
     if nota.pk:
-        return _nome_paciente_nota_cached(
-            nota.pk,
-            _discriminacao_texto(nota.discriminacao),
-            (nota.cliente or '').strip(),
-        )
-    paciente = _extrair_paciente_discriminacao(nota.discriminacao)
+        return _nome_paciente_nota_cached(nota.pk, disc, cliente, valor_str)
+    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+    if not discriminacao_valor_coerente(disc, valor):
+        return cliente
+    paciente = _extrair_paciente_discriminacao(disc)
     if paciente:
         return paciente
-    return (nota.cliente or '').strip()
+    return cliente
 
 
 def _nota_coincide_paciente(nota: NotaFiscalServico, nome_paciente: str) -> bool:
     if not (nome_paciente or '').strip() or nome_paciente == '-':
         return False
+    cliente = (nota.cliente or '').strip()
+    if cliente and _similaridade(nome_paciente, cliente) >= SIMILARIDADE_MIN_PACIENTE:
+        return True
     paciente_nota = _nome_paciente_nota(nota)
     if not paciente_nota:
         return False
@@ -267,6 +290,21 @@ def _decimal_para_json(valor):
     return valor
 
 
+def _rotulo_tomador_paciente_nota(nota: NotaFiscalServico) -> str:
+    """Texto na busca de vínculo: tomador (cliente) e paciente da discriminação quando confiável."""
+    cliente = (nota.cliente or '').strip() or '-'
+    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+
+    valor = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    disc = _discriminacao_texto(nota.discriminacao)
+    paciente_disc = ''
+    if discriminacao_valor_coerente(disc, valor):
+        paciente_disc = _extrair_paciente_discriminacao(disc)
+    if paciente_disc and paciente_disc.upper() != cliente.upper():
+        return f'{cliente} · Pac. {paciente_disc}'
+    return cliente
+
+
 def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict:
     forma = _forma_pagamento_nota(nota)
     pagamentos = pagamentos_detalhados_nota(nota)
@@ -291,6 +329,7 @@ def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict
         ],
         'cliente': (nota.cliente or '').strip() or '-',
         'paciente_nota': paciente_nota or (nota.cliente or '').strip() or '-',
+        'nome_exibicao_vinculo': _rotulo_tomador_paciente_nota(nota),
         'valor_fmt': _valor_fmt_nota(nota),
         'valor_bruto': valor_bruto,
         'valor_liquido': valor_liquido,
