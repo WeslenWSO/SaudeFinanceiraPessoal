@@ -89,6 +89,80 @@ def pagamentos_da_nota(nota: dict | None, valor_ref: Decimal | None) -> list[dic
     }]
 
 
+def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[str, Any]]:
+    """
+    Preenche pagamentos_acerto_json a partir da discriminação da NF (regra de forma de pagamento).
+    Se a discriminação estiver incoerente com o valor, usa só forma já cadastrada na nota.
+    """
+    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+    from notasfiscais.utils import (
+        _encontra_cobranca_flexivel,
+        detectar_forma_pagamento_e_vincular,
+        extrair_forma_pagamento,
+    )
+
+    valor_ref = _dec(nota.valor_liquido) or _dec(nota.valor_bruto)
+    if valor_ref is None or valor_ref <= 0:
+        faturamento.pagamentos_acerto_json = []
+        faturamento.save(update_fields=['pagamentos_acerto_json'])
+        return []
+
+    cobrancas = list(Cobranca.objects.all())
+    pagamentos_json: list[dict] = []
+    disc = (nota.discriminacao or '').strip()
+    atualizar_nota = False
+    update_nf_fields: list[str] = []
+
+    if disc and discriminacao_valor_coerente(disc, valor_ref):
+        cob, motivo, segmentos = detectar_forma_pagamento_e_vincular(
+            disc,
+            cobrancas,
+            valor_total_nfse=_dec(nota.valor_bruto),
+            valor_liquido_nfse=_dec(nota.valor_liquido),
+        )
+        if motivo == 'multi_segmentar' and segmentos:
+            for seg in segmentos:
+                val = seg[0]
+                cob_seg = seg[1]
+                pagamentos_json.append({'cobranca_id': cob_seg.pk, 'valor': str(val)})
+        elif cob is not None and motivo == 'vinculado':
+            pagamentos_json.append({'cobranca_id': cob.pk, 'valor': str(valor_ref)})
+            if not nota.forma_pagamento_id:
+                nota.forma_pagamento = cob
+                atualizar_nota = True
+                update_nf_fields.append('forma_pagamento')
+        else:
+            from faturamento_medico.services.vincular_nota_solicitante import pagamentos_detalhados_nota
+
+            for rotulo, val in pagamentos_detalhados_nota(nota):
+                forma_txt = extrair_forma_pagamento(disc) or rotulo
+                cob_match = _encontra_cobranca_flexivel(forma_txt, cobrancas)
+                if not cob_match:
+                    cob_match = _encontra_cobranca_flexivel((rotulo or '').upper(), cobrancas)
+                if cob_match:
+                    pagamentos_json.append({'cobranca_id': cob_match.pk, 'valor': str(val)})
+            if not pagamentos_json:
+                forma_txt = extrair_forma_pagamento(disc)
+                if forma_txt:
+                    cob_match = _encontra_cobranca_flexivel(forma_txt, cobrancas)
+                    if cob_match:
+                        pagamentos_json.append({'cobranca_id': cob_match.pk, 'valor': str(valor_ref)})
+                        if not nota.forma_pagamento_id:
+                            nota.forma_pagamento = cob_match
+                            atualizar_nota = True
+                            update_nf_fields.append('forma_pagamento')
+
+    if not pagamentos_json and nota.forma_pagamento_id:
+        pagamentos_json.append({'cobranca_id': nota.forma_pagamento_id, 'valor': str(valor_ref)})
+
+    faturamento.pagamentos_acerto_json = pagamentos_json
+    faturamento.save(update_fields=['pagamentos_acerto_json'])
+    if atualizar_nota and update_nf_fields:
+        nota.save(update_fields=update_nf_fields)
+
+    return pagamentos_manuais_faturamento(faturamento)
+
+
 def pagamentos_efetivos_faturamento(faturamento, nota: dict | None) -> list[dict[str, Any]]:
     manual = pagamentos_manuais_faturamento(faturamento)
     if manual:

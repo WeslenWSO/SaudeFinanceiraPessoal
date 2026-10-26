@@ -156,27 +156,43 @@
         diffCell.textContent = formatMoedaBR(base - tabela);
     }
 
-    function atualizarColunasPagamentoNota(faturamentoId, nota) {
+    function atualizarColunasPagamentoNota(faturamentoId, nota, extras) {
         if (!faturamentoId) return;
+        extras = extras || {};
         var formaText = '-';
         var valorText = '-';
         var discText = '-';
         var valorNfNum = null;
-        if (nota) {
+        if (extras.forma_pgto_acerto && extras.forma_pgto_acerto !== '-') {
+            formaText = extras.forma_pgto_acerto;
+        } else if (nota) {
             formaText = nota.forma_pagamento_exibicao && nota.forma_pagamento_exibicao !== '-'
                 ? nota.forma_pagamento_exibicao
                 : (nota.forma_pagamento && nota.forma_pagamento !== '-'
                     ? nota.forma_pagamento
                     : '-');
+        }
+        if (nota) {
             valorText = formatValorNotaCelula(nota);
             discText = truncarTexto(nota.discriminacao, 120);
             valorNfNum = valorNumericoNota(nota);
         }
         document.querySelectorAll('tr[data-faturamento-id="' + faturamentoId + '"]').forEach(function(tr) {
-            var forma = tr.querySelector('.fm-celula-forma-pgto');
+            var formaTd = tr.querySelector('.fm-celula-forma-pgto');
             var valor = tr.querySelector('.fm-celula-valor-nf');
             var disc = tr.querySelector('.fm-celula-discriminacao');
-            if (forma) forma.textContent = truncarTexto(formaText, 28);
+            if (formaTd) {
+                var spanPg = formaTd.querySelector('.fm-forma-pgto-text');
+                if (spanPg) {
+                    spanPg.textContent = truncarTexto(formaText, 32);
+                    if (formaText && formaText !== '-') spanPg.setAttribute('title', formaText);
+                } else if (!formaTd.querySelector('.js-editar-pagamento-acerto')) {
+                    formaTd.textContent = truncarTexto(formaText, 28);
+                }
+                if (extras.pagamentos_acerto_json) {
+                    formaTd.setAttribute('data-pagamentos', extras.pagamentos_acerto_json);
+                }
+            }
             if (valor) valor.textContent = valorText;
             if (disc) {
                 disc.textContent = truncarTexto(discText, 40);
@@ -214,13 +230,13 @@
             '</div>';
     }
 
-    function atualizarLinhasMesmoFaturamento(faturamentoId, nota) {
+    function atualizarLinhasMesmoFaturamento(faturamentoId, nota, extras) {
         document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + faturamentoId + '"]').forEach(function(celula) {
             if (celula.querySelector('.js-vincular-nf') || celula.querySelector('.js-desvincular-nf') || celula.querySelector('.js-ver-notas-multi') || celula.querySelector('a[href]')) {
                 renderCelulaNF(celula, nota);
             }
         });
-        atualizarColunasPagamentoNota(faturamentoId, nota);
+        atualizarColunasPagamentoNota(faturamentoId, nota, extras);
     }
 
     function abrirModalMultiplas(notas) {
@@ -305,7 +321,7 @@
                                 if (vinculoAtual.celula) {
                                     renderCelulaNF(vinculoAtual.celula, res.nota);
                                 }
-                                atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, res.nota);
+                                atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, res.nota, res);
                                 if (modalVincular && window.bootstrap) {
                                     bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
                                 }

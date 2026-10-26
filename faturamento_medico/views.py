@@ -4756,11 +4756,21 @@ def vincular_nota_solicitante_faturamento(request):
         empresa_id=empresa_id,
         data_cancelamento__isnull=True,
     )
+    from faturamento_medico.services.pagamentos_acerto_caixa import (
+        aplicar_pagamentos_acerto_ao_vincular_nota,
+        serializar_pagamentos_json,
+        texto_forma_pgto,
+    )
+
     faturamento.nota_fiscal = nota.numero_nota
     faturamento.save(update_fields=['nota_fiscal'])
+    pagamentos = aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota)
+    forma_pgto = texto_forma_pgto(pagamentos)
     return JsonResponse({
         'ok': True,
         'nota': serializar_nota_linha(nota, manual=True),
+        'forma_pgto_acerto': forma_pgto,
+        'pagamentos_acerto_json': serializar_pagamentos_json(pagamentos),
     })
 
 
@@ -4779,7 +4789,8 @@ def desvincular_nota_solicitante_faturamento(request):
 
     faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
     faturamento.nota_fiscal = ''
-    faturamento.save(update_fields=['nota_fiscal'])
+    faturamento.pagamentos_acerto_json = []
+    faturamento.save(update_fields=['nota_fiscal', 'pagamentos_acerto_json'])
     return JsonResponse({'ok': True})
 
 
