@@ -151,7 +151,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  Movimentos: {stats["movimentos"]}')
         self.stdout.write(f'  Entradas NF (estoque): {stats["entradas_nf"]}')
         self.stdout.write(f'  Requisições (sem imobilizado): {stats["requisicoes"]}')
-        self.stdout.write(f'  Saldos em setor ≠ 0: {stats["saldos_setor"]}')
+        self.stdout.write(f'  Saldos em setor != 0: {stats["saldos_setor"]}')
         if options['limpar_inventarios']:
             from inventario.models import Inventario
 
