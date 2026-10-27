@@ -489,3 +489,41 @@ def inventario_fechar(request, pk):
     inventario.save(update_fields=['aberto'])
     messages.success(request, 'Inventário fechado.')
     return redirect('inventario:inventario_detail', pk=pk)
+
+
+@admin_inventario_required
+def inventario_buscar_produtos(request):
+    """AJAX: busca consumíveis por código/descrição para montar a grade do novo inventário."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'ok': False, 'error': 'Empresa não selecionada.'}, status=400)
+
+    setor = (request.GET.get('setor') or SetorEstoque.FARMACIA).strip()
+    todos = (request.GET.get('todos') or '').strip().lower() in ('1', 'true', 'sim')
+    qs = ProdutoEstoque.objects.filter(
+        empresa_id=empresa_id,
+        natureza=NaturezaEstoque.CONSUMIVEL,
+    ).order_by('codigo_produto', 'descricao')
+
+    if todos:
+        produtos = list(qs[:800])
+    else:
+        termo = (request.GET.get('q') or '').strip()
+        if len(termo) < 1:
+            return JsonResponse({'ok': True, 'produtos': []})
+        produtos = list(
+            qs.filter(
+                Q(codigo_produto__icontains=termo)
+                | Q(descricao__icontains=termo)
+                | Q(marca__icontains=termo),
+            )[:30],
+        )
+
+    excluir_raw = (request.GET.get('excluir') or '').strip()
+    excluir_ids = {int(x) for x in excluir_raw.split(',') if x.strip().isdigit()}
+    payload = [
+        _serializar_produto_inventario_grid(p, setor)
+        for p in produtos
+        if p.pk not in excluir_ids
+    ]
+    return JsonResponse({'ok': True, 'produtos': payload})

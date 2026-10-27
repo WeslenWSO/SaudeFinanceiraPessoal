@@ -6,6 +6,7 @@ from inventario.views import (
     InventarioListView,
     InventarioUpdateView,
     inventario_aplicar_estoque,
+    inventario_buscar_produtos,
     inventario_backup_estoque,
     inventario_backup_excel,
     inventario_contagem,
@@ -21,6 +22,7 @@ app_name = 'inventario'
 urlpatterns = [
     path('', InventarioListView.as_view(), name='inventario_list'),
     path('novo/', InventarioCreateView.as_view(), name='inventario_create'),
+    path('buscar-produtos/', inventario_buscar_produtos, name='buscar_produtos'),
     path('<int:pk>/', InventarioDetailView.as_view(), name='inventario_detail'),
     path('<int:pk>/config/', InventarioUpdateView.as_view(), name='inventario_config'),
     path('<int:pk>/contagem/<int:rodada>/', inventario_contagem, name='inventario_contagem'),
