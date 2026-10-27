@@ -6,6 +6,8 @@ import json
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.db.utils import OperationalError, ProgrammingError
+
 from cobranca.models import Cobranca
 
 _EPS = Decimal('0.05')
@@ -25,7 +27,12 @@ def _rotulo_cobranca(cob: Cobranca) -> str:
 
 
 def pagamentos_manuais_faturamento(faturamento) -> list[dict[str, Any]]:
-    raw = getattr(faturamento, 'pagamentos_acerto_json', None)
+    try:
+        raw = faturamento.pagamentos_acerto_json
+    except (ProgrammingError, OperationalError, AttributeError):
+        return []
+    if raw is None:
+        raw = getattr(faturamento, 'pagamentos_acerto_json', None)
     if not raw:
         return []
     if isinstance(raw, str):

@@ -32,6 +32,6 @@ def mensagem_schema_desatualizado(contexto: str = '') -> str:
 
 
 def capturar_erro_schema(exc: BaseException, *, contexto: str = '') -> str | None:
-    if isinstance(exc, (ProgrammingError, OperationalError)) and erro_parece_schema_desatualizado(exc):
+    if isinstance(exc, (ProgrammingError, OperationalError)):
         return mensagem_schema_desatualizado(contexto)
     return None

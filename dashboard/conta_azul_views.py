@@ -704,17 +704,18 @@ def conta_azul_dashboard(request):
             from SaudeFinanceira.db_schema import capturar_erro_schema
 
             msg_schema = capturar_erro_schema(exc, contexto='aba Análises')
-            if msg_schema:
-                logger.exception('Dashboard análises — schema desatualizado empresa=%s', empresa.pk)
-                messages.error(request, msg_schema)
-                analises_ctx = {
-                    'modelos_analise': (),
-                    'modelo_analise': '',
-                    'modelo_analise_partial': '',
-                    'url_analise_modelo_base': '?aba=analises&mes=' + ctx['mes_filtro'] + '&modelo=',
-                }
-            else:
-                raise
+            logger.exception('Dashboard análises — erro de banco empresa=%s', empresa.pk)
+            messages.error(
+                request,
+                msg_schema
+                or 'Erro ao carregar análises. Execute python manage.py migrate no Render.',
+            )
+            analises_ctx = {
+                'modelos_analise': (),
+                'modelo_analise': '',
+                'modelo_analise_partial': '',
+                'url_analise_modelo_base': '?aba=analises&mes=' + ctx['mes_filtro'] + '&modelo=',
+            }
 
     return render(
         request,

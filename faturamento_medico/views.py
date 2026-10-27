@@ -6153,50 +6153,62 @@ def conferencia_faturamento(request):
     return render(request, 'faturamento_medico/conferencia.html', ctx)
 
 
+def _tratar_falha_acerto_caixa(request, exc, *, empresa_id, logger):
+    from django.db.utils import OperationalError, ProgrammingError
+
+    try:
+        from SaudeFinanceira.db_schema import capturar_erro_schema, mensagem_schema_desatualizado
+    except ImportError:
+        capturar_erro_schema = None
+        mensagem_schema_desatualizado = None
+
+    logger.exception('acerto_caixa empresa=%s', empresa_id)
+    msg = None
+    if capturar_erro_schema:
+        msg = capturar_erro_schema(exc, contexto='acerto de caixa')
+    if not msg and isinstance(exc, (ProgrammingError, OperationalError)):
+        if mensagem_schema_desatualizado:
+            msg = mensagem_schema_desatualizado('acerto de caixa')
+        else:
+            msg = (
+                'O banco no servidor está desatualizado. '
+                'Execute python manage.py migrate --noinput no Shell do Render.'
+            )
+    if not msg:
+        msg = (
+            'Não foi possível abrir o acerto de caixa. '
+            'Confira os logs do servidor ou execute python manage.py migrate no Render.'
+        )
+    messages.error(request, msg)
+    return redirect('faturamento_medico:ftlistar')
+
+
 @login_required
 def acerto_caixa(request):
     """Fechamento / acerto de caixa — procedimentos, NF e resumos de pagamento/aguardando faturamento."""
+    import logging
+
+    logger = logging.getLogger(__name__)
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('dashboard:relatorio_mensal')
 
-    from django.db.utils import OperationalError, ProgrammingError
-
-    from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
-    from SaudeFinanceira.db_schema import capturar_erro_schema
-
-    from empresa.models import Empresa
-
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    empresa = Empresa.objects.filter(pk=empresa_id).first()
     try:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        from empresa.models import Empresa
+        from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
+
+        empresa = Empresa.objects.filter(pk=empresa_id).first()
         contexto = montar_contexto_acerto_caixa(request, empresa_id)
         contexto['empresa'] = empresa
         contexto['redirect_qs'] = request.GET.urlencode()
         return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
     except (ProgrammingError, OperationalError) as exc:
-        msg_schema = capturar_erro_schema(exc, contexto='acerto de caixa')
-        if msg_schema:
-            logger.exception('acerto_caixa schema empresa=%s', empresa_id)
-            messages.error(request, msg_schema)
-            return redirect('faturamento_medico:ftlistar')
-        raise
+        return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
     except Exception as exc:
-        msg_schema = capturar_erro_schema(exc, contexto='acerto de caixa')
-        logger.exception('acerto_caixa empresa=%s', empresa_id)
-        if msg_schema:
-            messages.error(request, msg_schema)
-        else:
-            messages.error(
-                request,
-                'Não foi possível abrir o acerto de caixa. '
-                'Confira os logs do servidor ou execute python manage.py migrate no Render.',
-            )
-        return redirect('faturamento_medico:ftlistar')
+        return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
 
 
 @login_required
@@ -6316,19 +6328,25 @@ def salvar_pagamentos_acerto_caixa(request):
 @login_required
 def imprimir_acerto_caixa(request):
     """Versão para impressão do Acerto de Caixa (mesmos filtros da tela)."""
+    import logging
+
+    logger = logging.getLogger(__name__)
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('dashboard:relatorio_mensal')
 
-    from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
-    from empresa.models import Empresa
+    try:
+        from empresa.models import Empresa
+        from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
 
-    empresa = Empresa.objects.filter(pk=empresa_id).first()
-    contexto = montar_contexto_acerto_caixa(request, empresa_id)
-    contexto['empresa'] = empresa
-    contexto['redirect_qs'] = request.GET.urlencode()
-    return render(request, 'faturamento_medico/imprimir_acerto_caixa.html', contexto)
+        empresa = Empresa.objects.filter(pk=empresa_id).first()
+        contexto = montar_contexto_acerto_caixa(request, empresa_id)
+        contexto['empresa'] = empresa
+        contexto['redirect_qs'] = request.GET.urlencode()
+        return render(request, 'faturamento_medico/imprimir_acerto_caixa.html', contexto)
+    except Exception as exc:
+        return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
 
 
 @login_required

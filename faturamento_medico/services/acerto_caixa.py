@@ -531,7 +531,11 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     if somente_marcados:
         qs = qs.filter(marcado_acerto_caixa=True)
 
-    qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
+    qs = (
+        qs.order_by('data', 'horario_inicio', 'nome')
+        .prefetch_related('itens_servico')
+        .defer('pagamentos_acerto_json')
+    )
     notas_por_data = carregar_notas_por_data(empresa_id, di, df)
     fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
     fats_bloqueio: dict[int, bool] = {}
