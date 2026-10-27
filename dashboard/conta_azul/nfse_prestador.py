@@ -11,6 +11,7 @@ from django.db import IntegrityError
 from django.utils.dateparse import parse_date, parse_datetime
 
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
+from dashboard.conta_azul.venda_nfse import enriquecer_campos_nfse_com_venda_ca
 from notasfiscais.models import NotaFiscalServico
 from notasfiscais.utils import extrair_socio
 from socio.models import Socio
@@ -194,8 +195,11 @@ def importar_nfse_prestador_conta_azul(
         'erros': 0,
         'ignorados_status': 0,
         'ignorados_sem_numero': 0,
+        'vendas_sincronizadas': 0,
     }
     vistos: set[str] = set()
+    cache_vendas: dict[str, dict] = {}
+    cache_cobranca: dict = {}
     cur = data_de
     while cur <= data_ate:
         fim = min(cur + timedelta(days=14), data_ate)
@@ -225,6 +229,19 @@ def importar_nfse_prestador_conta_azul(
                 stats['criados'] += 1
                 continue
 
+            if item.get('id_venda'):
+                antes = (campos.get('discriminacao') or '').strip()
+                enriquecer_campos_nfse_com_venda_ca(
+                    client,
+                    item,
+                    campos,
+                    cache_vendas=cache_vendas,
+                    cache_cobranca=cache_cobranca,
+                )
+                depois = (campos.get('discriminacao') or '').strip()
+                if depois and depois != antes:
+                    stats['vendas_sincronizadas'] += 1
+
             existente = _localizar_nfse(
                 empresa,
                 ca_id,
@@ -242,14 +259,20 @@ def importar_nfse_prestador_conta_azul(
                     )
                     for k, v in campos.items():
                         if k == 'discriminacao':
-                            if disc_incoerente and (v or '').strip():
+                            nova = (v or '').strip()
+                            if disc_incoerente and nova:
                                 setattr(existente, k, v)
                                 existente.forma_pagamento = None
                                 existente.nsu = ''
-                            elif (existente.discriminacao or '').strip():
-                                continue
-                            else:
+                            elif nova and not (existente.discriminacao or '').strip():
                                 setattr(existente, k, v)
+                            elif nova and 'PAGAMENTO' in nova.upper() and 'PAGAMENTO' not in (
+                                existente.discriminacao or ''
+                            ).upper():
+                                setattr(existente, k, v)
+                            continue
+                        if k == 'forma_pagamento' and v is not None:
+                            setattr(existente, k, v)
                             continue
                         setattr(existente, k, v)
                     existente.save()

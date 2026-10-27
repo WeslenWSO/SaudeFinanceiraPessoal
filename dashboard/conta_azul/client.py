@@ -186,6 +186,28 @@ class ContaAzulClient:
         data = self.get(f'/v1/servicos/{sid}')
         return data if isinstance(data, dict) else {}
 
+    def buscar_venda_por_id(self, venda_id: str) -> dict:
+        vid = (venda_id or '').strip()
+        if not vid:
+            return {}
+        data = self.get(f'/v1/venda/{vid}')
+        return data if isinstance(data, dict) else {}
+
+    def buscar_itens_venda(self, venda_id: str) -> Any:
+        vid = (venda_id or '').strip()
+        if not vid:
+            return []
+        data = self.get(f'/v1/venda/{vid}/itens')
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ('itens', 'items', 'data', 'content'):
+                val = data.get(key)
+                if isinstance(val, list):
+                    return val
+            return data
+        return []
+
     def atualizar_servico(self, servico_id: str, payload: dict) -> dict:
         sid = (servico_id or '').strip()
         if not sid:
