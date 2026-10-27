@@ -1,21 +1,18 @@
 from django import forms
 from django.contrib.auth.models import User
 
-from estoque.models import ProdutoEstoque
+from estoque.models import NaturezaEstoque, ProdutoEstoque
+from estoque.setores import SETOR_LISTA_CEGA_FARMACIA
 
 from inventario.models import Inventario, InventarioItem
 
 
 class InventarioForm(forms.ModelForm):
-    produtos = forms.ModelMultipleChoiceField(
+    produto_inventario_ids = forms.ModelMultipleChoiceField(
         queryset=ProdutoEstoque.objects.none(),
         required=False,
-        label='Produtos para contagem',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': 10}),
-        help_text=(
-            'Opcional: marque só os produtos deste inventário. '
-            'Se nenhum for marcado, entram todos os produtos do cadastro de Estoque.'
-        ),
+        label='Produtos do inventário',
+        widget=forms.MultipleHiddenInput(),
     )
     usuarios_contagem_1 = forms.ModelMultipleChoiceField(
         queryset=User.objects.filter(is_active=True).order_by('username'),
@@ -38,22 +35,38 @@ class InventarioForm(forms.ModelForm):
 
     class Meta:
         model = Inventario
-        fields = ('descricao',)
+        fields = ('descricao', 'setor')
         widgets = {
             'descricao': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': 'Ex.: Inventário setembro/2026'},
             ),
+            'setor': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, empresa_id=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if empresa_id:
-            self.fields['produtos'].queryset = ProdutoEstoque.objects.filter(
+        self.fields['setor'].choices = SETOR_LISTA_CEGA_FARMACIA
+        self.fields['setor'].help_text = (
+            'Informe onde você está contando: depósito central (Farmácia) '
+            'ou material já transferido para um setor clínico.'
+        )
+        if self.instance and self.instance.pk:
+            self.fields['setor'].disabled = True
+            self.fields.pop('produto_inventario_ids', None)
+        elif empresa_id:
+            self.fields['produto_inventario_ids'].queryset = ProdutoEstoque.objects.filter(
                 empresa_id=empresa_id,
+                natureza=NaturezaEstoque.CONSUMIVEL,
             ).order_by('codigo_produto', 'descricao')
+            self.fields['produto_inventario_ids'].help_text = (
+                'Busque por código ou descrição e adicione na grade. '
+                'Se nenhum produto for incluído, entram todos os consumíveis do estoque.'
+            )
 
     def produtos_selecionados_ids(self) -> list[int] | None:
-        produtos = self.cleaned_data.get('produtos')
+        if 'produto_inventario_ids' not in self.fields:
+            return None
+        produtos = self.cleaned_data.get('produto_inventario_ids')
         if not produtos:
             return None
         return list(produtos.values_list('pk', flat=True))

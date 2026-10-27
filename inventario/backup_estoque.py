@@ -1,6 +1,7 @@
 """Backup e restauração lógica do estoque ligados ao inventário."""
 from __future__ import annotations
 
+from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth.models import User
@@ -8,8 +9,9 @@ from django.db import transaction
 from django.utils import timezone
 from openpyxl import Workbook
 
-from estoque.models import MovimentoEstoque, ProdutoEstoque
+from estoque.models import MovimentoEstoque, ProdutoEstoque, SaldoEstoqueSetor
 from estoque.setores import SetorEstoque
+from inventario.estoque_setor import quantidade_sistema_no_setor
 from inventario.models import EstoqueBackup, EstoqueBackupLinha, Inventario, InventarioItem
 
 
@@ -90,11 +92,14 @@ def aplicar_contagem_ao_estoque(inventario: Inventario, usuario: User) -> dict[s
 
     stats = {'atualizados': 0, 'ignorados': 0}
     campo = f'contagem_{rodada}'
+    setor = inventario.setor or SetorEstoque.FARMACIA
+    setor_rotulo = inventario.rotulo_setor
     produtos_por_codigo = {
         p.codigo_produto: p
         for p in ProdutoEstoque.objects.filter(empresa_id=inventario.empresa_id)
     }
-    atualizar: list[ProdutoEstoque] = []
+    atualizar_produtos: list[ProdutoEstoque] = []
+    atualizar_saldos: list[SaldoEstoqueSetor] = []
 
     for item in inventario.itens.select_related('produto'):
         qtd = getattr(item, campo, None)
@@ -107,28 +112,42 @@ def aplicar_contagem_ao_estoque(inventario: Inventario, usuario: User) -> dict[s
         if produto is None:
             stats['ignorados'] += 1
             continue
-        q_ant = produto.quantidade_estoque
+        q_ant = quantidade_sistema_no_setor(produto, setor)
         if q_ant != qtd:
             MovimentoEstoque.objects.create(
                 empresa_id=inventario.empresa_id,
                 produto=produto,
                 tipo=MovimentoEstoque.Tipo.AJUSTE,
-                setor_destino=SetorEstoque.FARMACIA,
+                setor_destino=setor,
                 quantidade=abs(qtd - q_ant),
                 valor_unitario=produto.valor_custo_medio or 0,
                 valor_custo_medio_apos=produto.valor_custo_medio or 0,
                 usuario=usuario,
                 observacao=(
-                    f'Inventário «{inventario.descricao}» ({rodada}ª contagem): '
-                    f'{q_ant} → {qtd}'
+                    f'Inventário «{inventario.descricao}» — {setor_rotulo} '
+                    f'({rodada}ª contagem): {q_ant} → {qtd}'
                 )[:500],
             )
-        produto.quantidade_estoque = qtd
-        atualizar.append(produto)
+        if setor == SetorEstoque.FARMACIA:
+            produto.quantidade_estoque = qtd
+            atualizar_produtos.append(produto)
+        else:
+            saldo, _ = SaldoEstoqueSetor.objects.get_or_create(
+                produto=produto,
+                setor=setor,
+                defaults={'quantidade': Decimal('0')},
+            )
+            saldo.quantidade = qtd
+            atualizar_saldos.append(saldo)
         stats['atualizados'] += 1
 
-    if atualizar:
-        ProdutoEstoque.objects.bulk_update(atualizar, ['quantidade_estoque', 'atualizado_em'])
+    if atualizar_produtos:
+        ProdutoEstoque.objects.bulk_update(
+            atualizar_produtos,
+            ['quantidade_estoque', 'atualizado_em'],
+        )
+    if atualizar_saldos:
+        SaldoEstoqueSetor.objects.bulk_update(atualizar_saldos, ['quantidade'])
 
     inventario.estoque_aplicado_em = timezone.now()
     inventario.estoque_aplicado_por = usuario

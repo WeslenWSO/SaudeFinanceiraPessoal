@@ -12,7 +12,7 @@
     </div>
   </div>
   <p class="small text-muted mb-3">
-    Contagem física da <strong>farmácia</strong> (quantidade em sistema). Ao aplicar, o saldo é ajustado e registrado no histórico de movimentos. Somente administradores.
+    Contagem física por <strong>setor</strong> (farmácia central ou setor clínico). Ao aplicar, o saldo daquele setor é ajustado no histórico de movimentos. Somente administradores.
   </p>
 
   {% include 'parcial/_messages.html' %}
@@ -23,6 +23,7 @@
         <thead class="table-light">
           <tr>
             <th>Descrição</th>
+            <th>Setor</th>
             <th>Status</th>
             <th>Criado em</th>
             <th></th>
@@ -32,6 +33,7 @@
           {% for inv in object_list %}
           <tr>
             <td>{{ inv.descricao }}</td>
+            <td>{{ inv.rotulo_setor }}</td>
             <td>
               {% if inv.aberto %}
               <span class="badge bg-success">Aberto</span>
@@ -46,7 +48,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="4" class="text-center text-muted py-4">Nenhum inventário cadastrado.</td>
+            <td colspan="5" class="text-center text-muted py-4">Nenhum inventário cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>

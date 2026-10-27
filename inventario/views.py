@@ -1,9 +1,10 @@
 from django.contrib import messages
 from inventario.decorators import admin_inventario_required
 from inventario.mixins import RequerAdminInventarioMixin
+from django.db.models import Q
 from django.db.utils import DatabaseError
 from django.forms import modelformset_factory
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -28,11 +29,44 @@ from inventario.models import (
     InventarioItem,
     InventarioResponsavelContagem,
 )
+from estoque.models import NaturezaEstoque, ProdutoEstoque
+from estoque.setores import SetorEstoque
+from inventario.estoque_setor import quantidade_sistema_no_setor
 from inventario.services import (
     popular_itens_do_estoque,
     salvar_responsaveis,
     usuario_pode_contar,
 )
+
+
+def _serializar_produto_inventario_grid(produto: ProdutoEstoque, setor: str) -> dict:
+    saldo = quantidade_sistema_no_setor(produto, setor)
+    q_fmt = f'{saldo:f}'.rstrip('0').rstrip('.') or '0'
+    return {
+        'id': produto.pk,
+        'codigo': produto.codigo_produto,
+        'descricao': produto.descricao,
+        'marca': (produto.marca or '').strip(),
+        'saldo': str(saldo),
+        'saldo_fmt': q_fmt,
+    }
+
+
+def _produtos_grid_por_ids(empresa_id: int, ids: list[str], setor: str) -> list[dict]:
+    if not empresa_id or not ids:
+        return []
+    try:
+        pks = [int(x) for x in ids if str(x).strip().isdigit()]
+    except (TypeError, ValueError):
+        return []
+    if not pks:
+        return []
+    produtos = ProdutoEstoque.objects.filter(
+        empresa_id=empresa_id,
+        pk__in=pks,
+        natureza=NaturezaEstoque.CONSUMIVEL,
+    ).order_by('codigo_produto', 'descricao')
+    return [_serializar_produto_inventario_grid(p, setor) for p in produtos]
 
 
 class _EmpresaInventarioMixin:
@@ -107,6 +141,11 @@ class InventarioCreateView(RequerAdminInventarioMixin, CreateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['descricao'] = 'Novo inventário'
+        ctx['buscar_produtos_url'] = reverse('inventario:buscar_produtos')
+        setor = (self.request.POST.get('setor') or SetorEstoque.FARMACIA).strip()
+        ids = self.request.POST.getlist('produto_inventario_ids') if self.request.method == 'POST' else []
+        empresa_id = self.request.session.get('empresa_id')
+        ctx['produtos_grid_inicial'] = _produtos_grid_por_ids(empresa_id, ids, setor)
         return ctx
 
 

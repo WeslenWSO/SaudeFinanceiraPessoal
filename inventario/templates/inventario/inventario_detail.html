@@ -11,6 +11,7 @@
       <h1 class="h4 mb-1">{{ descricao }}</h1>
       <p class="text-muted small mb-0">
         {% if object.aberto %}<span class="badge bg-success">Aberto</span>{% else %}<span class="badge bg-secondary">Fechado</span>{% endif %}
+        · Setor: <span class="badge bg-info text-dark">{{ object.rotulo_setor }}</span>
         · Criado em {{ object.criado_em|date:"d/m/Y H:i" }}
         {% if object.estoque_aplicado_em %}
         · Estoque atualizado em {{ object.estoque_aplicado_em|date:"d/m/Y H:i" }}

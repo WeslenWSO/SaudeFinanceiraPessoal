@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 
-from estoque.models import ProdutoEstoque
+from estoque.models import NaturezaEstoque, ProdutoEstoque
+from inventario.estoque_setor import quantidade_sistema_no_setor
 from inventario.models import Inventario, InventarioItem, InventarioResponsavelContagem
 
 
@@ -9,9 +10,11 @@ def popular_itens_do_estoque(
     *,
     produto_ids: list[int] | None = None,
 ) -> int:
-    produtos = ProdutoEstoque.objects.filter(empresa_id=inventario.empresa_id).order_by(
-        'codigo_produto',
-    )
+    produtos = ProdutoEstoque.objects.filter(
+        empresa_id=inventario.empresa_id,
+        natureza=NaturezaEstoque.CONSUMIVEL,
+    ).order_by('codigo_produto')
+    setor = inventario.setor
     if produto_ids is not None:
         produtos = produtos.filter(pk__in=produto_ids)
     existentes = set(
@@ -26,7 +29,7 @@ def popular_itens_do_estoque(
             produto=p,
             codigo_produto=p.codigo_produto,
             descricao_produto=p.descricao,
-            quantidade_estoque=p.quantidade_estoque,
+            quantidade_estoque=quantidade_sistema_no_setor(p, setor),
             quantidade_estoque_contabil=p.quantidade_estoque_contabil,
         )
         for p in produtos

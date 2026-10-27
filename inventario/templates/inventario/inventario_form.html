@@ -13,6 +13,16 @@
       {% if form.descricao.errors %}<div class="text-danger small">{{ form.descricao.errors }}</div>{% endif %}
     </div>
 
+    <div class="mb-3">
+      <label class="form-label" for="id_setor">Setor inventariado</label>
+      {{ form.setor }}
+      {% if form.setor.help_text %}<div class="form-text">{{ form.setor.help_text }}</div>{% endif %}
+      {% if form.setor.errors %}<div class="text-danger small">{{ form.setor.errors }}</div>{% endif %}
+      {% if object.pk %}
+      <div class="form-text text-muted">O setor não pode ser alterado após criar o inventário.</div>
+      {% endif %}
+    </div>
+
     {% if not object.pk %}
     <div class="mb-3">
       <label class="form-label">{{ form.produtos.label }}</label>
@@ -24,7 +34,8 @@
     <div class="alert alert-light border small mb-3">
       <strong>Como funciona</strong>
       <ul class="mb-0 ps-3">
-        <li><strong>Produtos:</strong> lista acima (ou todos do Estoque se vazio). Vale para <em>todos</em> os contadores.</li>
+        <li><strong>Setor:</strong> a coluna «Qtd. estoque» reflete o saldo <em>naquele setor</em> (farmácia ou setor clínico).</li>
+        <li><strong>Produtos:</strong> lista acima (ou todos os consumíveis do Estoque se vazio). Vale para <em>todos</em> os contadores.</li>
         <li><strong>Usuários:</strong> em cada coluna abaixo, escolha quem pode lançar a <strong>1ª</strong>, <strong>2ª</strong> ou <strong>3ª</strong> contagem.</li>
         <li>Não há produtos diferentes por usuário — quem está na 1ª contagem vê os mesmos itens do inventário.</li>
       </ul>

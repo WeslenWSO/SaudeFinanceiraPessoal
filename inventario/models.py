@@ -6,6 +6,7 @@ from django.db import models
 
 from empresa.models import Empresa
 from estoque.models import ProdutoEstoque
+from estoque.setores import SetorEstoque, rotulo_setor
 
 
 class Inventario(models.Model):
@@ -16,6 +17,13 @@ class Inventario(models.Model):
         verbose_name='Empresa',
     )
     descricao = models.CharField(max_length=200, verbose_name='Descrição')
+    setor = models.CharField(
+        max_length=32,
+        choices=SetorEstoque.choices,
+        default=SetorEstoque.FARMACIA,
+        verbose_name='Setor inventariado',
+        help_text='Onde a contagem física será feita (depósito farmácia ou setor clínico).',
+    )
     aberto = models.BooleanField(default=True, verbose_name='Aberto')
     rodada_atualiza_estoque = models.PositiveSmallIntegerField(
         default=0,
@@ -48,6 +56,10 @@ class Inventario(models.Model):
 
     def __str__(self) -> str:
         return f'{self.descricao} ({self.empresa})'
+
+    @property
+    def rotulo_setor(self) -> str:
+        return rotulo_setor(self.setor)
 
 
 class InventarioResponsavelContagem(models.Model):
