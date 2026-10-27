@@ -192,6 +192,7 @@ class InventarioDetailView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, 
         inv = self.object
         ctx['descricao'] = inv.descricao
         ctx['itens'] = inv.itens.select_related(
+            'produto',
             'contagem_1_por',
             'contagem_2_por',
             'contagem_3_por',
@@ -209,6 +210,9 @@ class InventarioDetailView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, 
             for rodada in (1, 2, 3)
         }
         ctx['rodada_estoque'] = inv.rodada_atualiza_estoque
+        ctx['pode_aplicar_contagem_estoque'] = (
+            inv.aberto and not inv.concluido and inv.rodada_atualiza_estoque in (1, 2, 3)
+        )
         ctx['ultimo_backup'] = (
             inv.backups_estoque.prefetch_related('linhas').order_by('-criado_em').first()
         )
@@ -249,7 +253,10 @@ def inventario_contagem(request, pk, rodada):
         can_delete=False,
     )
 
-    queryset = inventario.itens.all().order_by('codigo_produto', 'descricao_produto')
+    queryset = (
+        inventario.itens.select_related('produto')
+        .order_by('codigo_produto', 'descricao_produto')
+    )
     prefix = f'r{rodada}'
 
     if request.method == 'POST':
@@ -459,11 +466,11 @@ def inventario_aplicar_estoque(request, pk):
     if inventario is None:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('empresa:lista')
-    if not inventario.aberto:
-        messages.error(request, 'Inventário fechado ou já concluído.')
+    if inventario.concluido or inventario.estoque_aplicado_em:
+        messages.error(request, 'Este inventário já foi aplicado ao estoque e não pode ser aplicado novamente.')
         return redirect('inventario:inventario_detail', pk=pk)
-    if inventario.concluido:
-        messages.error(request, 'Este inventário já foi aplicado ao estoque.')
+    if not inventario.aberto:
+        messages.error(request, 'Inventário fechado.')
         return redirect('inventario:inventario_detail', pk=pk)
 
     from inventario.permissoes import validar_senha_administrador_inventario

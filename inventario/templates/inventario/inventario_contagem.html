@@ -10,7 +10,8 @@
   {% include 'parcial/_messages.html' %}
 
   <p class="text-muted small">
-    Informe a quantidade contada por produto. Ao salvar, registramos a data e o seu usuário nesta rodada.
+    Informe a quantidade contada na <strong>unidade de consumo</strong> (coluna Un.) de cada produto.
+    Setor: <strong>{{ inventario.rotulo_setor }}</strong>.
   </p>
 
   {% if total_itens == 0 %}
@@ -29,8 +30,10 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
+            <th class="small">Embalagem</th>
+            <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
-            <th style="min-width:8rem;">Quantidade contada</th>
+            <th style="min-width:8rem;">Qtd. contada</th>
           </tr>
         </thead>
         <tbody>
@@ -39,8 +42,17 @@
             {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
             <td><code>{{ form.instance.codigo_produto }}</code></td>
             <td>{{ form.instance.descricao_produto }}</td>
-            <td class="text-end">{{ form.instance.quantidade_estoque }}</td>
-            <td>{{ form.contagem_valor }}</td>
+            <td class="small text-muted">{% if form.instance.rotulo_embalagem_master %}{{ form.instance.rotulo_embalagem_master }}{% else %}—{% endif %}</td>
+            <td>{% if form.instance.unidade_consumo %}<strong>{{ form.instance.unidade_consumo }}</strong>{% else %}—{% endif %}</td>
+            <td class="text-end">{{ form.instance.quantidade_estoque }}{% if form.instance.unidade_consumo %} <span class="text-muted small">{{ form.instance.unidade_consumo }}</span>{% endif %}</td>
+            <td>
+              <div class="input-group input-group-sm">
+                {{ form.contagem_valor }}
+                {% if form.instance.unidade_consumo %}
+                <span class="input-group-text">{{ form.instance.unidade_consumo }}</span>
+                {% endif %}
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>

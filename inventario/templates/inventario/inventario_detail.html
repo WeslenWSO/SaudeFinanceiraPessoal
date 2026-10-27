@@ -79,7 +79,16 @@
   </div>
   {% endif %}
 
-  {% if object.aberto %}
+  {% if object.concluido %}
+  <div class="card shadow-sm mb-3 border-primary">
+    <div class="card-body py-3">
+      <p class="small text-muted mb-0">A contagem deste inventário já foi aplicada ao estoque. Não é possível aplicar novamente.</p>
+      <button type="button" class="btn btn-success btn-sm mt-2" disabled aria-disabled="true">
+        Aplicar contagem ao estoque
+      </button>
+    </div>
+  </div>
+  {% elif object.aberto %}
   <div class="card shadow-sm mb-3">
     <div class="card-body py-3">
       <form method="post" action="{% url 'inventario:inventario_rodada_estoque' object.pk %}" class="row g-3 align-items-end">
@@ -111,8 +120,9 @@
         </div>
       </form>
       <button type="button" class="btn btn-success btn-sm mt-2" id="btn-abrir-aplicar-estoque"
-              {% if rodada_estoque == 0 %}disabled{% endif %}
-              data-bs-toggle="modal" data-bs-target="#modal-aplicar-estoque">
+              {% if not pode_aplicar_contagem_estoque %}disabled aria-disabled="true"{% else %}
+              data-bs-toggle="modal" data-bs-target="#modal-aplicar-estoque"{% endif %}
+              title="{% if not pode_aplicar_contagem_estoque %}Selecione qual contagem (1ª, 2ª ou 3ª) será aplicada{% endif %}">
         Aplicar contagem ao estoque
       </button>
     </div>
@@ -178,6 +188,8 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
+            <th class="small">Emb.</th>
+            <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
             <th class="text-end">Est. contábil</th>
             <th class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">1ª cont.</th>
@@ -195,6 +207,8 @@
           <tr>
             <td><code>{{ item.codigo_produto }}</code></td>
             <td>{{ item.descricao_produto }}</td>
+            <td class="small text-muted">{% if item.rotulo_embalagem_master %}{{ item.rotulo_embalagem_master }}{% else %}—{% endif %}</td>
+            <td>{{ item.unidade_consumo|default:"—" }}</td>
             <td class="text-end">{{ item.quantidade_estoque }}</td>
             <td class="text-end">{{ item.quantidade_estoque_contabil }}</td>
             <td class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">
@@ -239,7 +253,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="12" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
+            <td colspan="14" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -248,7 +262,7 @@
   </div>
 </div>
 
-{% if object.aberto and not object.concluido %}
+{% if pode_aplicar_contagem_estoque %}
 <div class="modal fade" id="modal-aplicar-estoque" tabindex="-1" aria-labelledby="modal-aplicar-estoque-label" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
