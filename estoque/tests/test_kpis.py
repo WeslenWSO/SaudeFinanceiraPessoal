@@ -44,10 +44,15 @@ class KpisEstoqueServiceTest(TestCase):
             produto=p,
             tipo=MovimentoEstoque.Tipo.BAIXA,
             quantidade=Decimal('3'),
+            valor_unitario=Decimal('2.5'),
         )
         data = montar_kpis_estoque(self.empresa.pk)
         self.assertEqual(data['mov_baixas_mes'], 1)
-        self.assertEqual(len(data['top_baixas_mes']), 1)
+        self.assertEqual(len(data['top_saidas_mes']), 1)
+        self.assertEqual(data['top_saidas_mes'][0]['qtd'], 3.0)
+        self.assertIn('7,50', data['top_saidas_mes'][0]['valor_fmt'])
+        self.assertEqual(len(data['chart_12m_labels']), 12)
+        self.assertEqual(len(data['chart_12m_qtd']), 12)
 
 
 class KpisEstoqueViewTest(TestCase):

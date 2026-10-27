@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.db.models import Count, F, Q, Sum
 from django.db.models.fields import DecimalField
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
@@ -47,11 +47,111 @@ def _valor_linha_custo_contabil():
     )
 
 
+_MESES_CURTO = ('Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez')
+
+
 def _periodo_mes(ref: date | None = None) -> tuple[date, date]:
     hoje = ref or timezone.localdate()
     ini = hoje.replace(day=1)
     fim = hoje.replace(day=monthrange(hoje.year, hoje.month)[1])
     return ini, fim
+
+
+def _primeiro_dia_mes(d: date) -> date:
+    return d.replace(day=1)
+
+
+def _add_meses(d: date, delta: int) -> date:
+    m = d.month - 1 + delta
+    y = d.year + m // 12
+    m = m % 12 + 1
+    return date(y, m, 1)
+
+
+def _ultimos_12_meses(ref: date | None = None) -> list[tuple[date, date, str, str]]:
+    """(início, fim, rótulo gráfico, chave YYYY-MM) dos últimos 12 meses."""
+    ref_m = _primeiro_dia_mes(ref or timezone.localdate())
+    out: list[tuple[date, date, str, str]] = []
+    for i in range(11, -1, -1):
+        ini = _add_meses(ref_m, -i)
+        fim = ini.replace(day=monthrange(ini.year, ini.month)[1])
+        rotulo = f'{_MESES_CURTO[ini.month - 1]}/{ini.strftime("%y")}'
+        chave = ini.strftime('%Y-%m')
+        out.append((ini, fim, rotulo, chave))
+    return out
+
+
+def _valor_movimento():
+    return Coalesce(F('quantidade'), Decimal('0')) * Coalesce(F('valor_unitario'), Decimal('0'))
+
+
+def _top_saidas_queryset(movs_baixa, *, limit: int = 10):
+    dec = DecimalField(max_digits=18, decimal_places=2)
+    return (
+        movs_baixa.values('produto__codigo_produto', 'produto__descricao')
+        .annotate(
+            qtd=Sum('quantidade'),
+            valor=Sum(_valor_movimento(), output_field=dec),
+        )
+        .order_by('-qtd')[:limit]
+    )
+
+
+def _serializar_top_saidas(rows) -> list[dict]:
+    return [
+        {
+            'codigo': row['produto__codigo_produto'],
+            'descricao': row['produto__descricao'],
+            'qtd_fmt': _fmt_numero(row['qtd']),
+            'valor_fmt': _fmt_moeda(row['valor']),
+            'qtd': float(row['qtd'] or 0),
+            'valor': float(row['valor'] or 0),
+        }
+        for row in rows
+    ]
+
+
+def _serie_saidas_12_meses(empresa_id: int, ref: date | None = None) -> dict:
+    meses = _ultimos_12_meses(ref)
+    ini_global = meses[0][0]
+    fim_global = meses[-1][1]
+    dec = DecimalField(max_digits=18, decimal_places=2)
+
+    por_mes = {
+        row['mes'].strftime('%Y-%m'): row
+        for row in (
+            MovimentoEstoque.objects.filter(
+                empresa_id=empresa_id,
+                tipo=MovimentoEstoque.Tipo.BAIXA,
+                criado_em__date__gte=ini_global,
+                criado_em__date__lte=fim_global,
+            )
+            .annotate(mes=TruncMonth('criado_em'))
+            .values('mes')
+            .annotate(
+                qtd=Sum('quantidade'),
+                valor=Sum(_valor_movimento(), output_field=dec),
+            )
+        )
+        if row['mes']
+    }
+
+    labels: list[str] = []
+    qtds: list[float] = []
+    valores: list[float] = []
+    for _ini, _fim, rotulo, chave in meses:
+        labels.append(rotulo)
+        row = por_mes.get(chave)
+        qtds.append(float(row['qtd'] or 0) if row else 0.0)
+        valores.append(float(row['valor'] or 0) if row else 0.0)
+
+    return {
+        'labels': labels,
+        'qtd': qtds,
+        'valor': valores,
+        'inicio': ini_global,
+        'fim': fim_global,
+    }
 
 
 def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> dict:
@@ -75,7 +175,13 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
         'mov_ajustes_mes': 0,
         'inventarios_abertos': 0,
         'alertas_amostra': [],
-        'top_baixas_mes': [],
+        'top_saidas_mes': [],
+        'top_saidas_12m': [],
+        'destaque_saida_qtd_mes': None,
+        'destaque_saida_valor_mes': None,
+        'chart_12m_labels': [],
+        'chart_12m_qtd': [],
+        'chart_12m_valor': [],
     }
     if not empresa_id:
         return vazio
@@ -113,12 +219,30 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
         for row in movs.values('tipo').annotate(n=Count('id'))
     }
 
-    top_baixas = (
-        movs.filter(tipo=MovimentoEstoque.Tipo.BAIXA)
-        .values('produto__codigo_produto', 'produto__descricao')
-        .annotate(total=Sum('quantidade'))
-        .order_by('-total')[:8]
+    movs_baixa_mes = movs.filter(tipo=MovimentoEstoque.Tipo.BAIXA)
+    top_saidas_mes_rows = list(_top_saidas_queryset(movs_baixa_mes, limit=12))
+    top_saidas_mes = _serializar_top_saidas(top_saidas_mes_rows)
+
+    dec_mov = DecimalField(max_digits=18, decimal_places=2)
+    top_valor_mes_row = (
+        movs_baixa_mes.values('produto__codigo_produto', 'produto__descricao')
+        .annotate(
+            qtd=Sum('quantidade'),
+            valor=Sum(_valor_movimento(), output_field=dec_mov),
+        )
+        .order_by('-valor')
+        .first()
     )
+
+    meses_12 = _ultimos_12_meses(ref)
+    movs_baixa_12 = MovimentoEstoque.objects.filter(
+        empresa_id=empresa_id,
+        tipo=MovimentoEstoque.Tipo.BAIXA,
+        criado_em__date__gte=meses_12[0][0],
+        criado_em__date__lte=meses_12[-1][1],
+    )
+    top_saidas_12m = _serializar_top_saidas(_top_saidas_queryset(movs_baixa_12, limit=15))
+    chart = _serie_saidas_12_meses(empresa_id, ref)
 
     try:
         from inventario.models import Inventario
@@ -170,12 +294,22 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
         'mov_ajustes_mes': mov_por_tipo.get(MovimentoEstoque.Tipo.AJUSTE, 0),
         'inventarios_abertos': inv_abertos,
         'alertas_amostra': alertas,
-        'top_baixas_mes': [
+        'top_saidas_mes': top_saidas_mes,
+        'top_saidas_12m': top_saidas_12m,
+        'destaque_saida_qtd_mes': top_saidas_mes[0] if top_saidas_mes else None,
+        'destaque_saida_valor_mes': (
             {
-                'codigo': row['produto__codigo_produto'],
-                'descricao': row['produto__descricao'],
-                'total_fmt': _fmt_numero(row['total']),
+                'codigo': top_valor_mes_row['produto__codigo_produto'],
+                'descricao': top_valor_mes_row['produto__descricao'],
+                'qtd_fmt': _fmt_numero(top_valor_mes_row['qtd']),
+                'valor_fmt': _fmt_moeda(top_valor_mes_row['valor']),
             }
-            for row in top_baixas
-        ],
+            if top_valor_mes_row and (top_valor_mes_row['valor'] or 0) > 0
+            else None
+        ),
+        'chart_12m_labels': chart['labels'],
+        'chart_12m_qtd': chart['qtd'],
+        'chart_12m_valor': chart['valor'],
+        'chart_12m_inicio': chart['inicio'],
+        'chart_12m_fim': chart['fim'],
     }

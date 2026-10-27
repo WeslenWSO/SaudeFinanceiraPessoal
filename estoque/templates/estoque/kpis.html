@@ -17,12 +17,13 @@
 .est-kpi-valor.laranja { color: #d97706; }
 .est-kpi-valor.vermelho { color: #dc3545; }
 .est-kpi-sub { font-size: 0.75rem; color: #6c757d; margin-top: 0.2rem; }
+.est-chart-wrap { height: 320px; position: relative; }
 </style>
 <div class="container-fluid px-4 py-3">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
       <h1 class="h4 mb-0">KPIs de estoque</h1>
-      <p class="text-muted small mb-0">Movimentos e requisições referem-se a {{ kpis.periodo_rotulo }}.</p>
+      <p class="text-muted small mb-0">Movimentos e requisições referem-se a {{ kpis.periodo_rotulo }}. Saídas = baixas / consumo.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'estoque:farmacia_list' %}" class="btn btn-outline-primary btn-sm">Farmácia</a>
@@ -55,6 +56,42 @@
       <div class="est-kpi-label">Imobilizado</div>
       <div class="est-kpi-valor">{{ kpis.imobilizado_itens }} itens</div>
       <div class="est-kpi-sub">R$ {{ kpis.valor_imobilizado_fmt }} (custo médio)</div>
+    </div>
+  </div>
+
+  <h2 class="h6 text-muted mb-2">Maior saída no mês ({{ kpis.periodo_rotulo }})</h2>
+  <div class="est-kpis mb-4">
+    <div class="est-kpi destaque">
+      <div class="est-kpi-label">Por quantidade</div>
+      {% if kpis.destaque_saida_qtd_mes %}
+      <div class="est-kpi-valor">{{ kpis.destaque_saida_qtd_mes.qtd_fmt }}</div>
+      <div class="est-kpi-sub"><code>{{ kpis.destaque_saida_qtd_mes.codigo }}</code> {{ kpis.destaque_saida_qtd_mes.descricao|truncatechars:40 }}</div>
+      <div class="est-kpi-sub">Valor: R$ {{ kpis.destaque_saida_qtd_mes.valor_fmt }}</div>
+      {% else %}
+      <div class="est-kpi-valor text-muted">—</div>
+      <div class="est-kpi-sub">Sem baixas no mês</div>
+      {% endif %}
+    </div>
+    <div class="est-kpi destaque">
+      <div class="est-kpi-label">Por valor (custo)</div>
+      {% if kpis.destaque_saida_valor_mes %}
+      <div class="est-kpi-valor">R$ {{ kpis.destaque_saida_valor_mes.valor_fmt }}</div>
+      <div class="est-kpi-sub"><code>{{ kpis.destaque_saida_valor_mes.codigo }}</code> {{ kpis.destaque_saida_valor_mes.descricao|truncatechars:40 }}</div>
+      <div class="est-kpi-sub">Qtd.: {{ kpis.destaque_saida_valor_mes.qtd_fmt }}</div>
+      {% else %}
+      <div class="est-kpi-valor text-muted">—</div>
+      <div class="est-kpi-sub">Sem baixas no mês</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 mb-1">Saídas nos últimos 12 meses</h2>
+      <p class="text-muted small mb-3">Barras: quantidade baixada · Linha: valor (qtd × custo unitário do movimento)</p>
+      <div class="est-chart-wrap">
+        <canvas id="chartSaidas12m" aria-label="Gráfico de saídas de estoque"></canvas>
+      </div>
     </div>
   </div>
 
@@ -95,8 +132,53 @@
     </div>
   </div>
 
-  <div class="row g-3">
+  <div class="row g-3 mb-3">
     <div class="col-lg-6">
+      <h2 class="h6">Ranking de saídas — mês atual</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+          <thead class="table-light"><tr><th>#</th><th>Código</th><th>Produto</th><th class="text-end">Qtd.</th><th class="text-end">Valor</th></tr></thead>
+          <tbody>
+            {% for row in kpis.top_saidas_mes %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td><code>{{ row.codigo }}</code></td>
+              <td>{{ row.descricao|truncatechars:40 }}</td>
+              <td class="text-end">{{ row.qtd_fmt }}</td>
+              <td class="text-end">R$ {{ row.valor_fmt }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">Sem baixas no período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <h2 class="h6">Ranking de saídas — últimos 12 meses</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+          <thead class="table-light"><tr><th>#</th><th>Código</th><th>Produto</th><th class="text-end">Qtd.</th><th class="text-end">Valor</th></tr></thead>
+          <tbody>
+            {% for row in kpis.top_saidas_12m %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td><code>{{ row.codigo }}</code></td>
+              <td>{{ row.descricao|truncatechars:40 }}</td>
+              <td class="text-end">{{ row.qtd_fmt }}</td>
+              <td class="text-end">R$ {{ row.valor_fmt }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">Sem baixas no período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-12">
       <h2 class="h6">Produtos abaixo do mínimo</h2>
       <div class="table-responsive">
         <table class="table table-sm table-bordered">
@@ -116,25 +198,82 @@
         </table>
       </div>
     </div>
-    <div class="col-lg-6">
-      <h2 class="h6">Maiores baixas no mês (quantidade)</h2>
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered">
-          <thead class="table-light"><tr><th>Código</th><th>Produto</th><th class="text-end">Total</th></tr></thead>
-          <tbody>
-            {% for row in kpis.top_baixas_mes %}
-            <tr>
-              <td><code>{{ row.codigo }}</code></td>
-              <td>{{ row.descricao|truncatechars:45 }}</td>
-              <td class="text-end">{{ row.total_fmt }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="3" class="text-muted">Sem baixas no período.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 </div>
+
+{{ chart_saidas|json_script:"est-chart-saidas-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (typeof Chart === 'undefined') return;
+  var el = document.getElementById('chartSaidas12m');
+  var raw = document.getElementById('est-chart-saidas-data');
+  if (!el || !raw) return;
+  var data = JSON.parse(raw.textContent);
+
+  function fmtMoeda(v) {
+    if (Math.abs(v) >= 1000) return 'R$ ' + (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil';
+    return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Quantidade',
+          data: data.qtd,
+          backgroundColor: 'rgba(31, 56, 100, 0.75)',
+          borderRadius: 3,
+          yAxisID: 'yQtd',
+        },
+        {
+          type: 'line',
+          label: 'Valor (R$)',
+          data: data.valor,
+          borderColor: '#fd7e14',
+          backgroundColor: 'rgba(253, 126, 20, 0.15)',
+          fill: true,
+          tension: 0.25,
+          yAxisID: 'yVal',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) {
+              if (ctx.dataset.yAxisID === 'yVal') {
+                return ctx.dataset.label + ': ' + fmtMoeda(ctx.raw);
+              }
+              return ctx.dataset.label + ': ' + Number(ctx.raw).toLocaleString('pt-BR');
+            },
+          },
+        },
+      },
+      scales: {
+        yQtd: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'Quantidade' },
+        },
+        yVal: {
+          type: 'linear',
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Valor' },
+          ticks: { callback: function (v) { return fmtMoeda(v); } },
+        },
+      },
+    },
+  });
+})();
+</script>
 {% endblock %}

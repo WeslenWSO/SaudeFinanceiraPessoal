@@ -682,11 +682,19 @@ def kpis_estoque(request):
         messages.error(request, 'Selecione uma empresa.')
         return redirect('dashboard:relatorio_mensal')
 
+    kpis = montar_kpis_estoque(empresa_id)
+    chart_saidas = {
+        'labels': kpis['chart_12m_labels'],
+        'qtd': kpis['chart_12m_qtd'],
+        'valor': kpis['chart_12m_valor'],
+    }
+
     return render(
         request,
         'estoque/kpis.html',
         {
-            'kpis': montar_kpis_estoque(empresa_id),
+            'kpis': kpis,
+            'chart_saidas': chart_saidas,
             'descricao': 'KPIs de estoque',
         },
     )
