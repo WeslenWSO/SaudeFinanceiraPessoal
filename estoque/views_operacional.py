@@ -31,6 +31,7 @@ from estoque.permissoes import (
     validar_senha_aprovacao_estorno_nf,
 )
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
+from estoque.services.kpis import montar_kpis_estoque
 from estoque.services.movimentacao import (
     EstoqueErro,
     concluir_requisicao,
@@ -670,6 +671,23 @@ def requisicao_imprimir(request, pk: int):
             'setor_rotulo': _setor_rotulo_requisicao(requisicao),
             'agora': timezone.now(),
             'auto_print': auto_print,
+        },
+    )
+
+
+@login_required
+def kpis_estoque(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    return render(
+        request,
+        'estoque/kpis.html',
+        {
+            'kpis': montar_kpis_estoque(empresa_id),
+            'descricao': 'KPIs de estoque',
         },
     )
 

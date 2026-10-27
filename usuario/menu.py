@@ -52,6 +52,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('empresa', 'Empresa', 'fa-building', 'cadastro', url_name='empresa:lista'),
     MenuItemDef('fornecedor', 'Fornecedor', 'fa-truck', 'cadastro', url_name='fornecedor:fornList'),
     MenuItemDef('estoque', 'Cadastro de produtos', 'fa-box', 'estoque', url_name='estoque:produto_list'),
+    MenuItemDef(
+        'estoque_kpis',
+        'KPIs de estoque',
+        'fa-gauge-high',
+        'estoque',
+        url_name='estoque:kpis',
+    ),
     MenuItemDef('cliente', 'Cliente', 'fa-user-tie', 'cadastro', url_name='cliente:clieList'),
     MenuItemDef('cobranca', 'Cobrança', 'fa-credit-card', 'cadastro', url_name='cobranca:cobList'),
     MenuItemDef('categoria', 'Categoria', 'fa-tags', 'cadastro', url_name='categoria:catList'),

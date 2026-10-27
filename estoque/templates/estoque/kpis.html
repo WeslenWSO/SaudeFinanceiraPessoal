@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<style>
+.est-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+@media (max-width: 992px) { .est-kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 576px) { .est-kpis { grid-template-columns: 1fr; } }
+.est-kpi {
+  border: 1px solid #dee2e6; border-radius: 0.35rem; padding: 0.85rem 1rem;
+  background: #fff; min-height: 5rem;
+}
+.est-kpi.destaque { border-color: #1f3864; background: #f8fafc; }
+.est-kpi.alerta { border-color: #ffc107; background: #fffbeb; }
+.est-kpi-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6c757d; margin-bottom: 0.25rem; }
+.est-kpi-valor { font-size: 1.25rem; font-weight: 700; line-height: 1.2; color: #1f3864; }
+.est-kpi-valor.verde { color: #198754; }
+.est-kpi-valor.laranja { color: #d97706; }
+.est-kpi-valor.vermelho { color: #dc3545; }
+.est-kpi-sub { font-size: 0.75rem; color: #6c757d; margin-top: 0.2rem; }
+</style>
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-0">KPIs de estoque</h1>
+      <p class="text-muted small mb-0">Movimentos e requisições referem-se a {{ kpis.periodo_rotulo }}.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'estoque:farmacia_list' %}" class="btn btn-outline-primary btn-sm">Farmácia</a>
+      <a href="{% url 'estoque:relatorio_movimentos' %}" class="btn btn-outline-secondary btn-sm">Relatório</a>
+      <a href="{% url 'estoque:requisicao_list' %}" class="btn btn-outline-secondary btn-sm">Requisições</a>
+    </div>
+  </div>
+  {% include 'parcial/_messages.html' %}
+
+  <h2 class="h6 text-muted mb-2">Posição (farmácia / consumíveis)</h2>
+  <div class="est-kpis mb-4">
+    <div class="est-kpi destaque">
+      <div class="est-kpi-label">Valor em estoque (custo médio)</div>
+      <div class="est-kpi-valor">R$ {{ kpis.valor_farmacia_medio_fmt }}</div>
+      <div class="est-kpi-sub">Contábil: R$ {{ kpis.valor_farmacia_contabil_fmt }}</div>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Produtos cadastrados</div>
+      <div class="est-kpi-valor verde">{{ kpis.farmacia_produtos }}</div>
+      <div class="est-kpi-sub">{{ kpis.farmacia_com_saldo }} com saldo &gt; 0</div>
+    </div>
+    <div class="est-kpi {% if kpis.abaixo_minimo %}alerta{% endif %}">
+      <div class="est-kpi-label">Abaixo do mínimo</div>
+      <div class="est-kpi-valor {% if kpis.abaixo_minimo %}laranja{% endif %}">{{ kpis.abaixo_minimo }}</div>
+      {% if kpis.abaixo_minimo %}
+      <div class="est-kpi-sub"><a href="{% url 'estoque:farmacia_list' %}?somente_alertas=1">Ver alertas</a></div>
+      {% endif %}
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Imobilizado</div>
+      <div class="est-kpi-valor">{{ kpis.imobilizado_itens }} itens</div>
+      <div class="est-kpi-sub">R$ {{ kpis.valor_imobilizado_fmt }} (custo médio)</div>
+    </div>
+  </div>
+
+  <h2 class="h6 text-muted mb-2">Operação no mês</h2>
+  <div class="est-kpis mb-4">
+    <div class="est-kpi">
+      <div class="est-kpi-label">Entradas (NF)</div>
+      <div class="est-kpi-valor">{{ kpis.mov_entradas_mes }}</div>
+      <div class="est-kpi-sub">movimentos</div>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Baixas / consumo</div>
+      <div class="est-kpi-valor">{{ kpis.mov_baixas_mes }}</div>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Transferências</div>
+      <div class="est-kpi-valor">{{ kpis.mov_transferencias_mes }}</div>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Ajustes (inventário)</div>
+      <div class="est-kpi-valor">{{ kpis.mov_ajustes_mes }}</div>
+    </div>
+    <div class="est-kpi {% if kpis.requisicoes_rascunho %}alerta{% endif %}">
+      <div class="est-kpi-label">Requisições em rascunho</div>
+      <div class="est-kpi-valor {% if kpis.requisicoes_rascunho %}laranja{% endif %}">{{ kpis.requisicoes_rascunho }}</div>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-label">Requisições concluídas</div>
+      <div class="est-kpi-valor verde">{{ kpis.requisicoes_mes }}</div>
+      <div class="est-kpi-sub">no mês</div>
+    </div>
+    <div class="est-kpi {% if kpis.inventarios_abertos %}alerta{% endif %}">
+      <div class="est-kpi-label">Inventários abertos</div>
+      <div class="est-kpi-valor">{{ kpis.inventarios_abertos }}</div>
+      {% if kpis.inventarios_abertos %}
+      <div class="est-kpi-sub"><a href="{% url 'inventario:inventario_list' %}">Abrir inventários</a></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <h2 class="h6">Produtos abaixo do mínimo</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+          <thead class="table-light"><tr><th>Código</th><th>Produto</th><th class="text-end">Saldo</th><th class="text-end">Mín.</th></tr></thead>
+          <tbody>
+            {% for p in kpis.alertas_amostra %}
+            <tr>
+              <td><code>{{ p.codigo_produto }}</code></td>
+              <td>{{ p.descricao|truncatechars:45 }}</td>
+              <td class="text-end">{{ p.quantidade_estoque }}</td>
+              <td class="text-end">{{ p.estoque_minimo }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">Nenhum alerta ativo.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <h2 class="h6">Maiores baixas no mês (quantidade)</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+          <thead class="table-light"><tr><th>Código</th><th>Produto</th><th class="text-end">Total</th></tr></thead>
+          <tbody>
+            {% for row in kpis.top_baixas_mes %}
+            <tr>
+              <td><code>{{ row.codigo }}</code></td>
+              <td>{{ row.descricao|truncatechars:45 }}</td>
+              <td class="text-end">{{ row.total_fmt }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-muted">Sem baixas no período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
