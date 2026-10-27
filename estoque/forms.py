@@ -93,6 +93,9 @@ class ProdutoEstoqueForm(forms.ModelForm):
         )
         self.fields['quantidade_estoque'].help_text = 'Sempre na unidade de consumo (campo Un.).'
         self.fields['quantidade_estoque_contabil'].help_text = 'Espelho contábil, na mesma unidade de consumo.'
+        self.fields['unidade_master'].required = False
+        self.fields['quantidade_por_master'].required = False
+        self.fields['unidade'].required = False
         self.fields['fornecedor'].required = False
         self.fields['fornecedor'].empty_label = '—'
         qs = Fornecedor.objects.all().order_by('razao')
