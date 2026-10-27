@@ -6,13 +6,14 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Case, CharField, Count, F, Q, Sum, Value, When
 from django.db.models.fields import DecimalField
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
-from estoque.models import MovimentoEstoque, NaturezaEstoque, ProdutoEstoque, RequisicaoEstoque
+from estoque.models import MovimentoEstoque, NaturezaEstoque, ProdutoEstoque, RequisicaoEstoque, SaldoEstoqueSetor
+from estoque.setores import SETOR_LISTA_CEGA_FARMACIA, SetorEstoque, rotulo_setor
 
 
 def _fmt_moeda(valor) -> str:
@@ -111,6 +112,195 @@ def _serializar_top_saidas(rows) -> list[dict]:
     ]
 
 
+def _setor_consumo_movimento():
+    """Setor onde a baixa/consumo é contabilizado."""
+    return Case(
+        When(setor_destino__gt='', then=F('setor_destino')),
+        default=F('setor_origem'),
+        output_field=CharField(),
+    )
+
+
+def _merge_setor_map(
+    dest: dict[str, dict],
+    rows,
+    setor_key: str,
+    *,
+    campo_qtd: str,
+    campo_val: str,
+    prefix: str,
+) -> None:
+    for row in rows:
+        setor = (row.get(setor_key) or '').strip() or SetorEstoque.FARMACIA
+        if setor not in dest:
+            dest[setor] = _linha_setor_vazia(setor)
+        dest[setor][f'{prefix}_qtd'] += row[campo_qtd] or Decimal('0')
+        dest[setor][f'{prefix}_valor'] += row[campo_val] or Decimal('0')
+
+
+def _linha_setor_vazia(setor: str) -> dict:
+    return {
+        'setor': setor,
+        'rotulo': rotulo_setor(setor),
+        'estoque_qtd': Decimal('0'),
+        'estoque_valor': Decimal('0'),
+        'estoque_itens': 0,
+        'entrada_qtd': Decimal('0'),
+        'entrada_valor': Decimal('0'),
+        'saida_qtd': Decimal('0'),
+        'saida_valor': Decimal('0'),
+    }
+
+
+def _montar_dados_por_setor(
+    empresa_id: int,
+    *,
+    ini: date,
+    fim: date,
+    qs_farm,
+    movs_mes,
+    dec: DecimalField,
+) -> list[dict]:
+    por_setor: dict[str, dict] = {}
+
+    farm_qtd = qs_farm.aggregate(
+        total=Coalesce(Sum('quantidade_estoque'), Decimal('0')),
+        valor=Sum(_valor_linha_custo_medio(), output_field=dec),
+        itens=Count('id', filter=Q(quantidade_estoque__gt=0)),
+    )
+    por_setor[SetorEstoque.FARMACIA] = {
+        **_linha_setor_vazia(SetorEstoque.FARMACIA),
+        'estoque_qtd': farm_qtd['total'] or Decimal('0'),
+        'estoque_valor': farm_qtd['valor'] or Decimal('0'),
+        'estoque_itens': farm_qtd['itens'] or 0,
+    }
+
+    saldos_setor = (
+        SaldoEstoqueSetor.objects.filter(
+            produto__empresa_id=empresa_id,
+            produto__natureza=NaturezaEstoque.CONSUMIVEL,
+        )
+        .exclude(setor=SetorEstoque.FARMACIA)
+        .values('setor')
+        .annotate(
+            qtd=Coalesce(Sum('quantidade'), Decimal('0')),
+            valor=Sum(
+                Coalesce(F('quantidade'), Decimal('0'))
+                * Coalesce(F('produto__valor_custo_medio'), Decimal('0')),
+                output_field=dec,
+            ),
+            itens=Count('produto', filter=Q(quantidade__gt=0)),
+        )
+    )
+    for row in saldos_setor:
+        setor = (row['setor'] or '').strip()
+        if not setor:
+            continue
+        por_setor[setor] = {
+            **_linha_setor_vazia(setor),
+            'estoque_qtd': row['qtd'] or Decimal('0'),
+            'estoque_valor': row['valor'] or Decimal('0'),
+            'estoque_itens': row['itens'] or 0,
+        }
+
+    val_mov = Sum(_valor_movimento(), output_field=dec)
+
+    setor_entrada_nf = Case(
+        When(setor_destino__gt='', then=F('setor_destino')),
+        default=Value(SetorEstoque.FARMACIA),
+        output_field=CharField(),
+    )
+    _merge_setor_map(
+        por_setor,
+        movs_mes.filter(tipo=MovimentoEstoque.Tipo.ENTRADA_NF)
+        .annotate(setor_ref=setor_entrada_nf)
+        .values('setor_ref')
+        .annotate(qtd=Sum('quantidade'), val=val_mov),
+        'setor_ref',
+        campo_qtd='qtd',
+        campo_val='val',
+        prefix='entrada',
+    )
+
+    _merge_setor_map(
+        por_setor,
+        movs_mes.filter(tipo=MovimentoEstoque.Tipo.TRANSFERENCIA)
+        .values('setor_destino')
+        .annotate(qtd=Sum('quantidade'), val=val_mov),
+        'setor_destino',
+        campo_qtd='qtd',
+        campo_val='val',
+        prefix='entrada',
+    )
+
+    _merge_setor_map(
+        por_setor,
+        movs_mes.filter(tipo=MovimentoEstoque.Tipo.TRANSFERENCIA)
+        .values('setor_origem')
+        .annotate(qtd=Sum('quantidade'), val=val_mov),
+        'setor_origem',
+        campo_qtd='qtd',
+        campo_val='val',
+        prefix='saida',
+    )
+
+    _merge_setor_map(
+        por_setor,
+        movs_mes.filter(tipo=MovimentoEstoque.Tipo.BAIXA)
+        .annotate(setor_ref=_setor_consumo_movimento())
+        .values('setor_ref')
+        .annotate(qtd=Sum('quantidade'), val=val_mov),
+        'setor_ref',
+        campo_qtd='qtd',
+        campo_val='val',
+        prefix='saida',
+    )
+
+    ordem = [s[0] for s in SETOR_LISTA_CEGA_FARMACIA]
+    ordem_idx = {c: i for i, c in enumerate(ordem)}
+
+    linhas = []
+    for setor_val, _rotulo in SETOR_LISTA_CEGA_FARMACIA:
+        base = por_setor.get(setor_val) or _linha_setor_vazia(setor_val)
+        linhas.append(
+            {
+                'setor': setor_val,
+                'rotulo': base['rotulo'],
+                'estoque_qtd_fmt': _fmt_numero(base['estoque_qtd']),
+                'estoque_valor_fmt': _fmt_moeda(base['estoque_valor']),
+                'estoque_itens': base['estoque_itens'],
+                'entrada_qtd_fmt': _fmt_numero(base['entrada_qtd']),
+                'entrada_valor_fmt': _fmt_moeda(base['entrada_valor']),
+                'saida_qtd_fmt': _fmt_numero(base['saida_qtd']),
+                'saida_valor_fmt': _fmt_moeda(base['saida_valor']),
+                'estoque_qtd': float(base['estoque_qtd']),
+                'entrada_qtd': float(base['entrada_qtd']),
+                'saida_qtd': float(base['saida_qtd']),
+            },
+        )
+
+    extras = [s for s in por_setor if s not in ordem_idx]
+    for setor in sorted(extras, key=lambda s: por_setor[s]['rotulo'].lower()):
+        base = por_setor[setor]
+        linhas.append(
+            {
+                'setor': setor,
+                'rotulo': base['rotulo'],
+                'estoque_qtd_fmt': _fmt_numero(base['estoque_qtd']),
+                'estoque_valor_fmt': _fmt_moeda(base['estoque_valor']),
+                'estoque_itens': base['estoque_itens'],
+                'entrada_qtd_fmt': _fmt_numero(base['entrada_qtd']),
+                'entrada_valor_fmt': _fmt_moeda(base['entrada_valor']),
+                'saida_qtd_fmt': _fmt_numero(base['saida_qtd']),
+                'saida_valor_fmt': _fmt_moeda(base['saida_valor']),
+                'estoque_qtd': float(base['estoque_qtd']),
+                'entrada_qtd': float(base['entrada_qtd']),
+                'saida_qtd': float(base['saida_qtd']),
+            },
+        )
+    return linhas
+
+
 def _serie_saidas_12_meses(empresa_id: int, ref: date | None = None) -> dict:
     meses = _ultimos_12_meses(ref)
     ini_global = meses[0][0]
@@ -182,6 +372,7 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
         'chart_12m_labels': [],
         'chart_12m_qtd': [],
         'chart_12m_valor': [],
+        'por_setor': [],
     }
     if not empresa_id:
         return vazio
@@ -265,6 +456,14 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
     )
 
     mes_nome = ini.strftime('%m/%Y')
+    por_setor = _montar_dados_por_setor(
+        empresa_id,
+        ini=ini,
+        fim=fim,
+        qs_farm=qs_farm,
+        movs_mes=movs,
+        dec=dec,
+    )
 
     return {
         'empresa_id': empresa_id,
@@ -312,4 +511,5 @@ def montar_kpis_estoque(empresa_id: int | None, *, ref: date | None = None) -> d
         'chart_12m_valor': chart['valor'],
         'chart_12m_inicio': chart['inicio'],
         'chart_12m_fim': chart['fim'],
+        'por_setor': por_setor,
     }

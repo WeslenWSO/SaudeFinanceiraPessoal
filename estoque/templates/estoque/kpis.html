@@ -85,6 +85,57 @@
     </div>
   </div>
 
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <h2 class="h6 text-muted mb-0">Dados por setor — {{ kpis.periodo_rotulo }}</h2>
+    <a href="{% url 'estoque:farmacia_lista_setores' %}" class="btn btn-outline-secondary btn-sm">Detalhe por setor</a>
+  </div>
+  <p class="small text-muted mb-2">
+    <strong>Estoque:</strong> depósito farmácia (saldo central) e saldos nos setores clínicos.
+    <strong>Entrada:</strong> NF + transferências recebidas.
+    <strong>Saída:</strong> baixas/consumo + transferências enviadas.
+  </p>
+  <div class="table-responsive mb-3">
+    <table class="table table-sm table-bordered">
+      <thead class="table-light">
+        <tr>
+          <th>Setor</th>
+          <th class="text-end">Itens c/ saldo</th>
+          <th class="text-end">Estoque (qtd)</th>
+          <th class="text-end">Estoque (R$)</th>
+          <th class="text-end">Entrada qtd</th>
+          <th class="text-end">Entrada R$</th>
+          <th class="text-end">Saída qtd</th>
+          <th class="text-end">Saída R$</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in kpis.por_setor %}
+        <tr>
+          <td>{{ row.rotulo }}</td>
+          <td class="text-end">{{ row.estoque_itens }}</td>
+          <td class="text-end">{{ row.estoque_qtd_fmt }}</td>
+          <td class="text-end">R$ {{ row.estoque_valor_fmt }}</td>
+          <td class="text-end">{{ row.entrada_qtd_fmt }}</td>
+          <td class="text-end">R$ {{ row.entrada_valor_fmt }}</td>
+          <td class="text-end">{{ row.saida_qtd_fmt }}</td>
+          <td class="text-end">R$ {{ row.saida_valor_fmt }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-muted">Sem dados por setor.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 mb-1">Movimentação por setor no mês (quantidade)</h2>
+      <div class="est-chart-wrap" style="height: 280px;">
+        <canvas id="chartSetoresMes" aria-label="Entradas e saídas por setor"></canvas>
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h6 mb-1">Saídas nos últimos 12 meses</h2>
@@ -202,10 +253,35 @@
 </div>
 
 {{ chart_saidas|json_script:"est-chart-saidas-data" }}
+{{ chart_setores|json_script:"est-chart-setores-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
   if (typeof Chart === 'undefined') return;
+
+  var rawSet = document.getElementById('est-chart-setores-data');
+  var elSet = document.getElementById('chartSetoresMes');
+  if (rawSet && elSet) {
+    var ds = JSON.parse(rawSet.textContent);
+    new Chart(elSet, {
+      type: 'bar',
+      data: {
+        labels: ds.labels,
+        datasets: [
+          { label: 'Estoque atual', data: ds.estoque, backgroundColor: 'rgba(31, 56, 100, 0.7)' },
+          { label: 'Entrada no mês', data: ds.entrada, backgroundColor: 'rgba(25, 135, 84, 0.75)' },
+          { label: 'Saída no mês', data: ds.saida, backgroundColor: 'rgba(253, 126, 20, 0.75)' },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: false }, y: { beginAtZero: true } },
+      },
+    });
+  }
+
   var el = document.getElementById('chartSaidas12m');
   var raw = document.getElementById('est-chart-saidas-data');
   if (!el || !raw) return;

@@ -691,14 +691,30 @@ def conta_azul_dashboard(request):
     analises_ctx: dict = {}
     if aba_ativa == 'analises':
         modelo_codigo = (request.GET.get('modelo') or '').strip().lower()
-        analises_ctx = montar_contexto_aba_analises(
-            request,
-            empresa.pk,
-            ano=ctx['ano_ref'],
-            mes=ctx['mes_ref'],
-            regime=ctx['regime'],
-            modelo_codigo=modelo_codigo or None,
-        )
+        try:
+            analises_ctx = montar_contexto_aba_analises(
+                request,
+                empresa.pk,
+                ano=ctx['ano_ref'],
+                mes=ctx['mes_ref'],
+                regime=ctx['regime'],
+                modelo_codigo=modelo_codigo or None,
+            )
+        except (ProgrammingError, OperationalError) as exc:
+            from SaudeFinanceira.db_schema import capturar_erro_schema
+
+            msg_schema = capturar_erro_schema(exc, contexto='aba Análises')
+            if msg_schema:
+                logger.exception('Dashboard análises — schema desatualizado empresa=%s', empresa.pk)
+                messages.error(request, msg_schema)
+                analises_ctx = {
+                    'modelos_analise': (),
+                    'modelo_analise': '',
+                    'modelo_analise_partial': '',
+                    'url_analise_modelo_base': '?aba=analises&mes=' + ctx['mes_filtro'] + '&modelo=',
+                }
+            else:
+                raise
 
     return render(
         request,

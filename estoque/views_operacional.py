@@ -688,6 +688,20 @@ def kpis_estoque(request):
         'qtd': kpis['chart_12m_qtd'],
         'valor': kpis['chart_12m_valor'],
     }
+    por_setor = kpis.get('por_setor') or []
+    chart_setores = {
+        'labels': [r['rotulo'] for r in por_setor if r.get('estoque_qtd') or r.get('entrada_qtd') or r.get('saida_qtd')],
+        'estoque': [r.get('estoque_qtd', 0) for r in por_setor if r.get('estoque_qtd') or r.get('entrada_qtd') or r.get('saida_qtd')],
+        'entrada': [r.get('entrada_qtd', 0) for r in por_setor if r.get('estoque_qtd') or r.get('entrada_qtd') or r.get('saida_qtd')],
+        'saida': [r.get('saida_qtd', 0) for r in por_setor if r.get('estoque_qtd') or r.get('entrada_qtd') or r.get('saida_qtd')],
+    }
+    if not chart_setores['labels']:
+        chart_setores = {
+            'labels': [r['rotulo'] for r in por_setor],
+            'estoque': [r.get('estoque_qtd', 0) for r in por_setor],
+            'entrada': [r.get('entrada_qtd', 0) for r in por_setor],
+            'saida': [r.get('saida_qtd', 0) for r in por_setor],
+        }
 
     return render(
         request,
@@ -695,6 +709,7 @@ def kpis_estoque(request):
         {
             'kpis': kpis,
             'chart_saidas': chart_saidas,
+            'chart_setores': chart_setores,
             'descricao': 'KPIs de estoque',
         },
     )

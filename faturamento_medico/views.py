@@ -6161,12 +6161,22 @@ def acerto_caixa(request):
         messages.error(request, 'Selecione uma empresa.')
         return redirect('dashboard:relatorio_mensal')
 
+    from django.db.utils import OperationalError, ProgrammingError
+
     from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
+    from SaudeFinanceira.db_schema import capturar_erro_schema
 
     from empresa.models import Empresa
 
     empresa = Empresa.objects.filter(pk=empresa_id).first()
-    contexto = montar_contexto_acerto_caixa(request, empresa_id)
+    try:
+        contexto = montar_contexto_acerto_caixa(request, empresa_id)
+    except (ProgrammingError, OperationalError) as exc:
+        msg_schema = capturar_erro_schema(exc, contexto='acerto de caixa')
+        if msg_schema:
+            messages.error(request, msg_schema)
+            return redirect('faturamento_medico:ftlistar')
+        raise
     contexto['empresa'] = empresa
     contexto['redirect_qs'] = request.GET.urlencode()
     return render(request, 'faturamento_medico/acerto_caixa.html', contexto)

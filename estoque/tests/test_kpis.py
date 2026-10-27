@@ -5,7 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from empresa.models import Empresa
-from estoque.models import MovimentoEstoque, NaturezaEstoque, ProdutoEstoque
+from estoque.models import MovimentoEstoque, NaturezaEstoque, ProdutoEstoque, SaldoEstoqueSetor
+from estoque.setores import SetorEstoque
 from estoque.services.kpis import montar_kpis_estoque
 
 
@@ -53,6 +54,30 @@ class KpisEstoqueServiceTest(TestCase):
         self.assertIn('7,50', data['top_saidas_mes'][0]['valor_fmt'])
         self.assertEqual(len(data['chart_12m_labels']), 12)
         self.assertEqual(len(data['chart_12m_qtd']), 12)
+
+    def test_por_setor_entrada_saida(self):
+        p = ProdutoEstoque.objects.create(
+            empresa=self.empresa,
+            codigo_produto='C1',
+            descricao='Item C',
+            natureza=NaturezaEstoque.CONSUMIVEL,
+            quantidade_estoque=Decimal('10'),
+            valor_custo_medio=Decimal('1'),
+        )
+        SaldoEstoqueSetor.objects.create(produto=p, setor=SetorEstoque.SEDACAO, quantidade=Decimal('2'))
+        MovimentoEstoque.objects.create(
+            empresa=self.empresa,
+            produto=p,
+            tipo=MovimentoEstoque.Tipo.TRANSFERENCIA,
+            setor_origem=SetorEstoque.FARMACIA,
+            setor_destino=SetorEstoque.SEDACAO,
+            quantidade=Decimal('2'),
+            valor_unitario=Decimal('1'),
+        )
+        data = montar_kpis_estoque(self.empresa.pk)
+        sedacao = next(r for r in data['por_setor'] if r['setor'] == SetorEstoque.SEDACAO)
+        self.assertEqual(sedacao['estoque_qtd'], 2.0)
+        self.assertEqual(sedacao['entrada_qtd'], 2.0)
 
 
 class KpisEstoqueViewTest(TestCase):
