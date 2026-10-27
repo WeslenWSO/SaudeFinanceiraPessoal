@@ -5,7 +5,7 @@
   <h1 class="h4 mb-3">{{ descricao }}</h1>
   {% include 'parcial/_messages.html' %}
 
-  <form method="post" class="card shadow-sm p-4">
+  <form method="post" class="card shadow-sm p-4" id="form-inventario">
     {% csrf_token %}
     <div class="mb-3">
       <label class="form-label" for="id_descricao">Descrição</label>
@@ -25,19 +25,51 @@
 
     {% if not object.pk %}
     <div class="mb-3">
-      <label class="form-label">{{ form.produtos.label }}</label>
-      {{ form.produtos }}
-      {% if form.produtos.help_text %}<div class="form-text">{{ form.produtos.help_text }}</div>{% endif %}
+      <label class="form-label" for="inv-busca-produto">Produtos que participam do inventário</label>
+      <p class="form-text mb-2">
+        Busque por <strong>código</strong> ou <strong>descrição</strong> e clique no resultado para incluir na grade.
+        Se a grade ficar vazia ao salvar, entram <em>todos</em> os consumíveis do estoque.
+      </p>
+      <div class="position-relative mb-2">
+        <input type="search" id="inv-busca-produto" class="form-control" placeholder="Ex.: 1234 ou dipirona" autocomplete="off">
+        <div id="inv-busca-resultados" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 20; max-height: 14rem; overflow-y: auto;"></div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="inv-btn-todos-produtos">Incluir todos os consumíveis</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="inv-btn-limpar-grade">Limpar grade</button>
+        <span class="align-self-center small text-muted" id="inv-contador-produtos">0 produto(s)</span>
+      </div>
+      <div id="inv-produtos-hidden"></div>
+      <div class="table-responsive border rounded">
+        <table class="table table-sm table-hover mb-0 align-middle" id="inv-grade-produtos">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Descrição</th>
+              <th>Marca</th>
+              <th class="text-end">Saldo no setor</th>
+              <th style="width: 5rem;"></th>
+            </tr>
+          </thead>
+          <tbody id="inv-grade-corpo">
+            <tr id="inv-grade-vazia">
+              <td colspan="5" class="text-center text-muted py-3">Nenhum produto incluído — use a busca acima.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {% if form.produto_inventario_ids.errors %}
+      <div class="text-danger small mt-1">{{ form.produto_inventario_ids.errors }}</div>
+      {% endif %}
     </div>
     {% endif %}
 
     <div class="alert alert-light border small mb-3">
       <strong>Como funciona</strong>
       <ul class="mb-0 ps-3">
-        <li><strong>Setor:</strong> a coluna «Qtd. estoque» reflete o saldo <em>naquele setor</em> (farmácia ou setor clínico).</li>
-        <li><strong>Produtos:</strong> lista acima (ou todos os consumíveis do Estoque se vazio). Vale para <em>todos</em> os contadores.</li>
+        <li><strong>Setor:</strong> a coluna «Saldo no setor» usa o setor escolhido acima.</li>
+        <li><strong>Produtos:</strong> só entram na contagem os itens da grade (ou todos, se vazia).</li>
         <li><strong>Usuários:</strong> em cada coluna abaixo, escolha quem pode lançar a <strong>1ª</strong>, <strong>2ª</strong> ou <strong>3ª</strong> contagem.</li>
-        <li>Não há produtos diferentes por usuário — quem está na 1ª contagem vê os mesmos itens do inventário.</li>
       </ul>
     </div>
 
@@ -65,4 +97,225 @@
     </div>
   </form>
 </div>
+
+{% if not object.pk and buscar_produtos_url %}
+{{ produtos_grid_inicial|json_script:"inv-produtos-inicial" }}
+<script>
+(function() {
+    var buscarUrl = "{% url 'inventario:buscar_produtos' %}";
+
+    var setorEl = document.getElementById('id_setor');
+    var buscaEl = document.getElementById('inv-busca-produto');
+    var resultadosEl = document.getElementById('inv-busca-resultados');
+    var corpoEl = document.getElementById('inv-grade-corpo');
+    var vaziaEl = document.getElementById('inv-grade-vazia');
+    var hiddenEl = document.getElementById('inv-produtos-hidden');
+    var contadorEl = document.getElementById('inv-contador-produtos');
+    var btnTodos = document.getElementById('inv-btn-todos-produtos');
+    var btnLimpar = document.getElementById('inv-btn-limpar-grade');
+
+    var produtosMap = {};
+    var debounceTimer = null;
+
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function setorAtual() {
+        return setorEl ? setorEl.value : 'farmacia';
+    }
+
+    function idsNaGrade() {
+        return Object.keys(produtosMap);
+    }
+
+    function syncHidden() {
+        if (!hiddenEl) return;
+        hiddenEl.innerHTML = '';
+        idsNaGrade().forEach(function(id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'produto_inventario_ids';
+            inp.value = id;
+            hiddenEl.appendChild(inp);
+        });
+    }
+
+    function atualizarContador() {
+        var n = idsNaGrade().length;
+        if (contadorEl) contadorEl.textContent = n + ' produto(s)';
+        if (vaziaEl) vaziaEl.classList.toggle('d-none', n > 0);
+    }
+
+    function renderLinha(p) {
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-produto-id', String(p.id));
+        tr.innerHTML =
+            '<td><code>' + escapeHtml(p.codigo) + '</code></td>' +
+            '<td>' + escapeHtml(p.descricao) + '</td>' +
+            '<td>' + escapeHtml(p.marca || '—') + '</td>' +
+            '<td class="text-end">' + escapeHtml(p.saldo_fmt) + '</td>' +
+            '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm py-0 inv-remover-produto">Remover</button></td>';
+        return tr;
+    }
+
+    function adicionarProduto(p) {
+        if (!p || !p.id) return;
+        var key = String(p.id);
+        if (produtosMap[key]) return;
+        produtosMap[key] = p;
+        if (vaziaEl) vaziaEl.classList.add('d-none');
+        corpoEl.appendChild(renderLinha(p));
+        syncHidden();
+        atualizarContador();
+    }
+
+    function removerProduto(id) {
+        var key = String(id);
+        delete produtosMap[key];
+        var tr = corpoEl.querySelector('tr[data-produto-id="' + key + '"]');
+        if (tr) tr.remove();
+        syncHidden();
+        atualizarContador();
+    }
+
+    function fecharResultados() {
+        if (resultadosEl) {
+            resultadosEl.classList.add('d-none');
+            resultadosEl.innerHTML = '';
+        }
+    }
+
+    function mostrarResultados(lista) {
+        if (!resultadosEl) return;
+        resultadosEl.innerHTML = '';
+        if (!lista.length) {
+            resultadosEl.innerHTML = '<div class="list-group-item small text-muted">Nenhum produto encontrado.</div>';
+        } else {
+            lista.forEach(function(p) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action py-2 inv-pick-produto';
+                btn.innerHTML =
+                    '<strong>' + escapeHtml(p.codigo) + '</strong> — ' + escapeHtml(p.descricao) +
+                    ' <span class="text-muted small">(saldo: ' + escapeHtml(p.saldo_fmt) + ')</span>';
+                btn.addEventListener('click', function() {
+                    adicionarProduto(p);
+                    fecharResultados();
+                    if (buscaEl) buscaEl.value = '';
+                });
+                resultadosEl.appendChild(btn);
+            });
+        }
+        resultadosEl.classList.remove('d-none');
+    }
+
+    function buscarProdutos(opts) {
+        opts = opts || {};
+        var params = new URLSearchParams();
+        params.set('setor', setorAtual());
+        if (opts.todos) {
+            params.set('todos', '1');
+        } else {
+            params.set('q', opts.q || '');
+        }
+        var excl = idsNaGrade().join(',');
+        if (excl) params.set('excluir', excl);
+
+        fetch(buscarUrl + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (!res.ok) return;
+                if (opts.todos) {
+                    (res.produtos || []).forEach(adicionarProduto);
+                    return;
+                }
+                mostrarResultados(res.produtos || []);
+            })
+            .catch(function() { fecharResultados(); });
+    }
+
+    if (corpoEl) {
+        corpoEl.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.inv-remover-produto');
+            if (!btn) return;
+            var tr = btn.closest('tr[data-produto-id]');
+            if (tr) removerProduto(tr.getAttribute('data-produto-id'));
+        });
+    }
+
+    if (buscaEl) {
+        buscaEl.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            var q = buscaEl.value.trim();
+            if (q.length < 1) {
+                fecharResultados();
+                return;
+            }
+            debounceTimer = setTimeout(function() { buscarProdutos({ q: q }); }, 280);
+        });
+        buscaEl.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') fecharResultados();
+        });
+    }
+
+    document.addEventListener('click', function(ev) {
+        if (!resultadosEl || !buscaEl) return;
+        if (ev.target === buscaEl || resultadosEl.contains(ev.target)) return;
+        fecharResultados();
+    });
+
+    if (setorEl) {
+        setorEl.addEventListener('change', function() {
+            idsNaGrade().forEach(function(id) {
+                var p = produtosMap[id];
+                if (!p) return;
+                fetch(buscarUrl + '?setor=' + encodeURIComponent(setorAtual()) + '&q=' + encodeURIComponent(p.codigo), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(function(r) { return r.json(); })
+                    .then(function(res) {
+                        if (!res.ok || !res.produtos || !res.produtos.length) return;
+                        var atualizado = res.produtos[0];
+                        produtosMap[id] = atualizado;
+                        var tr = corpoEl.querySelector('tr[data-produto-id="' + id + '"]');
+                        if (tr && tr.cells[3]) tr.cells[3].textContent = atualizado.saldo_fmt;
+                    });
+            });
+        });
+    }
+
+    if (btnTodos) {
+        btnTodos.addEventListener('click', function() {
+            if (!confirm('Incluir todos os produtos consumíveis na grade?')) return;
+            buscarProdutos({ todos: true });
+        });
+    }
+
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', function() {
+            produtosMap = {};
+            corpoEl.querySelectorAll('tr[data-produto-id]').forEach(function(tr) { tr.remove(); });
+            syncHidden();
+            atualizarContador();
+        });
+    }
+
+    try {
+        var inicialEl = document.getElementById('inv-produtos-inicial');
+        if (inicialEl) {
+            var inicial = JSON.parse(inicialEl.textContent);
+            (inicial || []).forEach(adicionarProduto);
+        }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+{% endif %}
 {% endblock %}
