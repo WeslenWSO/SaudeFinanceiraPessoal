@@ -278,9 +278,11 @@
             O inventário passará para o status <strong>Concluído</strong> e não poderá mais ser alterado.
             Faça backup antes, se necessário.
           </p>
-          <label class="form-label" for="senha-aplicar-estoque">Senha do administrador</label>
+          <label class="form-label" for="admin-usuario-aplicar-estoque">Usuário administrador</label>
+          <input type="text" class="form-control mb-2" id="admin-usuario-aplicar-estoque" name="admin_usuario" required autocomplete="username" autocapitalize="off">
+          <label class="form-label" for="senha-aplicar-estoque">Senha</label>
           <input type="password" class="form-control" id="senha-aplicar-estoque" name="senha" required autocomplete="current-password">
-          <div class="form-text">Use a senha do seu usuário administrador (staff) logado.</div>
+          <div class="form-text">Login e senha de um administrador (staff) ou usuário Admin/Saude autorizado.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>

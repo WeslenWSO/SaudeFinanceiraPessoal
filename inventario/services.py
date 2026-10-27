@@ -60,6 +60,14 @@ def salvar_responsaveis(
 
 
 def usuario_pode_contar(inventario: Inventario, usuario: User, rodada: int) -> bool:
-    from inventario.permissoes import usuario_pode_inventario
+    from inventario.permissoes import usuario_pode_acessar_inventario
 
-    return usuario_pode_inventario(usuario)
+    if not usuario_pode_acessar_inventario(usuario):
+        return False
+    responsaveis = InventarioResponsavelContagem.objects.filter(
+        inventario=inventario,
+        rodada=rodada,
+    )
+    if not responsaveis.exists():
+        return True
+    return responsaveis.filter(usuario=usuario).exists()

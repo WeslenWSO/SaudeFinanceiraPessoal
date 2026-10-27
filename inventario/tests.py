@@ -9,6 +9,13 @@ from estoque.models import ProdutoEstoque
 from inventario.backup_estoque import aplicar_contagem_ao_estoque, criar_backup_estoque
 from inventario.models import EstoqueBackup, Inventario, InventarioItem, InventarioResponsavelContagem
 from inventario.services import popular_itens_do_estoque, salvar_responsaveis, usuario_pode_contar
+from usuario.menu import MARCADOR_MENU_CONFIGURADO
+from usuario.models import PermissaoMenuUsuario
+
+
+def _liberar_menu_inventario(user: User) -> None:
+    PermissaoMenuUsuario.objects.create(usuario=user, codigo=MARCADOR_MENU_CONFIGURADO)
+    PermissaoMenuUsuario.objects.create(usuario=user, codigo='inventario')
 
 
 class InventarioModelTests(TestCase):
@@ -44,6 +51,8 @@ class InventarioFluxoTests(TestCase):
         self.empresa = Empresa.objects.create(razao='Empresa Teste', cnpj='12345678000199')
         self.contador = User.objects.create_user('contador', password='x')
         self.outro = User.objects.create_user('outro', password='x')
+        _liberar_menu_inventario(self.contador)
+        _liberar_menu_inventario(self.outro)
         ProdutoEstoque.objects.create(
             empresa=self.empresa,
             codigo_produto='P001',

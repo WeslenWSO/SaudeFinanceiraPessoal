@@ -210,8 +210,13 @@ class InventarioDetailView(RequerAdminInventarioMixin, _EmpresaInventarioMixin, 
             for rodada in (1, 2, 3)
         }
         ctx['rodada_estoque'] = inv.rodada_atualiza_estoque
+        from inventario.permissoes import usuario_pode_aplicar_contagem_estoque
+
         ctx['pode_aplicar_contagem_estoque'] = (
-            inv.aberto and not inv.concluido and inv.rodada_atualiza_estoque in (1, 2, 3)
+            usuario_pode_aplicar_contagem_estoque(self.request.user)
+            and inv.aberto
+            and not inv.concluido
+            and inv.rodada_atualiza_estoque in (1, 2, 3)
         )
         ctx['ultimo_backup'] = (
             inv.backups_estoque.prefetch_related('linhas').order_by('-criado_em').first()
@@ -473,16 +478,24 @@ def inventario_aplicar_estoque(request, pk):
         messages.error(request, 'Inventário fechado.')
         return redirect('inventario:inventario_detail', pk=pk)
 
-    from inventario.permissoes import validar_senha_administrador_inventario
+    from inventario.permissoes import (
+        usuario_pode_aplicar_contagem_estoque,
+        validar_credencial_aplicar_inventario,
+    )
 
+    if not usuario_pode_aplicar_contagem_estoque(request.user):
+        messages.error(request, 'Sem permissão para aplicar contagem ao estoque.')
+        return redirect('inventario:inventario_detail', pk=pk)
+
+    admin_login = (request.POST.get('admin_usuario') or '').strip()
     senha = (request.POST.get('senha') or '').strip()
-    ok_senha, msg_senha = validar_senha_administrador_inventario(request.user, senha)
-    if not ok_senha:
-        messages.error(request, msg_senha)
+    ok_cred, msg_cred, admin_user = validar_credencial_aplicar_inventario(admin_login, senha)
+    if not ok_cred or admin_user is None:
+        messages.error(request, msg_cred)
         return redirect('inventario:inventario_detail', pk=pk)
 
     try:
-        stats = aplicar_contagem_ao_estoque(inventario, request.user)
+        stats = aplicar_contagem_ao_estoque(inventario, admin_user)
     except ValueError as exc:
         messages.error(request, str(exc))
         return redirect('inventario:inventario_detail', pk=pk)
