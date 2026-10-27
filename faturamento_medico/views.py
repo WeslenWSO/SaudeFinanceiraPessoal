@@ -4756,7 +4756,9 @@ def vincular_nota_solicitante_faturamento(request):
         empresa_id=empresa_id,
         data_cancelamento__isnull=True,
     )
+    from faturamento_medico.models import rotulo_caixa_acerto
     from faturamento_medico.services.pagamentos_acerto_caixa import (
+        aplicar_caixa_acerto_ao_vincular_nota,
         aplicar_pagamentos_acerto_ao_vincular_nota,
         serializar_pagamentos_json,
         texto_forma_pgto,
@@ -4765,12 +4767,16 @@ def vincular_nota_solicitante_faturamento(request):
     faturamento.nota_fiscal = nota.numero_nota
     faturamento.save(update_fields=['nota_fiscal'])
     pagamentos = aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota)
+    caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, nota)
     forma_pgto = texto_forma_pgto(pagamentos)
     return JsonResponse({
         'ok': True,
         'nota': serializar_nota_linha(nota, manual=True),
         'forma_pgto_acerto': forma_pgto,
         'pagamentos_acerto_json': serializar_pagamentos_json(pagamentos),
+        'caixa_acerto': caixa_val,
+        'caixa_acerto_rotulo': rotulo_caixa_acerto(caixa_val, empresa_id) if caixa_val else '',
+        'marcado_acerto_caixa': bool(faturamento.marcado_acerto_caixa),
     })
 
 

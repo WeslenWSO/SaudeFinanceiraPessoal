@@ -240,7 +240,11 @@ def importar_nfse_prestador_conta_azul(
                     cache_cobranca=cache_cobranca,
                 )
                 depois = (campos.get('discriminacao') or '').strip()
-                if depois and depois != antes:
+                if (
+                    (depois and depois != antes)
+                    or campos.get('forma_pagamento') is not None
+                    or (campos.get('caixa_acerto_sugerido') or '').strip()
+                ):
                     stats['vendas_sincronizadas'] += 1
 
             existente = _localizar_nfse(

@@ -390,6 +390,7 @@ def conta_azul_sincronizar(request, pk):
                 despesas='despesas' in request.POST,
                 transferencias='transferencias' in request.POST,
                 nfse_prestador='nfse_prestador' in request.POST,
+                vendas='vendas' in request.POST or 'nfse_prestador' in request.POST,
                 data_de=data_de,
                 data_ate=data_ate,
             )

@@ -9,6 +9,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.urls import reverse
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
 from .produto_foto import (
     baixar_bytes_imagem,
@@ -1273,10 +1274,21 @@ def listar_produtos_comercio(request):
             'produto', 'movimento',
         )
     }
+    from estoque.services.de_para_nota import situacao_codigo_nota
+
     for item in page_itens:
         entrada = entradas.get(item.id)
         item.entrada_estoque = entrada
         item.pode_estornar_entrada = bool(entrada and pode_estornar_entrada_nota(entrada))
+        sit = situacao_codigo_nota(
+            empresa_id,
+            item.codigo_produto,
+            item.nota_fiscal.fornecedor_id,
+        )
+        item.precisa_vinculo_produto = sit['precisa_vinculo']
+        item.produto_destino_nf = sit['produto_destino']
+        item.codigo_sistema_nf = sit['codigo_sistema']
+        item.via_de_para_nf = sit['via_de_para']
 
     destino_estoque = (request.GET.get('destino_estoque') or '').strip().lower()
     if destino_estoque not in ('imobilizado', 'consumivel', 'farmacia'):
@@ -1295,6 +1307,7 @@ def listar_produtos_comercio(request):
         'setores_imobilizado': list(SETOR_LOCALIZACAO_IMOBILIZADO),
         'totais': totais,
         'quantidade_registros': paginator.count,
+        'buscar_produtos_nf_url': reverse('estoque:buscar_produtos_nf'),
     }
     return render(request, 'notafiscalentrada/produtos_comercio.html', context)
 

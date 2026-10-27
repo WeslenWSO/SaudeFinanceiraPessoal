@@ -127,6 +127,38 @@ def importar_vendas_conta_azul(
     return stats
 
 
+def atualizar_nfse_com_vendas_importadas(
+    empresa,
+    *,
+    data_de: date,
+    data_ate: date,
+) -> dict[str, int]:
+    from notasfiscais.discriminacao_nfse import extrair_id_venda_conta_azul
+    from notasfiscais.models import NotaFiscalServico
+
+    stats = {'atualizadas': 0, 'ignoradas': 0}
+    for nota in NotaFiscalServico.objects.filter(
+        empresa=empresa,
+        data_emissao__gte=data_de,
+        data_emissao__lte=data_ate,
+    ):
+        id_v = extrair_id_venda_conta_azul(nota.observacoes)
+        if not id_v:
+            stats['ignoradas'] += 1
+            continue
+        venda = VendaContaAzul.objects.filter(empresa=empresa, conta_azul_id=id_v).first()
+        if not venda:
+            stats['ignoradas'] += 1
+            continue
+        upd = aplicar_venda_cache_em_nota(nota, venda)
+        if upd:
+            nota.save(update_fields=upd)
+            stats['atualizadas'] += 1
+        else:
+            stats['ignoradas'] += 1
+    return stats
+
+
 def aplicar_venda_cache_em_nota(nota, venda: VendaContaAzul) -> list[str]:
     """Atualiza NF local com dados já sincronizados da venda. Retorna update_fields."""
     campos: list[str] = []

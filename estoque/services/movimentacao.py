@@ -97,6 +97,82 @@ def _ajustar_setor(produto: ProdutoEstoque, setor: str, delta: Decimal) -> None:
     saldo.save(update_fields=['quantidade'])
 
 
+def _resolver_produto_entrada_nota(
+    item: NotaFiscalEntradaItem,
+    *,
+    natureza: str,
+    marca: str,
+    unidade_master: str,
+    quantidade_por_master,
+    setor_localizacao: str,
+    produto_escolhido: ProdutoEstoque | None,
+) -> ProdutoEstoque:
+    from estoque.services.de_para_nota import buscar_produto_de_para
+
+    empresa = item.nota_fiscal.empresa
+    codigo = (item.codigo_produto or '').strip()
+    if not codigo:
+        raise EstoqueErro('Item sem código de produto.')
+    setor_loc = (setor_localizacao or '').strip()
+    q_master = quantidade_por_master if quantidade_por_master is not None else None
+
+    if produto_escolhido is not None:
+        if produto_escolhido.empresa_id != empresa.pk:
+            raise EstoqueErro('Produto selecionado não pertence à empresa.')
+        if produto_escolhido.natureza != natureza:
+            rotulo = produto_escolhido.get_natureza_display()
+            raise EstoqueErro(
+                f'O produto {produto_escolhido.codigo_produto} é {rotulo}; '
+                'escolha um item da mesma natureza deste lançamento.',
+            )
+        produto = produto_escolhido
+        created = False
+    else:
+        produto = ProdutoEstoque.objects.filter(
+            empresa=empresa,
+            codigo_produto=codigo,
+        ).first()
+        if not produto:
+            produto = buscar_produto_de_para(
+                empresa.pk,
+                codigo,
+                item.nota_fiscal.fornecedor_id,
+            )
+        if produto:
+            created = False
+        else:
+            produto, created = ProdutoEstoque.objects.get_or_create(
+                empresa=empresa,
+                codigo_produto=codigo,
+                defaults={
+                    'natureza': natureza,
+                    'setor_localizacao': setor_loc[:32] if setor_loc else '',
+                    'descricao': (item.nome_produto or codigo)[:300],
+                    'marca': (marca or '')[:120],
+                    'unidade': (item.unidade or '')[:20],
+                    'unidade_master': (unidade_master or '')[:20],
+                    'quantidade_por_master': quantidade_por_master or Decimal('0'),
+                },
+            )
+
+    if not created:
+        if produto.natureza != natureza:
+            rotulo = produto.get_natureza_display()
+            raise EstoqueErro(
+                f'Código {produto.codigo_produto} já está cadastrado como {rotulo}. '
+                'Use a tela correta de estoque ou vincule outro produto (de-para).',
+            )
+        if marca:
+            produto.marca = marca[:120]
+        if unidade_master:
+            produto.unidade_master = unidade_master[:20]
+        if q_master is not None and q_master > 0:
+            produto.quantidade_por_master = q_master
+        if item.nome_produto and len(item.nome_produto) > len(produto.descricao or ''):
+            produto.descricao = item.nome_produto[:300]
+    return produto
+
+
 @transaction.atomic
 def gerar_entrada_desde_item_nota(
     item: NotaFiscalEntradaItem,
@@ -109,6 +185,9 @@ def gerar_entrada_desde_item_nota(
     natureza: str = NaturezaEstoque.CONSUMIVEL,
     setor_localizacao: str = '',
     unidade_consumo: str = '',
+    produto: ProdutoEstoque | None = None,
+    salvar_de_para: bool = False,
+    de_para_global_fornecedor: bool = False,
 ) -> EntradaEstoqueNota:
     if item.nota_fiscal.tipo_nota != 'comercio':
         raise EstoqueErro('Somente itens de NF de comércio geram estoque.')
@@ -117,8 +196,6 @@ def gerar_entrada_desde_item_nota(
 
     empresa = item.nota_fiscal.empresa
     codigo = (item.codigo_produto or '').strip()
-    if not codigo:
-        raise EstoqueErro('Item sem código de produto.')
     if natureza not in NaturezaEstoque.values:
         natureza = NaturezaEstoque.CONSUMIVEL
     setor_entrada = (
@@ -128,35 +205,25 @@ def gerar_entrada_desde_item_nota(
     )
     setor_loc = (setor_localizacao or '').strip()
 
-    produto, created = ProdutoEstoque.objects.get_or_create(
-        empresa=empresa,
-        codigo_produto=codigo,
-        defaults={
-            'natureza': natureza,
-            'setor_localizacao': setor_loc[:32] if setor_loc else '',
-            'descricao': (item.nome_produto or codigo)[:300],
-            'marca': (marca or '')[:120],
-            'unidade': (item.unidade or '')[:20],
-            'unidade_master': (unidade_master or '')[:20],
-            'quantidade_por_master': quantidade_por_master or Decimal('0'),
-        },
+    produto = _resolver_produto_entrada_nota(
+        item,
+        natureza=natureza,
+        marca=marca,
+        unidade_master=unidade_master,
+        quantidade_por_master=quantidade_por_master,
+        setor_localizacao=setor_loc,
+        produto_escolhido=produto,
     )
-    q_master = quantidade_por_master if quantidade_por_master is not None else None
-    if not created:
-        if produto.natureza != natureza:
-            rotulo = produto.get_natureza_display()
-            raise EstoqueErro(
-                f'Código {codigo} já está cadastrado como {rotulo}. '
-                'Use a tela correta de estoque ou outro código.',
-            )
-        if marca:
-            produto.marca = marca[:120]
-        if unidade_master:
-            produto.unidade_master = unidade_master[:20]
-        if q_master is not None and q_master > 0:
-            produto.quantidade_por_master = q_master
-        if item.nome_produto and len(item.nome_produto) > len(produto.descricao or ''):
-            produto.descricao = item.nome_produto[:300]
+    if produto and salvar_de_para and codigo:
+        from estoque.services.de_para_nota import gravar_de_para_nota
+
+        gravar_de_para_nota(
+            empresa,
+            codigo,
+            item.nota_fiscal.fornecedor_id,
+            produto,
+            global_fornecedor=de_para_global_fornecedor,
+        )
     if item.nota_fiscal.fornecedor_id:
         produto.fornecedor_id = item.nota_fiscal.fornecedor_id
     if setor_loc:

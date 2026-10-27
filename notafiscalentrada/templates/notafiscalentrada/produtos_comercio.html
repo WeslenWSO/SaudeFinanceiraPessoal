@@ -163,12 +163,37 @@
                                 </form>
                                 {% endif %}
                                 {% else %}
-                                <form method="post" action="{% url 'estoque:gerar_estoque_nf_item' item.id %}" class="d-flex flex-column gap-1" style="min-width: 9rem;">
+                                <form method="post" action="{% url 'estoque:gerar_estoque_nf_item' item.id %}" class="d-flex flex-column gap-1 js-form-gerar-estoque" style="min-width: 11rem;">
                                     {% csrf_token %}
                                     {% if destino_estoque == 'imobilizado' %}
                                     <input type="hidden" name="natureza" value="imobilizado">
                                     {% else %}
                                     <input type="hidden" name="natureza" value="consumivel">
+                                    {% endif %}
+                                    {% if item.via_de_para_nf and item.codigo_sistema_nf %}
+                                    <span class="badge bg-info text-dark" title="De-para salvo">
+                                      → {{ item.codigo_sistema_nf }}
+                                    </span>
+                                    {% elif item.precisa_vinculo_produto %}
+                                    <div class="border rounded p-1 bg-light js-depara-box">
+                                      <small class="text-muted d-block mb-1">De-para (NF ≠ sistema)</small>
+                                      <input type="hidden" name="produto_estoque_id" class="js-produto-estoque-id" value="">
+                                      <input type="search" class="form-control form-control-sm js-busca-produto-sf mb-1"
+                                             placeholder="Código ou nome no estoque" autocomplete="off"
+                                             aria-label="Produto no sistema">
+                                      <div class="list-group list-group-flush small js-resultados-produto-sf d-none" style="max-height: 8rem; overflow-y: auto;"></div>
+                                      <div class="small text-success d-none js-produto-selecionado"></div>
+                                      <label class="form-check form-check-inline small mt-1 mb-0">
+                                        <input class="form-check-input" type="checkbox" name="salvar_de_para" value="1" checked>
+                                        Salvar vínculo
+                                      </label>
+                                      <label class="form-check form-check-inline small mt-1 mb-0">
+                                        <input class="form-check-input" type="checkbox" name="de_para_global" value="1">
+                                        Todos fornec.
+                                      </label>
+                                    </div>
+                                    {% else %}
+                                    <input type="hidden" name="produto_estoque_id" value="">
                                     {% endif %}
                                     {% if destino_estoque != 'imobilizado' %}
                                     <small class="text-muted">NF: {{ item.quantidade }} {{ item.unidade|default:"—" }}</small>
@@ -265,6 +290,77 @@
       });
     });
   }
+
+  var buscarProdUrl = "{{ buscar_produtos_nf_url|escapejs }}";
+  var debounceTimer = null;
+
+  function naturezaDoForm(form) {
+    var n = form.querySelector('input[name=natureza]');
+    return n ? n.value : 'consumivel';
+  }
+
+  document.querySelectorAll('.js-depara-box').forEach(function (box) {
+    var form = box.closest('form');
+    var inp = box.querySelector('.js-busca-produto-sf');
+    var lista = box.querySelector('.js-resultados-produto-sf');
+    var hid = box.querySelector('.js-produto-estoque-id');
+    var sel = box.querySelector('.js-produto-selecionado');
+    if (!inp || !lista || !hid) return;
+
+    function escolher(p) {
+      hid.value = p.id;
+      inp.value = p.codigo + ' — ' + p.descricao;
+      lista.classList.add('d-none');
+      lista.innerHTML = '';
+      if (sel) {
+        sel.textContent = 'Entrada no produto ' + p.codigo;
+        sel.classList.remove('d-none');
+      }
+    }
+
+    inp.addEventListener('input', function () {
+      hid.value = '';
+      if (sel) sel.classList.add('d-none');
+      clearTimeout(debounceTimer);
+      var q = inp.value.trim();
+      if (q.length < 1) {
+        lista.classList.add('d-none');
+        return;
+      }
+      debounceTimer = setTimeout(function () {
+        var url = buscarProdUrl + '?q=' + encodeURIComponent(q) + '&natureza=' + encodeURIComponent(naturezaDoForm(form));
+        fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+          if (!data.ok || !data.produtos || !data.produtos.length) {
+            lista.innerHTML = '<div class="list-group-item text-muted">Nenhum produto</div>';
+            lista.classList.remove('d-none');
+            return;
+          }
+          lista.innerHTML = '';
+          data.produtos.forEach(function (p) {
+            var a = document.createElement('button');
+            a.type = 'button';
+            a.className = 'list-group-item list-group-item-action py-1';
+            a.textContent = p.codigo + ' — ' + p.descricao;
+            a.addEventListener('click', function () { escolher(p); });
+            lista.appendChild(a);
+          });
+          lista.classList.remove('d-none');
+        });
+      }, 280);
+    });
+  });
+
+  document.querySelectorAll('.js-form-gerar-estoque').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var box = form.querySelector('.js-depara-box');
+      if (!box) return;
+      var hid = box.querySelector('.js-produto-estoque-id');
+      if (hid && !hid.value.trim()) {
+        e.preventDefault();
+        alert('Selecione o produto do estoque (de-para): o código da NF não existe no cadastro.');
+      }
+    });
+  });
 })();
 </script>
 {% include 'estoque/parcial/_modal_estorno_nf.html' %}

@@ -89,6 +89,36 @@ def pagamentos_da_nota(nota: dict | None, valor_ref: Decimal | None) -> list[dic
     }]
 
 
+def aplicar_caixa_acerto_ao_vincular_nota(faturamento, nota) -> str:
+    """Marca acerto de caixa e define caixa a partir da NF / venda CA sincronizada."""
+    from faturamento_medico.models import CAIXAS_ACERTO_VALORES
+    from faturamento_medico.services.contas_caixa_acerto import conta_caixa_valida
+    from notasfiscais.discriminacao_nfse import extrair_id_venda_conta_azul
+
+    caixa = (getattr(nota, 'caixa_acerto_sugerido', None) or '').strip()
+    if not caixa:
+        id_v = extrair_id_venda_conta_azul(nota.observacoes)
+        if id_v:
+            from dashboard.models import VendaContaAzul
+
+            venda = VendaContaAzul.objects.filter(
+                empresa_id=nota.empresa_id,
+                conta_azul_id=id_v,
+            ).first()
+            if venda:
+                caixa = (venda.caixa_acerto or '').strip()
+    if not caixa:
+        return (faturamento.caixa_acerto or '').strip()
+    if not conta_caixa_valida(faturamento.empresa_id, caixa) and caixa not in CAIXAS_ACERTO_VALORES:
+        return (faturamento.caixa_acerto or '').strip()
+    if (faturamento.caixa_acerto or '').strip() == caixa and faturamento.marcado_acerto_caixa:
+        return caixa
+    faturamento.caixa_acerto = caixa
+    faturamento.marcado_acerto_caixa = True
+    faturamento.save(update_fields=['caixa_acerto', 'marcado_acerto_caixa'])
+    return caixa
+
+
 def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[str, Any]]:
     """
     Preenche pagamentos_acerto_json a partir da discriminação da NF (regra de forma de pagamento).

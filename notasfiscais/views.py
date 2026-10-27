@@ -2002,6 +2002,7 @@ def _executar_import_nfse_ca_em_background(empresa_id: int, data_de: date, data_
         resultado = sincronizar_conta_azul(
             empresa,
             nfse_prestador=True,
+            vendas=True,
             data_de=data_de,
             data_ate=data_ate,
         )
@@ -2057,6 +2058,7 @@ def importar_nfse_conta_azul(request):
             resultado = sincronizar_conta_azul(
                 empresa,
                 nfse_prestador=True,
+                vendas=True,
                 data_de=di,
                 data_ate=df,
             )

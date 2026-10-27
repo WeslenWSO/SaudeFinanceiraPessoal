@@ -46,6 +46,10 @@ from dashboard.conta_azul.forma_pagamento_ca import (
     _texto_forma_pagamento_item,
 )
 from dashboard.conta_azul.nfse_prestador import importar_nfse_prestador_conta_azul
+from dashboard.conta_azul.vendas_sync import (
+    atualizar_nfse_com_vendas_importadas,
+    importar_vendas_conta_azul,
+)
 from extrato.models import Banco, ContaBancaria, Lancamento
 from fornecedor.models import Fornecedor
 
@@ -1543,6 +1547,7 @@ def sincronizar_conta_azul(
     despesas: bool = False,
     transferencias: bool = False,
     nfse_prestador: bool = False,
+    vendas: bool = False,
     data_de: date | None = None,
     data_ate: date | None = None,
     dry_run: bool = False,
@@ -1585,6 +1590,14 @@ def sincronizar_conta_azul(
                 resultado['transferencias'] = importar_transferencias(
                     empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
                 )
+            if vendas:
+                resultado['vendas'] = importar_vendas_conta_azul(
+                    empresa,
+                    client,
+                    data_de=data_de,
+                    data_ate=data_ate,
+                    dry_run=dry_run,
+                )
             if nfse_prestador:
                 resultado['nfse_prestador'] = importar_nfse_prestador_conta_azul(
                     empresa,
@@ -1592,6 +1605,12 @@ def sincronizar_conta_azul(
                     data_de=data_de,
                     data_ate=data_ate,
                     dry_run=dry_run,
+                )
+            if vendas and not dry_run:
+                resultado['nfse_venda_cache'] = atualizar_nfse_com_vendas_importadas(
+                    empresa,
+                    data_de=data_de,
+                    data_ate=data_ate,
                 )
         cfg = getattr(empresa, 'conta_azul_config', None)
         if cfg and not dry_run:
@@ -1639,6 +1658,12 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["ignorados_sem_numero"]} sem número'
         if stats.get('detalhes_limitados'):
             ok[-1] += f' (detalhe API limitado a {stats["detalhes_limitados"]} parcelas; rode de novo para completar NSU/cobrança)'
+        if stats.get('vendas_sincronizadas'):
+            ok[-1] += f', {stats["vendas_sincronizadas"]} enriquecidas com venda CA'
+        if stats.get('detalhes_erro'):
+            ok[-1] += f', {stats["detalhes_erro"]} vendas sem detalhe API'
+        if chave == 'nfse_venda_cache' and stats.get('atualizadas') is not None:
+            ok[-1] = f'NF atualizadas com cache de vendas: {stats["atualizadas"]}'
 
     erros_unicos = list(dict.fromkeys(erros))
     if erros_unicos and not ok:

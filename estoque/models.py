@@ -195,6 +195,59 @@ class SetorEstoqueResponsavel(models.Model):
         ]
 
 
+class ProdutoCodigoNotaDePara(models.Model):
+    """Vincula código do item na NF de comércio ao código cadastrado no estoque."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='de_para_codigo_nota',
+        verbose_name='Empresa',
+    )
+    codigo_nota = models.CharField(
+        max_length=50,
+        verbose_name='Código na nota',
+        help_text='Código do produto como veio no XML/NF do fornecedor.',
+    )
+    fornecedor = models.ForeignKey(
+        'fornecedor.Fornecedor',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='de_para_codigo_nota',
+        verbose_name='Fornecedor',
+        help_text='Vazio = vale para qualquer fornecedor com este código na NF.',
+    )
+    produto = models.ForeignKey(
+        ProdutoEstoque,
+        on_delete=models.CASCADE,
+        related_name='de_para_codigos_nota',
+        verbose_name='Produto no estoque',
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'De-para código NF → estoque'
+        verbose_name_plural = 'De-para códigos NF → estoque'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('empresa', 'codigo_nota'),
+                condition=models.Q(fornecedor__isnull=True),
+                name='depara_nota_global_unico',
+            ),
+            models.UniqueConstraint(
+                fields=('empresa', 'codigo_nota', 'fornecedor'),
+                condition=models.Q(fornecedor__isnull=False),
+                name='depara_nota_fornecedor_unico',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        alvo = self.produto.codigo_produto if self.produto_id else '—'
+        return f'NF {self.codigo_nota} → {alvo}'
+
+
 class EntradaEstoqueNota(models.Model):
     nota_item = models.OneToOneField(
         'notafiscalentrada.NotaFiscalEntradaItem',

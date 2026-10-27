@@ -47,11 +47,17 @@
           </p>
           <div class="form-check"><input class="form-check-input" type="checkbox" name="transferencias" id="tra">
             <label class="form-check-label" for="tra">Transferências</label></div>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="vendas" id="vendas" checked>
+            <label class="form-check-label" for="vendas">Pedidos de venda (pagamento e caixa → vínculo NF / acerto de caixa)</label></div>
+          <p class="small text-muted mb-0 ms-4">
+            Busca vendas do período na API (<code>/v1/venda/busca</code>) e grava forma de pagamento, conta financeira e vendedor/caixa local.
+            Marcado automaticamente ao sincronizar NFS-e.
+          </p>
           <div class="form-check"><input class="form-check-input" type="checkbox" name="nfse_prestador" id="nfse">
             <label class="form-check-label" for="nfse">Notas fiscais de serviço (NFS-e prestador → tela Notas Fiscais)</label></div>
           <p class="small text-muted mb-0 ms-4">
-            Usa o mês/ano acima como período de competência. Importa notas <strong>emitidas</strong>, corrigidas e canceladas no Conta Azul
-            (a API não traz discriminação completa; valores e tomador vêm do ERP).
+            Usa o mês/ano acima como período de competência. Importa notas <strong>emitidas</strong>, corrigidas e canceladas no Conta Azul.
+            Com <code>id_venda</code>, enriquece discriminação, forma de pagamento e caixa a partir da venda CA.
           </p>
         </fieldset>
         <button type="submit" class="btn btn-primary">Sincronizar</button>

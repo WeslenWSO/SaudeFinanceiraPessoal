@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, OperationalError
 from django.db.models import Prefetch, Q, Sum
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -193,6 +193,40 @@ class ProdutoEstoqueOperacionalDetailView(LoginRequiredMixin, _EmpresaMixin, Det
 
 
 @login_required
+def buscar_produtos_estoque_nf(request):
+    """AJAX: produtos do estoque para de-para na entrada pela NF."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'ok': False, 'error': 'Empresa não selecionada.'}, status=400)
+    termo = (request.GET.get('q') or '').strip()
+    natureza = (request.GET.get('natureza') or NaturezaEstoque.CONSUMIVEL).strip()
+    if natureza not in NaturezaEstoque.values:
+        natureza = NaturezaEstoque.CONSUMIVEL
+    qs = ProdutoEstoque.objects.filter(empresa_id=empresa_id, natureza=natureza).order_by(
+        'codigo_produto',
+    )
+    if termo:
+        qs = qs.filter(
+            Q(codigo_produto__icontains=termo)
+            | Q(descricao__icontains=termo)
+            | Q(marca__icontains=termo),
+        )
+    produtos = qs[:25]
+    return JsonResponse({
+        'ok': True,
+        'produtos': [
+            {
+                'id': p.pk,
+                'codigo': p.codigo_produto,
+                'descricao': p.descricao,
+                'marca': p.marca or '',
+            }
+            for p in produtos
+        ],
+    })
+
+
+@login_required
 @require_POST
 def gerar_estoque_item_nota(request, item_id: int):
     empresa_id = request.session.get('empresa_id')
@@ -220,6 +254,27 @@ def gerar_estoque_item_nota(request, item_id: int):
 
     try:
         natureza = form.cleaned_data.get('natureza') or NaturezaEstoque.CONSUMIVEL
+        produto_escolhido = None
+        pid = form.cleaned_data.get('produto_estoque_id')
+        if pid:
+            produto_escolhido = ProdutoEstoque.objects.filter(
+                pk=int(pid),
+                empresa_id=empresa_id,
+            ).first()
+            if not produto_escolhido:
+                raise EstoqueErro('Produto do estoque inválido.')
+        from estoque.services.de_para_nota import situacao_codigo_nota
+
+        sit = situacao_codigo_nota(
+            empresa_id,
+            item.codigo_produto,
+            item.nota_fiscal.fornecedor_id,
+        )
+        if sit['precisa_vinculo'] and not produto_escolhido:
+            raise EstoqueErro(
+                f'Código NF «{item.codigo_produto}» não existe no estoque. '
+                'Informe o produto do sistema (de-para) ou cadastre o mesmo código antes.',
+            )
         gerar_entrada_desde_item_nota(
             item,
             usuario=request.user,
@@ -230,6 +285,9 @@ def gerar_estoque_item_nota(request, item_id: int):
             data_validade=form.cleaned_data.get('data_validade'),
             natureza=natureza,
             setor_localizacao=form.cleaned_data.get('setor_localizacao') or '',
+            produto=produto_escolhido,
+            salvar_de_para=bool(form.cleaned_data.get('salvar_de_para')),
+            de_para_global_fornecedor=bool(form.cleaned_data.get('de_para_global')),
         )
         destino = (
             'imobilizado'

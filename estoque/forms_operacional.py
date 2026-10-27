@@ -58,6 +58,20 @@ class GerarEstoqueNotaForm(forms.Form):
         choices=[('', '— Setor —')] + list(SETOR_LOCALIZACAO_IMOBILIZADO),
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
     )
+    produto_estoque_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    salvar_de_para = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Salvar de-para (código NF → produto)',
+    )
+    de_para_global = forms.BooleanField(
+        required=False,
+        label='Válido para todos os fornecedores',
+        help_text='Se desmarcado, o vínculo vale só para o fornecedor desta NF.',
+    )
 
     def clean(self):
         return super().clean()

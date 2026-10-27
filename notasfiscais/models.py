@@ -183,6 +183,13 @@ class NotaFiscalServico(models.Model):
         blank=True,
     )
     nsu = models.CharField(verbose_name='NSU', max_length=100, blank=True, null=True)
+    caixa_acerto_sugerido = models.CharField(
+        verbose_name='Caixa acerto sugerido (Conta Azul)',
+        max_length=40,
+        blank=True,
+        default='',
+        help_text='Conta caixa local (PK) inferida da venda CA; usada ao vincular NF no faturamento.',
+    )
     status_conciliacao = models.CharField(
         verbose_name='Status de Conciliação',
         max_length=30,
