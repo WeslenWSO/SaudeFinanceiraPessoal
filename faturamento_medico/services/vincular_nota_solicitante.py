@@ -379,6 +379,48 @@ def buscar_notas_paciente(
     return matches
 
 
+def resolver_notas_faturamento_acerto(
+    empresa_id: int | None,
+    faturamento,
+) -> list[dict]:
+    """Mesma regra da grade do acerto de caixa (manual + busca por paciente)."""
+    if not empresa_id or faturamento is None:
+        return []
+    data_exame = faturamento.data
+    if not data_exame:
+        return resolver_notas_linha({}, empresa_id, faturamento.nome or '', None, faturamento.nota_fiscal)
+    notas_por_data = carregar_notas_por_data(empresa_id, data_exame, data_exame)
+    return resolver_notas_linha(
+        notas_por_data,
+        empresa_id,
+        faturamento.nome or '',
+        data_exame,
+        faturamento.nota_fiscal,
+    )
+
+
+def valor_total_notas_serializadas(notas: list[dict]) -> Decimal | None:
+    if not notas:
+        return None
+    total = Decimal('0')
+    tem_valor = False
+    for nota in notas:
+        bruto = nota.get('valor_liquido')
+        if bruto is None:
+            bruto = nota.get('valor_bruto')
+        if bruto is None:
+            continue
+        total += Decimal(str(bruto))
+        tem_valor = True
+    return total if tem_valor else None
+
+
+def valor_nf_rateio_acerto_caixa(empresa_id: int | None, faturamento) -> tuple[Decimal | None, list[dict]]:
+    """Total da(s) NFSe vinculada(s) à linha — base do rateio de pagamentos."""
+    notas = resolver_notas_faturamento_acerto(empresa_id, faturamento)
+    return valor_total_notas_serializadas(notas), notas
+
+
 def buscar_nota_manual_salva(
     empresa_id: int | None,
     numero_nota: str | None,

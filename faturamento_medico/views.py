@@ -6284,8 +6284,7 @@ def salvar_pagamentos_acerto_caixa(request):
         validar_e_normalizar_pagamentos,
     )
     from faturamento_medico.services.vincular_nota_solicitante import (
-        buscar_nota_manual_salva,
-        serializar_nota_linha,
+        valor_nf_rateio_acerto_caixa,
     )
 
     faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
@@ -6299,14 +6298,24 @@ def salvar_pagamentos_acerto_caixa(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON de pagamentos inválido.'}, status=400)
 
-    valor_esperado = None
-    nota = buscar_nota_manual_salva(empresa_id, faturamento.nota_fiscal)
-    if nota:
-        valor_esperado = nota.valor_liquido if nota.valor_liquido is not None else nota.valor_bruto
+    valor_esperado, notas_vinculadas = valor_nf_rateio_acerto_caixa(empresa_id, faturamento)
+    rotulo_valor = 'valor da NF'
+    if notas_vinculadas:
+        numeros = [str(n.get('numero') or '').strip() for n in notas_vinculadas]
+        numeros = [n for n in numeros if n]
+        if len(numeros) == 1:
+            rotulo_valor = f'valor da NF {numeros[0]}'
+        elif len(numeros) > 1:
+            rotulo_valor = f'valor das NFs ({", ".join(numeros)})'
     if valor_esperado is None:
         valor_esperado = faturamento.total or Decimal('0')
+        rotulo_valor = 'valor do atendimento (sem NF vinculada na grade)'
 
-    normalizado, erro = validar_e_normalizar_pagamentos(linhas, valor_esperado=valor_esperado)
+    normalizado, erro = validar_e_normalizar_pagamentos(
+        linhas,
+        valor_esperado=valor_esperado,
+        rotulo_valor_esperado=rotulo_valor,
+    )
     if erro:
         return JsonResponse({'error': erro}, status=400)
     assert normalizado is not None

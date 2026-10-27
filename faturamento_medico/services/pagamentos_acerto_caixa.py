@@ -263,6 +263,7 @@ def validar_e_normalizar_pagamentos(
     linhas: list[dict],
     *,
     valor_esperado: Decimal | None,
+    rotulo_valor_esperado: str = 'valor da NF',
 ) -> tuple[list[dict] | None, str | None]:
     if not linhas:
         return [], None
@@ -282,7 +283,7 @@ def validar_e_normalizar_pagamentos(
     if valor_esperado is not None and valor_esperado > 0:
         if abs(total - valor_esperado) > _EPS:
             return None, (
-                f'A soma (R$ {_fmt_moeda(total)}) deve bater com o valor da NF '
+                f'A soma (R$ {_fmt_moeda(total)}) deve bater com o {rotulo_valor_esperado} '
                 f'(R$ {_fmt_moeda(valor_esperado)}).'
             )
     return normalizado, None

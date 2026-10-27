@@ -395,6 +395,7 @@
                             <td class="fm-celula-forma-pgto"
                                 data-faturamento-id="{{ linha.faturamento_id }}"
                                 data-valor-nf="{{ linha.valor_nota|default:'' }}"
+                                data-numero-nf="{{ linha.nota_fiscal|default:'' }}"
                                 data-pagamentos="{{ linha.pagamentos_acerto_json|escape }}">
                                 {% if linha.mostrar_forma_pgto_celula and not linha.aguardando_faturamento %}
                                 <div class="d-flex flex-column gap-1">
@@ -450,7 +451,9 @@
             </div>
             <div class="modal-body">
                 <p class="small text-muted mb-2">
-                    Valor da NF: <strong id="pagamentoAcertoValorNf">—</strong>.
+                    <span id="pagamentoAcertoRotuloNf">Valor da NF</span>:
+                    <strong id="pagamentoAcertoValorNf">—</strong>
+                    (a soma das formas deve ser igual a este valor).
                     Some os valores das formas (ex.: Dinheiro R$ 500 + Cartão R$ 1.000).
                 </p>
                 <div id="pagamentoAcertoLinhas"></div>
@@ -606,6 +609,7 @@
     var modalEl = document.getElementById('modalPagamentoAcerto');
     var linhasEl = document.getElementById('pagamentoAcertoLinhas');
     var valorNfEl = document.getElementById('pagamentoAcertoValorNf');
+    var rotuloNfEl = document.getElementById('pagamentoAcertoRotuloNf');
     var ctx = { faturamentoId: null, valorNf: null };
 
     function escapeHtml(s) {
@@ -637,8 +641,13 @@
 
     function abrirModal(btn) {
         ctx.faturamentoId = btn.getAttribute('data-faturamento-id');
-        var cel = document.querySelector('.fm-celula-forma-pgto[data-faturamento-id="' + ctx.faturamentoId + '"]');
+        var tr = btn.closest('tr');
+        var cel = tr ? tr.querySelector('.fm-celula-forma-pgto') : null;
+        if (!cel) {
+            cel = document.querySelector('.fm-celula-forma-pgto[data-faturamento-id="' + ctx.faturamentoId + '"]');
+        }
         ctx.valorNf = cel ? cel.getAttribute('data-valor-nf') : '';
+        var numeroNf = cel ? (cel.getAttribute('data-numero-nf') || '').trim() : '';
         var raw = cel ? cel.getAttribute('data-pagamentos') : '[]';
         var pag = [];
         try { pag = JSON.parse(raw || '[]'); } catch (e) { pag = []; }
@@ -651,8 +660,13 @@
         } else {
             addLinha('', '');
         }
+        if (rotuloNfEl) {
+            rotuloNfEl.textContent = numeroNf && numeroNf !== '-'
+                ? ('Valor da NF ' + numeroNf)
+                : 'Valor da NF';
+        }
         if (valorNfEl) {
-            var vn = parseFloat(ctx.valorNf);
+            var vn = parseFloat(String(ctx.valorNf || '').replace(',', '.'));
             valorNfEl.textContent = isNaN(vn) ? '—' : ('R$ ' + vn.toFixed(2).replace('.', ','));
         }
         if (modalEl && window.bootstrap) {
@@ -701,6 +715,22 @@
         btnSalvar.addEventListener('click', function() {
             if (!ctx.faturamentoId) return;
             var pagamentos = coletarPagamentos();
+            var esperado = parseFloat(String(ctx.valorNf || '').replace(',', '.'));
+            if (!isNaN(esperado) && esperado > 0) {
+                var soma = 0;
+                pagamentos.forEach(function(p) {
+                    var v = parseFloat(String(p.valor || '').replace(/\./g, '').replace(',', '.'));
+                    if (!isNaN(v)) soma += v;
+                });
+                if (Math.abs(soma - esperado) > 0.05) {
+                    alert(
+                        'A soma (R$ ' + soma.toFixed(2).replace('.', ',') +
+                        ') deve bater com o valor da NF (R$ ' +
+                        esperado.toFixed(2).replace('.', ',') + ').'
+                    );
+                    return;
+                }
+            }
             var body = new URLSearchParams({
                 faturamento_id: String(ctx.faturamentoId),
                 pagamentos: JSON.stringify(pagamentos)
