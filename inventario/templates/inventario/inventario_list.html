@@ -35,7 +35,9 @@
             <td>{{ inv.descricao }}</td>
             <td>{{ inv.rotulo_setor }}</td>
             <td>
-              {% if inv.aberto %}
+              {% if inv.concluido %}
+              <span class="badge bg-primary">Concluído</span>
+              {% elif inv.aberto %}
               <span class="badge bg-success">Aberto</span>
               {% else %}
               <span class="badge bg-secondary">Fechado</span>

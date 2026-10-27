@@ -460,7 +460,18 @@ def inventario_aplicar_estoque(request, pk):
         messages.error(request, 'Selecione uma empresa.')
         return redirect('empresa:lista')
     if not inventario.aberto:
-        messages.error(request, 'Inventário fechado.')
+        messages.error(request, 'Inventário fechado ou já concluído.')
+        return redirect('inventario:inventario_detail', pk=pk)
+    if inventario.concluido:
+        messages.error(request, 'Este inventário já foi aplicado ao estoque.')
+        return redirect('inventario:inventario_detail', pk=pk)
+
+    from inventario.permissoes import validar_senha_administrador_inventario
+
+    senha = (request.POST.get('senha') or '').strip()
+    ok_senha, msg_senha = validar_senha_administrador_inventario(request.user, senha)
+    if not ok_senha:
+        messages.error(request, msg_senha)
         return redirect('inventario:inventario_detail', pk=pk)
 
     try:
@@ -471,7 +482,7 @@ def inventario_aplicar_estoque(request, pk):
 
     messages.success(
         request,
-        f'Estoque atualizado: {stats["atualizados"]} produto(s); '
+        f'Inventário concluído. Estoque atualizado: {stats["atualizados"]} produto(s); '
         f'{stats["ignorados"]} sem contagem na rodada escolhida.',
     )
     return redirect('inventario:inventario_detail', pk=pk)

@@ -10,7 +10,13 @@
     <div>
       <h1 class="h4 mb-1">{{ descricao }}</h1>
       <p class="text-muted small mb-0">
-        {% if object.aberto %}<span class="badge bg-success">Aberto</span>{% else %}<span class="badge bg-secondary">Fechado</span>{% endif %}
+        {% if object.concluido %}
+        <span class="badge bg-primary">Concluído</span>
+        {% elif object.aberto %}
+        <span class="badge bg-success">Aberto</span>
+        {% else %}
+        <span class="badge bg-secondary">Fechado</span>
+        {% endif %}
         · Setor: <span class="badge bg-info text-dark">{{ object.rotulo_setor }}</span>
         · Criado em {{ object.criado_em|date:"d/m/Y H:i" }}
         {% if object.estoque_aplicado_em %}
@@ -104,13 +110,11 @@
           <button type="submit" class="btn btn-outline-primary btn-sm">Salvar seleção</button>
         </div>
       </form>
-      <form method="post" action="{% url 'inventario:inventario_aplicar_estoque' object.pk %}" class="mt-2"
-            onsubmit="return confirm('Aplicar a contagem selecionada ao cadastro de estoque? Faça backup antes se necessário.');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-success btn-sm" {% if rodada_estoque == 0 %}disabled{% endif %}>
-          Aplicar contagem ao estoque
-        </button>
-      </form>
+      <button type="button" class="btn btn-success btn-sm mt-2" id="btn-abrir-aplicar-estoque"
+              {% if rodada_estoque == 0 %}disabled{% endif %}
+              data-bs-toggle="modal" data-bs-target="#modal-aplicar-estoque">
+        Aplicar contagem ao estoque
+      </button>
     </div>
   </div>
   {% endif %}
@@ -243,4 +247,34 @@
     </div>
   </div>
 </div>
+
+{% if object.aberto and not object.concluido %}
+<div class="modal fade" id="modal-aplicar-estoque" tabindex="-1" aria-labelledby="modal-aplicar-estoque-label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'inventario:inventario_aplicar_estoque' object.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-aplicar-estoque-label">Aplicar contagem ao estoque</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            A contagem selecionada será gravada no estoque do setor <strong>{{ object.rotulo_setor }}</strong>.
+            O inventário passará para o status <strong>Concluído</strong> e não poderá mais ser alterado.
+            Faça backup antes, se necessário.
+          </p>
+          <label class="form-label" for="senha-aplicar-estoque">Senha do administrador</label>
+          <input type="password" class="form-control" id="senha-aplicar-estoque" name="senha" required autocomplete="current-password">
+          <div class="form-text">Use a senha do seu usuário administrador (staff) logado.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar e concluir inventário</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

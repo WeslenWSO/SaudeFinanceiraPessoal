@@ -61,6 +61,18 @@ class Inventario(models.Model):
     def rotulo_setor(self) -> str:
         return rotulo_setor(self.setor)
 
+    @property
+    def concluido(self) -> bool:
+        return self.estoque_aplicado_em is not None
+
+    @property
+    def status_exibicao(self) -> str:
+        if self.concluido:
+            return 'Concluído'
+        if self.aberto:
+            return 'Aberto'
+        return 'Fechado'
+
 
 class InventarioResponsavelContagem(models.Model):
     inventario = models.ForeignKey(

@@ -126,3 +126,7 @@ class InventarioBackupEstoqueTests(TestCase):
         self.assertEqual(stats['atualizados'], 1)
         self.produto.refresh_from_db()
         self.assertEqual(self.produto.quantidade_estoque, Decimal('8.000'))
+        self.inv.refresh_from_db()
+        self.assertFalse(self.inv.aberto)
+        self.assertIsNotNone(self.inv.estoque_aplicado_em)
+        self.assertEqual(self.inv.status_exibicao, 'Concluído')

@@ -151,5 +151,6 @@ def aplicar_contagem_ao_estoque(inventario: Inventario, usuario: User) -> dict[s
 
     inventario.estoque_aplicado_em = timezone.now()
     inventario.estoque_aplicado_por = usuario
-    inventario.save(update_fields=['estoque_aplicado_em', 'estoque_aplicado_por'])
+    inventario.aberto = False
+    inventario.save(update_fields=['estoque_aplicado_em', 'estoque_aplicado_por', 'aberto'])
     return stats
