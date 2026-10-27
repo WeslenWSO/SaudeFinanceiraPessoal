@@ -115,6 +115,7 @@ def _discriminacao_de_itens_venda(itens_raw: Any) -> str:
             or it.get('nome')
             or serv.get('descricao')
             or serv.get('nome')
+            or it.get('detalhes')
         )
         if not desc:
             continue
@@ -134,8 +135,9 @@ def montar_discriminacao_venda_ca(envelope: dict | None, itens_payload: Any = No
     candidatos: list[str] = []
     for fonte in (v, envelope):
         for key in (
-            'observacao',
             'observacoes',
+            'observacao',
+            'introducao',
             'informacao_complementar',
             'informacoes_complementares',
             'informacoes_adicionais',

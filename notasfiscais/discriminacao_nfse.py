@@ -9,6 +9,18 @@ from notasfiscais.utils import _PADRAO_VALOR_MONETARIO, _normalizar_valor_moneta
 
 _EPS = Decimal('0.05')
 
+_RE_RESUMO_PLACEHOLDER_CA = re.compile(
+    r'^\s*RPS\s+\S+\s*[—–-]\s*Venda\s+\S+\s*[—–-]\s*CNAE\s+\S+\s*$',
+    re.IGNORECASE,
+)
+
+
+def discriminacao_e_resumo_placeholder_ca(discriminacao: str | None) -> bool:
+    """Texto gerado só com metadados da listagem NFS-e Conta Azul (sem serviço/paciente)."""
+    if not (discriminacao or '').strip():
+        return False
+    return bool(_RE_RESUMO_PLACEHOLDER_CA.match((discriminacao or '').strip()))
+
 
 def _valores_procedimentos_no_cabecalho(discriminacao: str) -> list[Decimal]:
     if not discriminacao:

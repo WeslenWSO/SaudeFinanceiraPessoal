@@ -171,10 +171,17 @@ def aplicar_venda_cache_em_nota(nota, venda: VendaContaAzul) -> list[str]:
     if venda.nsu and not (nota.nsu or '').strip():
         nota.nsu = venda.nsu
         campos.append('nsu')
+    from notasfiscais.discriminacao_nfse import discriminacao_e_resumo_placeholder_ca
+
     resumo = (venda.discriminacao_resumo or '').strip()
-    if resumo and 'PAGAMENTO' in resumo.upper():
+    if resumo:
         disc = (nota.discriminacao or '').strip()
-        if not disc or 'PAGAMENTO' not in disc.upper():
+        substituir = (
+            not disc
+            or discriminacao_e_resumo_placeholder_ca(disc)
+            or ('PAGAMENTO' in resumo.upper() and 'PAGAMENTO' not in disc.upper())
+        )
+        if substituir and resumo != disc:
             nota.discriminacao = resumo
             campos.append('discriminacao')
     return campos

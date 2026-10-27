@@ -13,8 +13,6 @@ from django.utils.dateparse import parse_date, parse_datetime
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
 from dashboard.conta_azul.venda_nfse import enriquecer_campos_nfse_com_venda_ca
 from notasfiscais.models import NotaFiscalServico
-from notasfiscais.utils import extrair_socio
-from socio.models import Socio
 
 CA_NFSE_ID_PREFIX = 'Conta Azul NFS-e ID:'
 SERIE_PADRAO = '1'
@@ -27,6 +25,48 @@ STATUS_IMPORTAR = frozenset(
         'CANCELAMENTO_MANUAL',
     }
 )
+
+STATUS_CA_CANCELADO = frozenset({'CANCELADA', 'CANCELAMENTO_MANUAL'})
+
+
+def status_ca_cancelado(item: dict) -> bool:
+    status = str(item.get('status') or '').strip().upper()
+    return status in STATUS_CA_CANCELADO
+
+
+def _data_cancelamento_de_item_ca(item: dict, data_emissao: date) -> date | None:
+    if not status_ca_cancelado(item):
+        return None
+    info = item.get('informacao_transmissao') or {}
+    dc_raw = info.get('data_inicio_cancelamento')
+    if dc_raw:
+        dt = parse_datetime(str(dc_raw)) if 'T' in str(dc_raw) else None
+        if dt:
+            return dt.date()
+        return parse_date(str(dc_raw)[:10]) or data_emissao
+    return data_emissao
+
+
+def _motivo_cancelamento_de_item_ca(item: dict) -> str:
+    cancel_info = item.get('informacoes_cancelamento') or {}
+    return (cancel_info.get('motivo') or '').strip()[:500]
+
+
+def aplicar_regras_nfse_cancelada_ca(
+    nfse: NotaFiscalServico,
+    *,
+    data_cancelamento: date | None,
+    motivo: str,
+) -> None:
+    """Mesma regra do evento/XML: data de cancelamento, motivo e valores zerados."""
+    from notasfiscais.nfse_evento_cancelamento import aplicar_cancelamento_por_evento
+
+    aplicar_cancelamento_por_evento(
+        nfse,
+        data_cancelamento=data_cancelamento,
+        codigo_motivo='',
+        motivo=motivo,
+    )
 
 
 def _marcador_ca_id(ca_id: str) -> str:
@@ -124,38 +164,31 @@ def _campos_de_item_ca(item: dict, *, empresa) -> dict[str, Any] | None:
     nome_cliente = (item.get('nome_cliente') or 'Cliente não informado').strip()[:200]
     doc = _documento_cliente(str(item.get('documento_cliente') or ''))
 
-    cancel_info = item.get('informacoes_cancelamento') or {}
-    motivo_cancel = (cancel_info.get('motivo') or '').strip()
-    data_cancelamento = None
-    if status in ('CANCELADA', 'CANCELAMENTO_MANUAL'):
-        info = item.get('informacao_transmissao') or {}
-        dc_raw = info.get('data_inicio_cancelamento')
-        if dc_raw:
-            dt = parse_datetime(str(dc_raw)) if 'T' in str(dc_raw) else None
-            if dt:
-                data_cancelamento = dt.date()
-            else:
-                data_cancelamento = parse_date(str(dc_raw)[:10]) or data_emissao
-        else:
-            data_cancelamento = data_emissao
+    motivo_cancel = _motivo_cancelamento_de_item_ca(item)
+    data_cancelamento = _data_cancelamento_de_item_ca(item, data_emissao)
 
     numero_rps = item.get('numero_rps')
-    discriminacao_parts = []
+    meta_ca: list[str] = []
     if numero_rps is not None:
-        discriminacao_parts.append(f'RPS {numero_rps}')
+        meta_ca.append(f'RPS {numero_rps}')
     if item.get('numero_venda'):
-        discriminacao_parts.append(f'Venda {item.get("numero_venda")}')
+        meta_ca.append(f'Venda {item.get("numero_venda")}')
     if item.get('codigo_cnae'):
-        discriminacao_parts.append(f'CNAE {item.get("codigo_cnae")}')
-    discriminacao = ' — '.join(discriminacao_parts) if discriminacao_parts else ''
+        meta_ca.append(f'CNAE {item.get("codigo_cnae")}')
 
     obs_lines = [
         _marcador_ca_id(ca_id) if ca_id else '',
         f'Status Conta Azul: {status or "—"}',
     ]
+    if meta_ca:
+        obs_lines.append(' — '.join(meta_ca))
     if item.get('id_venda'):
         obs_lines.append(f'id_venda: {item.get("id_venda")}')
     observacoes = '\n'.join(x for x in obs_lines if x)
+
+    valor_gravacao = valor
+    if status_ca_cancelado(item):
+        valor_gravacao = Decimal('0')
 
     campos: dict[str, Any] = {
         'numero_nota': numero_nota,
@@ -164,19 +197,12 @@ def _campos_de_item_ca(item: dict, *, empresa) -> dict[str, Any] | None:
         'data_emissao': data_emissao,
         'cnpj_cpf': doc or '—',
         'cliente': nome_cliente,
-        'valor_bruto': valor,
-        'valor_liquido': valor,
+        'valor_bruto': valor_gravacao,
+        'valor_liquido': valor_gravacao,
         'data_cancelamento': data_cancelamento,
-        'motivo_cancelamento': motivo_cancel[:500] if motivo_cancel else '',
+        'motivo_cancelamento': motivo_cancel,
         'observacoes': observacoes,
     }
-    if discriminacao and not campos.get('discriminacao'):
-        campos['discriminacao'] = discriminacao
-
-    if getattr(empresa, 'pk', None) and discriminacao:
-        socio = extrair_socio(discriminacao, Socio.objects.filter(empresa=empresa))
-        if socio:
-            campos['socio'] = socio
 
     return campos
 
@@ -196,6 +222,7 @@ def importar_nfse_prestador_conta_azul(
         'ignorados_status': 0,
         'ignorados_sem_numero': 0,
         'vendas_sincronizadas': 0,
+        'canceladas_aplicadas': 0,
     }
     vistos: set[str] = set()
     cache_vendas: dict[str, dict] = {}
@@ -229,7 +256,7 @@ def importar_nfse_prestador_conta_azul(
                 stats['criados'] += 1
                 continue
 
-            if item.get('id_venda'):
+            if item.get('id_venda') and not status_ca_cancelado(item):
                 antes = (campos.get('discriminacao') or '').strip()
                 enriquecer_campos_nfse_com_venda_ca(
                     client,
@@ -254,15 +281,22 @@ def importar_nfse_prestador_conta_azul(
                 campos['serie'],
             )
             try:
+                cancelamento_ca = status_ca_cancelado(item)
                 if existente:
-                    from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
+                    from notasfiscais.discriminacao_nfse import (
+                        discriminacao_e_resumo_placeholder_ca,
+                        discriminacao_valor_coerente,
+                    )
 
+                    ja_cancelada = existente.is_cancelada()
                     valor_ca = campos.get('valor_liquido') or campos.get('valor_bruto')
                     disc_incoerente = not discriminacao_valor_coerente(
                         existente.discriminacao,
                         valor_ca,
                     )
                     for k, v in campos.items():
+                        if k in ('data_cancelamento', 'motivo_cancelamento'):
+                            continue
                         if k == 'discriminacao':
                             nova = (v or '').strip()
                             if disc_incoerente and nova:
@@ -270,6 +304,10 @@ def importar_nfse_prestador_conta_azul(
                                 existente.forma_pagamento = None
                                 existente.nsu = ''
                             elif nova and not (existente.discriminacao or '').strip():
+                                setattr(existente, k, v)
+                            elif nova and discriminacao_e_resumo_placeholder_ca(
+                                existente.discriminacao or '',
+                            ):
                                 setattr(existente, k, v)
                             elif nova and 'PAGAMENTO' in nova.upper() and 'PAGAMENTO' not in (
                                 existente.discriminacao or ''
@@ -286,11 +324,29 @@ def importar_nfse_prestador_conta_azul(
                         if k == 'nsu' and v and not (existente.nsu or '').strip():
                             setattr(existente, k, v)
                             continue
+                        if k in ('valor_bruto', 'valor_liquido') and cancelamento_ca:
+                            continue
                         setattr(existente, k, v)
+                    if cancelamento_ca:
+                        aplicar_regras_nfse_cancelada_ca(
+                            existente,
+                            data_cancelamento=campos.get('data_cancelamento'),
+                            motivo=campos.get('motivo_cancelamento') or '',
+                        )
+                        if not ja_cancelada:
+                            stats['canceladas_aplicadas'] += 1
                     existente.save()
                     stats['atualizados'] += 1
                 else:
-                    NotaFiscalServico.objects.create(empresa=empresa, **campos)
+                    nf = NotaFiscalServico.objects.create(empresa=empresa, **campos)
+                    if cancelamento_ca:
+                        aplicar_regras_nfse_cancelada_ca(
+                            nf,
+                            data_cancelamento=campos.get('data_cancelamento'),
+                            motivo=campos.get('motivo_cancelamento') or '',
+                        )
+                        nf.save()
+                        stats['canceladas_aplicadas'] += 1
                     stats['criados'] += 1
             except IntegrityError:
                 stats['erros'] += 1

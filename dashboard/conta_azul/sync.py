@@ -1660,6 +1660,8 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f' (detalhe API limitado a {stats["detalhes_limitados"]} parcelas; rode de novo para completar NSU/cobrança)'
         if stats.get('vendas_sincronizadas'):
             ok[-1] += f', {stats["vendas_sincronizadas"]} enriquecidas com venda CA'
+        if stats.get('canceladas_aplicadas'):
+            ok[-1] += f', {stats["canceladas_aplicadas"]} canceladas (regra CA)'
         if stats.get('detalhes_erro'):
             ok[-1] += f', {stats["detalhes_erro"]} vendas sem detalhe API'
         if chave == 'nfse_venda_cache' and stats.get('atualizadas') is not None:
