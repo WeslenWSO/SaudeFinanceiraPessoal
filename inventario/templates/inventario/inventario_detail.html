@@ -192,6 +192,7 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
+            <th>Marca</th>
             <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
@@ -211,6 +212,7 @@
           <tr>
             <td><code>{{ item.codigo_produto }}</code></td>
             <td>{{ item.descricao_produto }}</td>
+            <td>{% if item.marca_produto %}{{ item.marca_produto }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
             <td>
               {% if item.unidade_master_codigo %}
               {{ item.unidade_master_codigo }}
@@ -262,7 +264,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="15" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
+            <td colspan="16" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
           </tr>
           {% endfor %}
         </tbody>

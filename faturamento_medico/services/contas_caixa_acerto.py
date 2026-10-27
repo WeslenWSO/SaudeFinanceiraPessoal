@@ -1,9 +1,14 @@
 """Contas bancárias usadas no Acerto de Caixa (Caixa local ou Outros no Conta Azul)."""
 from __future__ import annotations
 
+import logging
+
 from django.db.models import Q
+from django.db.utils import OperationalError, ProgrammingError
 
 from extrato.models import ContaBancaria
+
+logger = logging.getLogger(__name__)
 
 _TIPOS_ACERTO_CAIXA = ('CAIXA', 'OUTROS')
 
@@ -17,7 +22,7 @@ def conta_elegivel_acerto_caixa(conta: ContaBancaria) -> bool:
 def conta_ativa_no_acerto_caixa(conta: ContaBancaria) -> bool:
     if not conta_elegivel_acerto_caixa(conta):
         return False
-    if conta.inativo_acerto_caixa:
+    if getattr(conta, 'inativo_acerto_caixa', False):
         return False
     return (conta.status or 'A') != 'I'
 
@@ -34,10 +39,12 @@ def queryset_contas_caixa_cadastro(empresa_id: int):
 
 def queryset_contas_caixa(empresa_id: int):
     """Somente caixas ativos no acerto (inativos não entram no filtro)."""
-    return queryset_contas_caixa_cadastro(empresa_id).filter(
-        inativo_acerto_caixa=False,
-        status='A',
-    )
+    qs = queryset_contas_caixa_cadastro(empresa_id).filter(status='A')
+    try:
+        return qs.filter(inativo_acerto_caixa=False)
+    except (ProgrammingError, OperationalError):
+        logger.warning('Coluna inativo_acerto_caixa ausente — migrate extrato 0029+')
+        return qs
 
 
 def caixa_valor_ativo_no_acerto(empresa_id: int, valor: str) -> bool:
@@ -59,11 +66,17 @@ def rotulo_conta_caixa(conta: ContaBancaria) -> str:
 
 
 def caixas_acerto_choices(empresa_id: int) -> list[tuple[str, str]]:
-    return [
-        (str(conta.pk), rotulo_conta_caixa(conta))
-        for conta in queryset_contas_caixa_cadastro(empresa_id)
-        if conta_ativa_no_acerto_caixa(conta)
-    ]
+    try:
+        return [
+            (str(conta.pk), rotulo_conta_caixa(conta))
+            for conta in queryset_contas_caixa_cadastro(empresa_id)
+            if conta_ativa_no_acerto_caixa(conta)
+        ]
+    except (ProgrammingError, OperationalError):
+        logger.exception('Falha ao listar caixas (migrate extrato/faturamento?) empresa=%s', empresa_id)
+        from faturamento_medico.models import CAIXAS_ACERTO_CHOICES
+
+        return list(CAIXAS_ACERTO_CHOICES)
 
 
 def caixas_acerto_valores(empresa_id: int) -> frozenset[str]:

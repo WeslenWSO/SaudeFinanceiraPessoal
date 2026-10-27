@@ -198,6 +198,12 @@ class InventarioItem(models.Model):
         return f'{self.codigo_produto} — {self.descricao_produto}'
 
     @property
+    def marca_produto(self) -> str:
+        if self.produto_id and self.produto:
+            return (self.produto.marca or '').strip()
+        return ''
+
+    @property
     def unidade_consumo(self) -> str:
         if self.produto_id and self.produto:
             return (self.produto.unidade or '').strip()

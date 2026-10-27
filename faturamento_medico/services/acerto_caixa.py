@@ -8,6 +8,7 @@ import re
 
 from django.db import transaction
 from django.db.models import Q
+from django.db.utils import OperationalError, ProgrammingError
 from django.utils import timezone
 
 from cobranca.models import Cobranca
@@ -254,10 +255,13 @@ def _filtros_para_snapshot(filtros: dict) -> dict:
 
 
 def _fechamentos_ativos_empresa(empresa_id: int):
-    return AcertoCaixaFechamento.objects.filter(
-        empresa_id=empresa_id,
-        reaberto_em__isnull=True,
-    )
+    try:
+        return AcertoCaixaFechamento.objects.filter(
+            empresa_id=empresa_id,
+            reaberto_em__isnull=True,
+        )
+    except (ProgrammingError, OperationalError):
+        return AcertoCaixaFechamento.objects.none()
 
 
 def _fechamento_cobre_faturamento(fech: AcertoCaixaFechamento, fat: FaturamentoMedico) -> bool:

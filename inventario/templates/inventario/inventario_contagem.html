@@ -30,6 +30,7 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
+            <th>Marca</th>
             <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
@@ -42,6 +43,7 @@
             {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
             <td><code>{{ form.instance.codigo_produto }}</code></td>
             <td>{{ form.instance.descricao_produto }}</td>
+            <td>{% if form.instance.marca_produto %}{{ form.instance.marca_produto }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
             <td>
               {% if form.instance.unidade_master_codigo %}
               <strong>{{ form.instance.unidade_master_codigo }}</strong>

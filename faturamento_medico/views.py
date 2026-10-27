@@ -6168,18 +6168,35 @@ def acerto_caixa(request):
 
     from empresa.models import Empresa
 
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     empresa = Empresa.objects.filter(pk=empresa_id).first()
     try:
         contexto = montar_contexto_acerto_caixa(request, empresa_id)
+        contexto['empresa'] = empresa
+        contexto['redirect_qs'] = request.GET.urlencode()
+        return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
     except (ProgrammingError, OperationalError) as exc:
         msg_schema = capturar_erro_schema(exc, contexto='acerto de caixa')
         if msg_schema:
+            logger.exception('acerto_caixa schema empresa=%s', empresa_id)
             messages.error(request, msg_schema)
             return redirect('faturamento_medico:ftlistar')
         raise
-    contexto['empresa'] = empresa
-    contexto['redirect_qs'] = request.GET.urlencode()
-    return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
+    except Exception as exc:
+        msg_schema = capturar_erro_schema(exc, contexto='acerto de caixa')
+        logger.exception('acerto_caixa empresa=%s', empresa_id)
+        if msg_schema:
+            messages.error(request, msg_schema)
+        else:
+            messages.error(
+                request,
+                'Não foi possível abrir o acerto de caixa. '
+                'Confira os logs do servidor ou execute python manage.py migrate no Render.',
+            )
+        return redirect('faturamento_medico:ftlistar')
 
 
 @login_required
