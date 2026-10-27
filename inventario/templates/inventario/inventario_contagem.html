@@ -30,7 +30,7 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
-            <th class="small">Embalagem</th>
+            <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
             <th style="min-width:8rem;">Qtd. contada</th>
@@ -42,7 +42,12 @@
             {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
             <td><code>{{ form.instance.codigo_produto }}</code></td>
             <td>{{ form.instance.descricao_produto }}</td>
-            <td class="small text-muted">{% if form.instance.rotulo_embalagem_master %}{{ form.instance.rotulo_embalagem_master }}{% else %}—{% endif %}</td>
+            <td>
+              {% if form.instance.unidade_master_codigo %}
+              <strong>{{ form.instance.unidade_master_codigo }}</strong>
+              {% if form.instance.rotulo_embalagem_master %}<span class="text-muted small d-block">{{ form.instance.rotulo_embalagem_master }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
             <td>{% if form.instance.unidade_consumo %}<strong>{{ form.instance.unidade_consumo }}</strong>{% else %}—{% endif %}</td>
             <td class="text-end">{{ form.instance.quantidade_estoque }}{% if form.instance.unidade_consumo %} <span class="text-muted small">{{ form.instance.unidade_consumo }}</span>{% endif %}</td>
             <td>

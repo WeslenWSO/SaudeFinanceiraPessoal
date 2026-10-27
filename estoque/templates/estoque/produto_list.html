@@ -16,6 +16,10 @@
 
   {% include 'parcial/_messages.html' %}
 
+  <p class="small text-muted mb-2">
+    Quantidades de estoque são sempre na <strong>unidade de consumo</strong> (coluna Un.). Un. master é só referência de embalagem.
+  </p>
+
   <form method="get" class="row g-2 mb-3">
     <div class="col-md-6">
       <input type="search" name="q" class="form-control form-control-sm" placeholder="Buscar código, descrição ou marca" value="{{ busca }}">
@@ -33,8 +37,10 @@
             <th>Código</th>
             <th>Descrição</th>
             <th>Marca</th>
+            <th>Un.</th>
+            <th>Un. master</th>
             <th>Fornecedor</th>
-            <th class="text-end">Qtd.</th>
+            <th class="text-end">Qtd. (Un.)</th>
             <th class="text-end">Est. mín.</th>
             <th class="text-end">Dias entrega</th>
             <th class="text-end">Est. contábil</th>
@@ -50,6 +56,10 @@
             <td><code>{{ p.codigo_produto }}</code></td>
             <td>{{ p.descricao }}</td>
             <td>{{ p.marca|default:"—" }}</td>
+            <td>{% if p.unidade %}<strong>{{ p.unidade }}</strong>{% else %}—{% endif %}</td>
+            <td class="small">
+              {% if p.unidade_master %}{{ p.unidade_master }}{% if p.rotulo_unidade_master %}<span class="text-muted d-block">{{ p.rotulo_unidade_master }}</span>{% endif %}{% else %}—{% endif %}
+            </td>
             <td class="small">{{ p.fornecedor_rotulo|default:"—"|truncatechars:30 }}</td>
             <td class="text-end">{{ p.quantidade_estoque }}</td>
             <td class="text-end">{% if p.estoque_minimo %}{{ p.estoque_minimo }}{% else %}—{% endif %}</td>
@@ -68,7 +78,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="12" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
+            <td colspan="14" class="text-center text-muted py-4">Nenhum produto cadastrado.</td>
           </tr>
           {% endfor %}
         </tbody>

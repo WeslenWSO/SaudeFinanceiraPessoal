@@ -130,6 +130,10 @@
   {% endif %}
 
   <div class="alert alert-light border small py-2 mb-3">
+    <strong>Unidades:</strong> quantidades e aplicação ao estoque são sempre na coluna <strong>Un.</strong> (unidade de consumo).
+  </div>
+
+  <div class="alert alert-light border small py-2 mb-3">
     <strong>Produtos × usuários × rodada</strong> —
     Produtos: botão <strong>Escolher produtos</strong> (ou no cadastro do inventário).
     Usuários por rodada: <a href="{% url 'inventario:inventario_config' object.pk %}">Responsáveis</a>
@@ -188,7 +192,7 @@
           <tr>
             <th>Código</th>
             <th>Produto</th>
-            <th class="small">Emb.</th>
+            <th>Un. master</th>
             <th>Un.</th>
             <th class="text-end">Qtd. estoque</th>
             <th class="text-end">Est. contábil</th>
@@ -207,8 +211,13 @@
           <tr>
             <td><code>{{ item.codigo_produto }}</code></td>
             <td>{{ item.descricao_produto }}</td>
-            <td class="small text-muted">{% if item.rotulo_embalagem_master %}{{ item.rotulo_embalagem_master }}{% else %}—{% endif %}</td>
-            <td>{{ item.unidade_consumo|default:"—" }}</td>
+            <td>
+              {% if item.unidade_master_codigo %}
+              {{ item.unidade_master_codigo }}
+              {% if item.rotulo_embalagem_master %}<span class="text-muted small d-block">{{ item.rotulo_embalagem_master }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td><strong>{{ item.unidade_consumo|default:"—" }}</strong></td>
             <td class="text-end">{{ item.quantidade_estoque }}</td>
             <td class="text-end">{{ item.quantidade_estoque_contabil }}</td>
             <td class="text-end {% if rodada_estoque == 1 %}col-contagem-ativa{% endif %}">
@@ -253,7 +262,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="14" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
+            <td colspan="15" class="text-center text-muted py-4">Nenhum item. Sincronize com o estoque ou cadastre produtos.</td>
           </tr>
           {% endfor %}
         </tbody>

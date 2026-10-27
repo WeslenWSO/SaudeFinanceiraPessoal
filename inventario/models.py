@@ -209,6 +209,12 @@ class InventarioItem(models.Model):
             return (self.produto.rotulo_unidade_master or '').strip()
         return ''
 
+    @property
+    def unidade_master_codigo(self) -> str:
+        if self.produto_id and self.produto:
+            return (self.produto.unidade_master or '').strip()
+        return ''
+
     def valor_contagem(self, rodada: int) -> Decimal | None:
         return getattr(self, f'contagem_{rodada}', None)
 

@@ -47,6 +47,9 @@ def _serializar_produto_inventario_grid(produto: ProdutoEstoque, setor: str) -> 
         'codigo': produto.codigo_produto,
         'descricao': produto.descricao,
         'marca': (produto.marca or '').strip(),
+        'unidade': (produto.unidade or '').strip(),
+        'unidade_master': (produto.unidade_master or '').strip(),
+        'embalagem': (produto.rotulo_unidade_master or '').strip(),
         'saldo': str(saldo),
         'saldo_fmt': q_fmt,
     }
@@ -369,7 +372,10 @@ def inventario_produtos(request, pk):
     else:
         form = InventarioAdicionarProdutosForm(inventario=inventario)
 
-    itens = inventario.itens.order_by('codigo_produto', 'descricao_produto')
+    itens = inventario.itens.select_related('produto').order_by(
+        'codigo_produto',
+        'descricao_produto',
+    )
     return render(
         request,
         'inventario/inventario_produtos.html',

@@ -84,9 +84,15 @@ class ProdutoEstoqueForm(forms.ModelForm):
         self.fields['dias_entrega_fornecedor'].help_text = (
             'Quantos dias o fornecedor costuma demorar para entregar (informação de compras).'
         )
+        self.fields['unidade'].help_text = (
+            'Unidade de consumo — todo saldo, inventário e movimentos usam esta unidade.'
+        )
+        self.fields['unidade_master'].help_text = 'Embalagem de compra (ex.: PCT, CX). Não substitui a unidade do estoque.'
         self.fields['quantidade_por_master'].help_text = (
             'Ex.: informe 4 quando 1 PCT (master) contém 4 UN (unidade de consumo).'
         )
+        self.fields['quantidade_estoque'].help_text = 'Sempre na unidade de consumo (campo Un.).'
+        self.fields['quantidade_estoque_contabil'].help_text = 'Espelho contábil, na mesma unidade de consumo.'
         self.fields['fornecedor'].required = False
         self.fields['fornecedor'].empty_label = '—'
         qs = Fornecedor.objects.all().order_by('razao')

@@ -8,6 +8,7 @@
     </div>
     <div class="card-body">
       {% include 'parcial/_messages.html' %}
+      <p class="small text-muted">Estoque, inventário e NF convertem entradas para a <strong>unidade de consumo</strong> (Un.). Un. master é só cadastro de embalagem.</p>
       <form method="post" novalidate>
         {% csrf_token %}
         {% for field in form %}

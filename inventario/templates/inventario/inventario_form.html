@@ -47,13 +47,15 @@
               <th>Código</th>
               <th>Descrição</th>
               <th>Marca</th>
-              <th class="text-end">Saldo no setor</th>
+              <th>Un. master</th>
+              <th>Un.</th>
+              <th class="text-end">Saldo (Un.)</th>
               <th style="width: 5rem;"></th>
             </tr>
           </thead>
           <tbody id="inv-grade-corpo">
             <tr id="inv-grade-vazia">
-              <td colspan="5" class="text-center text-muted py-3">Nenhum produto incluído — use a busca acima.</td>
+              <td colspan="7" class="text-center text-muted py-3">Nenhum produto incluído — use a busca acima.</td>
             </tr>
           </tbody>
         </table>
@@ -67,7 +69,8 @@
     <div class="alert alert-light border small mb-3">
       <strong>Como funciona</strong>
       <ul class="mb-0 ps-3">
-        <li><strong>Setor:</strong> a coluna «Saldo no setor» usa o setor escolhido acima.</li>
+        <li><strong>Unidades:</strong> saldo e contagem sempre na <strong>Un.</strong> (consumo); Un. master é referência de embalagem.</li>
+        <li><strong>Setor:</strong> a coluna «Saldo (Un.)» usa o setor escolhido acima.</li>
         <li><strong>Produtos:</strong> só entram na contagem os itens da grade (ou todos, se vazia).</li>
         <li><strong>Usuários:</strong> em cada coluna abaixo, escolha quem pode lançar a <strong>1ª</strong>, <strong>2ª</strong> ou <strong>3ª</strong> contagem.</li>
       </ul>
@@ -155,10 +158,14 @@
     function renderLinha(p) {
         var tr = document.createElement('tr');
         tr.setAttribute('data-produto-id', String(p.id));
+        var um = p.unidade_master ? escapeHtml(p.unidade_master) : '—';
+        var un = p.unidade ? '<strong>' + escapeHtml(p.unidade) + '</strong>' : '—';
         tr.innerHTML =
             '<td><code>' + escapeHtml(p.codigo) + '</code></td>' +
             '<td>' + escapeHtml(p.descricao) + '</td>' +
             '<td>' + escapeHtml(p.marca || '—') + '</td>' +
+            '<td>' + um + '</td>' +
+            '<td>' + un + '</td>' +
             '<td class="text-end">' + escapeHtml(p.saldo_fmt) + '</td>' +
             '<td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm py-0 inv-remover-produto">Remover</button></td>';
         return tr;
@@ -286,7 +293,7 @@
                         var atualizado = res.produtos[0];
                         produtosMap[id] = atualizado;
                         var tr = corpoEl.querySelector('tr[data-produto-id="' + id + '"]');
-                        if (tr && tr.cells[3]) tr.cells[3].textContent = atualizado.saldo_fmt;
+                        if (tr && tr.cells[5]) tr.cells[5].textContent = atualizado.saldo_fmt;
                     });
             });
         });

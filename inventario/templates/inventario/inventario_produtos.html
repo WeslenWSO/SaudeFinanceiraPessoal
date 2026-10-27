@@ -11,7 +11,7 @@
 
   <p class="text-muted small">
     Os produtos vêm do cadastro <a href="{% url 'estoque:produto_list' %}">Estoque</a> da empresa selecionada.
-    Marque abaixo o que entra neste inventário ou use «Incluir todos do estoque» na tela anterior.
+    Saldos e contagens são sempre na <strong>unidade de consumo</strong> (Un.).
   </p>
 
   <div class="row g-3">
@@ -38,6 +38,8 @@
               <tr>
                 <th>Código</th>
                 <th>Produto</th>
+                <th>Un. master</th>
+                <th>Un.</th>
                 <th class="text-end">Qtd. estoque</th>
                 <th></th>
               </tr>
@@ -47,6 +49,10 @@
               <tr>
                 <td><code>{{ item.codigo_produto }}</code></td>
                 <td>{{ item.descricao_produto }}</td>
+                <td>
+                  {% if item.unidade_master_codigo %}{{ item.unidade_master_codigo }}{% else %}—{% endif %}
+                </td>
+                <td><strong>{{ item.unidade_consumo|default:"—" }}</strong></td>
                 <td class="text-end">{{ item.quantidade_estoque }}</td>
                 <td class="text-end">
                   <form method="post" action="{% url 'inventario:inventario_remover_item' inventario.pk item.pk %}" class="d-inline"
@@ -58,7 +64,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="4" class="text-center text-muted py-4">Nenhum produto. Inclua pela lista ao lado ou sincronize todo o estoque.</td>
+                <td colspan="6" class="text-center text-muted py-4">Nenhum produto. Inclua pela lista ao lado ou sincronize todo o estoque.</td>
               </tr>
               {% endfor %}
             </tbody>
