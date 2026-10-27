@@ -43,6 +43,7 @@ from dashboard.conta_azul.catalogos_fiscais import (
     listar_nbs,
     sugestoes_por_lei_116,
 )
+from dashboard.conta_azul.periodo_sync import MAX_DIAS_SYNC_CONTA_AZUL, parse_periodo_sync, periodo_sync_padrao
 from dashboard.conta_azul.conciliacao import (
     contas_bancarias_conciliacao,
     lancamento_eh_cartao_destaque,
@@ -370,18 +371,22 @@ def conta_azul_sincronizar(request, pk):
                 'Abra a configuração, clique em Conectar/Reconectar ou cole o código manual.',
             )
             return redirect('empresa:conta_azul_config', pk=pk)
+        data_de_str = request.POST.get('data_de')
+        data_ate_str = request.POST.get('data_ate')
         try:
-            ano = int(request.POST.get('ano') or hoje.year)
-            mes = int(request.POST.get('mes') or hoje.month)
-        except (TypeError, ValueError):
-            ano, mes = hoje.year, hoje.month
-        data_de = date(ano, mes, 1)
-        if mes == 12:
-            data_ate = date(ano, 12, 31)
-        else:
-            data_ate = date(ano, mes + 1, 1)
-            from datetime import timedelta
-            data_ate = data_ate - timedelta(days=1)
+            data_de, data_ate = parse_periodo_sync(data_de_str, data_ate_str, hoje=hoje)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return render(
+                request,
+                'empresa/conta_azul_sincronizar.html',
+                _ctx_conta_azul_sincronizar(
+                    empresa,
+                    config,
+                    data_de=data_de_str,
+                    data_ate=data_ate_str,
+                ),
+            )
 
         try:
             opcoes = dict(
@@ -401,25 +406,50 @@ def conta_azul_sincronizar(request, pk):
             ).start()
             msg = (
                 'Sincronização Conta Azul iniciada em segundo plano. '
-                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar ou a lista de NFSe. '
-                'Use um mês por vez se houver muitos lançamentos.'
+                f'Período: {data_de.strftime("%d/%m/%Y")} a {data_ate.strftime("%d/%m/%Y")}. '
+                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar ou a lista de NFSe.'
             )
             messages.info(request, msg)
         except Exception as exc:
             messages.error(request, f'Não foi possível iniciar a sincronização: {exc}')
-        return redirect('empresa:conta_azul_sincronizar', pk=pk)
+        return redirect(
+            f"{reverse('empresa:conta_azul_sincronizar', kwargs={'pk': pk})}"
+            f"?data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}"
+        )
 
+    data_de_g = request.GET.get('data_de')
+    data_ate_g = request.GET.get('data_ate')
     return render(
         request,
         'empresa/conta_azul_sincronizar.html',
-        {
-            'empresa': empresa,
-            'config': config,
-            'descricao': f'Sincronizar Conta Azul — {empresa.razao}',
-            'mes_ref': hoje.month,
-            'ano_ref': hoje.year,
-        },
+        _ctx_conta_azul_sincronizar(empresa, config, data_de=data_de_g, data_ate=data_ate_g, hoje=hoje),
     )
+
+
+def _ctx_conta_azul_sincronizar(
+    empresa,
+    config,
+    *,
+    data_de=None,
+    data_ate=None,
+    hoje: date | None = None,
+) -> dict:
+    hoje = hoje or date.today()
+    padrao_de, padrao_ate = periodo_sync_padrao(hoje)
+    de_str = (str(data_de).strip() if data_de else '') or padrao_de.isoformat()
+    ate_str = (str(data_ate).strip() if data_ate else '') or padrao_ate.isoformat()
+    try:
+        parse_periodo_sync(de_str, ate_str, hoje=hoje)
+    except ValueError:
+        de_str, ate_str = padrao_de.isoformat(), padrao_ate.isoformat()
+    return {
+        'empresa': empresa,
+        'config': config,
+        'descricao': f'Sincronizar Conta Azul — {empresa.razao}',
+        'data_de_str': de_str,
+        'data_ate_str': ate_str,
+        'max_dias_sync': MAX_DIAS_SYNC_CONTA_AZUL,
+    }
 
 
 @login_required
