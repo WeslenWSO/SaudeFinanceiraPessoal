@@ -250,3 +250,60 @@ class ServicoContaAzul(models.Model):
     def __str__(self):
         rotulo = self.codigo or self.conta_azul_id or str(self.pk)
         return f'{rotulo} — {self.descricao[:60]}'
+
+
+class VendaContaAzul(models.Model):
+    """Pedido de venda Conta Azul (pagamento e caixa para vínculo NF / acerto)."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='vendas_conta_azul',
+        verbose_name='Empresa',
+    )
+    conta_azul_id = models.CharField(
+        max_length=36,
+        db_index=True,
+        verbose_name='ID venda Conta Azul',
+    )
+    numero_venda = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Número da venda',
+    )
+    data_venda = models.DateField(null=True, blank=True, verbose_name='Data da venda')
+    forma_pagamento = models.ForeignKey(
+        'cobranca.Cobranca',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='vendas_conta_azul',
+        verbose_name='Forma de pagamento',
+    )
+    caixa_acerto = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        verbose_name='Caixa acerto (SF)',
+        help_text='PK da conta caixa local ou código legado.',
+    )
+    vendedor_nome = models.CharField(max_length=120, blank=True, default='')
+    conta_financeira_ca_id = models.CharField(max_length=36, blank=True, default='')
+    nsu = models.CharField(max_length=100, blank=True, default='')
+    discriminacao_resumo = models.TextField(blank=True, default='')
+    sincronizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Venda Conta Azul'
+        verbose_name_plural = 'Vendas Conta Azul'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empresa', 'conta_azul_id'],
+                name='venda_conta_azul_unica',
+            ),
+        ]
+        ordering = ['-data_venda', '-numero_venda']
+
+    def __str__(self) -> str:
+        n = self.numero_venda or self.conta_azul_id[:8]
+        return f'Venda {n}'

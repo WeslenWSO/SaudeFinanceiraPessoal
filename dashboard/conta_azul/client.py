@@ -186,6 +186,28 @@ class ContaAzulClient:
         data = self.get(f'/v1/servicos/{sid}')
         return data if isinstance(data, dict) else {}
 
+    def buscar_vendas(self, *, data_de: date, data_ate: date, **filtros) -> list:
+        params = dict(filtros)
+        params['data_inicio'] = data_de.isoformat()
+        params['data_fim'] = data_ate.isoformat()
+        params.setdefault('pagina', 1)
+        params.setdefault('tamanho_pagina', 50)
+        todos: list = []
+        while True:
+            data = self.get('/v1/venda/busca', params)
+            if not isinstance(data, dict):
+                break
+            itens = data.get('itens') or []
+            if isinstance(itens, list):
+                todos.extend(itens)
+            total = data.get('total_itens') or data.get('itens_totais') or data.get('total')
+            if total is not None and len(todos) >= int(total):
+                break
+            if not itens:
+                break
+            params['pagina'] = int(params.get('pagina', 1)) + 1
+        return todos
+
     def buscar_venda_por_id(self, venda_id: str) -> dict:
         vid = (venda_id or '').strip()
         if not vid:

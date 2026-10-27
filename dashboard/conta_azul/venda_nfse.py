@@ -6,6 +6,7 @@ from typing import Any
 
 from cobranca.models import Cobranca
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
+from dashboard.conta_azul.caixa_acerto_venda import caixa_acerto_de_venda_ca
 from dashboard.conta_azul.forma_pagamento_ca import _cobranca_de_item, _texto_forma_pagamento_item
 
 
@@ -41,9 +42,18 @@ def _item_pagamento_de_venda(envelope: dict | None) -> dict:
     """Monta dict compatível com _texto_forma_pagamento_item do sync financeiro."""
     if not isinstance(envelope, dict):
         return {}
+    v = _corpo_venda(envelope)
+    cp = v.get('condicao_pagamento')
+    if isinstance(cp, dict):
+        item = dict(cp)
+        tipo = cp.get('tipo_pagamento')
+        if tipo:
+            item['metodo_pagamento'] = tipo
+        if _texto_forma_pagamento_item(item):
+            return item
     for bloco in (
         envelope.get('evento_financeiro'),
-        _corpo_venda(envelope),
+        v,
         envelope,
     ):
         if not isinstance(bloco, dict):
@@ -53,7 +63,13 @@ def _item_pagamento_de_venda(envelope: dict | None) -> dict:
             return item
         for key in ('condicao_pagamento', 'condicao_pagamento_venda', 'pagamento'):
             val = bloco.get(key)
-            if val is not None and val != '':
+            if isinstance(val, dict):
+                merged = {**item, **val}
+                if val.get('tipo_pagamento'):
+                    merged['metodo_pagamento'] = val['tipo_pagamento']
+                if _texto_forma_pagamento_item(merged):
+                    return merged
+            elif val is not None and val != '':
                 item['forma_pagamento'] = val
                 if _texto_forma_pagamento_item(item):
                     return item
@@ -179,6 +195,7 @@ def enriquecer_campos_nfse_com_venda_ca(
     item_nfse: dict,
     campos: dict[str, Any],
     *,
+    empresa_id: int,
     cache_vendas: dict[str, dict],
     cache_cobranca: dict[str, Cobranca] | None = None,
 ) -> dict[str, Any]:
@@ -211,5 +228,16 @@ def enriquecer_campos_nfse_com_venda_ca(
     cob = cobranca_de_venda_ca(envelope, cache_cobranca=cache_cobranca)
     if cob is not None:
         campos['forma_pagamento'] = cob
+
+    if empresa_id:
+        caixa = caixa_acerto_de_venda_ca(empresa_id, envelope)
+        if caixa:
+            campos['caixa_acerto_sugerido'] = caixa
+
+    cp = _corpo_venda(envelope).get('condicao_pagamento')
+    if isinstance(cp, dict):
+        nsu = str(cp.get('nsu') or '').strip()
+        if nsu and not (campos.get('nsu') or '').strip():
+            campos['nsu'] = nsu[:100]
 
     return campos

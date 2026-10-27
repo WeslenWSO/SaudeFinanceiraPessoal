@@ -235,6 +235,7 @@ def importar_nfse_prestador_conta_azul(
                     client,
                     item,
                     campos,
+                    empresa_id=empresa.pk,
                     cache_vendas=cache_vendas,
                     cache_cobranca=cache_cobranca,
                 )
@@ -272,6 +273,13 @@ def importar_nfse_prestador_conta_azul(
                                 setattr(existente, k, v)
                             continue
                         if k == 'forma_pagamento' and v is not None:
+                            setattr(existente, k, v)
+                            continue
+                        if k == 'caixa_acerto_sugerido' and v:
+                            if not (existente.caixa_acerto_sugerido or '').strip():
+                                setattr(existente, k, v)
+                            continue
+                        if k == 'nsu' and v and not (existente.nsu or '').strip():
                             setattr(existente, k, v)
                             continue
                         setattr(existente, k, v)
