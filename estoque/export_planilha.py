@@ -63,6 +63,7 @@ COLUNAS_ANALISE_COMPRA = (
     'Unidade master',
     'Qtd. master',
     'Dias de entrega',
+    'Qtd. desejada',
 )
 
 
@@ -92,6 +93,7 @@ def exportar_analise_compra_xlsx(linhas: list[dict]) -> bytes:
                 row.get('unidade_master') or '',
                 _num(row.get('qtd_master')) if row.get('qtd_master') else '',
                 row.get('dias_entrega') if row.get('dias_entrega') is not None else '',
+                _num(row.get('quantidade_desejada')),
             ]
         )
     buf = BytesIO()

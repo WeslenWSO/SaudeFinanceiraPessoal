@@ -393,3 +393,92 @@ class RequisicaoEstoqueItem(models.Model):
     class Meta:
         verbose_name = 'Item da requisição'
         verbose_name_plural = 'Itens da requisição'
+
+
+class AnaliseCompraSalva(models.Model):
+    """Lista de produtos selecionados na análise de compra (base para orçamento)."""
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name='analises_compra_salvas',
+    )
+    titulo = models.CharField(max_length=200, verbose_name='Título')
+    observacao = models.TextField(blank=True, default='')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='analises_compra_criadas',
+    )
+    orcamento_gerado = models.ForeignKey(
+        'orcamento_compra.OrcamentoCompra',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='analises_compra_origem',
+        verbose_name='Orçamento gerado',
+    )
+
+    class Meta:
+        verbose_name = 'Análise de compra salva'
+        verbose_name_plural = 'Análises de compra salvas'
+        ordering = ['-atualizado_em', '-id']
+
+    def __str__(self) -> str:
+        return self.titulo
+
+
+class AnaliseCompraSalvaItem(models.Model):
+    analise = models.ForeignKey(
+        AnaliseCompraSalva,
+        on_delete=models.CASCADE,
+        related_name='itens',
+    )
+    produto = models.ForeignKey(
+        ProdutoEstoque,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='itens_analise_compra',
+    )
+    codigo_produto = models.CharField(max_length=50)
+    descricao = models.CharField(max_length=300)
+    marca = models.CharField(max_length=120, blank=True, default='')
+    fornecedor_texto = models.CharField(max_length=200, blank=True, default='')
+    qtd_ultima_compra = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        null=True,
+        blank=True,
+    )
+    data_ultima_compra = models.DateField(null=True, blank=True)
+    estoque_registrado = models.DecimalField(max_digits=14, decimal_places=3, default=0)
+    unidade = models.CharField(max_length=20, blank=True, default='')
+    unidade_master = models.CharField(max_length=20, blank=True, default='')
+    qtd_master = models.DecimalField(max_digits=14, decimal_places=3, default=0)
+    dias_entrega = models.PositiveIntegerField(null=True, blank=True)
+    quantidade_desejada = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+        verbose_name='Quantidade desejada',
+    )
+    ordem = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Item da análise de compra'
+        verbose_name_plural = 'Itens da análise de compra'
+        ordering = ['ordem', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['analise', 'produto'],
+                name='analise_compra_item_produto_unico',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.codigo_produto} — {self.descricao}'

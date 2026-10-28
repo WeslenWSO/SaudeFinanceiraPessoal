@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">{{ analise.titulo }}</h1>
+      <p class="small text-muted mb-0">
+        Salva em {{ analise.criado_em|date:"d/m/Y H:i" }}
+        {% if analise.observacao %} · {{ analise.observacao }}{% endif %}
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'estoque:analise_compra_salvas' %}" class="btn btn-outline-secondary btn-sm">Lista</a>
+      <a href="{% url 'estoque:analise_compra_exportar_excel' %}?analise_id={{ analise.pk }}"
+         class="btn btn-success btn-sm">
+        <i class="fas fa-file-excel me-1"></i> Excel
+      </a>
+      {% if analise.orcamento_gerado_id %}
+      <a href="{% url 'orcamento_compra:detalhe' analise.orcamento_gerado_id %}"
+         class="btn btn-outline-primary btn-sm">Ver orçamento</a>
+      {% else %}
+      <form method="post" action="{% url 'estoque:analise_compra_gerar_orcamento' analise.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm">
+          Gerar orçamento de compra
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% include 'parcial/_messages.html' %}
+
+  <p class="small text-muted mb-2">
+    Informe a <strong>quantidade desejada</strong> (unidade de consumo) e clique em Salvar quantidades.
+    Estoque atual entre parênteses quando diferente do registrado na análise.
+  </p>
+
+  <form method="post" action="{% url 'estoque:analise_compra_salvar_quantidades' analise.pk %}">
+    {% csrf_token %}
+    <div class="mb-3">
+      <button type="submit" class="btn btn-primary btn-sm">Salvar quantidades</button>
+    </div>
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Produto</th>
+              <th>Marca</th>
+              <th>Fornecedor</th>
+              <th class="text-end">Qtd. últ. compra</th>
+              <th>Data últ. compra</th>
+              <th class="text-end">Estoque</th>
+              <th>Un.</th>
+              <th class="text-end">Dias entrega</th>
+              <th class="text-end" style="min-width:7rem">Qtd. desejada</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas %}
+            <tr>
+              <td><code>{{ linha.codigo_produto }}</code></td>
+              <td>{{ linha.descricao }}</td>
+              <td>{{ linha.marca }}</td>
+              <td class="small">{{ linha.fornecedor|truncatechars:35 }}</td>
+              <td class="text-end">{{ linha.qtd_ultima_compra_fmt }}</td>
+              <td>{{ linha.data_ultima_compra_fmt }}</td>
+              <td class="text-end" title="Registrado: {{ linha.estoque_registrado_fmt }}">
+                {{ linha.estoque_fmt }}
+              </td>
+              <td>{{ linha.unidade }}</td>
+              <td class="text-end">{{ linha.dias_entrega_fmt }}</td>
+              <td class="text-end">
+                <input type="text" name="qtd_desejada_{{ linha.item_id }}"
+                       class="form-control form-control-sm text-end"
+                       inputmode="decimal"
+                       value="{{ linha.quantidade_desejada_fmt }}"
+                       placeholder="0">
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10" class="text-muted text-center py-4">Sem itens.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

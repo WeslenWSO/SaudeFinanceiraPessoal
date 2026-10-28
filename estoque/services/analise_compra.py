@@ -6,9 +6,19 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Q
+from decimal import InvalidOperation
 
-from estoque.models import EntradaEstoqueNota, NaturezaEstoque, ProdutoEstoque
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+
+from estoque.models import (
+    AnaliseCompraSalva,
+    AnaliseCompraSalvaItem,
+    EntradaEstoqueNota,
+    NaturezaEstoque,
+    ProdutoEstoque,
+)
 
 
 def _data_ultima_compra(entrada: EntradaEstoqueNota | None) -> date | None:
@@ -88,6 +98,7 @@ def montar_linhas_analise_compra(
         qtd_uc = entrada.quantidade if entrada else None
         linhas.append(
             {
+                'produto_id': produto.pk,
                 'codigo_produto': produto.codigo_produto,
                 'descricao': produto.descricao,
                 'marca': (produto.marca or '').strip() or (entrada.marca if entrada else '') or '',
@@ -111,6 +122,163 @@ def montar_linhas_analise_compra(
             }
         )
     return linhas
+
+
+def parse_quantidade_br(raw) -> Decimal | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    s = s.replace(' ', '')
+    if ',' in s and '.' in s:
+        s = s.replace('.', '').replace(',', '.')
+    elif ',' in s:
+        s = s.replace(',', '.')
+    try:
+        return Decimal(s)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+@transaction.atomic
+def criar_analise_compra_salva(
+    empresa_id: int,
+    *,
+    titulo: str,
+    observacao: str,
+    produto_ids: list[int],
+    usuario,
+) -> AnaliseCompraSalva:
+    ids = sorted({int(x) for x in produto_ids if x})
+    if not ids:
+        raise ValueError('Selecione ao menos um produto.')
+    titulo = (titulo or '').strip() or timezone.localdate().strftime('Análise %d/%m/%Y')
+    ultimas = _mapa_ultima_entrada_por_produto(empresa_id)
+    produtos = {
+        p.pk: p
+        for p in ProdutoEstoque.objects.filter(empresa_id=empresa_id, pk__in=ids)
+    }
+    if len(produtos) != len(ids):
+        raise ValueError('Um ou mais produtos não pertencem à empresa selecionada.')
+    analise = AnaliseCompraSalva.objects.create(
+        empresa_id=empresa_id,
+        titulo=titulo[:200],
+        observacao=(observacao or '').strip(),
+        criado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
+    )
+    ordem = 0
+    for pid in ids:
+        produto = produtos[pid]
+        entrada = ultimas.get(produto.pk)
+        ordem += 1
+        AnaliseCompraSalvaItem.objects.create(
+            analise=analise,
+            produto=produto,
+            codigo_produto=produto.codigo_produto,
+            descricao=produto.descricao,
+            marca=(produto.marca or '').strip() or (entrada.marca if entrada else ''),
+            fornecedor_texto=_fornecedor_exibicao(produto, entrada),
+            qtd_ultima_compra=entrada.quantidade if entrada else None,
+            data_ultima_compra=_data_ultima_compra(entrada),
+            estoque_registrado=produto.quantidade_estoque or Decimal('0'),
+            unidade=produto.unidade or '',
+            unidade_master=produto.unidade_master or '',
+            qtd_master=produto.quantidade_por_master or Decimal('0'),
+            dias_entrega=produto.dias_entrega_fornecedor,
+            quantidade_desejada=Decimal('0'),
+            ordem=ordem,
+        )
+    return analise
+
+
+def montar_linhas_analise_salva(analise: AnaliseCompraSalva) -> list[dict[str, Any]]:
+    linhas: list[dict[str, Any]] = []
+    for it in analise.itens.select_related('produto').order_by('ordem', 'id'):
+        produto = it.produto
+        estoque_atual = produto.quantidade_estoque if produto else it.estoque_registrado
+        linhas.append(
+            {
+                'item_id': it.pk,
+                'produto_id': it.produto_id,
+                'codigo_produto': it.codigo_produto,
+                'descricao': it.descricao,
+                'marca': it.marca or '—',
+                'fornecedor': it.fornecedor_texto or '—',
+                'qtd_ultima_compra': it.qtd_ultima_compra,
+                'qtd_ultima_compra_fmt': _fmt_qtd(it.qtd_ultima_compra),
+                'data_ultima_compra': it.data_ultima_compra,
+                'data_ultima_compra_fmt': (
+                    it.data_ultima_compra.strftime('%d/%m/%Y') if it.data_ultima_compra else '—'
+                ),
+                'estoque': estoque_atual,
+                'estoque_fmt': _fmt_qtd(estoque_atual),
+                'estoque_registrado_fmt': _fmt_qtd(it.estoque_registrado),
+                'unidade': it.unidade or '—',
+                'unidade_master': it.unidade_master or '—',
+                'qtd_master_fmt': _fmt_qtd(it.qtd_master) if it.qtd_master else '—',
+                'dias_entrega_fmt': str(it.dias_entrega) if it.dias_entrega is not None else '—',
+                'quantidade_desejada': it.quantidade_desejada,
+                'quantidade_desejada_fmt': _fmt_qtd(it.quantidade_desejada),
+            }
+        )
+    return linhas
+
+
+@transaction.atomic
+def salvar_quantidades_desejadas(analise: AnaliseCompraSalva, valores: dict[int, Decimal]) -> int:
+    atualizados = 0
+    for item in analise.itens.all():
+        if item.pk not in valores:
+            continue
+        q = valores[item.pk]
+        if q < 0:
+            q = Decimal('0')
+        if item.quantidade_desejada != q:
+            item.quantidade_desejada = q
+            item.save(update_fields=['quantidade_desejada'])
+            atualizados += 1
+    analise.save(update_fields=['atualizado_em'])
+    return atualizados
+
+
+@transaction.atomic
+def gerar_orcamento_compra_da_analise(analise: AnaliseCompraSalva, *, usuario) -> 'OrcamentoCompra':
+    from orcamento_compra.models import OrcamentoCompra, OrcamentoCompraItem
+
+    if analise.orcamento_gerado_id:
+        return analise.orcamento_gerado
+    itens = list(
+        analise.itens.filter(quantidade_desejada__gt=0).order_by('ordem', 'id'),
+    )
+    if not itens:
+        raise ValueError('Informe a quantidade desejada em ao menos um produto.')
+    orc = OrcamentoCompra.objects.create(
+        empresa_id=analise.empresa_id,
+        titulo=f'Compra — {analise.titulo}'[:200],
+        observacao=(
+            f'Gerado a partir da análise de compra #{analise.pk} em '
+            f'{timezone.localdate().strftime("%d/%m/%Y")}.'
+        ),
+        status=OrcamentoCompra.STATUS_COTACAO,
+        criado_por=usuario if getattr(usuario, 'is_authenticated', False) else None,
+    )
+    ordem = 0
+    for it in itens:
+        ordem += 1
+        unidade = (it.unidade or 'UN').strip() or 'UN'
+        OrcamentoCompraItem.objects.create(
+            orcamento=orc,
+            produto=it.produto,
+            codigo_produto_comercio=it.codigo_produto,
+            descricao=it.descricao,
+            unidade=unidade[:20],
+            quantidade=it.quantidade_desejada,
+            ordem=ordem,
+        )
+    analise.orcamento_gerado = orc
+    analise.save(update_fields=['orcamento_gerado', 'atualizado_em'])
+    return orc
 
 
 def _fmt_qtd(val: Decimal | None) -> str:

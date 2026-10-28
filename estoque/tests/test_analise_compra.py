@@ -9,7 +9,12 @@ from openpyxl import load_workbook
 from empresa.models import Empresa
 from estoque.export_planilha import exportar_analise_compra_xlsx
 from estoque.models import EntradaEstoqueNota, NaturezaEstoque, ProdutoEstoque
-from estoque.services.analise_compra import montar_linhas_analise_compra
+from estoque.services.analise_compra import (
+    criar_analise_compra_salva,
+    gerar_orcamento_compra_da_analise,
+    montar_linhas_analise_compra,
+)
+from orcamento_compra.models import OrcamentoCompra
 from notafiscalentrada.models import NotaFiscalEntrada, NotaFiscalEntradaItem
 
 
@@ -67,6 +72,22 @@ class AnaliseCompraTest(TestCase):
         self.assertEqual(row['data_ultima_compra'].day, 15)
         self.assertEqual(row['fornecedor'], 'Fornecedor NF')
         self.assertEqual(row['estoque'], Decimal('25'))
+
+    def test_salvar_e_gerar_orcamento(self):
+        analise = criar_analise_compra_salva(
+            self.empresa.pk,
+            titulo='Teste compra',
+            observacao='',
+            produto_ids=[self.produto.pk],
+            usuario=None,
+        )
+        item = analise.itens.get()
+        item.quantidade_desejada = Decimal('3')
+        item.save(update_fields=['quantidade_desejada'])
+        orc = gerar_orcamento_compra_da_analise(analise, usuario=None)
+        self.assertEqual(orc.itens.count(), 1)
+        self.assertEqual(orc.itens.get().quantidade, Decimal('3'))
+        self.assertEqual(orc.status, OrcamentoCompra.STATUS_COTACAO)
 
     def test_export_xlsx_cabecalho(self):
         linhas = montar_linhas_analise_compra(self.empresa.pk)

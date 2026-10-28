@@ -36,7 +36,15 @@ from estoque.export_planilha import (
     exportar_farmacia_xlsx,
     queryset_farmacia_export,
 )
-from estoque.services.analise_compra import montar_linhas_analise_compra
+from estoque.models import AnaliseCompraSalva
+from estoque.services.analise_compra import (
+    criar_analise_compra_salva,
+    gerar_orcamento_compra_da_analise,
+    montar_linhas_analise_compra,
+    montar_linhas_analise_salva,
+    parse_quantidade_br,
+    salvar_quantidades_desejadas,
+)
 from estoque.services.kpis import montar_kpis_estoque
 from estoque.services.movimentacao import (
     EstoqueErro,
@@ -745,7 +753,11 @@ def kpis_estoque(request):
     )
 
 
-@login_required
+def _analise_compra_empresa(request, pk: int) -> AnaliseCompraSalva:
+    empresa_id = request.session.get('empresa_id')
+    return get_object_or_404(AnaliseCompraSalva, pk=pk, empresa_id=empresa_id)
+
+
 @login_required
 def analise_compra(request):
     empresa_id = request.session.get('empresa_id')
@@ -768,19 +780,131 @@ def analise_compra(request):
 
 
 @login_required
+@require_POST
+def analise_compra_salvar(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    produto_ids = request.POST.getlist('produto_id')
+    titulo = (request.POST.get('titulo') or '').strip()
+    observacao = (request.POST.get('observacao') or '').strip()
+    try:
+        analise = criar_analise_compra_salva(
+            empresa_id,
+            titulo=titulo,
+            observacao=observacao,
+            produto_ids=[int(x) for x in produto_ids if str(x).strip().isdigit()],
+            usuario=request.user,
+        )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        q = (request.POST.get('busca') or '').strip()
+        url = reverse('estoque:analise_compra')
+        if q:
+            url += f'?q={q}'
+        return redirect(url)
+    messages.success(request, f'Análise salva com {analise.itens.count()} produto(s).')
+    return redirect('estoque:analise_compra_detalhe', pk=analise.pk)
+
+
+@login_required
+def analise_compra_lista_salvas(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    analises = (
+        AnaliseCompraSalva.objects.filter(empresa_id=empresa_id)
+        .select_related('orcamento_gerado', 'criado_por')
+        .prefetch_related('itens')
+        .order_by('-atualizado_em')
+    )
+    return render(
+        request,
+        'estoque/analise_compra_salvas.html',
+        {
+            'descricao': 'Análises de compra salvas',
+            'analises': analises,
+        },
+    )
+
+
+@login_required
+def analise_compra_detalhe(request, pk: int):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    analise = _analise_compra_empresa(request, pk)
+    linhas = montar_linhas_analise_salva(analise)
+    return render(
+        request,
+        'estoque/analise_compra_detalhe.html',
+        {
+            'descricao': analise.titulo,
+            'analise': analise,
+            'linhas': linhas,
+            'total_linhas': len(linhas),
+        },
+    )
+
+
+@login_required
+@require_POST
+def analise_compra_salvar_quantidades(request, pk: int):
+    analise = _analise_compra_empresa(request, pk)
+    valores: dict[int, Decimal] = {}
+    for item in analise.itens.all():
+        raw = request.POST.get(f'qtd_desejada_{item.pk}')
+        q = parse_quantidade_br(raw)
+        if q is not None:
+            valores[item.pk] = q
+    salvar_quantidades_desejadas(analise, valores)
+    messages.success(request, 'Quantidades desejadas atualizadas.')
+    return redirect('estoque:analise_compra_detalhe', pk=pk)
+
+
+@login_required
+@require_POST
+def analise_compra_gerar_orcamento(request, pk: int):
+    analise = _analise_compra_empresa(request, pk)
+    if analise.orcamento_gerado_id:
+        messages.info(request, 'Esta análise já possui orçamento gerado.')
+        return redirect('orcamento_compra:detalhe', pk=analise.orcamento_gerado_id)
+    try:
+        orc = gerar_orcamento_compra_da_analise(analise, usuario=request.user)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('estoque:analise_compra_detalhe', pk=pk)
+    messages.success(
+        request,
+        f'Orçamento «{orc.titulo}» criado com {orc.itens.count()} item(ns). Adicione fornecedores para cotar.',
+    )
+    return redirect('orcamento_compra:detalhe', pk=orc.pk)
+
+
+@login_required
 def analise_compra_exportar_excel(request):
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa.')
         return redirect('empresa:lista')
-    busca = (request.GET.get('q') or '').strip()
-    linhas = montar_linhas_analise_compra(empresa_id, busca=busca)
+    pk = request.GET.get('analise_id')
+    if pk and str(pk).isdigit():
+        analise = get_object_or_404(AnaliseCompraSalva, pk=int(pk), empresa_id=empresa_id)
+        linhas = montar_linhas_analise_salva(analise)
+        nome = f'analise_compra_{analise.pk}.xlsx'
+    else:
+        busca = (request.GET.get('q') or '').strip()
+        linhas = montar_linhas_analise_compra(empresa_id, busca=busca)
+        nome = 'analise_compra_estoque.xlsx'
     data = exportar_analise_compra_xlsx(linhas)
     response = HttpResponse(
         data,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    response['Content-Disposition'] = 'attachment; filename="analise_compra_estoque.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="{nome}"'
     return response
 
 

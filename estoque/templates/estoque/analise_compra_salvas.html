@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'estoque:analise_compra' %}" class="btn btn-outline-secondary btn-sm">Nova análise</a>
+  </div>
+  {% include 'parcial/_messages.html' %}
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Título</th>
+            <th class="text-center">Itens</th>
+            <th>Atualizada</th>
+            <th>Orçamento</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in analises %}
+          <tr>
+            <td>{{ a.titulo }}</td>
+            <td class="text-center">{{ a.itens.count }}</td>
+            <td>{{ a.atualizado_em|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if a.orcamento_gerado_id %}
+              <a href="{% url 'orcamento_compra:detalhe' a.orcamento_gerado_id %}">#{{ a.orcamento_gerado_id }}</a>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'estoque:analise_compra_detalhe' a.pk %}" class="btn btn-primary btn-sm">Abrir</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma análise salva.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
