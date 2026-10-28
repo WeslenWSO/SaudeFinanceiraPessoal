@@ -151,3 +151,4 @@ class ProdutoEstoqueViewTest(TestCase):
                 codigo_produto='99',
             ).exists(),
         )
+

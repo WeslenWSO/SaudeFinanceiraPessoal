@@ -8,7 +8,6 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from estoque.import_planilha import COLUNAS_MODELO
-from estoque.models import ProdutoEstoque
 
 
 def _num(val) -> float | int | str:
