@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h4 mb-0">{{ descricao }}</h1>
+    <a href="{% url 'estoque:analise_compra_exportar_excel' %}?{{ export_query_string }}"
+       class="btn btn-success btn-sm">
+      <i class="fas fa-file-excel me-1"></i> Exportar Excel
+    </a>
+  </div>
+  <p class="small text-muted mb-3">
+    Produtos consumíveis (farmácia). Última compra = última entrada gerada a partir de NF de comércio.
+    Estoque na unidade de consumo.
+  </p>
+  {% include 'parcial/_messages.html' %}
+
+  <form method="get" class="row g-2 mb-3 align-items-end">
+    <div class="col-md-6">
+      <label class="form-label small mb-0">Buscar</label>
+      <input type="search" name="q" class="form-control form-control-sm"
+             placeholder="Código, produto ou marca" value="{{ busca }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Filtrar</button>
+    </div>
+  </form>
+
+  <p class="small text-muted">{{ total_linhas }} produto(s)</p>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Produto</th>
+            <th>Marca</th>
+            <th>Fornecedor</th>
+            <th class="text-end">Qtd. últ. compra</th>
+            <th>Data últ. compra</th>
+            <th class="text-end">Estoque</th>
+            <th>Un.</th>
+            <th>Un. master</th>
+            <th class="text-end">Qtd. master</th>
+            <th class="text-end">Dias entrega</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          <tr>
+            <td><code>{{ linha.codigo_produto }}</code></td>
+            <td>{{ linha.descricao }}</td>
+            <td>{{ linha.marca|default:"—" }}</td>
+            <td class="small">{{ linha.fornecedor|default:"—"|truncatechars:40 }}</td>
+            <td class="text-end">{{ linha.qtd_ultima_compra_fmt }}</td>
+            <td>{{ linha.data_ultima_compra_fmt }}</td>
+            <td class="text-end">{{ linha.estoque_fmt }}</td>
+            <td>{{ linha.unidade|default:"—" }}</td>
+            <td>{{ linha.unidade_master|default:"—" }}</td>
+            <td class="text-end">{{ linha.qtd_master_fmt }}</td>
+            <td class="text-end">{{ linha.dias_entrega_fmt }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="11" class="text-center text-muted py-4">Nenhum produto encontrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

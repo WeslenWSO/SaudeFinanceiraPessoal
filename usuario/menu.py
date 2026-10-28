@@ -146,6 +146,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='estoque:relatorio_movimentos',
     ),
     MenuItemDef(
+        'estoque_analise_compra',
+        'Análise de compra',
+        'fa-cart-shopping',
+        'estoque',
+        url_name='estoque:analise_compra',
+    ),
+    MenuItemDef(
         'inventario',
         'Inventário de estoque',
         'fa-clipboard-list',

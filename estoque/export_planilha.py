@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from io import BytesIO
 
@@ -43,6 +44,54 @@ def exportar_produtos_cadastro_xlsx(produtos) -> bytes:
                 _num(p.quantidade_por_master) if p.quantidade_por_master else '',
                 p.fornecedor_rotulo or '',
                 p.get_natureza_display() if hasattr(p, 'get_natureza_display') else '',
+            ]
+        )
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+COLUNAS_ANALISE_COMPRA = (
+    'Código do produto',
+    'Produto',
+    'Marca',
+    'Fornecedor',
+    'Qtd. última compra',
+    'Data última compra',
+    'Estoque',
+    'Unidade',
+    'Unidade master',
+    'Qtd. master',
+    'Dias de entrega',
+)
+
+
+def exportar_analise_compra_xlsx(linhas: list[dict]) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Análise compra'
+    ws.append(list(COLUNAS_ANALISE_COMPRA))
+    for row in linhas:
+        data_uc = row.get('data_ultima_compra')
+        if isinstance(data_uc, date):
+            data_cel = data_uc.strftime('%d/%m/%Y')
+        else:
+            data_cel = row.get('data_ultima_compra_fmt') or ''
+            if data_cel == '—':
+                data_cel = ''
+        ws.append(
+            [
+                row.get('codigo_produto') or '',
+                row.get('descricao') or '',
+                row.get('marca') or '',
+                row.get('fornecedor') or '',
+                _num(row.get('qtd_ultima_compra')),
+                data_cel,
+                _num(row.get('estoque')),
+                row.get('unidade') or '',
+                row.get('unidade_master') or '',
+                _num(row.get('qtd_master')) if row.get('qtd_master') else '',
+                row.get('dias_entrega') if row.get('dias_entrega') is not None else '',
             ]
         )
     buf = BytesIO()

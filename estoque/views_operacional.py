@@ -31,7 +31,12 @@ from estoque.permissoes import (
     validar_senha_aprovacao_estorno_nf,
 )
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
-from estoque.export_planilha import exportar_farmacia_xlsx, queryset_farmacia_export
+from estoque.export_planilha import (
+    exportar_analise_compra_xlsx,
+    exportar_farmacia_xlsx,
+    queryset_farmacia_export,
+)
+from estoque.services.analise_compra import montar_linhas_analise_compra
 from estoque.services.kpis import montar_kpis_estoque
 from estoque.services.movimentacao import (
     EstoqueErro,
@@ -738,6 +743,45 @@ def kpis_estoque(request):
             'descricao': 'KPIs de estoque',
         },
     )
+
+
+@login_required
+@login_required
+def analise_compra(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    busca = (request.GET.get('q') or '').strip()
+    linhas = montar_linhas_analise_compra(empresa_id, busca=busca)
+    return render(
+        request,
+        'estoque/analise_compra.html',
+        {
+            'descricao': 'Estoque — Análise de compra',
+            'busca': busca,
+            'linhas': linhas,
+            'total_linhas': len(linhas),
+            'export_query_string': request.GET.urlencode(),
+        },
+    )
+
+
+@login_required
+def analise_compra_exportar_excel(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('empresa:lista')
+    busca = (request.GET.get('q') or '').strip()
+    linhas = montar_linhas_analise_compra(empresa_id, busca=busca)
+    data = exportar_analise_compra_xlsx(linhas)
+    response = HttpResponse(
+        data,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="analise_compra_estoque.xlsx"'
+    return response
 
 
 @login_required
