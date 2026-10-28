@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
 
@@ -12,6 +12,7 @@ from estoque.models import EntradaEstoqueNota, NaturezaEstoque, ProdutoEstoque
 from estoque.services.analise_compra import (
     criar_analise_compra_salva,
     gerar_orcamento_compra_da_analise,
+    media_consumo_por_dia,
     montar_linhas_analise_compra,
 )
 from orcamento_compra.models import OrcamentoCompra
@@ -63,6 +64,15 @@ class AnaliseCompraTest(TestCase):
             valor_unitario=Decimal('2'),
         )
 
+    def test_media_consumo_por_dia(self):
+        media = media_consumo_por_dia(
+            Decimal('100'),
+            Decimal('40'),
+            date(2026, 10, 1),
+            hoje=date(2026, 10, 11),
+        )
+        self.assertEqual(media, Decimal('6'))
+
     def test_montar_linha_ultima_compra(self):
         linhas = montar_linhas_analise_compra(self.empresa.pk)
         self.assertEqual(len(linhas), 1)
@@ -72,6 +82,7 @@ class AnaliseCompraTest(TestCase):
         self.assertEqual(row['data_ultima_compra'].day, 15)
         self.assertEqual(row['fornecedor'], 'Fornecedor NF')
         self.assertEqual(row['estoque'], Decimal('25'))
+        self.assertIsNotNone(row['media_consumo_dia'])
 
     def test_salvar_e_gerar_orcamento(self):
         analise = criar_analise_compra_salva(

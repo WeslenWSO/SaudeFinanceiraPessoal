@@ -67,6 +67,7 @@
               <th class="text-end">Qtd. últ. compra</th>
               <th>Data últ. compra</th>
               <th class="text-end">Estoque</th>
+              <th class="text-end" title="(Qtd. últ. compra − estoque) ÷ dias desde a compra">Média/dia</th>
               <th>Un.</th>
               <th>Un. master</th>
               <th class="text-end">Qtd. master</th>
@@ -87,6 +88,9 @@
               <td class="text-end">{{ linha.qtd_ultima_compra_fmt }}</td>
               <td>{{ linha.data_ultima_compra_fmt }}</td>
               <td class="text-end">{{ linha.estoque_fmt }}</td>
+              <td class="text-end" title="{% if linha.dias_desde_compra_fmt != '—' %}{{ linha.dias_desde_compra_fmt }} dia(s) desde a compra{% endif %}">
+                {{ linha.media_consumo_dia_fmt }}
+              </td>
               <td>{{ linha.unidade|default:"—" }}</td>
               <td>{{ linha.unidade_master|default:"—" }}</td>
               <td class="text-end">{{ linha.qtd_master_fmt }}</td>
@@ -94,7 +98,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="12" class="text-center text-muted py-4">Nenhum produto encontrado.</td>
+              <td colspan="13" class="text-center text-muted py-4">Nenhum produto encontrado.</td>
             </tr>
             {% endfor %}
           </tbody>

@@ -53,6 +53,7 @@
               <th class="text-end">Qtd. últ. compra</th>
               <th>Data últ. compra</th>
               <th class="text-end">Estoque</th>
+              <th class="text-end" title="(Qtd. últ. compra − estoque) ÷ dias desde a compra">Média/dia</th>
               <th>Un.</th>
               <th class="text-end">Dias entrega</th>
               <th class="text-end" style="min-width:7rem">Qtd. desejada</th>
@@ -70,6 +71,9 @@
               <td class="text-end" title="Registrado: {{ linha.estoque_registrado_fmt }}">
                 {{ linha.estoque_fmt }}
               </td>
+              <td class="text-end" title="{% if linha.dias_desde_compra_fmt != '—' %}{{ linha.dias_desde_compra_fmt }} dia(s) desde a compra{% endif %}">
+                {{ linha.media_consumo_dia_fmt }}
+              </td>
               <td>{{ linha.unidade }}</td>
               <td class="text-end">{{ linha.dias_entrega_fmt }}</td>
               <td class="text-end">
@@ -81,7 +85,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="10" class="text-muted text-center py-4">Sem itens.</td></tr>
+            <tr><td colspan="11" class="text-muted text-center py-4">Sem itens.</td></tr>
             {% endfor %}
           </tbody>
         </table>

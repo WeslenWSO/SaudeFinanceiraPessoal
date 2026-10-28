@@ -21,6 +21,49 @@ from estoque.models import (
 )
 
 
+def media_consumo_por_dia(
+    qtd_ultima_compra: Decimal | None,
+    estoque: Decimal | None,
+    data_ultima_compra: date | None,
+    *,
+    hoje: date | None = None,
+) -> Decimal | None:
+    """(Qtd. última compra − estoque) ÷ dias da compra até hoje."""
+    if qtd_ultima_compra is None or data_ultima_compra is None:
+        return None
+    hoje = hoje or timezone.localdate()
+    dias = (hoje - data_ultima_compra).days
+    if dias < 0:
+        return None
+    if dias == 0:
+        dias = 1
+    est = estoque if estoque is not None else Decimal('0')
+    consumo = Decimal(str(qtd_ultima_compra)) - Decimal(str(est))
+    return consumo / Decimal(dias)
+
+
+def _linha_media_consumo(
+    qtd_ultima: Decimal | None,
+    estoque: Decimal | None,
+    data_uc: date | None,
+    *,
+    hoje: date | None = None,
+) -> dict[str, Any]:
+    media = media_consumo_por_dia(qtd_ultima, estoque, data_uc, hoje=hoje)
+    dias = None
+    if data_uc is not None:
+        ref = hoje or timezone.localdate()
+        d = (ref - data_uc).days
+        if d >= 0:
+            dias = d
+    return {
+        'dias_desde_compra': dias,
+        'dias_desde_compra_fmt': str(dias) if dias is not None else '—',
+        'media_consumo_dia': media,
+        'media_consumo_dia_fmt': _fmt_qtd(media),
+    }
+
+
 def _data_ultima_compra(entrada: EntradaEstoqueNota | None) -> date | None:
     if entrada is None:
         return None
@@ -109,6 +152,7 @@ def montar_linhas_analise_compra(
                 'data_ultima_compra_fmt': data_uc.strftime('%d/%m/%Y') if data_uc else '—',
                 'estoque': produto.quantidade_estoque,
                 'estoque_fmt': _fmt_qtd(produto.quantidade_estoque),
+                **_linha_media_consumo(qtd_uc, produto.quantidade_estoque, data_uc),
                 'unidade': produto.unidade or '',
                 'unidade_master': produto.unidade_master or '',
                 'qtd_master': produto.quantidade_por_master,
@@ -214,6 +258,7 @@ def montar_linhas_analise_salva(analise: AnaliseCompraSalva) -> list[dict[str, A
                 'estoque': estoque_atual,
                 'estoque_fmt': _fmt_qtd(estoque_atual),
                 'estoque_registrado_fmt': _fmt_qtd(it.estoque_registrado),
+                **_linha_media_consumo(it.qtd_ultima_compra, estoque_atual, it.data_ultima_compra),
                 'unidade': it.unidade or '—',
                 'unidade_master': it.unidade_master or '—',
                 'qtd_master_fmt': _fmt_qtd(it.qtd_master) if it.qtd_master else '—',
