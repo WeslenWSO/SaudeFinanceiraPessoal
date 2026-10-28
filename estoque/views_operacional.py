@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, OperationalError
 from django.db.models import Prefetch, Q, Sum
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -31,6 +31,7 @@ from estoque.permissoes import (
     validar_senha_aprovacao_estorno_nf,
 )
 from estoque.alertas import contar_abaixo_estoque_minimo, queryset_abaixo_estoque_minimo
+from estoque.export_planilha import exportar_farmacia_xlsx, queryset_farmacia_export
 from estoque.services.kpis import montar_kpis_estoque
 from estoque.services.movimentacao import (
     EstoqueErro,
@@ -116,7 +117,31 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin
         amostra = list(queryset_abaixo_estoque_minimo(empresa_id)[:8])
         ctx['alertas_amostra'] = amostra
         ctx['alertas_restantes'] = max(0, ctx['total_alertas_minimo'] - len(amostra))
+        ctx['export_query_string'] = self.request.GET.urlencode()
         return ctx
+
+
+@login_required
+def farmacia_exportar_excel(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa antes de exportar.')
+        return redirect('empresa:lista')
+    busca = (request.GET.get('q') or '').strip()
+    somente_alertas = (request.GET.get('somente_alertas') or '').strip() in ('1', 'true', 'sim')
+    qs = queryset_farmacia_export(
+        empresa_id,
+        busca=busca,
+        somente_alertas=somente_alertas,
+    )
+    data = exportar_farmacia_xlsx(qs)
+    response = HttpResponse(
+        data,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    nome = 'estoque_farmacia_alertas.xlsx' if somente_alertas else 'estoque_farmacia.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{nome}"'
+    return response
 
 
 class EstoqueImobilizadoListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):

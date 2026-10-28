@@ -5,6 +5,7 @@ from estoque.views import (
     ProdutoEstoqueListView,
     ProdutoEstoqueUpdateView,
     excluir_produto_estoque,
+    produto_exportar_excel,
     produto_importar_excel,
     produto_modelo_excel,
 )
@@ -22,6 +23,7 @@ from estoque.views_operacional import (
     lista_farmacia_por_setor,
     lista_imobilizado_por_historico,
     lista_imobilizado_por_setor,
+    farmacia_exportar_excel,
     kpis_estoque,
     relatorio_movimentos,
     requisicao_detail,
@@ -33,6 +35,7 @@ app_name = 'estoque'
 
 urlpatterns = [
     path('farmacia/', EstoqueFarmaciaListView.as_view(), name='farmacia_list'),
+    path('farmacia/exportar-excel/', farmacia_exportar_excel, name='farmacia_exportar_excel'),
     path('farmacia/lista-setor/', lista_farmacia_por_setor, name='farmacia_lista_setores'),
     path(
         'farmacia/checklist/<slug:setor_slug>/',
@@ -59,6 +62,7 @@ urlpatterns = [
     path('kpis/', kpis_estoque, name='kpis'),
     path('relatorios/movimentos/', relatorio_movimentos, name='relatorio_movimentos'),
     path('', ProdutoEstoqueListView.as_view(), name='produto_list'),
+    path('exportar-excel/', produto_exportar_excel, name='produto_exportar_excel'),
     path('importar/', produto_importar_excel, name='produto_import'),
     path('modelo-excel/', produto_modelo_excel, name='produto_modelo_excel'),
     path('novo/', ProdutoEstoqueCreateView.as_view(), name='produto_create'),

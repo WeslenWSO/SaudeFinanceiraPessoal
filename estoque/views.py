@@ -11,6 +11,10 @@ from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.list import ListView
 
 from estoque.forms import ProdutoEstoqueForm, ProdutoEstoqueImportForm
+from estoque.export_planilha import (
+    exportar_produtos_cadastro_xlsx,
+    queryset_produtos_cadastro_export,
+)
 from estoque.import_planilha import (
     importar_produtos_estoque,
     parse_planilha_produtos,
@@ -48,6 +52,7 @@ class ProdutoEstoqueListView(LoginRequiredMixin, _EmpresaQuerysetMixin, ListView
         ctx = super().get_context_data(**kwargs)
         ctx['descricao'] = 'Estoque — produtos'
         ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        ctx['export_query_string'] = self.request.GET.urlencode()
         ctx['now'] = timezone.now()
         return ctx
 
@@ -149,6 +154,23 @@ def produto_importar_excel(request):
             'form': form,
         },
     )
+
+
+@login_required
+def produto_exportar_excel(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa antes de exportar.')
+        return redirect('empresa:lista')
+    busca = (request.GET.get('q') or '').strip()
+    qs = queryset_produtos_cadastro_export(empresa_id, busca=busca)
+    data = exportar_produtos_cadastro_xlsx(qs)
+    response = HttpResponse(
+        data,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="estoque_produtos.xlsx"'
+    return response
 
 
 @login_required
