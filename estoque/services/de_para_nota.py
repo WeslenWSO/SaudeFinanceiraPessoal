@@ -56,7 +56,7 @@ def situacao_codigo_nota(
 ) -> dict:
     """
     Retorna flags para a UI de entrada NF.
-    precisa_vinculo: código NF ≠ código no cadastro e ainda sem de-para.
+    precisa_vinculo: True quando o código NF ainda não está no cadastro (UI de de-para opcional).
     """
     codigo = _norm_codigo(codigo_nota)
     produto_mesmo_codigo = None

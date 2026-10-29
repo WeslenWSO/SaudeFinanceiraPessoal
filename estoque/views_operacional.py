@@ -302,18 +302,6 @@ def gerar_estoque_item_nota(request, item_id: int):
             ).first()
             if not produto_escolhido:
                 raise EstoqueErro('Produto do estoque inválido.')
-        from estoque.services.de_para_nota import situacao_codigo_nota
-
-        sit = situacao_codigo_nota(
-            empresa_id,
-            item.codigo_produto,
-            item.nota_fiscal.fornecedor_id,
-        )
-        if sit['precisa_vinculo'] and not produto_escolhido:
-            raise EstoqueErro(
-                f'Código NF «{item.codigo_produto}» não existe no estoque. '
-                'Informe o produto do sistema (de-para) ou cadastre o mesmo código antes.',
-            )
         gerar_entrada_desde_item_nota(
             item,
             usuario=request.user,

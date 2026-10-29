@@ -176,10 +176,13 @@
                                     </span>
                                     {% elif item.precisa_vinculo_produto %}
                                     <div class="border rounded p-1 bg-light js-depara-box">
-                                      <small class="text-muted d-block mb-1">De-para (NF ≠ sistema)</small>
+                                      <small class="text-muted d-block mb-1">
+                                        Produto novo na NF — deixe vazio para cadastrar com código <code>{{ item.codigo_produto }}</code>,
+                                        ou vincule a um produto já existente:
+                                      </small>
                                       <input type="hidden" name="produto_estoque_id" class="js-produto-estoque-id" value="">
                                       <input type="search" class="form-control form-control-sm js-busca-produto-sf mb-1"
-                                             placeholder="Código ou nome no estoque" autocomplete="off"
+                                             placeholder="Opcional: código ou nome no estoque" autocomplete="off"
                                              aria-label="Produto no sistema">
                                       <div class="list-group list-group-flush small js-resultados-produto-sf d-none" style="max-height: 8rem; overflow-y: auto;"></div>
                                       <div class="small text-success d-none js-produto-selecionado"></div>
@@ -350,17 +353,6 @@
     });
   });
 
-  document.querySelectorAll('.js-form-gerar-estoque').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      var box = form.querySelector('.js-depara-box');
-      if (!box) return;
-      var hid = box.querySelector('.js-produto-estoque-id');
-      if (hid && !hid.value.trim()) {
-        e.preventDefault();
-        alert('Selecione o produto do estoque (de-para): o código da NF não existe no cadastro.');
-      }
-    });
-  });
 })();
 </script>
 {% include 'estoque/parcial/_modal_estorno_nf.html' %}
