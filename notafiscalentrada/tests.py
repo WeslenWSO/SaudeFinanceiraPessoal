@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -83,6 +84,28 @@ class ProdutosComercioListTest(TestCase):
         self.assertContains(r, reverse('notafiscalentrada:produto_comercio_foto_img'))
         self.assertContains(r, 'produto-foto-img')
         self.assertContains(r, 'P001')
+        self.assertContains(r, 'Trocar foto')
+
+    def test_upload_foto_produto(self):
+        png = (
+            b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+            b'\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00'
+            b'\x01\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+        )
+        url = reverse('notafiscalentrada:produto_comercio_foto_upload')
+        r = self.client.post(
+            url,
+            {
+                'codigo': 'P001',
+                'nome': 'Sofa Especial',
+                'next': reverse('notafiscalentrada:produtos_comercio'),
+                'imagem': SimpleUploadedFile('foto.png', png, content_type='image/png'),
+            },
+        )
+        self.assertEqual(r.status_code, 302)
+        foto = ProdutoComercioFoto.objects.get(empresa=self.empresa, codigo_produto='P001')
+        self.assertEqual(foto.fonte, 'upload')
+        self.assertTrue(bool(foto.imagem))
 
     def test_mapa_fotos_cache(self):
         ProdutoComercioFoto.objects.create(

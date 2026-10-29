@@ -228,6 +228,17 @@ class ProdutoEstoqueOperacionalDetailView(LoginRequiredMixin, _EmpresaMixin, Det
             if p.natureza == NaturezaEstoque.IMOBILIZADO
             else reverse('estoque:farmacia_list')
         )
+        empresa_id = self.get_empresa_id()
+        foto_url = ''
+        if empresa_id:
+            from notafiscalentrada.produto_foto import mapa_fotos_arquivo_por_codigo
+
+            foto_url = mapa_fotos_arquivo_por_codigo(empresa_id, [p.codigo_produto]).get(
+                p.codigo_produto,
+                '',
+            )
+        ctx['foto_produto_url'] = foto_url
+        ctx['foto_upload_next'] = self.request.get_full_path()
         return ctx
 
 

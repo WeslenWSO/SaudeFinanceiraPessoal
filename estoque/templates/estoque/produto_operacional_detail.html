@@ -6,8 +6,14 @@
   <div class="mb-3">
     <a href="{{ voltar_estoque_url }}" class="btn btn-outline-secondary btn-sm">← Estoque</a>
   </div>
-  <h1 class="h4">{{ produto.descricao }}</h1>
-  <p class="text-muted">
+  {% include 'parcial/_messages.html' %}
+  <div class="d-flex flex-wrap align-items-start gap-3 mb-2">
+    <div>
+      {% include 'notafiscalentrada/parcial/_produto_foto_upload.html' with produto_codigo=produto.codigo_produto produto_nome=produto.descricao foto_url=foto_produto_url upload_next=foto_upload_next extra_img_class='border' %}
+    </div>
+    <div class="flex-grow-1">
+  <h1 class="h4 mb-1">{{ produto.descricao }}</h1>
+  <p class="text-muted mb-0">
     <code>{{ produto.codigo_produto }}</code> · Marca: {{ produto.marca|default:"—" }}
     · Fornecedor: {{ produto.fornecedor_rotulo|default:"—" }}
     {% if produto.natureza == 'imobilizado' %}
@@ -20,6 +26,8 @@
     · Preço médio: R$ {{ produto.valor_custo_medio|floatformat:4 }}
     · <a href="{% url 'estoque:produto_update' produto.pk %}">Editar cadastro</a>
   </p>
+    </div>
+  </div>
 
   {% if saldos_setor %}
   <h2 class="h6 mt-4">Saldo nos setores</h2>
@@ -81,4 +89,15 @@
   </div>
 </div>
 {% include 'estoque/parcial/_modal_estorno_nf.html' %}
+<script>
+(function () {
+  document.querySelectorAll('.js-foto-file-input').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      if (inp.files && inp.files.length) {
+        inp.closest('form').submit();
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

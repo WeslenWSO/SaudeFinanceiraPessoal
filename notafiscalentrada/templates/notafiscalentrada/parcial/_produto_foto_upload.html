@@ -1,0 +1,28 @@
+<div class="produto-foto-upload text-center">
+  <img src="{% if foto_url %}{{ foto_url }}{% else %}{% url 'notafiscalentrada:produto_comercio_foto_img' %}?codigo={{ produto_codigo|urlencode }}&amp;nome={{ produto_nome|urlencode }}{% endif %}"
+       alt=""
+       class="produto-foto-thumb produto-foto-img{% if extra_img_class %} {{ extra_img_class }}{% endif %}"
+       width="56"
+       height="56"
+       loading="lazy"
+       referrerpolicy="no-referrer"
+       data-codigo="{{ produto_codigo|escape }}"
+       data-nome="{{ produto_nome|escape }}"
+       data-proxy="{% url 'notafiscalentrada:produto_comercio_foto_img' %}"
+       title="{{ produto_nome|default:produto_codigo|truncatechars:80 }}">
+  <form method="post"
+        action="{% url 'notafiscalentrada:produto_comercio_foto_upload' %}"
+        enctype="multipart/form-data"
+        class="js-form-foto-upload mt-1">
+    {% csrf_token %}
+    <input type="hidden" name="codigo" value="{{ produto_codigo }}">
+    <input type="hidden" name="nome" value="{{ produto_nome|default:'' }}">
+    <input type="hidden" name="next" value="{{ upload_next }}">
+    <label class="btn btn-outline-secondary btn-sm py-0 px-1 mb-0" style="font-size:0.7rem;line-height:1.4"
+           title="Enviar foto da câmera ou da galeria">
+      <i class="fas fa-camera"></i> Trocar foto
+      <input type="file" name="imagem" accept="image/*" capture="environment"
+             class="d-none js-foto-file-input">
+    </label>
+  </form>
+</div>

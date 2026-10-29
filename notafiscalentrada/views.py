@@ -11,12 +11,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.urls import reverse
 from .models import NotaFiscalEntrada, NotaFiscalEntradaItem
+from django.utils.http import url_has_allowed_host_and_scheme
+
 from .produto_foto import (
     baixar_bytes_imagem,
     mapa_fotos_arquivo_por_codigo,
     obter_foto_produto,
     persistir_arquivo_imagem,
     placeholder_foto_svg,
+    salvar_foto_produto_upload,
     url_google_imagens,
 )
 from estoque.setores import SETOR_LOCALIZACAO_IMOBILIZADO
@@ -1310,6 +1313,35 @@ def listar_produtos_comercio(request):
         'buscar_produtos_nf_url': reverse('estoque:buscar_produtos_nf'),
     }
     return render(request, 'notafiscalentrada/produtos_comercio.html', context)
+
+
+@login_required
+@require_POST
+def produto_comercio_foto_upload(request):
+    """Upload / troca de foto do produto (por código NF / estoque)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('notafiscalentrada:produtos_comercio')
+
+    codigo = (request.POST.get('codigo') or '').strip()
+    nome = (request.POST.get('nome') or '').strip()
+    next_url = (request.POST.get('next') or '').strip()
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = reverse('notafiscalentrada:produtos_comercio')
+
+    arquivo = request.FILES.get('imagem')
+    try:
+        salvar_foto_produto_upload(empresa_id, codigo, nome, arquivo)
+        messages.success(request, f'Foto salva para o código {codigo}.')
+    except ValueError as exc:
+        messages.error(request, str(exc))
+
+    return redirect(next_url)
 
 
 @login_required

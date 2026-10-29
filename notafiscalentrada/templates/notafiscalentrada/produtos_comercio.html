@@ -47,7 +47,7 @@
                   {% if destino_estoque == 'imobilizado' %}
                   Lançamento para <strong>estoque imobilizado</strong> · itens de NF de comércio
                   {% else %}
-                  Itens das notas de entrada tipo comércio · foto buscada na internet (cache por código do produto)
+                  Itens das notas de entrada tipo comércio · foto automática na internet ou <strong>Trocar foto</strong> (câmera/galeria)
                   {% endif %}
                 </small>
             </div>
@@ -67,6 +67,7 @@
             </div>
         </div>
         <div class="card-body">
+            {% include 'parcial/_messages.html' %}
             <form method="get" class="mb-4">
                 {% if destino_estoque %}<input type="hidden" name="destino_estoque" value="{{ destino_estoque }}">{% endif %}
                 <div class="row g-2 align-items-end">
@@ -127,17 +128,7 @@
                         {% for item in itens %}
                         <tr>
                             <td class="produto-foto-cell">
-                                <img src="{% if item.foto_exibir_url %}{{ item.foto_exibir_url }}{% else %}{% url 'notafiscalentrada:produto_comercio_foto_img' %}?codigo={{ item.codigo_produto|urlencode }}&amp;nome={{ item.nome_produto|urlencode }}{% endif %}"
-                                     alt=""
-                                     class="produto-foto-thumb produto-foto-img"
-                                     width="56"
-                                     height="56"
-                                     loading="lazy"
-                                     referrerpolicy="no-referrer"
-                                     data-codigo="{{ item.codigo_produto|escape }}"
-                                     data-nome="{{ item.nome_produto|escape }}"
-                                     data-proxy="{% url 'notafiscalentrada:produto_comercio_foto_img' %}"
-                                     title="{{ item.nome_produto|truncatechars:80 }}">
+                                {% include 'notafiscalentrada/parcial/_produto_foto_upload.html' with produto_codigo=item.codigo_produto produto_nome=item.nome_produto foto_url=item.foto_exibir_url upload_next=request.get_full_path %}
                             </td>
                             <td class="text-nowrap">{{ item.nota_fiscal.data_emissao|date:"d/m/Y" }}</td>
                             <td>
@@ -350,6 +341,14 @@
           lista.classList.remove('d-none');
         });
       }, 280);
+    });
+  });
+
+  document.querySelectorAll('.js-foto-file-input').forEach(function (inp) {
+    inp.addEventListener('change', function () {
+      if (inp.files && inp.files.length) {
+        inp.closest('form').submit();
+      }
     });
   });
 

@@ -5,6 +5,18 @@ import logging
 import re
 from urllib.parse import quote_plus
 
+_MAX_FOTO_UPLOAD_BYTES = 5 * 1024 * 1024
+_TIPOS_FOTO_UPLOAD = frozenset(
+    {
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif',
+        'image/heic',
+        'image/heif',
+    },
+)
+
 import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -332,6 +344,13 @@ def obter_foto_produto(
     ).first()
     if existente and not forcar_busca:
         return existente
+    if (
+        existente
+        and forcar_busca
+        and existente.fonte == 'upload'
+        and existente.imagem
+    ):
+        return existente
 
     url, fonte = buscar_url_imagem_internet(nome_produto, codigo_produto)
     if not url:
@@ -377,6 +396,57 @@ def baixar_bytes_imagem(url: str) -> tuple[bytes | None, str]:
 
 def placeholder_foto_svg() -> bytes:
     return _PLACEHOLDER_SVG
+
+
+def _extensao_por_content_type(content_type: str) -> str:
+    ct = (content_type or '').split(';')[0].strip().lower()
+    if 'png' in ct:
+        return 'png'
+    if 'webp' in ct:
+        return 'webp'
+    if 'gif' in ct:
+        return 'gif'
+    return 'jpg'
+
+
+def salvar_foto_produto_upload(
+    empresa_id: int,
+    codigo_produto: str,
+    nome_produto: str,
+    arquivo,
+) -> ProdutoComercioFoto:
+    """Grava foto enviada pelo usuário (câmera ou arquivo) no MEDIA."""
+    codigo = (codigo_produto or '').strip()
+    if not codigo:
+        raise ValueError('Código do produto é obrigatório.')
+    if not arquivo:
+        raise ValueError('Selecione uma imagem.')
+    tamanho = int(getattr(arquivo, 'size', 0) or 0)
+    if tamanho <= 0:
+        raise ValueError('Arquivo de imagem vazio.')
+    if tamanho > _MAX_FOTO_UPLOAD_BYTES:
+        raise ValueError('Imagem muito grande (máximo 5 MB).')
+    ctype = (getattr(arquivo, 'content_type', '') or '').split(';')[0].strip().lower()
+    if ctype and ctype not in _TIPOS_FOTO_UPLOAD:
+        raise ValueError('Formato não suportado. Use JPG, PNG ou WebP.')
+
+    obj, created = ProdutoComercioFoto.objects.get_or_create(
+        empresa_id=empresa_id,
+        codigo_produto=codigo,
+        defaults={'nome_produto': (nome_produto or '')[:200]},
+    )
+    if not created and obj.imagem:
+        obj.imagem.delete(save=False)
+    nome_arquivo = re.sub(r'[^\w.-]+', '_', codigo)[:40]
+    ext = _extensao_por_content_type(ctype)
+    obj.imagem.save(f'{nome_arquivo}.{ext}', arquivo, save=False)
+    if nome_produto:
+        obj.nome_produto = nome_produto[:200]
+    obj.fonte = 'upload'
+    obj.url_imagem = ''
+    obj.atualizado_em = timezone.now()
+    obj.save()
+    return obj
 
 
 def persistir_arquivo_imagem(foto: ProdutoComercioFoto) -> ProdutoComercioFoto:
