@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Abas no /dash/ — False oculta o link (acesso direto: ?aba=financeiro ou ?aba=analises)
-ABA_FINANCEIRO_DASHBOARD_VISIVEL = False
+ABA_FINANCEIRO_DASHBOARD_VISIVEL = True
 ABA_ANALISES_DASHBOARD_VISIVEL = True
 
 
