@@ -74,9 +74,14 @@ services:
       - key: BACKUP_GOOGLE_DRIVE_FOLDER_ID
         value: "1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y"
       - key: BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON
-        sync: false
+        fromService:
+          type: web
+          name: saude-financeira
+          envVarKey: BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON
       - key: BACKUP_DATABASE_DIR
         value: /var/data/backups
+      - key: TZ
+        value: America/Rio_Branco
       - key: RENDER
         value: "true"
 

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
-from accounts.backup_banco import criar_backup_completo
-from accounts.backup_google_drive import drive_configurado, enviar_arquivo_para_drive
+from accounts.backup_runner import executar_backup_google_drive
 
 
 class Command(BaseCommand):
@@ -25,47 +24,40 @@ class Command(BaseCommand):
             action='store_true',
             help='Só executa se estiver no horário configurado (uso: cron a cada hora).',
         )
-
-    def handle(self, *args, **options):
-        if options['agendado']:
-            from accounts.backup_config import slot_backup_para_executar_agora
-
-            slot = slot_backup_para_executar_agora()
-            if slot is None:
-                self.stdout.write('Fora do horário de backup agendado — nada a fazer.')
-                return
-
-            self.stdout.write(
-                f'Executando backup agendado (slot {slot.strftime("%H:%M")}).'
-            )
-
-        info = criar_backup_completo()
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Backup local: {info['arquivo']} ({info['formato']}, {info['tamanho']} bytes)"
-            )
+        parser.add_argument(
+            '--forcar',
+            action='store_true',
+            help='Ignora horário agendado (teste no Shell do Render).',
         )
 
+    def handle(self, *args, **options):
         if options['somente_local']:
-            return
+            from accounts.backup_banco import criar_backup_completo
 
-        if not drive_configurado():
+            info = criar_backup_completo()
             self.stdout.write(
-                self.style.WARNING(
-                    'Google Drive não configurado — backup ficou só no servidor. '
-                    'Configure BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON e compartilhe a pasta '
-                    'BKP_SAUDE com o e-mail da service account.'
+                self.style.SUCCESS(
+                    f"Backup local: {info['arquivo']} ({info['formato']}, {info['tamanho']} bytes)"
                 )
             )
             return
 
-        caminho = info.get('caminho') or ''
-        if not caminho:
-            raise RuntimeError('Caminho do backup não retornado.')
+        modo = 'manual'
+        if options['agendado']:
+            modo = 'agendado'
+        elif options['forcar']:
+            modo = 'forcar'
 
-        up = enviar_arquivo_para_drive(caminho)
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Enviado ao Drive: {up.get('name')} (id={up.get('file_id')})"
-            )
-        )
+        try:
+            result = executar_backup_google_drive(modo=modo)
+        except Exception as exc:
+            raise CommandError(str(exc)) from exc
+
+        if result.get('pulou'):
+            self.stdout.write(result.get('mensagem', 'Nada a fazer.'))
+            return
+
+        if result.get('ok'):
+            self.stdout.write(self.style.SUCCESS(result.get('mensagem', 'OK')))
+        else:
+            self.stdout.write(self.style.WARNING(result.get('mensagem', 'Falha parcial.')))

@@ -38,15 +38,34 @@
                         <strong>agendador de tarefas</strong> para o responsável informado.
                     </p>
 
+                    <div class="alert alert-light border small mb-3">
+                        <strong>Importante:</strong> as tarefas no <em>agendador</em> são apenas lembretes.
+                        O arquivo só vai para o Drive quando roda o <strong>cron Render</strong> ou o botão
+                        <strong>Executar backup agora</strong> abaixo.
+                    </div>
+
                     <div class="alert {% if drive_credencial_ok %}alert-success{% else %}alert-warning{% endif %} small">
                         <strong>Upload para o Drive</strong>
                         {% if drive_credencial_ok %}
-                        — credencial da service account OK (variável <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code>).
+                        — credencial OK neste servidor (<code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code>).
                         {% else %}
-                        — configure <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code> no Render e compartilhe a pasta
-                        com o e-mail da service account (Editor). O ID da pasta é definido abaixo.
+                        — configure o JSON no Render (web <strong>e</strong> cron <code>backup-db-google-drive</code>)
+                        e compartilhe a pasta BKP_SAUDE como <strong>Editor</strong> com:
+                        {% if drive_service_account_email %}
+                        <code>{{ drive_service_account_email }}</code>
+                        {% else %}
+                        o e-mail da service account (<code>...@....iam.gserviceaccount.com</code>).
+                        {% endif %}
                         {% endif %}
                     </div>
+
+                    <form method="post" class="mb-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="executar_backup_agora">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-cloud-upload-alt me-1"></i> Executar backup agora e enviar ao Drive
+                        </button>
+                    </form>
 
                     <form method="post" class="mb-4">
                         {% csrf_token %}
@@ -145,10 +164,44 @@
                     </form>
 
                     {% if horarios_ativos %}
-                    <p class="text-muted small mt-3 mb-0">
-                        Horários ativos agora:
+                    <p class="text-muted small mt-3 mb-2">
+                        Horários ativos (fuso America/Rio_Branco):
                         {% for h in horarios_ativos %}{{ h|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% endfor %}.
                     </p>
+                    {% endif %}
+
+                    <h6 class="border-bottom pb-2 mb-2 mt-4">Últimas execuções</h6>
+                    {% if ultimas_execucoes %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Quando</th>
+                                    <th>Origem</th>
+                                    <th>Status</th>
+                                    <th>Detalhe</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ex in ultimas_execucoes %}
+                                <tr>
+                                    <td class="small text-nowrap">{{ ex.executado_em|date:"d/m/Y H:i" }}</td>
+                                    <td class="small">{{ ex.origem|default:"—" }}</td>
+                                    <td class="small">
+                                        {% if ex.sucesso %}
+                                        <span class="text-success">OK</span>
+                                        {% else %}
+                                        <span class="text-danger">Falha</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small text-break">{{ ex.mensagem|truncatechars:120 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">Nenhuma execução registrada ainda (após migrate).</p>
                     {% endif %}
                 </div>
             </div>

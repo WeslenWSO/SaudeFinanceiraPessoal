@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-from django.db import IntegrityError
 from django.utils import timezone
 
 from accounts.models import BackupBancoConfig, BackupExecucaoAgendada
@@ -46,10 +45,10 @@ def descricao_tarefa_backup(config: BackupBancoConfig) -> str:
 def slot_backup_para_executar_agora(
     *,
     agora: datetime | None = None,
-) -> time | None:
+) -> tuple[time, BackupExecucaoAgendada] | None:
     """
-    Retorna o horário configurado cujo slot deve rodar nesta execução do cron
-    (mesma hora local, minutos 0–29).
+    Reserva o slot do cron (hora local, minuto 0–29).
+    Reexecuta se a tentativa anterior falhou (sucesso=False).
     """
     config = obter_config_backup()
     if not config.backup_automatico_ativo:
@@ -58,13 +57,20 @@ def slot_backup_para_executar_agora(
     if agora.minute >= 30:
         return None
     for slot in horarios_backup_ativos(config):
-        if agora.hour == slot.hour:
-            try:
-                BackupExecucaoAgendada.objects.create(
-                    data=agora.date(),
-                    hora=slot.hour,
-                )
-            except IntegrityError:
-                return None
-            return slot
+        if agora.hour != slot.hour:
+            continue
+        row = BackupExecucaoAgendada.objects.filter(
+            data=agora.date(),
+            hora=slot.hour,
+        ).first()
+        if row and row.sucesso:
+            return None
+        if not row:
+            row = BackupExecucaoAgendada.objects.create(
+                data=agora.date(),
+                hora=slot.hour,
+                origem='cron',
+                sucesso=False,
+            )
+        return slot, row
     return None

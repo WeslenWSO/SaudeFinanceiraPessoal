@@ -3,6 +3,11 @@
   <p class="text-muted small mb-3">
     Período: <strong>{{ titulo_periodo }}</strong>
     · Base: <strong>{{ visao.legenda_receitas|lower }}</strong>
+    {% if regime == 'competencia' %}
+    — todos os títulos em <em>Contas a Receber</em> (emissão) e <em>Contas a Pagar</em> (emissão/vencimento), valor do documento.
+    {% elif regime == 'caixa' %}
+    — somente valores <strong>recebidos</strong> (CAR) e <strong>pagos</strong> (CAP) na data de baixa.
+    {% endif %}
   </p>
 
   {% if not visao.tem_dados %}

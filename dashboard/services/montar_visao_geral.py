@@ -1,4 +1,4 @@
-"""Agregações para o dashboard principal — Visão Geral."""
+"""Agregações para o dashboard Financeiro — Competência (CAR/CAP) e Caixa realizado."""
 
 from __future__ import annotations
 
@@ -16,16 +16,16 @@ from contasareceber.models import ContaAReceber
 MESES_CURTO = ('Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez')
 
 REGIMES = (
-    ('geral', 'Visão Geral'),
     ('competencia', 'Competência'),
     ('caixa', 'Caixa Realizado'),
 )
 
 SUFIXO_REGIME = {
-    'geral': 'visão geral',
     'competencia': 'competência',
     'caixa': 'caixa realizado',
 }
+
+REGIME_PADRAO = 'competencia'
 
 
 def _cap_empresa_q(empresa):
@@ -69,18 +69,6 @@ def _sum_receitas_competencia(empresa, ini: date, fim: date) -> Decimal:
     )['t'] or Decimal('0')
 
 
-def _sum_receitas_geral(empresa, ini: date, fim: date) -> Decimal:
-    pago = _sum_receitas_caixa(empresa, ini, fim)
-    aberto = ContaAReceber.objects.filter(
-        empresa=empresa,
-        data_vencimento__gte=ini,
-        data_vencimento__lte=fim,
-    ).exclude(status__in=['pago', 'cancelado']).aggregate(
-        t=Coalesce(Sum('valor_a_receber'), Decimal('0')),
-    )['t'] or Decimal('0')
-    return pago + aberto
-
-
 def _sum_despesas_caixa(empresa, ini: date, fim: date) -> Decimal:
     return ContasaPagar.objects.filter(
         _cap_empresa_q(empresa),
@@ -108,19 +96,6 @@ def _sum_despesas_competencia(empresa, ini: date, fim: date) -> Decimal:
     return com_emissao + sem_emissao
 
 
-def _sum_despesas_geral(empresa, ini: date, fim: date) -> Decimal:
-    pago = _sum_despesas_caixa(empresa, ini, fim)
-    aberto = ContasaPagar.objects.filter(
-        _cap_empresa_q(empresa),
-        dtvenc__gte=ini,
-        dtvenc__lte=fim,
-        categoria__tipo='D',
-    ).filter(Q(valorPago__isnull=True) | Q(valorPago=0)).exclude(
-        status__in=['pago', 'cancelado'],
-    ).aggregate(t=Coalesce(Sum('valorDoc'), Decimal('0')))['t'] or Decimal('0')
-    return pago + aberto
-
-
 def _receitas_por_categoria(empresa, ini: date, fim: date, regime: str, limite: int = 10):
     if regime == 'caixa':
         qs = (
@@ -135,51 +110,20 @@ def _receitas_por_categoria(empresa, ini: date, fim: date, regime: str, limite: 
             .annotate(total=Coalesce(Sum('valor_recebido'), Decimal('0')))
             .order_by('-total')[:limite]
         )
-    elif regime == 'competencia':
-        qs = (
-            ContaAReceber.objects.filter(
-                empresa=empresa,
-                data_emissao__gte=ini,
-                data_emissao__lte=fim,
-                categoria__isnull=False,
-            )
-            .exclude(status='cancelado')
-            .values('categoria__nome')
-            .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
-            .order_by('-total')[:limite]
-        )
-    else:
-        qs_pago = (
-            ContaAReceber.objects.filter(
-                empresa=empresa,
-                status='pago',
-                data_recebimento__gte=ini,
-                data_recebimento__lte=fim,
-                categoria__isnull=False,
-            )
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valor_recebido'), Decimal('0')))
-        )
-        qs_aberto = (
-            ContaAReceber.objects.filter(
-                empresa=empresa,
-                data_vencimento__gte=ini,
-                data_vencimento__lte=fim,
-                categoria__isnull=False,
-            )
-            .exclude(status__in=['pago', 'cancelado'])
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
-        )
-        totais: dict[int, dict] = {}
-        for row in list(qs_pago) + list(qs_aberto):
-            cid = row['categoria_id']
-            if cid not in totais:
-                totais[cid] = {'nome': row['categoria__nome'] or '—', 'total': Decimal('0')}
-            totais[cid]['total'] += row['total'] or Decimal('0')
-        ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
-        return [{'nome': x['nome'], 'total': x['total']} for x in ordenado]
+        return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
 
+    qs = (
+        ContaAReceber.objects.filter(
+            empresa=empresa,
+            data_emissao__gte=ini,
+            data_emissao__lte=fim,
+            categoria__isnull=False,
+        )
+        .exclude(status='cancelado')
+        .values('categoria__nome')
+        .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
+        .order_by('-total')[:limite]
+    )
     return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
 
 
@@ -197,48 +141,26 @@ def _despesas_por_categoria(empresa, ini: date, fim: date, regime: str, limite: 
             .annotate(total=Coalesce(Sum('valorPago'), Decimal('0')))
             .order_by('-total')[:limite]
         )
-    elif regime == 'competencia':
-        qs_em = (
-            base.filter(dtEmissao__gte=ini, dtEmissao__lte=fim)
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
-        )
-        qs_venc = (
-            base.filter(dtEmissao__isnull=True, dtvenc__gte=ini, dtvenc__lte=fim)
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
-        )
-        totais: dict[int, dict] = {}
-        for row in list(qs_em) + list(qs_venc):
-            cid = row['categoria_id']
-            if cid not in totais:
-                totais[cid] = {'nome': row['categoria__nome'] or '—', 'total': Decimal('0')}
-            totais[cid]['total'] += row['total'] or Decimal('0')
-        ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
-        return [{'nome': x['nome'], 'total': x['total']} for x in ordenado]
-    else:
-        qs_pago = (
-            base.filter(dtPag__gte=ini, dtPag__lte=fim, valorPago__gt=0)
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valorPago'), Decimal('0')))
-        )
-        qs_aberto = (
-            base.filter(dtvenc__gte=ini, dtvenc__lte=fim)
-            .filter(Q(valorPago__isnull=True) | Q(valorPago=0))
-            .exclude(status='pago')
-            .values('categoria_id', 'categoria__nome')
-            .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
-        )
-        totais = {}
-        for row in list(qs_pago) + list(qs_aberto):
-            cid = row['categoria_id']
-            if cid not in totais:
-                totais[cid] = {'nome': row['categoria__nome'] or '—', 'total': Decimal('0')}
-            totais[cid]['total'] += row['total'] or Decimal('0')
-        ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
-        return [{'nome': x['nome'], 'total': x['total']} for x in ordenado]
+        return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
 
-    return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
+    qs_em = (
+        base.filter(dtEmissao__gte=ini, dtEmissao__lte=fim)
+        .values('categoria_id', 'categoria__nome')
+        .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
+    )
+    qs_venc = (
+        base.filter(dtEmissao__isnull=True, dtvenc__gte=ini, dtvenc__lte=fim)
+        .values('categoria_id', 'categoria__nome')
+        .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
+    )
+    totais: dict[int, dict] = {}
+    for row in list(qs_em) + list(qs_venc):
+        cid = row['categoria_id']
+        if cid not in totais:
+            totais[cid] = {'nome': row['categoria__nome'] or '—', 'total': Decimal('0')}
+        totais[cid]['total'] += row['total'] or Decimal('0')
+    ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
+    return [{'nome': x['nome'], 'total': x['total']} for x in ordenado]
 
 
 def _lbl_forma_pagamento(descricao: str | None) -> str:
@@ -280,37 +202,7 @@ def _receitas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, li
             for r in qs
         ]
 
-    qs_pago = (
-        ContaAReceber.objects.filter(
-            empresa=empresa,
-            status='pago',
-            data_recebimento__gte=ini,
-            data_recebimento__lte=fim,
-        )
-        .values('forma_pagamento_id', 'forma_pagamento__descricao')
-        .annotate(total=Coalesce(Sum('valor_recebido'), Decimal('0')))
-    )
-    qs_aberto = (
-        ContaAReceber.objects.filter(
-            empresa=empresa,
-            data_vencimento__gte=ini,
-            data_vencimento__lte=fim,
-        )
-        .exclude(status__in=['pago', 'cancelado'])
-        .values('forma_pagamento_id', 'forma_pagamento__descricao')
-        .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
-    )
-    totais: dict = {}
-    for row in list(qs_pago) + list(qs_aberto):
-        chave = row['forma_pagamento_id'] or 0
-        if chave not in totais:
-            totais[chave] = {
-                'nome': _lbl_forma_pagamento(row['forma_pagamento__descricao']),
-                'total': Decimal('0'),
-            }
-        totais[chave]['total'] += row['total'] or Decimal('0')
-    ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
-    return ordenado
+    return []
 
 
 def _despesas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, limite: int = 10):
@@ -353,29 +245,7 @@ def _despesas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, li
         ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
         return ordenado
 
-    qs_pago = (
-        base.filter(dtPag__gte=ini, dtPag__lte=fim, valorPago__gt=0)
-        .values('cobranca_id', 'cobranca__descricao')
-        .annotate(total=Coalesce(Sum('valorPago'), Decimal('0')))
-    )
-    qs_aberto = (
-        base.filter(dtvenc__gte=ini, dtvenc__lte=fim)
-        .filter(Q(valorPago__isnull=True) | Q(valorPago=0))
-        .exclude(status='pago')
-        .values('cobranca_id', 'cobranca__descricao')
-        .annotate(total=Coalesce(Sum('valorDoc'), Decimal('0')))
-    )
-    totais = {}
-    for row in list(qs_pago) + list(qs_aberto):
-        chave = row['cobranca_id'] or 0
-        if chave not in totais:
-            totais[chave] = {
-                'nome': _lbl_forma_pagamento(row['cobranca__descricao']),
-                'total': Decimal('0'),
-            }
-        totais[chave]['total'] += row['total'] or Decimal('0')
-    ordenado = sorted(totais.values(), key=lambda x: x['total'], reverse=True)[:limite]
-    return ordenado
+    return []
 
 
 def _contas_a_vencer(empresa) -> tuple[Decimal, Decimal]:
@@ -397,17 +267,15 @@ def _contas_a_vencer(empresa) -> tuple[Decimal, Decimal]:
     return a_receber, a_pagar
 
 
-def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str = 'geral') -> dict:
+def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str = REGIME_PADRAO) -> dict:
     if regime not in {r[0] for r in REGIMES}:
-        regime = 'geral'
+        regime = REGIME_PADRAO
 
     sum_rec_fn = {
-        'geral': _sum_receitas_geral,
         'competencia': _sum_receitas_competencia,
         'caixa': _sum_receitas_caixa,
     }[regime]
     sum_desp_fn = {
-        'geral': _sum_despesas_geral,
         'competencia': _sum_despesas_competencia,
         'caixa': _sum_despesas_caixa,
     }[regime]

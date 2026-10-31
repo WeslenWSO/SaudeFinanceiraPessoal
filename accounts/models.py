@@ -49,13 +49,23 @@ class BackupBancoConfig(models.Model):
 
 
 class BackupExecucaoAgendada(models.Model):
-    """Evita executar o mesmo slot de backup duas vezes no mesmo dia (cron)."""
+    """Histórico de execuções automáticas e manuais de backup."""
 
     data = models.DateField(db_index=True)
     hora = models.PositiveSmallIntegerField(
         help_text='Hora local (0–23) do slot configurado.',
     )
     executado_em = models.DateTimeField(auto_now_add=True)
+    sucesso = models.BooleanField(default=False)
+    mensagem = models.TextField(blank=True, default='')
+    arquivo_nome = models.CharField(max_length=255, blank=True, default='')
+    drive_file_id = models.CharField(max_length=128, blank=True, default='')
+    origem = models.CharField(
+        max_length=20,
+        blank=True,
+        default='cron',
+        help_text='cron, manual ou forcar',
+    )
 
     class Meta:
         verbose_name = 'Execução de backup agendada'

@@ -600,7 +600,7 @@ def _url_mes_dashboard(request, ano: int, mes: int) -> str:
 
 
 def _contexto_dashboard_intervalo(request):
-    """Empresa da sessão + mês de referência + regime (Visão Geral / Competência / Caixa)."""
+    """Empresa da sessão + mês de referência + regime (Competência / Caixa realizado)."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return None, None
@@ -612,9 +612,13 @@ def _contexto_dashboard_intervalo(request):
     data_inicio = date(ano_ref, mes_ref, 1)
     data_fim = date(ano_ref, mes_ref, monthrange(ano_ref, mes_ref)[1])
 
-    regime = (request.GET.get('regime') or 'geral').strip().lower()
+    from dashboard.services.montar_visao_geral import REGIME_PADRAO
+
+    regime = (request.GET.get('regime') or REGIME_PADRAO).strip().lower()
+    if regime == 'geral':
+        regime = REGIME_PADRAO
     if regime not in {r[0] for r in REGIMES}:
-        regime = 'geral'
+        regime = REGIME_PADRAO
 
     ref = date(ano_ref, mes_ref, 1)
     ant = ref - relativedelta(months=1)

@@ -46,6 +46,13 @@ def drive_configurado() -> bool:
     return bool(_folder_id() and _credenciais_service_account())
 
 
+def email_service_account_drive() -> str:
+    info = _credenciais_service_account()
+    if not info:
+        return ''
+    return str(info.get('client_email') or '').strip()
+
+
 def enviar_arquivo_para_drive(caminho_local: str | Path, *, nome_no_drive: str | None = None) -> dict:
     """
     Faz upload para a pasta BKP_SAUDE (ou BACKUP_GOOGLE_DRIVE_FOLDER_ID).
@@ -71,7 +78,7 @@ def enviar_arquivo_para_drive(caminho_local: str | Path, *, nome_no_drive: str |
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    scopes = ['https://www.googleapis.com/auth/drive.file']
+    scopes = ['https://www.googleapis.com/auth/drive']
     creds = service_account.Credentials.from_service_account_info(creds_info, scopes=scopes)
     service = build('drive', 'v3', credentials=creds, cache_discovery=False)
 
@@ -80,7 +87,12 @@ def enviar_arquivo_para_drive(caminho_local: str | Path, *, nome_no_drive: str |
     metadata = {'name': nome, 'parents': [folder_id]}
     created = (
         service.files()
-        .create(body=metadata, media_body=media, fields='id,name,webViewLink')
+        .create(
+            body=metadata,
+            media_body=media,
+            fields='id,name,webViewLink',
+            supportsAllDrives=True,
+        )
         .execute()
     )
     return {

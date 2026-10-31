@@ -146,6 +146,25 @@ def backup_agendamento_config_view(request):
             )
             return redirect('backup_agendamento_config')
 
+        if acao == 'executar_backup_agora':
+            from accounts.backup_runner import executar_backup_google_drive
+
+            try:
+                result = executar_backup_google_drive(modo='manual')
+            except Exception as exc:
+                messages.error(request, f'Erro ao executar backup: {exc}')
+                return redirect('backup_agendamento_config')
+            if result.get('pulou'):
+                messages.warning(request, result.get('mensagem', 'Nada executado.'))
+            elif result.get('ok'):
+                messages.success(request, result.get('mensagem', 'Backup enviado ao Drive.'))
+            else:
+                messages.warning(
+                    request,
+                    result.get('mensagem', 'Backup local OK; Drive não configurado neste servidor.'),
+                )
+            return redirect('backup_agendamento_config')
+
         form = BackupBancoConfigForm(request.POST, instance=config)
         if form.is_valid():
             cfg = form.save()
@@ -168,7 +187,12 @@ def backup_agendamento_config_view(request):
     else:
         form = BackupBancoConfigForm(instance=config)
 
-    from accounts.backup_google_drive import drive_configurado
+    from accounts.backup_google_drive import drive_configurado, email_service_account_drive
+    from accounts.models import BackupExecucaoAgendada
+
+    ultimas_execucoes = list(
+        BackupExecucaoAgendada.objects.order_by('-executado_em')[:15]
+    )
 
     return render(
         request,
@@ -177,6 +201,8 @@ def backup_agendamento_config_view(request):
             'form': form,
             'horarios_ativos': horarios_backup_ativos(config),
             'drive_credencial_ok': drive_configurado(),
+            'drive_service_account_email': email_service_account_drive(),
+            'ultimas_execucoes': ultimas_execucoes,
         },
     )
 
