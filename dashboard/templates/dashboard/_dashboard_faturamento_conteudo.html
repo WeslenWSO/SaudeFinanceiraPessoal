@@ -96,6 +96,100 @@
       </div>
     </div>
   </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">
+          Faturamento por forma de pagamento
+        </div>
+        <div class="card-body">
+          <div style="position: relative; height: 320px;">
+            <canvas id="chartFaturamentoFormaPagamento" aria-label="Faturamento NFSe por forma de pagamento"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Formas de pagamento</div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height: 320px;">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Forma</th>
+                  <th class="text-end">Qtd</th>
+                  <th class="text-end">Valor</th>
+                  <th class="text-end">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in visao_faturamento.linhas_forma_pagamento %}
+                <tr>
+                  <td class="small">{{ row.forma_pagamento }}</td>
+                  <td class="text-end small">{{ row.quantidade_fmt }}</td>
+                  <td class="text-end small text-nowrap">R$ {{ row.valor_fmt }}</td>
+                  <td class="text-end small">{{ row.percentual_fmt }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="small text-muted p-3">Sem forma de pagamento nas notas do período.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">
+          10 maiores clientes por valor
+        </div>
+        <div class="card-body">
+          <div style="position: relative; height: 380px;">
+            <canvas id="chartFaturamentoTopClientes" aria-label="Top clientes por faturamento NFSe"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Ranking de clientes</div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height: 380px;">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>#</th>
+                  <th>Cliente</th>
+                  <th class="text-end">Qtd</th>
+                  <th class="text-end">Valor</th>
+                  <th class="text-end">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in visao_faturamento.linhas_top_clientes %}
+                <tr>
+                  <td class="small text-muted">{{ forloop.counter }}</td>
+                  <td class="small">{{ row.cliente }}</td>
+                  <td class="text-end small">{{ row.quantidade_fmt }}</td>
+                  <td class="text-end small text-nowrap">R$ {{ row.valor_fmt }}</td>
+                  <td class="text-end small">{{ row.percentual_fmt }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="small text-muted p-3">Nenhum cliente no período.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 
   <p class="small text-muted mb-0">

@@ -791,8 +791,14 @@ def conta_azul_dashboard(request):
                 'data_inicio': ctx['data_inicio_str'],
                 'data_fim': ctx['data_fim_str'],
                 'linhas_categoria': [],
+                'linhas_forma_pagamento': [],
+                'linhas_top_clientes': [],
                 'chart_categoria_labels_json': '[]',
                 'chart_categoria_data_json': '[]',
+                'chart_forma_pagamento_labels_json': '[]',
+                'chart_forma_pagamento_data_json': '[]',
+                'chart_top_clientes_labels_json': '[]',
+                'chart_top_clientes_data_json': '[]',
             }
         else:
             visao = visao_financeira_vazia(ctx.get('regime') or 'competencia')
