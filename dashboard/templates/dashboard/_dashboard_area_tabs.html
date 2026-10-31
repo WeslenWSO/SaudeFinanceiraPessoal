@@ -8,6 +8,15 @@
     </a>
   </li>
   {% endif %}
+  {% if aba_faturamento_visivel %}
+  <li class="nav-item">
+    <a class="nav-link fw-semibold py-2 {% if aba_ativa == 'faturamento' %}active{% endif %}"
+       href="{{ url_aba_faturamento }}"
+       {% if aba_ativa == 'faturamento' %}aria-current="page"{% endif %}>
+      <i class="fas fa-file-medical me-1"></i> Faturamento
+    </a>
+  </li>
+  {% endif %}
   {% if aba_analises_visivel %}
   <li class="nav-item">
     <a class="nav-link fw-semibold py-2 {% if aba_ativa == 'analises' %}active{% endif %}"

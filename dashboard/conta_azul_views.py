@@ -641,24 +641,46 @@ def _contexto_dashboard_intervalo(request):
     return empresa, ctx
 
 
-def _aba_dashboard(request) -> str:
+def _abas_dashboard_visiveis() -> tuple[bool, bool, bool]:
     from dashboard.analises_catalogo import (
         ABA_ANALISES_DASHBOARD_VISIVEL,
+        ABA_FATURAMENTO_DASHBOARD_VISIVEL,
         ABA_FINANCEIRO_DASHBOARD_VISIVEL,
     )
 
-    padrao = 'financeiro' if ABA_FINANCEIRO_DASHBOARD_VISIVEL else 'analises'
-    if not ABA_FINANCEIRO_DASHBOARD_VISIVEL and not ABA_ANALISES_DASHBOARD_VISIVEL:
-        padrao = 'financeiro'
+    return (
+        ABA_FINANCEIRO_DASHBOARD_VISIVEL,
+        ABA_FATURAMENTO_DASHBOARD_VISIVEL,
+        ABA_ANALISES_DASHBOARD_VISIVEL,
+    )
+
+
+def _aba_dashboard_padrao() -> str:
+    fin, fat, ana = _abas_dashboard_visiveis()
+    if fin:
+        return 'financeiro'
+    if fat:
+        return 'faturamento'
+    if ana:
+        return 'analises'
+    return 'financeiro'
+
+
+def _aba_dashboard(request) -> str:
+    fin, fat, ana = _abas_dashboard_visiveis()
+    padrao = _aba_dashboard_padrao()
 
     aba = (request.GET.get('aba') or padrao).strip().lower()
     if aba in ('producao', 'producao_conferencia'):
         aba = 'analises'
-    if aba == 'financeiro' and not ABA_FINANCEIRO_DASHBOARD_VISIVEL:
-        aba = 'analises' if ABA_ANALISES_DASHBOARD_VISIVEL else padrao
-    if aba == 'analises' and not ABA_ANALISES_DASHBOARD_VISIVEL:
-        aba = 'financeiro' if ABA_FINANCEIRO_DASHBOARD_VISIVEL else padrao
-    if aba not in ('financeiro', 'analises'):
+    permitidas = set()
+    if fin:
+        permitidas.add('financeiro')
+    if fat:
+        permitidas.add('faturamento')
+    if ana:
+        permitidas.add('analises')
+    if aba not in permitidas:
         aba = padrao
     return aba
 
@@ -679,13 +701,17 @@ def conta_azul_dashboard(request):
 
     aba_ativa = _aba_dashboard(request)
     visao = None
+    visao_faturamento = None
     if aba_ativa == 'financeiro':
         visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
+    elif aba_ativa == 'faturamento':
+        from dashboard.montar_visao_faturamento import montar_visao_faturamento
 
-    from dashboard.analises_catalogo import (
-        ABA_ANALISES_DASHBOARD_VISIVEL,
-        ABA_FINANCEIRO_DASHBOARD_VISIVEL,
-    )
+        visao_faturamento = montar_visao_faturamento(
+            empresa.pk, ctx['ano_ref'], ctx['mes_ref']
+        )
+
+    fin_vis, fat_vis, ana_vis = _abas_dashboard_visiveis()
     from dashboard.analises_montagem import montar_contexto_aba_analises
 
     analises_ctx: dict = {}
@@ -717,17 +743,22 @@ def conta_azul_dashboard(request):
                 'url_analise_modelo_base': '?aba=analises&mes=' + ctx['mes_filtro'] + '&modelo=',
             }
 
+    abas_count = sum((fin_vis, fat_vis, ana_vis))
     return render(
         request,
         'dashboard/dashboard_inicio.html',
         {
             'titulo': 'Dashboard',
             'visao': visao,
+            'visao_faturamento': visao_faturamento,
             'aba_ativa': aba_ativa,
             'url_aba_financeiro': _url_aba_dashboard(request, 'financeiro'),
+            'url_aba_faturamento': _url_aba_dashboard(request, 'faturamento'),
             'url_aba_analises': _url_aba_dashboard(request, 'analises'),
-            'aba_analises_visivel': ABA_ANALISES_DASHBOARD_VISIVEL,
-            'aba_financeiro_visivel': ABA_FINANCEIRO_DASHBOARD_VISIVEL,
+            'aba_analises_visivel': ana_vis,
+            'aba_financeiro_visivel': fin_vis,
+            'aba_faturamento_visivel': fat_vis,
+            'aba_tabs_visiveis': abas_count > 1,
             **analises_ctx,
             **ctx,
         },

@@ -1,0 +1,104 @@
+  <p class="text-muted small mb-3">
+    Período: <strong>{{ titulo_periodo }}</strong>
+    · Base: <strong>data do exame</strong> (faturamento médico, exceto cancelados/desistência)
+  </p>
+
+  {% if not visao_faturamento.tem_dados %}
+  <div class="alert alert-info">
+    Nenhum faturamento no período. Importe ou cadastre exames em Faturamento Médico.
+  </div>
+  {% else %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100 text-center">
+        <div class="card-body py-3">
+          <div class="text-muted text-uppercase small fw-semibold">Faturamento total</div>
+          <div class="fs-5 fw-bold text-success">R$ {{ visao_faturamento.kpi_faturamento_total_fmt }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100 text-center">
+        <div class="card-body py-3">
+          <div class="text-muted text-uppercase small fw-semibold">Atendimentos</div>
+          <div class="fs-5 fw-bold">{{ visao_faturamento.kpi_atendimentos_fmt }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100 text-center">
+        <div class="card-body py-3">
+          <div class="text-muted text-uppercase small fw-semibold">Ticket médio</div>
+          <div class="fs-5 fw-bold text-primary">R$ {{ visao_faturamento.kpi_ticket_medio_fmt }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100 text-center">
+        <div class="card-body py-3">
+          <div class="text-muted text-uppercase small fw-semibold">Média / dia útil</div>
+          <div class="fs-5 fw-bold">R$ {{ visao_faturamento.kpi_media_dia_fmt }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Faturamento por categoria (convênio / parceiro)</div>
+        <div class="card-body">
+          <div style="position: relative; height: 420px;">
+            <canvas id="chartFaturamentoCategoria" aria-label="Faturamento por categoria"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header fw-semibold py-2 bg-white border-0">Detalhamento</div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height: 420px;">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Categoria</th>
+                  <th class="text-end">Qtd</th>
+                  <th class="text-end">Valor</th>
+                  <th class="text-end">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in visao_faturamento.linhas_convenio %}
+                <tr>
+                  <td class="small">{{ row.convenio }}</td>
+                  <td class="text-end small">{{ row.quantidade_fmt }}</td>
+                  <td class="text-end small text-nowrap">R$ {{ row.valor_fmt }}</td>
+                  <td class="text-end small">{{ row.percentual_fmt }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-dark">
+                <tr>
+                  <td>Total</td>
+                  <td class="text-end">{{ visao_faturamento.total_quantidade_fmt }}</td>
+                  <td class="text-end text-nowrap">R$ {{ visao_faturamento.total_valor_fmt }}</td>
+                  <td class="text-end">{{ visao_faturamento.total_percentual_fmt }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="small text-muted mb-0">
+    <a href="{% url 'dashboard:index' %}?aba=analises&amp;modelo=faturamento_convenio&amp;mes={{ mes_filtro }}">
+      Relatório completo (Análises)
+    </a>
+    ·
+    <a href="{% url 'faturamento_medico:ftlistar' %}">Faturamento Médico</a>
+  </p>

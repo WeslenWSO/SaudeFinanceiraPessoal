@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Abas no /dash/ — False oculta o link (acesso direto: ?aba=financeiro ou ?aba=analises)
+# Abas no /dash/ — False oculta o link (acesso direto: ?aba=financeiro|faturamento|analises)
 ABA_FINANCEIRO_DASHBOARD_VISIVEL = True
+ABA_FATURAMENTO_DASHBOARD_VISIVEL = True
 ABA_ANALISES_DASHBOARD_VISIVEL = True
 
 
