@@ -337,6 +337,12 @@ DATE_INPUT_FORMATS = ['%Y-%m-%d', '%d/%m/%Y']
 _backup_dir_env = os.environ.get('BACKUP_DATABASE_DIR', '').strip()
 BACKUP_DATABASE_DIR = Path(_backup_dir_env) if _backup_dir_env else BASE_DIR / 'backups'
 BACKUP_DATABASE_TIMEOUT = 600
+# Google Drive — pasta BKP_SAUDE (Meu Drive weslensioliveira@gmail.com)
+BACKUP_GOOGLE_DRIVE_FOLDER_ID = os.environ.get(
+    'BACKUP_GOOGLE_DRIVE_FOLDER_ID',
+    '1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y',
+).strip()
+BACKUP_GOOGLE_SERVICE_ACCOUNT_FILE = os.environ.get('BACKUP_GOOGLE_SERVICE_ACCOUNT_FILE', '').strip()
 
 
 MESSAGE_TAGS = {

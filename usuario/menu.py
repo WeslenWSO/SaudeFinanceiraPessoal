@@ -66,7 +66,7 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     MenuItemDef('regraimposto', 'Regras do Imposto', 'fa-percent', 'cadastro', url_name='regraimposto:ListaRegra'),
     MenuItemDef('regrarateio', 'Regra do Rateio', 'fa-share-nodes', 'cadastro', url_name='regrarateio:regraList'),
     MenuItemDef('usuario', 'Usuário', 'fa-user-cog', 'cadastro', url_name='usuario:usuarioList'),
-    MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='accounts:backup_banco'),
+    MenuItemDef('backup_banco', 'Backup do banco', 'fa-database', 'cadastro', url_name='backup_banco'),
     MenuItemDef('faturamento_medico', 'Faturamento Médico', 'fa-file-medical', 'faturamento', url_name='faturamento_medico:ftlistar'),
     MenuItemDef(
         'faturamento_conferencia',

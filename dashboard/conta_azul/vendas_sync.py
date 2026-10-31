@@ -46,7 +46,7 @@ def _upsert_venda_de_envelope(
 
     numero = v.get('numero')
     data_v = _parse_data_venda(v.get('data_compromisso') or v.get('data'))
-    cob = cobranca_de_venda_ca(envelope, cache_cobranca)
+    cob = cobranca_de_venda_ca(envelope, cache_cobranca=cache_cobranca)
     caixa = caixa_acerto_de_venda_ca(empresa.pk, envelope)
     disc = montar_discriminacao_venda_ca(envelope)
     vend = envelope.get('vendedor') if isinstance(envelope.get('vendedor'), dict) else {}

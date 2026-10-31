@@ -42,6 +42,21 @@
                         {% endif %}
                     </div>
 
+                    <div class="alert {% if drive_backup_configurado %}alert-success{% else %}alert-warning{% endif %} small mb-3">
+                        <strong>Google Drive — pasta BKP_SAUDE</strong>
+                        (conta weslensioliveira@gmail.com)
+                        {% if drive_backup_configurado %}
+                        <p class="mb-0 mt-1">Upload automático ativo ao gerar backup e no cron diário.</p>
+                        {% else %}
+                        <p class="mb-0 mt-1">
+                          Configure no Render <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code> e
+                          <code>BACKUP_GOOGLE_DRIVE_FOLDER_ID</code>
+                          (pasta <code>1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y</code>).
+                          Compartilhe a pasta BKP_SAUDE com o e-mail da service account (Editor).
+                        </p>
+                        {% endif %}
+                    </div>
+
                     <form method="post" class="mb-4">
                         {% csrf_token %}
                         <input type="hidden" name="acao" value="gerar">
@@ -79,7 +94,7 @@
                                     <td>{{ item.modificado|date:"d/m/Y H:i" }}</td>
                                     <td class="text-end">{{ item.tamanho_fmt }}</td>
                                     <td class="text-end">
-                                        <a href="{% url 'accounts:backup_banco_download' item.nome %}"
+                                        <a href="{% url 'backup_banco_download' item.nome %}"
                                            class="btn btn-outline-primary btn-sm">
                                             <i class="fas fa-download"></i>
                                         </a>

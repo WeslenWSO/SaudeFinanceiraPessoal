@@ -20,6 +20,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
 
+from accounts.views import backup_banco_download, backup_banco_view
+
 
 def _redirect_accounts_login(request):
     """Compatível com @login_required e links antigos que usam /accounts/login/."""
@@ -29,7 +31,13 @@ def _redirect_accounts_login(request):
 
 
 urlpatterns = [
-
+    # Antes do Django admin (senão /admin/backup-banco/ vira 404)
+    path('admin/backup-banco/', backup_banco_view, name='backup_banco'),
+    path(
+        'admin/backup-banco/download/<str:nome>/',
+        backup_banco_download,
+        name='backup_banco_download',
+    ),
     path('admin/', admin.site.urls),
     path('favicon.ico', RedirectView.as_view(url='/static/icons/favicon.ico', permanent=True)),
     path('accounts/login/', _redirect_accounts_login, name='accounts_login_redirect'),

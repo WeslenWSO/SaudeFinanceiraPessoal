@@ -70,27 +70,33 @@ def backup_banco_view(request):
         senha = (request.POST.get('senha') or '').strip()
         if not senha:
             messages.error(request, 'Informe sua senha para confirmar o backup.')
-            return redirect('accounts:backup_banco')
+            return redirect('backup_banco')
 
         if not request.user.check_password(senha):
             messages.error(request, 'Senha incorreta.')
-            return redirect('accounts:backup_banco')
+            return redirect('backup_banco')
 
         try:
             info = criar_backup_completo()
         except Exception as exc:
             messages.error(request, f'Erro ao gerar backup: {exc}')
-            return redirect('accounts:backup_banco')
+            return redirect('backup_banco')
 
         caminho = caminho_backup_seguro(info['arquivo'])
         if not caminho:
             messages.error(request, 'Backup gerado, mas o arquivo não foi encontrado.')
-            return redirect('accounts:backup_banco')
+            return redirect('backup_banco')
 
-        messages.success(
-            request,
-            f'Backup salvo em {caminho} ({_formatar_tamanho(info["tamanho"])}).',
-        )
+        msg = f'Backup salvo em {caminho} ({_formatar_tamanho(info["tamanho"])}).'
+        try:
+            from accounts.backup_google_drive import drive_configurado, enviar_arquivo_para_drive
+
+            if drive_configurado():
+                up = enviar_arquivo_para_drive(caminho)
+                msg += f' Enviado ao Google Drive (BKP_SAUDE): {up.get("name")}.'
+        except Exception as exc:
+            msg += f' Aviso: não enviou ao Drive — {exc}'
+        messages.success(request, msg)
 
         content_type = 'application/gzip' if info['formato'] == 'sql.gz' else 'application/json'
         response = FileResponse(caminho.open('rb'), as_attachment=True, filename=info['arquivo'])
@@ -104,10 +110,13 @@ def backup_banco_view(request):
             'tamanho_fmt': _formatar_tamanho(item['tamanho']),
         })
 
+    from accounts.backup_google_drive import drive_configurado
+
     context = {
         'pasta_backups': str(diretorio_backups()),
         'backups_locais': backups,
         'usa_pg_dump': _engine_postgres() and bool(_pg_dump_disponivel()),
+        'drive_backup_configurado': drive_configurado(),
     }
     return render(request, 'accounts/backup_banco.html', context)
 
