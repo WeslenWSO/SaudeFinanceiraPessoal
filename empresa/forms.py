@@ -44,7 +44,8 @@ class EmpresaForm(forms.ModelForm):
         widgets = {
             'razao': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Razão Social'
+                'placeholder': 'Razão Social',
+                'maxlength': '150',
             }),
             'nome_fantasia': forms.TextInput(attrs={
                 'class': 'form-control',

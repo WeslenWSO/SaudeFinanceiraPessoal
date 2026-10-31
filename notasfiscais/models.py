@@ -403,6 +403,10 @@ class NotaFiscalServico(models.Model):
         from decimal import Decimal
 
         from contasareceber.models import ContaAReceber
+        from dashboard.conta_azul.config import conta_azul_bloqueia_car_local_id
+
+        if conta_azul_bloqueia_car_local_id(self.empresa_id):
+            return
 
         if not self.pk or not self.forma_pagamento:
             return

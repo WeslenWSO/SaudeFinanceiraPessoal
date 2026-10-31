@@ -11,7 +11,10 @@ def cotacao_context(request):
             pass
     return {
         'cotacao': "5.20",
-        'empresa_atual': empresa
+        'empresa_atual': empresa,
+        'empresa_integracao_conta_azul': bool(
+            empresa and getattr(empresa, 'integracao_conta_azul', False)
+        ),
     }
 
 

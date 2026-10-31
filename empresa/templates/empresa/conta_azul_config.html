@@ -35,6 +35,11 @@
               {% else %}<span class="badge bg-warning text-dark">Não conectado</span>{% endif %}
             </li>
             <li class="mb-2">
+              Integração CA (empresa):
+              {% if empresa.integracao_conta_azul %}<span class="badge bg-primary">Ativa</span>
+              {% else %}<span class="badge bg-secondary">Inativa</span>{% endif %}
+            </li>
+            <li class="mb-2">
               Access token:
               {% if config.token_valido %}<span class="badge bg-success">Válido</span>
               {% elif config.tem_refresh_token %}<span class="badge bg-info">Renova sozinho (~1h)</span>

@@ -538,12 +538,18 @@ class NFSeListView(LoginRequiredMixin, ListView):
         aplicar_cobranca_url = f'/{path_prefix}/nfse/aplicar-cobranca/'
         conta_azul_nfse = False
         conta_azul_sync_url = ''
+        empresa_integracao_conta_azul = False
         if empresa_id:
             try:
-                from dashboard.conta_azul.config import obter_ou_criar_config
+                from dashboard.conta_azul.config import (
+                    empresa_tem_integracao_conta_azul_id,
+                    obter_ou_criar_config,
+                )
 
-                cfg_ca = obter_ou_criar_config(Empresa.objects.get(pk=empresa_id))
+                emp_ca = Empresa.objects.get(pk=empresa_id)
+                cfg_ca = obter_ou_criar_config(emp_ca)
                 conta_azul_nfse = cfg_ca.tem_refresh_token()
+                empresa_integracao_conta_azul = empresa_tem_integracao_conta_azul_id(empresa_id)
                 conta_azul_sync_url = reverse('empresa:conta_azul_sincronizar', kwargs={'pk': empresa_id})
             except Exception:
                 pass
@@ -565,6 +571,8 @@ class NFSeListView(LoginRequiredMixin, ListView):
 
         context.update({
             'conta_azul_nfse_disponivel': conta_azul_nfse,
+            'empresa_integracao_conta_azul': empresa_integracao_conta_azul,
+            'bloquear_gerar_car_conta_azul': empresa_integracao_conta_azul,
             'conta_azul_sync_url': conta_azul_sync_url,
             'ca_periodo_dia_default': ca_periodo_dia_default,
             'ca_data_de_default': ca_data_de_default,
@@ -2364,6 +2372,17 @@ def gerar_contas_receber_bulk(request):
         empresa_id = request.session.get('empresa_id')
         if not empresa_id:
             return JsonResponse({"ok": False, "error": "Empresa não selecionada."}, status=400)
+
+        from dashboard.conta_azul.config import (
+            MENSAGEM_CAR_BLOQUEADO_CONTA_AZUL,
+            conta_azul_bloqueia_car_local_id,
+        )
+
+        if conta_azul_bloqueia_car_local_id(empresa_id):
+            return JsonResponse(
+                {"ok": False, "error": MENSAGEM_CAR_BLOQUEADO_CONTA_AZUL},
+                status=403,
+            )
 
         qs = NotaFiscalServico.objects.filter(id__in=ids, empresa_id=empresa_id)
 

@@ -40,6 +40,9 @@ class ContaAzulConfigForm(forms.ModelForm):
             gravar_client_secret(obj, secret)
         if commit:
             obj.save()
+            from dashboard.conta_azul.config import atualizar_flag_integracao_conta_azul_empresa
+
+            atualizar_flag_integracao_conta_azul_empresa(obj.empresa_id, ativo=obj.ativo)
         return obj
 
 

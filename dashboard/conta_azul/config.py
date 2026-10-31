@@ -53,6 +53,8 @@ def gravar_tokens(
             'atualizado_em',
         ]
     )
+    if config.ativo:
+        atualizar_flag_integracao_conta_azul_empresa(config.empresa_id, ativo=True)
 
 
 def limpar_tokens(config: ContaAzulConfig) -> None:
@@ -122,3 +124,40 @@ def config_da_empresa(empresa) -> ContaAzulConfig | None:
 def obter_ou_criar_config(empresa) -> ContaAzulConfig:
     cfg, _ = ContaAzulConfig.objects.get_or_create(empresa=empresa)
     return cfg
+
+
+MENSAGEM_CAR_BLOQUEADO_CONTA_AZUL = (
+    'Conta Azul conectada: as contas a receber vêm da sincronização com a API. '
+    'Use «Integração CA» ou Sincronizar dados — não gere CAR pela NFSe.'
+)
+
+
+def empresa_tem_integracao_conta_azul(empresa) -> bool:
+    if empresa is None:
+        return False
+    if isinstance(empresa, int):
+        return empresa_tem_integracao_conta_azul_id(empresa)
+    return bool(getattr(empresa, 'integracao_conta_azul', False))
+
+
+def empresa_tem_integracao_conta_azul_id(empresa_id: int | None) -> bool:
+    if not empresa_id:
+        return False
+    from empresa.models import Empresa
+
+    return Empresa.objects.filter(pk=empresa_id, integracao_conta_azul=True).exists()
+
+
+def atualizar_flag_integracao_conta_azul_empresa(empresa_id: int, *, ativo: bool) -> None:
+    from empresa.models import Empresa
+
+    Empresa.objects.filter(pk=empresa_id).update(integracao_conta_azul=bool(ativo))
+
+
+def conta_azul_bloqueia_car_local(empresa) -> bool:
+    """Empresa com flag de integração CA — não duplicar CAR gerado localmente pela NFSe."""
+    return empresa_tem_integracao_conta_azul(empresa)
+
+
+def conta_azul_bloqueia_car_local_id(empresa_id: int | None) -> bool:
+    return empresa_tem_integracao_conta_azul_id(empresa_id)

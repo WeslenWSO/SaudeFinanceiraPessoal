@@ -347,7 +347,13 @@
                 <button type="button" class="btn btn-muted btn-sm" id="btnAplicarCobranca" disabled title="Aplicar cobrança (forma de pagamento) nas notas selecionadas"><i class="fas fa-money-check-alt"></i> Aplicar Cobrança</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnAplicarRegraImposto" {% if periodo_fechado %}onclick="alert('Período fechado - vá para Apuração de Impostos e reabra o período para alterar regras.');" title="Período fechado"{% else %}onclick="document.getElementById('modalRegraImposto').showModal();" title="Aplicar regra de imposto"{% endif %}><i class="fas fa-calculator"></i> Aplicar Regra Imposto</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnSegmentar" disabled><i class="fas fa-cut"></i> Segmentar NFSe</button>
+                {% if bloquear_gerar_car_conta_azul %}
+                <span class="d-inline-block" tabindex="0" title="Conta Azul conectada — use a sincronização CA em vez de gerar CAR aqui.">
+                  <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled style="pointer-events: none;"><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
+                </span>
+                {% else %}
                 <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
+                {% endif %}
                 <button type="button" class="btn btn-danger btn-sm" id="btnExcluirNfse" disabled title="Excluir notas selecionadas e contas a receber vinculadas"><i class="fas fa-trash-alt"></i> Excluir Selecionadas</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnAISegmentacao" disabled><i class="fas fa-brain"></i> IA Segmentação</button>
             </div>
@@ -1065,7 +1071,9 @@ document.addEventListener('DOMContentLoaded', function() {
         btnExtrair.disabled = selectedIds.length === 0;
         btnAplicarRegra.disabled = selectedIds.length === 0;
         btnSegmentar.disabled = selectedIds.length !== 1;  // Só habilita se exatamente 1 selecionado
+        {% if not bloquear_gerar_car_conta_azul %}
         btnGerarContas.disabled = selectedIds.length === 0;
+        {% endif %}
         if (btnExcluirNfse) btnExcluirNfse.disabled = selectedIds.length === 0;
         btnAISegmentacao.disabled = selectedIds.length === 0;
         const btnAlterarSocio = document.getElementById('btnAlterarSocio');
@@ -1563,6 +1571,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para gerar contas a receber das notas selecionadas
     btnGerarContas.addEventListener('click', function() {
+        {% if bloquear_gerar_car_conta_azul %}
+        mostrarMensagem('Conta Azul conectada: use a sincronização CA. Geração de CAR pela NFSe está desativada.', 'warning');
+        return;
+        {% endif %}
         if (selectedIds.length === 0) {
             mostrarMensagem('Selecione pelo menos uma NFSe para gerar contas a receber.', 'warning');
             return;

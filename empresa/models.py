@@ -18,7 +18,7 @@ class Empresa(models.Model):
         ('Ativa', 'Ativa'),
         ('Inativa', 'Inativa'),
     ]
-    razao = models.CharField(verbose_name='Razao', max_length=50)
+    razao = models.CharField(verbose_name='Razao', max_length=150)
     cnpj = models.CharField(verbose_name='CNPJ', max_length=14)
     status = models.CharField(
         verbose_name='Estatus',
@@ -73,6 +73,12 @@ class Empresa(models.Model):
     )
 
     codigo_externo = models.CharField(verbose_name='Código Externo', max_length=50, blank=True, null=True, help_text='Código externo para integração com outros sistemas')
+
+    integracao_conta_azul = models.BooleanField(
+        verbose_name='Integração Conta Azul',
+        default=False,
+        help_text='Financeiro (CAR/CAP etc.) via API Conta Azul — desativa geração local de CAR pela NFSe.',
+    )
 
     # NFS-e ambiente nacional (SEFIN): opcional por empresa; senha armazenada cifrada (Fernet/SECRET_KEY).
     nfse_nacional_base_url = models.CharField(
