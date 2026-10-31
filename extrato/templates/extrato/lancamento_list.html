@@ -102,7 +102,7 @@
               <summary class="fw-semibold"><i class="fas fa-cloud-download-alt text-primary"></i> Importar extrato pela API Sicoob</summary>
               <p class="small text-muted mb-2 mt-2">
                 Consulta o extrato no ambiente Sicoob (escopo <code>cco_extrato</code>) e grava os lançamentos.
-                <strong>Cadastro na tela:</strong> menu <strong>Empresa</strong> → lista → <strong>Editar</strong> a empresa → seção <strong>«API Sicoob — extrato automático»</strong> (Client ID, chave de acesso e senha). <strong>Ou no servidor:</strong> <code>SICOOB_CLIENT_ID</code> e, para PJ, <code>SICOOB_CHAVE_ACESSO</code> + <code>SICOOB_SENHA</code> (ou <code>SICOOB_USERNAME</code> + <code>SICOOB_PASSWORD</code> para PF).
+                <strong>Credenciais no servidor (Render / .env):</strong> <code>SICOOB_CLIENT_ID</code> e, para PJ, <code>SICOOB_CHAVE_ACESSO</code> + <code>SICOOB_SENHA</code> (ou <code>SICOOB_USERNAME</code> + <code>SICOOB_PASSWORD</code> para PF).
                 No cadastro da conta bancária, preencha <strong>Sicoob — Nº conta API (extrato)</strong> (número usado em <code>numeroContaCorrente</code>).
               </p>
               {% if contas_sicoob %}

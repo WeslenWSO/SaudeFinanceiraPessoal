@@ -869,7 +869,7 @@ def empresa_update(request, pk):
 
 @login_required
 def empresa_integracao(request, pk):
-    """NFS-e nacional, cópias XML, portal e Sicoob — fora do cadastro principal."""
+    """NFS-e nacional, cópias XML e portal — fora do cadastro principal."""
     empresa = get_object_or_404(Empresa, pk=pk)
     if request.method == "POST":
         form = EmpresaIntegracaoForm(request.POST, request.FILES, instance=empresa)

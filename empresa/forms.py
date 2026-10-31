@@ -117,7 +117,7 @@ class EmpresaForm(forms.ModelForm):
 
 
 class EmpresaIntegracaoForm(forms.ModelForm):
-    """NFS-e nacional (SEFIN), cópias XML, portal e API Sicoob — tela dedicada."""
+    """NFS-e nacional (SEFIN), cópias XML e portal — tela dedicada."""
 
     nfse_nacional_pfx_senha = forms.CharField(
         label="Senha do arquivo .pfx",
@@ -127,33 +127,6 @@ class EmpresaIntegracaoForm(forms.ModelForm):
             attrs={"class": "form-control", "autocomplete": "new-password", "placeholder": "Deixe em branco para não alterar"},
         ),
         help_text="Ao enviar o .pfx com a senha correta, a validade do certificado é gravada automaticamente.",
-    )
-    sicoob_senha = forms.CharField(
-        label="Sicoob — Senha do cooperado",
-        required=False,
-        widget=forms.PasswordInput(
-            render_value=False,
-            attrs={
-                "class": "form-control",
-                "autocomplete": "new-password",
-                "placeholder": "Deixe em branco para não alterar a senha gravada",
-            },
-        ),
-        help_text="PJ: senha da chave de acesso no canal digital. Gravada cifrada. Vazio mantém a senha já salva (se houver).",
-    )
-    sicoob_client_secret = forms.CharField(
-        label="Sicoob — Client Secret (app no portal)",
-        required=False,
-        widget=forms.PasswordInput(
-            render_value=False,
-            attrs={
-                "class": "form-control font-monospace",
-                "autocomplete": "new-password",
-                "placeholder": "Obrigatório se o app for confidencial — vazio mantém o gravado",
-            },
-        ),
-        help_text="Mesmo Client Secret exibido no Dashboard do Portal Developers. Gravado cifrado. "
-        "Se o token retornar HTTP 403, inclua este campo ou defina SICOOB_CLIENT_SECRET no servidor.",
     )
     nfse_portal_nacional_senha = forms.CharField(
         label="Portal nacional (site) — senha",
@@ -185,9 +158,6 @@ class EmpresaIntegracaoForm(forms.ModelForm):
             "nfse_xml_pasta_prestador",
             "nfse_xml_pasta_tomador",
             "nfse_portal_nacional_login",
-            "sicoob_client_id",
-            "sicoob_chave_acesso",
-            "sicoob_mtls_usar_pfx_nfse",
         ]
         widgets = {
             "nfse_nacional_base_url": forms.TextInput(
@@ -263,23 +233,6 @@ class EmpresaIntegracaoForm(forms.ModelForm):
                     "autocomplete": "username",
                 }
             ),
-            "sicoob_client_id": forms.TextInput(
-                attrs={
-                    "class": "form-control font-monospace",
-                    "placeholder": "UUID do app no portal Sicoob — vazio = variável do servidor",
-                    "spellcheck": "false",
-                }
-            ),
-            "sicoob_chave_acesso": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "PJ: chave de acesso · PF: usuário (ex. CPF)",
-                    "autocomplete": "off",
-                }
-            ),
-            "sicoob_mtls_usar_pfx_nfse": forms.CheckboxInput(
-                attrs={"class": "form-check-input", "id": "id_sicoob_mtls_usar_pfx_nfse"}
-            ),
         }
 
     def clean_nfse_nacional_codigo_ibge_municipio(self):
@@ -354,12 +307,6 @@ class EmpresaIntegracaoForm(forms.ModelForm):
             obj.nfse_nacional_cert_validade = vd
         else:
             obj.nfse_nacional_cert_validade = None
-        senha_sicoob = (self.cleaned_data.get("sicoob_senha") or "").strip()
-        if senha_sicoob:
-            obj.sicoob_senha_cifrada = criptografar_senha_pfx(senha_sicoob)
-        cs_sicoob = (self.cleaned_data.get("sicoob_client_secret") or "").strip()
-        if cs_sicoob:
-            obj.sicoob_client_secret_cifrada = criptografar_senha_pfx(cs_sicoob)
         senha_portal = (self.cleaned_data.get("nfse_portal_nacional_senha") or "").strip()
         if senha_portal:
             obj.nfse_portal_nacional_senha_cifrada = criptografar_senha_pfx(senha_portal)

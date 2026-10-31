@@ -183,53 +183,6 @@
             </div>
         </div>
 
-        <div class="card border-secondary mb-4 bg-light">
-            <div class="card-body py-3">
-                <h6 class="text-secondary mb-3"><i class="fas fa-university me-1"></i> API Sicoob — extrato automático</h6>
-                <p class="small text-muted mb-3">
-                    O Sicoob documenta OAuth 2.0 <strong>client credentials</strong> (Client ID + certificado <strong>mTLS</strong> no token; sem usuário/senha do cooperado no POST).
-                    No servidor o padrão é <code>SICOOB_TOKEN_GRANT=client_credentials</code>; use <code>SICOOB_TOKEN_GRANT=password</code> só em fluxo legado com chave/senha.
-                    <strong>Client Secret</strong> só se o portal exigir (muitos apps PF não têm).
-                    <strong>mTLS:</strong> arquivo <code>.pfx</code> ou par <code>.pem</code> acessível pelo Python (marque abaixo para reutilizar o PFX da NFS-e ou use <code>SICOOB_MTLS_*</code> no ambiente).
-                    Campos vazios aqui usam variáveis do servidor (<code>SICOOB_CLIENT_ID</code>, etc.).
-                </p>
-                <div class="form-check mb-3">
-                    {{ form.sicoob_mtls_usar_pfx_nfse }}
-                    <label class="form-check-label small" for="{{ form.sicoob_mtls_usar_pfx_nfse.id_for_label }}">{{ form.sicoob_mtls_usar_pfx_nfse.label }}</label>
-                    {% if form.sicoob_mtls_usar_pfx_nfse.errors %}<div class="text-danger small">{{ form.sicoob_mtls_usar_pfx_nfse.errors.0 }}</div>{% endif %}
-                    <small class="text-muted d-block ms-4">{{ form.sicoob_mtls_usar_pfx_nfse.help_text }}</small>
-                </div>
-                <div class="mb-3">
-                    <label class="small mb-1" for="{{ form.sicoob_client_id.id_for_label }}">{{ form.sicoob_client_id.label }}</label>
-                    {{ form.sicoob_client_id }}
-                    {% if form.sicoob_client_id.errors %}<div class="text-danger small">{{ form.sicoob_client_id.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="small mb-1" for="{{ form.sicoob_client_secret.id_for_label }}">{{ form.sicoob_client_secret.label }}</label>
-                    {{ form.sicoob_client_secret }}
-                    {% if form.sicoob_client_secret.errors %}<div class="text-danger small">{{ form.sicoob_client_secret.errors.0 }}</div>{% endif %}
-                    <small class="text-muted d-block">{{ form.sicoob_client_secret.help_text }}</small>
-                    {% if empresa.sicoob_client_secret_cifrada %}
-                    <p class="small text-success mb-0"><i class="fas fa-check-circle me-1"></i>Client Secret já gravado (deixe em branco para manter).</p>
-                    {% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="small mb-1" for="{{ form.sicoob_chave_acesso.id_for_label }}">{{ form.sicoob_chave_acesso.label }}</label>
-                    {{ form.sicoob_chave_acesso }}
-                    {% if form.sicoob_chave_acesso.errors %}<div class="text-danger small">{{ form.sicoob_chave_acesso.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="small mb-1" for="{{ form.sicoob_senha.id_for_label }}">{{ form.sicoob_senha.label }}</label>
-                    {{ form.sicoob_senha }}
-                    {% if form.sicoob_senha.errors %}<div class="text-danger small">{{ form.sicoob_senha.errors.0 }}</div>{% endif %}
-                    <small class="text-muted d-block">{{ form.sicoob_senha.help_text }}</small>
-                </div>
-                {% if empresa.sicoob_senha_cifrada %}
-                <p class="small text-success mb-0"><i class="fas fa-check-circle me-1"></i>Senha Sicoob já gravada (deixe em branco para manter).</p>
-                {% endif %}
-            </div>
-        </div>
-
         <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Salvar configuração</button>
         <a href="{% url 'empresa:empresa_edit' empresa.pk %}" class="btn btn-outline-secondary">Dados da empresa</a>
         <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary">Lista</a>
