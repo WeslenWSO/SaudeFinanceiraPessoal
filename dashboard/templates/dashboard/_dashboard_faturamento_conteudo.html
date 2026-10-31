@@ -1,11 +1,12 @@
   <p class="text-muted small mb-3">
     Período: <strong>{{ titulo_periodo }}</strong>
-    · Base: <strong>data do exame</strong> (faturamento médico, exceto cancelados/desistência)
+    · Base: <strong>NFSe emitidas</strong> (data de emissão, notas não canceladas)
+    · Valores: <strong>valor bruto</strong>
   </p>
 
   {% if not visao_faturamento.tem_dados %}
   <div class="alert alert-info">
-    Nenhum faturamento no período. Importe ou cadastre exames em Faturamento Médico.
+    Nenhuma NFSe emitida no período. Importe ou cadastre notas em Fiscal → NFSe.
   </div>
   {% else %}
 
@@ -13,7 +14,7 @@
     <div class="col-6 col-md-3">
       <div class="card border-0 shadow-sm h-100 text-center">
         <div class="card-body py-3">
-          <div class="text-muted text-uppercase small fw-semibold">Faturamento total</div>
+          <div class="text-muted text-uppercase small fw-semibold">Faturamento (bruto)</div>
           <div class="fs-5 fw-bold text-success">R$ {{ visao_faturamento.kpi_faturamento_total_fmt }}</div>
         </div>
       </div>
@@ -21,8 +22,8 @@
     <div class="col-6 col-md-3">
       <div class="card border-0 shadow-sm h-100 text-center">
         <div class="card-body py-3">
-          <div class="text-muted text-uppercase small fw-semibold">Atendimentos</div>
-          <div class="fs-5 fw-bold">{{ visao_faturamento.kpi_atendimentos_fmt }}</div>
+          <div class="text-muted text-uppercase small fw-semibold">Notas emitidas</div>
+          <div class="fs-5 fw-bold">{{ visao_faturamento.kpi_notas_fmt }}</div>
         </div>
       </div>
     </div>
@@ -37,7 +38,7 @@
     <div class="col-6 col-md-3">
       <div class="card border-0 shadow-sm h-100 text-center">
         <div class="card-body py-3">
-          <div class="text-muted text-uppercase small fw-semibold">Média / dia útil</div>
+          <div class="text-muted text-uppercase small fw-semibold">Média / dia c/ emissão</div>
           <div class="fs-5 fw-bold">R$ {{ visao_faturamento.kpi_media_dia_fmt }}</div>
         </div>
       </div>
@@ -47,10 +48,12 @@
   <div class="row g-3 mb-4">
     <div class="col-lg-7">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header fw-semibold py-2 bg-white border-0">Faturamento por categoria (convênio / parceiro)</div>
+        <div class="card-header fw-semibold py-2 bg-white border-0">
+          Faturamento por categoria (regra de imposto / serviço)
+        </div>
         <div class="card-body">
           <div style="position: relative; height: 420px;">
-            <canvas id="chartFaturamentoCategoria" aria-label="Faturamento por categoria"></canvas>
+            <canvas id="chartFaturamentoCategoria" aria-label="Faturamento NFSe por categoria"></canvas>
           </div>
         </div>
       </div>
@@ -70,9 +73,9 @@
                 </tr>
               </thead>
               <tbody>
-                {% for row in visao_faturamento.linhas_convenio %}
+                {% for row in visao_faturamento.linhas_categoria %}
                 <tr>
-                  <td class="small">{{ row.convenio }}</td>
+                  <td class="small">{{ row.categoria }}</td>
                   <td class="text-end small">{{ row.quantidade_fmt }}</td>
                   <td class="text-end small text-nowrap">R$ {{ row.valor_fmt }}</td>
                   <td class="text-end small">{{ row.percentual_fmt }}</td>
@@ -96,9 +99,9 @@
   {% endif %}
 
   <p class="small text-muted mb-0">
-    <a href="{% url 'dashboard:index' %}?aba=analises&amp;modelo=faturamento_convenio&amp;mes={{ mes_filtro }}">
-      Relatório completo (Análises)
+    <a href="{% url 'notasfiscais:dashboard' %}?data_inicio={{ visao_faturamento.data_inicio }}&amp;data_fim={{ visao_faturamento.data_fim }}">
+      Dashboard NFSe (mesmo período)
     </a>
     ·
-    <a href="{% url 'faturamento_medico:ftlistar' %}">Faturamento Médico</a>
+    <a href="{% url 'notasfiscais:list' %}">Lista de NFSe</a>
   </p>
