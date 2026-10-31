@@ -41,8 +41,9 @@ def _load_dotenv_file() -> None:
 _load_dotenv_file()
 
 # Postgres local (opcional): USE_POSTGRES=true + POSTGRES_DB=SaudeFinanceiraPessoal
-# Render / produção: DATABASE_URL ou arquivo render_db.url (gitignored)
-if not os.environ.get('DATABASE_URL', '').strip():
+# Render / produção: DATABASE_URL (Environment). render_db.url só em dev local.
+_on_render_early = os.environ.get('RENDER', '').strip().lower() in ('true', '1', 'yes')
+if not os.environ.get('DATABASE_URL', '').strip() and not _on_render_early:
     _render_db_url = BASE_DIR / 'render_db.url'
     if _render_db_url.is_file():
         os.environ.setdefault(
@@ -78,7 +79,11 @@ _default_hosts = [
     'financaspessoais-eloo.onrender.com',
     'saudefinanceira-pessoal.onrender.com',
 ]
-_env_hosts = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+_env_hosts = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', '').replace(' ', '').split(',')
+    if h.strip()
+]
 if _render_host and _render_host not in _env_hosts:
     _env_hosts.append(_render_host)
 ALLOWED_HOSTS = list(dict.fromkeys(_default_hosts + _env_hosts))
@@ -178,6 +183,7 @@ INSTALLED_APPS = [
 
 ]
 MIDDLEWARE = [
+    'SaudeFinanceira.middleware_db.DatabaseErrorMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'notasfiscais.middleware.HandleSessionInterruptedMiddleware',
@@ -234,8 +240,18 @@ DATABASES = {
 }
 
 _database_url = os.environ.get('DATABASE_URL', '').strip()
+if _on_render and not _database_url:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        'No Render, defina DATABASE_URL (Environment → Add from Database → financas-db, Internal URL).',
+    )
 if _database_url:
+    from SaudeFinanceira.database_url import normalizar_database_url
+
+    _database_url = normalizar_database_url(_database_url)
     import dj_database_url
+
     DATABASES['default'] = dj_database_url.config(
         default=_database_url,
         conn_max_age=600,

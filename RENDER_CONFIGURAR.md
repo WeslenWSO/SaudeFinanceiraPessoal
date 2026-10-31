@@ -29,6 +29,27 @@ Save.
 
 ## 2. Banco PostgreSQL (DATABASE_URL)
 
+### Reconectar (500 / URL quebrada)
+
+1. Confirme que o Postgres **`financas-db`** existe e está **Available** (não Suspended).
+2. Abra **SaudeFinanceira** → **Environment** → **apague** a `DATABASE_URL` antiga.
+3. **Add from Database** → **financas-db** → variável **`DATABASE_URL`** → **Internal Database URL** → Save.
+4. **Manual Deploy** e veja nos **Logs**: `[startup] auth_user count: ...`
+
+Script local (valida `render_db.url` e mostra a Internal URL):
+
+```powershell
+cd "c:\Users\wesle\OneDrive\Documentos\GitHub\SaudeFinanceiraPessoal"
+.\scripts\reconectar_banco_render.ps1
+```
+
+Com API key Render (opcional, aplica no serviço `srv-d9hui8jtqb8s73a97d70`):
+
+```powershell
+$env:RENDER_API_KEY = "rnd_..."
+.\scripts\reconectar_banco_render.ps1 -AplicarViaApi -DispararDeploy
+```
+
 **Opcao A — mais facil (recomendado)**
 
 1. Abra **FinancasPessoais** -> **Environment**
