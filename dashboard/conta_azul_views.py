@@ -24,7 +24,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from dashboard.conta_azul.dashboards import montar_dashboard_por_tipo
-from dashboard.services.montar_visao_geral import REGIMES, montar_visao_geral
+from dashboard.services.montar_visao_geral import REGIMES, montar_visao_geral, visao_financeira_vazia
 from dashboard.conta_azul.client import ContaAzulAPIError, ContaAzulClient
 from dashboard.conta_azul.config import gravar_tokens, limpar_tokens, obter_ou_criar_config
 from dashboard.conta_azul.oauth import (
@@ -42,6 +42,16 @@ from dashboard.conta_azul.catalogos_fiscais import (
     listar_indicador_operacao,
     listar_nbs,
     sugestoes_por_lei_116,
+)
+from dashboard.conta_azul.opcoes_sync_form import (
+    SYNC_FLAGS_PADRAO,
+    alguma_flag_ativa,
+    flags_from_post,
+    flags_para_template,
+    montar_opcoes_sync,
+    precisa_periodo,
+    query_flags,
+    resumo_flags,
 )
 from dashboard.conta_azul.periodo_sync import MAX_DIAS_SYNC_CONTA_AZUL, parse_periodo_sync, periodo_sync_padrao
 from dashboard.conta_azul.conciliacao import (
@@ -385,20 +395,40 @@ def conta_azul_sincronizar(request, pk):
                     config,
                     data_de=data_de_str,
                     data_ate=data_ate_str,
+                    sync_flags=flags_from_post(request),
+                ),
+            )
+
+        flags = flags_from_post(request)
+        if not alguma_flag_ativa(flags):
+            messages.error(request, 'Marque pelo menos uma opção em «O que sincronizar».')
+            return render(
+                request,
+                'empresa/conta_azul_sincronizar.html',
+                _ctx_conta_azul_sincronizar(
+                    empresa,
+                    config,
+                    data_de=data_de_str,
+                    data_ate=data_ate_str,
+                    sync_flags=flags,
+                ),
+            )
+        if precisa_periodo(flags) and (not data_de or not data_ate):
+            messages.error(request, 'Informe o período De/Até para as opções marcadas.')
+            return render(
+                request,
+                'empresa/conta_azul_sincronizar.html',
+                _ctx_conta_azul_sincronizar(
+                    empresa,
+                    config,
+                    data_de=data_de_str,
+                    data_ate=data_ate_str,
+                    sync_flags=flags,
                 ),
             )
 
         try:
-            opcoes = dict(
-                cadastros='cadastros' in request.POST,
-                receitas='receitas' in request.POST,
-                despesas='despesas' in request.POST,
-                transferencias='transferencias' in request.POST,
-                nfse_prestador='nfse_prestador' in request.POST,
-                vendas='vendas' in request.POST or 'nfse_prestador' in request.POST,
-                data_de=data_de,
-                data_ate=data_ate,
-            )
+            opcoes = montar_opcoes_sync(flags, data_de=data_de, data_ate=data_ate)
             threading.Thread(
                 target=_executar_sync_conta_azul_em_background,
                 args=(empresa.pk, opcoes),
@@ -406,23 +436,32 @@ def conta_azul_sincronizar(request, pk):
             ).start()
             msg = (
                 'Sincronização Conta Azul iniciada em segundo plano. '
+                f'Itens: {resumo_flags(flags)}. '
                 f'Período: {data_de.strftime("%d/%m/%Y")} a {data_ate.strftime("%d/%m/%Y")}. '
                 'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar ou a lista de NFSe.'
             )
             messages.info(request, msg)
         except Exception as exc:
             messages.error(request, f'Não foi possível iniciar a sincronização: {exc}')
-        return redirect(
-            f"{reverse('empresa:conta_azul_sincronizar', kwargs={'pk': pk})}"
+        q = (
             f"?data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}"
+            f"&{query_flags(flags)}"
         )
+        return redirect(f"{reverse('empresa:conta_azul_sincronizar', kwargs={'pk': pk})}{q}")
 
     data_de_g = request.GET.get('data_de')
     data_ate_g = request.GET.get('data_ate')
     return render(
         request,
         'empresa/conta_azul_sincronizar.html',
-        _ctx_conta_azul_sincronizar(empresa, config, data_de=data_de_g, data_ate=data_ate_g, hoje=hoje),
+        _ctx_conta_azul_sincronizar(
+            empresa,
+            config,
+            data_de=data_de_g,
+            data_ate=data_ate_g,
+            hoje=hoje,
+            sync_flags=flags_para_template(request),
+        ),
     )
 
 
@@ -433,6 +472,7 @@ def _ctx_conta_azul_sincronizar(
     data_de=None,
     data_ate=None,
     hoje: date | None = None,
+    sync_flags: dict | None = None,
 ) -> dict:
     hoje = hoje or date.today()
     padrao_de, padrao_ate = periodo_sync_padrao(hoje)
@@ -442,6 +482,7 @@ def _ctx_conta_azul_sincronizar(
         parse_periodo_sync(de_str, ate_str, hoje=hoje)
     except ValueError:
         de_str, ate_str = padrao_de.isoformat(), padrao_ate.isoformat()
+    flags = dict(SYNC_FLAGS_PADRAO) if sync_flags is None else sync_flags
     return {
         'empresa': empresa,
         'config': config,
@@ -449,6 +490,7 @@ def _ctx_conta_azul_sincronizar(
         'data_de_str': de_str,
         'data_ate_str': ate_str,
         'max_dias_sync': MAX_DIAS_SYNC_CONTA_AZUL,
+        'sync_flags': flags,
     }
 
 
@@ -706,14 +748,29 @@ def conta_azul_dashboard(request):
     aba_ativa = _aba_dashboard(request)
     visao = None
     visao_faturamento = None
-    if aba_ativa == 'financeiro':
-        visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
-    elif aba_ativa == 'faturamento':
-        from dashboard.montar_visao_faturamento import montar_visao_faturamento
+    try:
+        if aba_ativa == 'financeiro':
+            visao = montar_visao_geral(empresa, ctx['data_inicio'], ctx['data_fim'], ctx['regime'])
+        elif aba_ativa == 'faturamento':
+            from dashboard.montar_visao_faturamento import montar_visao_faturamento
 
-        visao_faturamento = montar_visao_faturamento(
-            empresa.pk, ctx['ano_ref'], ctx['mes_ref']
-        )
+            visao_faturamento = montar_visao_faturamento(
+                empresa.pk, ctx['ano_ref'], ctx['mes_ref']
+            )
+    except Exception as exc:
+        logger.exception('Dashboard aba=%s empresa=%s', aba_ativa, empresa.pk)
+        messages.error(request, f'Erro ao montar dashboard ({aba_ativa}): {exc}')
+        if aba_ativa == 'faturamento':
+            visao_faturamento = {
+                'tem_dados': False,
+                'data_inicio': ctx['data_inicio_str'],
+                'data_fim': ctx['data_fim_str'],
+                'linhas_categoria': [],
+                'chart_categoria_labels_json': '[]',
+                'chart_categoria_data_json': '[]',
+            }
+        else:
+            visao = visao_financeira_vazia(ctx.get('regime') or 'competencia')
 
     fin_vis, fat_vis, ana_vis = _abas_dashboard_visiveis()
     from dashboard.analises_montagem import montar_contexto_aba_analises

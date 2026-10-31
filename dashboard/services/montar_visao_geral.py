@@ -328,3 +328,38 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
             or receitas_forma or despesas_forma
         ),
     }
+
+
+def visao_financeira_vazia(regime: str = REGIME_PADRAO) -> dict:
+    """Fallback quando montar_visao_geral falha — evita 500 no template."""
+    if regime not in {r[0] for r in REGIMES}:
+        regime = REGIME_PADRAO
+    sufixo = SUFIXO_REGIME[regime]
+    vazio: list = []
+    return {
+        'regime': regime,
+        'legenda_receitas': f'Receitas Totais ({sufixo})',
+        'legenda_despesas': f'Custos/Despesas Totais ({sufixo})',
+        'total_receitas_periodo': 0,
+        'total_despesas_periodo': 0,
+        'contas_receber': Decimal('0'),
+        'contas_pagar': Decimal('0'),
+        'entradas_categoria': vazio,
+        'saidas_categoria': vazio,
+        'receitas_forma_pagamento': vazio,
+        'despesas_forma_pagamento': vazio,
+        'chart_mensal_labels_json': '[]',
+        'chart_mensal_receitas_json': '[]',
+        'chart_mensal_despesas_json': '[]',
+        'chart_vencer_labels_json': '["Receber", "Pagar"]',
+        'chart_vencer_data_json': '[0, 0]',
+        'chart_entradas_labels_json': '[]',
+        'chart_entradas_data_json': '[]',
+        'chart_saidas_labels_json': '[]',
+        'chart_saidas_data_json': '[]',
+        'chart_receitas_forma_labels_json': '[]',
+        'chart_receitas_forma_data_json': '[]',
+        'chart_despesas_forma_labels_json': '[]',
+        'chart_despesas_forma_data_json': '[]',
+        'tem_dados': False,
+    }

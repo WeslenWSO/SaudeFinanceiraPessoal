@@ -97,7 +97,6 @@ def montar_visao_faturamento(empresa_id: int, ano: int, mes: int) -> dict:
     valores = [float(ln['valor']) for ln in linhas]
 
     return {
-        'titulo_periodo_nfse': mes_titulo,
         'data_inicio': inicio.isoformat(),
         'data_fim': fim.isoformat(),
         'kpi_faturamento_total_fmt': _fmt_moeda(total_valor),
