@@ -20,8 +20,25 @@ class Command(BaseCommand):
             action='store_true',
             help='Só grava na pasta BACKUP_DATABASE_DIR, sem upload.',
         )
+        parser.add_argument(
+            '--agendado',
+            action='store_true',
+            help='Só executa se estiver no horário configurado (uso: cron a cada hora).',
+        )
 
     def handle(self, *args, **options):
+        if options['agendado']:
+            from accounts.backup_config import slot_backup_para_executar_agora
+
+            slot = slot_backup_para_executar_agora()
+            if slot is None:
+                self.stdout.write('Fora do horário de backup agendado — nada a fazer.')
+                return
+
+            self.stdout.write(
+                f'Executando backup agendado (slot {slot.strftime("%H:%M")}).'
+            )
+
         info = criar_backup_completo()
         self.stdout.write(
             self.style.SUCCESS(

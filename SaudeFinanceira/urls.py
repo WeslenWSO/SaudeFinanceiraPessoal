@@ -20,7 +20,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
 
-from accounts.views import backup_banco_download, backup_banco_view
+from accounts.views import (
+    backup_agendamento_config_view,
+    backup_banco_download,
+    backup_banco_view,
+)
 
 
 def _redirect_accounts_login(request):
@@ -37,6 +41,11 @@ urlpatterns = [
         'admin/backup-banco/download/<str:nome>/',
         backup_banco_download,
         name='backup_banco_download',
+    ),
+    path(
+        'admin/backup-banco/config/',
+        backup_agendamento_config_view,
+        name='backup_agendamento_config',
     ),
     path('admin/', admin.site.urls),
     path('favicon.ico', RedirectView.as_view(url='/static/icons/favicon.ico', permanent=True)),

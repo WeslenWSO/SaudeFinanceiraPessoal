@@ -50,13 +50,13 @@ services:
       mountPath: /var/data
       sizeGB: 10
 
-  # Backup PostgreSQL → Google Drive (pasta BKP_SAUDE), diário 05:00 UTC (~02:00 BRT)
+  # Backup PostgreSQL → Google Drive — horários em /admin/backup-banco/config/ (cron horário)
   - type: cron
     name: backup-db-google-drive
     runtime: python
-    schedule: "0 5 * * *"
+    schedule: "0 * * * *"
     buildCommand: bash build.sh
-    startCommand: python manage.py backup_banco_google_drive
+    startCommand: python manage.py backup_banco_google_drive --agendado
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"

@@ -10,11 +10,22 @@ from django.conf import settings
 
 
 def _folder_id() -> str:
-    return (
+    env = (
         os.environ.get('BACKUP_GOOGLE_DRIVE_FOLDER_ID')
         or getattr(settings, 'BACKUP_GOOGLE_DRIVE_FOLDER_ID', '')
-        or '1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y'
+        or ''
     ).strip()
+    if env:
+        return env
+    try:
+        from accounts.backup_config import drive_folder_id_configurado
+
+        db_id = drive_folder_id_configurado()
+        if db_id:
+            return db_id
+    except Exception:
+        pass
+    return '1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y'
 
 
 def _credenciais_service_account() -> dict | None:

@@ -12,13 +12,18 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <h5 class="mb-0">
                         <i class="fas fa-database me-2 text-primary"></i> Backup do banco de dados
                     </h5>
-                    <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-arrow-left"></i> Voltar
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'backup_agendamento_config' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-clock"></i> Agendamento e Drive
+                        </a>
+                        <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if messages %}
@@ -43,16 +48,21 @@
                     </div>
 
                     <div class="alert {% if drive_backup_configurado %}alert-success{% else %}alert-warning{% endif %} small mb-3">
-                        <strong>Google Drive — pasta BKP_SAUDE</strong>
-                        (conta weslensioliveira@gmail.com)
+                        <strong>Google Drive — {{ backup_cfg.drive_pasta_nome|default:"BKP_SAUDE" }}</strong>
+                        {% if backup_horarios %}
+                        <p class="mb-0 mt-1">
+                            Horários agendados:
+                            {% for h in backup_horarios %}{{ h|time:"H:i" }}{% if not forloop.last %} e {% endif %}{% endfor %}
+                            · <a href="{% url 'backup_agendamento_config' %}">alterar</a>
+                        </p>
+                        {% endif %}
                         {% if drive_backup_configurado %}
-                        <p class="mb-0 mt-1">Upload automático ativo ao gerar backup e no cron diário.</p>
+                        <p class="mb-0 mt-1">Upload automático ativo (manual + cron).</p>
                         {% else %}
                         <p class="mb-0 mt-1">
-                          Configure no Render <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code> e
-                          <code>BACKUP_GOOGLE_DRIVE_FOLDER_ID</code>
-                          (pasta <code>1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y</code>).
-                          Compartilhe a pasta BKP_SAUDE com o e-mail da service account (Editor).
+                          Service account no Render (<code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code>)
+                          e pasta compartilhada (ID em
+                          <a href="{% url 'backup_agendamento_config' %}">Agendamento e Drive</a>).
                         </p>
                         {% endif %}
                     </div>

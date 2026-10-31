@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}Agendamento de backup{% endblock %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2 text-primary"></i> Agendamento e Google Drive
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'backup_banco' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-database"></i> Backup manual
+                        </a>
+                        <a href="{% url 'empresa:lista' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} py-2">{{ message }}</div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <p class="text-muted small">
+                        Horários usam o fuso do Django (<strong>America/Rio_Branco</strong>).
+                        O cron no Render roda <strong>a cada hora</strong> e executa o backup apenas nos
+                        horários ativos abaixo. Lembretes aparecem no
+                        <strong>agendador de tarefas</strong> para o responsável informado.
+                    </p>
+
+                    <div class="alert {% if drive_credencial_ok %}alert-success{% else %}alert-warning{% endif %} small">
+                        <strong>Upload para o Drive</strong>
+                        {% if drive_credencial_ok %}
+                        — credencial da service account OK (variável <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code>).
+                        {% else %}
+                        — configure <code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code> no Render e compartilhe a pasta
+                        com o e-mail da service account (Editor). O ID da pasta é definido abaixo.
+                        {% endif %}
+                    </div>
+
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="salvar">
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <h6 class="border-bottom pb-2 mb-3">Google Drive</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label" for="{{ form.drive_pasta_nome.id_for_label }}">Nome da pasta</label>
+                                {{ form.drive_pasta_nome }}
+                                {% if form.drive_pasta_nome.errors %}<div class="text-danger small">{{ form.drive_pasta_nome.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label" for="{{ form.drive_folder_id.id_for_label }}">ID da pasta</label>
+                                {{ form.drive_folder_id }}
+                                <div class="form-text">
+                                    Link:
+                                    <a href="https://drive.google.com/drive/folders/{{ form.instance.drive_folder_id }}"
+                                       target="_blank" rel="noopener">abrir pasta no Drive</a>
+                                </div>
+                                {% if form.drive_folder_id.errors %}<div class="text-danger small">{{ form.drive_folder_id.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <h6 class="border-bottom pb-2 mb-3">Horários diários</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="form-check form-switch mb-2">
+                                        {{ form.horario_1_ativo }}
+                                        <label class="form-check-label" for="{{ form.horario_1_ativo.id_for_label }}">
+                                            Horário 1
+                                        </label>
+                                    </div>
+                                    <label class="form-label" for="{{ form.horario_1.id_for_label }}">Início</label>
+                                    {{ form.horario_1 }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="form-check form-switch mb-2">
+                                        {{ form.horario_2_ativo }}
+                                        <label class="form-check-label" for="{{ form.horario_2_ativo.id_for_label }}">
+                                            Horário 2
+                                        </label>
+                                    </div>
+                                    <label class="form-label" for="{{ form.horario_2.id_for_label }}">Início</label>
+                                    {{ form.horario_2 }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="border-bottom pb-2 mb-3 mt-4">Agendador e cron</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    {{ form.backup_automatico_ativo }}
+                                    <label class="form-check-label" for="{{ form.backup_automatico_ativo.id_for_label }}">
+                                        Backup automático (cron Render)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    {{ form.gerar_tarefas_agendador }}
+                                    <label class="form-check-label" for="{{ form.gerar_tarefas_agendador.id_for_label }}">
+                                        Criar lembretes no agendador de tarefas
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="{{ form.responsavel_tarefa.id_for_label }}">Responsável</label>
+                                {{ form.responsavel_tarefa }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="{{ form.dias_tarefas_frente.id_for_label }}">Dias à frente</label>
+                                {{ form.dias_tarefas_frente }}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Salvar e atualizar tarefas
+                        </button>
+                    </form>
+
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="sincronizar_tarefas">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-sync me-1"></i> Só recriar tarefas no agendador
+                        </button>
+                    </form>
+
+                    {% if horarios_ativos %}
+                    <p class="text-muted small mt-3 mb-0">
+                        Horários ativos agora:
+                        {% for h in horarios_ativos %}{{ h|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -110,15 +110,75 @@ def backup_banco_view(request):
             'tamanho_fmt': _formatar_tamanho(item['tamanho']),
         })
 
+    from accounts.backup_config import horarios_backup_ativos, obter_config_backup
     from accounts.backup_google_drive import drive_configurado
 
+    cfg = obter_config_backup()
     context = {
         'pasta_backups': str(diretorio_backups()),
         'backups_locais': backups,
         'usa_pg_dump': _engine_postgres() and bool(_pg_dump_disponivel()),
         'drive_backup_configurado': drive_configurado(),
+        'backup_cfg': cfg,
+        'backup_horarios': horarios_backup_ativos(cfg),
     }
     return render(request, 'accounts/backup_banco.html', context)
+
+
+@login_required
+@user_passes_test(_usuario_admin)
+@require_http_methods(['GET', 'POST'])
+def backup_agendamento_config_view(request):
+    """Horários, pasta Drive e sincronização de tarefas no agendador."""
+    from accounts.backup_config import horarios_backup_ativos, obter_config_backup
+    from accounts.forms_backup import BackupBancoConfigForm
+    from agendador_tarefas.seed_backup_banco import sincronizar_tarefas_backup_banco_agenda
+
+    config = obter_config_backup()
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or 'salvar').strip()
+        if acao == 'sincronizar_tarefas':
+            n = sincronizar_tarefas_backup_banco_agenda()
+            messages.success(
+                request,
+                f'Tarefas de backup recriadas no agendador ({n} novas entradas).',
+            )
+            return redirect('backup_agendamento_config')
+
+        form = BackupBancoConfigForm(request.POST, instance=config)
+        if form.is_valid():
+            cfg = form.save()
+            if cfg.gerar_tarefas_agendador:
+                n = sincronizar_tarefas_backup_banco_agenda()
+                messages.success(
+                    request,
+                    f'Configuração salva. Tarefas no agendador atualizadas ({n} criadas).',
+                )
+            else:
+                from agendador_tarefas.seed_backup_banco import remover_tarefas_backup_banco_agenda
+                from agendador_tarefas.models import TarefaAgendada
+
+                remover_tarefas_backup_banco_agenda(TarefaAgendada)
+                messages.success(
+                    request,
+                    'Configuração salva. Lembretes de backup removidos do agendador.',
+                )
+            return redirect('backup_agendamento_config')
+    else:
+        form = BackupBancoConfigForm(instance=config)
+
+    from accounts.backup_google_drive import drive_configurado
+
+    return render(
+        request,
+        'accounts/backup_agendamento_config.html',
+        {
+            'form': form,
+            'horarios_ativos': horarios_backup_ativos(config),
+            'drive_credencial_ok': drive_configurado(),
+        },
+    )
 
 
 @login_required
