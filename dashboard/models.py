@@ -15,7 +15,7 @@ class ContaAzulConfig(models.Model):
     ]
 
     REDIRECT_DEV = 'https://www.contaazul.com'
-    REDIRECT_PROD = 'https://financaspessoais-eloo.onrender.com/empresa/conta-azul/oauth/callback/'
+    REDIRECT_PROD = 'https://financaspessoais-eloo.onrender.com/empresa/conta-azul/oauth/callback'
 
     empresa = models.OneToOneField(
         Empresa,
