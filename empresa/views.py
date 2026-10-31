@@ -12,7 +12,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_GET
 from .models import Empresa, UsuarioEmpresa
-from .forms import EmpresaForm, EmpresaIntegracaoForm
+from .forms import EmpresaForm
 from .certificado_windows import listar_certificados_windows_por_cnpj
 from socio.models import Socio
 from fornecedor.models import Fornecedor
@@ -869,25 +869,12 @@ def empresa_update(request, pk):
 
 @login_required
 def empresa_integracao(request, pk):
-    """NFS-e nacional, cópias XML e portal — fora do cadastro principal."""
+    """Integrações externas (Conta Azul, etc.) — fora do cadastro principal."""
     empresa = get_object_or_404(Empresa, pk=pk)
-    if request.method == "POST":
-        form = EmpresaIntegracaoForm(request.POST, request.FILES, instance=empresa)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Configuração de integração salva.")
-            return redirect("empresa:empresa_integracao", pk=pk)
-        messages.error(
-            request,
-            "Não foi possível salvar. Corrija os campos destacados e tente novamente.",
-        )
-    else:
-        form = EmpresaIntegracaoForm(instance=empresa)
     return render(
         request,
         "empresa/empresa_integracao_form.html",
         {
-            "form": form,
             "empresa": empresa,
             "descricao": f"Configuração de integração — {empresa.razao}",
         },
