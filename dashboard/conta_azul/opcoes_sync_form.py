@@ -83,3 +83,27 @@ def resumo_flags(flags: dict[str, bool]) -> str:
 
 def query_flags(flags: dict[str, bool]) -> str:
     return '&'.join(f'{nome}={"1" if flags.get(nome) else "0"}' for nome in SYNC_FLAGS)
+
+
+def dica_atualizar_pos_sync(flags: dict[str, bool]) -> str:
+    """Texto pós-sync alinhado às flags marcadas (sem citar CAR/CAP se não foram pedidos)."""
+    partes: list[str] = []
+    if flags.get('receitas'):
+        partes.append('Contas a Receber')
+    if flags.get('despesas'):
+        partes.append('Contas a Pagar')
+    if flags.get('transferencias'):
+        partes.append('Transferências')
+    if flags.get('nfse_prestador'):
+        partes.append('a lista de Notas Fiscais (NFSe)')
+    if flags.get('vendas'):
+        partes.append('Notas Fiscais (dados de pagamento/caixa das vendas)')
+    if flags.get('cadastros'):
+        partes.append('cadastros (clientes, fornecedores, categorias, contas)')
+    if not partes:
+        return 'Aguarde 1–3 minutos até a conclusão.'
+    if len(partes) == 1:
+        alvo = partes[0]
+    else:
+        alvo = ', '.join(partes[:-1]) + ' e ' + partes[-1]
+    return f'Aguarde 1–3 minutos e atualize {alvo}.'

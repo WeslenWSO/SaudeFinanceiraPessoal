@@ -46,6 +46,7 @@ from dashboard.conta_azul.catalogos_fiscais import (
 from dashboard.conta_azul.opcoes_sync_form import (
     SYNC_FLAGS_PADRAO,
     alguma_flag_ativa,
+    dica_atualizar_pos_sync,
     flags_from_post,
     flags_para_template,
     montar_opcoes_sync,
@@ -434,11 +435,15 @@ def conta_azul_sincronizar(request, pk):
                 args=(empresa.pk, opcoes),
                 daemon=True,
             ).start()
+            periodo_txt = (
+                f' Período: {data_de.strftime("%d/%m/%Y")} a {data_ate.strftime("%d/%m/%Y")}.'
+                if precisa_periodo(flags)
+                else ''
+            )
             msg = (
                 'Sincronização Conta Azul iniciada em segundo plano. '
-                f'Itens: {resumo_flags(flags)}. '
-                f'Período: {data_de.strftime("%d/%m/%Y")} a {data_ate.strftime("%d/%m/%Y")}. '
-                'Aguarde 1–3 minutos e atualize Contas a Receber / a Pagar ou a lista de NFSe.'
+                f'Itens: {resumo_flags(flags)}.{periodo_txt} '
+                f'{dica_atualizar_pos_sync(flags)}'
             )
             messages.info(request, msg)
         except Exception as exc:

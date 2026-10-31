@@ -2,6 +2,7 @@ from django.test import SimpleTestCase
 from django.test import RequestFactory
 
 from dashboard.conta_azul.opcoes_sync_form import (
+    dica_atualizar_pos_sync,
     flags_from_post,
     montar_opcoes_sync,
     resumo_flags,
@@ -34,3 +35,18 @@ class OpcoesSyncFormTests(SimpleTestCase):
         self.assertTrue(op['receitas'])
         self.assertFalse(op['despesas'])
         self.assertEqual(op['data_de'].day, 1)
+
+    def test_dica_pos_sync_sem_car_cap(self):
+        flags = {
+            'cadastros': True,
+            'receitas': False,
+            'despesas': False,
+            'transferencias': False,
+            'vendas': True,
+            'nfse_prestador': True,
+        }
+        dica = dica_atualizar_pos_sync(flags)
+        self.assertNotIn('Contas a Receber', dica)
+        self.assertNotIn('Contas a Pagar', dica)
+        self.assertIn('Notas Fiscais', dica)
+        self.assertIn('cadastros', dica)
