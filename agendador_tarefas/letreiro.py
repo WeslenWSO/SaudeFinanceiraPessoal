@@ -9,6 +9,13 @@ from django.utils import timezone
 
 from agendador_tarefas.models import TarefaAgendada
 
+SESSION_POPUP_TAREFAS = 'mostrar_popup_tarefas_letreiro'
+
+
+def marcar_popup_tarefas_letreiro(request) -> None:
+    """Exibe avisos de tarefas uma vez na primeira página após login."""
+    request.session[SESSION_POPUP_TAREFAS] = True
+
 
 def aliases_responsavel(user) -> list[str]:
     nomes: list[str] = []

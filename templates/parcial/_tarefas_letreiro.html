@@ -1,72 +1,52 @@
-{% load static %}
-{% if tarefas_letreiro_mensagens %}
-<link rel="stylesheet" href="{% static 'css/tarefas-letreiro.css' %}">
-<div id="tarefasLetreiro" class="tarefas-letreiro" role="region" aria-live="polite" aria-label="Tarefas a vencer" hidden>
-  <div class="tarefas-letreiro-label">
-    <i class="fas fa-bell" aria-hidden="true"></i>
-  </div>
-  <div class="tarefas-letreiro-viewport">
-    <div class="tarefas-letreiro-track">
-      {% for item in tarefas_letreiro_mensagens %}
-      <span class="tarefas-letreiro-item">
-        {% if item.url %}<a href="{{ item.url }}">{{ item.texto }}</a>{% else %}{{ item.texto }}{% endif %}
-      </span>
-      <span class="tarefas-letreiro-sep" aria-hidden="true">◆</span>
-      {% endfor %}
-      {% for item in tarefas_letreiro_mensagens %}
-      <span class="tarefas-letreiro-item">
-        {% if item.url %}<a href="{{ item.url }}">{{ item.texto }}</a>{% else %}{{ item.texto }}{% endif %}
-      </span>
-      <span class="tarefas-letreiro-sep" aria-hidden="true">◆</span>
-      {% endfor %}
+{% if tarefas_letreiro_popup %}
+<div class="modal fade" id="tarefasLetreiroModal" tabindex="-1" aria-labelledby="tarefasLetreiroModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header text-white" style="background: linear-gradient(90deg, #b45309, #d97706);">
+        <h5 class="modal-title" id="tarefasLetreiroModalLabel">
+          <i class="fas fa-bell me-2" aria-hidden="true"></i>
+          Tarefas a vencer ou em atraso
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body p-0">
+        <p class="px-3 pt-3 mb-2 text-muted small">
+          {{ tarefas_letreiro_popup|length }} tarefa(s) pendente(s) com prazo até 2 dias ou já vencidas.
+        </p>
+        <ul class="list-group list-group-flush">
+          {% for item in tarefas_letreiro_popup %}
+          <li class="list-group-item">
+            {% if item.url %}
+            <a href="{{ item.url }}" class="text-decoration-none">{{ item.texto }}</a>
+            {% else %}
+            {{ item.texto }}
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <a href="{% url 'agendador_tarefas:listar' %}" class="btn btn-outline-secondary btn-sm">
+          Ver tarefas
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Entendi</button>
+      </div>
     </div>
   </div>
-  <button type="button" class="tarefas-letreiro-fechar" id="tarefasLetreiroFechar" title="Ocultar avisos" aria-label="Ocultar avisos">
-    <i class="fas fa-times" aria-hidden="true"></i>
-  </button>
 </div>
 <script>
-(function () {
-  var KEY = 'tarefas_letreiro_oculto';
-  var el = document.getElementById('tarefasLetreiro');
-  var btn = document.getElementById('tarefasLetreiroFechar');
-  if (!el) return;
-
-  // Na tela de login, limpa o flag para o aviso voltar a aparecer após autenticar.
-  if (
-    document.body.classList.contains('login-page')
-    || location.pathname.indexOf('/login') !== -1
-    || location.pathname.indexOf('/accounts/login') !== -1
-  ) {
-    try { sessionStorage.removeItem(KEY); } catch (e) {}
+document.addEventListener('DOMContentLoaded', function () {
+  var el = document.getElementById('tarefasLetreiroModal');
+  if (!el || typeof bootstrap === 'undefined') return;
+  var inst = bootstrap.Modal.getOrCreateInstance(el, { backdrop: 'static' });
+  var vencEl = document.getElementById('vencimentosDiaModal');
+  if (vencEl) {
+    vencEl.addEventListener('hidden.bs.modal', function () {
+      inst.show();
+    }, { once: true });
+    return;
   }
-
-  function ocultar() {
-    el.hidden = true;
-    document.body.classList.remove('has-tarefas-letreiro');
-    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
-  }
-
-  function mostrar() {
-    el.hidden = false;
-    document.body.classList.add('has-tarefas-letreiro');
-  }
-
-  var oculto = false;
-  try { oculto = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
-
-  if (oculto) {
-    ocultar();
-  } else {
-    mostrar();
-  }
-
-  if (btn) {
-    btn.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      ocultar();
-    });
-  }
-})();
+  inst.show();
+});
 </script>
 {% endif %}

@@ -37,6 +37,9 @@ def login_view(request):
                 login(request, user)
                 for key in ('empresa_id', 'empresa_nome', 'regime_tributario'):
                     request.session.pop(key, None)
+                from agendador_tarefas.letreiro import marcar_popup_tarefas_letreiro
+
+                marcar_popup_tarefas_letreiro(request)
                 return redirect('empresa:lista')
             else:
                 form.add_error(None, 'Usuário ou senha incorretos.')

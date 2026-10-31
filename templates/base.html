@@ -5,8 +5,6 @@
   {% include 'parcial/_head.html' %}
 </head>
 <body>
-  {% load static %}
-  {% include 'parcial/_tarefas_letreiro.html' %}
   <div id="app-wrapper">
     {% block sid_Bar %}{% include 'parcial/_nav.html' %}{% endblock %}
     <div id="app-content" class="app-content-with-nav">
@@ -28,6 +26,7 @@
 
   {% include 'parcial/_empresa_selector_modal.html' %}
   {% include 'parcial/_vencimentos_dia_modal.html' %}
+  {% include 'parcial/_tarefas_letreiro.html' %}
 
   <script>
     var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
