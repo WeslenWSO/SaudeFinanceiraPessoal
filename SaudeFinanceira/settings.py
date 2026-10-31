@@ -337,6 +337,7 @@ DATE_INPUT_FORMATS = ['%Y-%m-%d', '%d/%m/%Y']
 _backup_dir_env = os.environ.get('BACKUP_DATABASE_DIR', '').strip()
 BACKUP_DATABASE_DIR = Path(_backup_dir_env) if _backup_dir_env else BASE_DIR / 'backups'
 BACKUP_DATABASE_TIMEOUT = 600
+BACKUP_LOCAL_RETENTION_DAYS = int(os.environ.get('BACKUP_LOCAL_RETENTION_DAYS', '5'))
 # Google Drive — pasta BKP_SAUDE (Meu Drive weslensioliveira@gmail.com)
 BACKUP_GOOGLE_DRIVE_FOLDER_ID = os.environ.get(
     'BACKUP_GOOGLE_DRIVE_FOLDER_ID',

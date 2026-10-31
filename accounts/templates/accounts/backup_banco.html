@@ -57,7 +57,10 @@
                         </p>
                         {% endif %}
                         {% if drive_backup_configurado %}
-                        <p class="mb-0 mt-1">Upload automático ativo (manual + cron).</p>
+                        <p class="mb-0 mt-1">
+                          Upload automático (manual + cron): envia <code>.sql.gz</code> e <code>.json</code>.
+                          No servidor, cópia local fica <strong>5 dias</strong> após envio; no Drive permanece.
+                        </p>
                         {% else %}
                         <p class="mb-0 mt-1">
                           Service account no Render (<code>BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON</code>)

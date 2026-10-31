@@ -45,6 +45,14 @@ services:
         value: "true"
       - key: UNIMED_OCR_MAX_PAGES
         value: "12"
+      - key: BACKUP_GOOGLE_DRIVE_FOLDER_ID
+        value: "1f6ULWD8aAPS5gfG7mGwY2GbG_HrQgz4y"
+      - key: BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: BACKUP_DATABASE_DIR
+        value: /var/data/backups
+      - key: BACKUP_LOCAL_RETENTION_DAYS
+        value: "5"
     disk:
       name: media-uploads
       mountPath: /var/data

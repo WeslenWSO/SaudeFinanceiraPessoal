@@ -61,3 +61,13 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(result.get('mensagem', 'OK')))
         else:
             self.stdout.write(self.style.WARNING(result.get('mensagem', 'Falha parcial.')))
+
+        from accounts.backup_retencao import limpar_backups_locais_expirados
+
+        removidos = limpar_backups_locais_expirados()
+        if removidos:
+            self.stdout.write(
+                self.style.NOTICE(
+                    'Removidos do servidor (retencao 5 dias pos-Drive): ' + ', '.join(removidos)
+                )
+            )

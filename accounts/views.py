@@ -88,15 +88,25 @@ def backup_banco_view(request):
             return redirect('backup_banco')
 
         msg = f'Backup salvo em {caminho} ({_formatar_tamanho(info["tamanho"])}).'
-        try:
-            from accounts.backup_google_drive import drive_configurado, enviar_arquivo_para_drive
+        from accounts.backup_google_drive import drive_configurado, enviar_backup_info_para_drive
 
-            if drive_configurado():
-                up = enviar_arquivo_para_drive(caminho)
-                msg += f' Enviado ao Google Drive (BKP_SAUDE): {up.get("name")}.'
-        except Exception as exc:
-            msg += f' Aviso: não enviou ao Drive — {exc}'
-        messages.success(request, msg)
+        if drive_configurado():
+            try:
+                ups = enviar_backup_info_para_drive(info)
+                msg += (
+                    f' Enviado ao Google Drive (BKP_SAUDE): '
+                    f'{", ".join(u.get("name", "") for u in ups)}. '
+                    f'Cópia local será mantida por 5 dias.'
+                )
+                messages.success(request, msg)
+            except Exception as exc:
+                messages.error(request, f'{msg} Não enviou ao Drive — {exc}')
+        else:
+            messages.warning(
+                request,
+                msg
+                + ' Drive não configurado neste servidor (BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON).',
+            )
 
         content_type = 'application/gzip' if info['formato'] == 'sql.gz' else 'application/json'
         response = FileResponse(caminho.open('rb'), as_attachment=True, filename=info['arquivo'])

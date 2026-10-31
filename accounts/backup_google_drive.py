@@ -53,6 +53,52 @@ def email_service_account_drive() -> str:
     return str(info.get('client_email') or '').strip()
 
 
+def enviar_backup_info_para_drive(info: dict) -> list[dict]:
+    """Envia arquivo principal + extras (sql.gz + json) e aplica retenção local."""
+    from accounts.backup_retencao import limpar_backups_locais_expirados, marcar_arquivo_enviado_drive
+
+    if not drive_configurado():
+        raise RuntimeError(
+            'Google Drive não configurado: defina BACKUP_GOOGLE_SERVICE_ACCOUNT_JSON no Render '
+            'e compartilhe a pasta BKP_SAUDE com a service account (Editor).'
+        )
+
+    uploads: list[dict] = []
+    caminhos: list[Path] = []
+    principal = (info.get('caminho') or '').strip()
+    if principal:
+        caminhos.append(Path(principal))
+    for extra in info.get('extras') or []:
+        p = (extra.get('caminho') or '').strip()
+        if p:
+            caminhos.append(Path(p))
+
+    if not caminhos:
+        raise RuntimeError('Nenhum arquivo de backup para enviar.')
+
+    erros: list[str] = []
+    for path in caminhos:
+        try:
+            up = enviar_arquivo_para_drive(path)
+            marcar_arquivo_enviado_drive(path, drive_file_id=up.get('file_id') or '', drive_name=up.get('name') or '')
+            uploads.append(up)
+        except Exception as exc:
+            erros.append(f'{path.name}: {exc}')
+
+    limpar_backups_locais_expirados()
+
+    if erros and not uploads:
+        raise RuntimeError('Falha ao enviar ao Drive — ' + '; '.join(erros))
+    if erros:
+        raise RuntimeError(
+            'Enviado parcialmente ao Drive. OK: '
+            + ', '.join(u.get('name', '') for u in uploads)
+            + '. Falhas: '
+            + '; '.join(erros)
+        )
+    return uploads
+
+
 def enviar_arquivo_para_drive(caminho_local: str | Path, *, nome_no_drive: str | None = None) -> dict:
     """
     Faz upload para a pasta BKP_SAUDE (ou BACKUP_GOOGLE_DRIVE_FOLDER_ID).
@@ -85,16 +131,24 @@ def enviar_arquivo_para_drive(caminho_local: str | Path, *, nome_no_drive: str |
     nome = nome_no_drive or path.name
     media = MediaFileUpload(str(path), resumable=True)
     metadata = {'name': nome, 'parents': [folder_id]}
-    created = (
-        service.files()
-        .create(
-            body=metadata,
-            media_body=media,
-            fields='id,name,webViewLink',
-            supportsAllDrives=True,
+    try:
+        created = (
+            service.files()
+            .create(
+                body=metadata,
+                media_body=media,
+                fields='id,name,webViewLink',
+                supportsAllDrives=True,
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as exc:
+        email = str(creds_info.get('client_email') or '')
+        raise RuntimeError(
+            f'Google Drive recusou o upload ({exc}). '
+            f'Confira: API Drive ativa, pasta compartilhada com {email or "service account"} '
+            f'(Editor), folder id={folder_id}.'
+        ) from exc
     return {
         'file_id': created.get('id'),
         'name': created.get('name'),
