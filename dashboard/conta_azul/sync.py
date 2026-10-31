@@ -1674,3 +1674,21 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
     if erros_unicos:
         return 'warning', f'Parcialmente sincronizado ({"; ".join(ok)}). Erros: {erros_unicos[0]}'
     return 'success', f'Sincronização concluída: {"; ".join(ok)}'
+
+
+def mensagem_sync_para_usuario(resultado: dict[str, Any]) -> tuple[str, str]:
+    """Mensagem amigável pós-sync (inclui dica quando NFS-e veio vazia da API)."""
+    nivel, texto = mensagem_resultado_sync(resultado)
+    nfse = resultado.get('nfse_prestador') if isinstance(resultado, dict) else None
+    if isinstance(nfse, dict) and not nfse.get('erro'):
+        criados = int(nfse.get('criados') or 0)
+        atualizados = int(nfse.get('atualizados') or 0)
+        if criados == 0 and atualizados == 0:
+            extra = (
+                ' Nenhuma NFS-e retornada pela API Conta Azul neste intervalo '
+                '(filtro por competência). Confira as datas no ERP ou tente um período menor.'
+            )
+            if nivel == 'success':
+                nivel = 'warning'
+            texto = (texto or 'Importação concluída.') + extra
+    return nivel, texto

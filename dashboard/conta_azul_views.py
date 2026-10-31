@@ -73,7 +73,12 @@ from dashboard.conta_azul.servicos import (
 )
 from extrato.models import Lancamento
 from extrato.services.stone_conciliacao_previa import conciliar_stone_lancamento
-from dashboard.conta_azul.sync import mensagem_resultado_sync, sincronizar_conta_azul
+from dashboard.conta_azul.sync import (
+    mensagem_resultado_sync,
+    mensagem_sync_para_usuario,
+    sincronizar_conta_azul,
+)
+from dashboard.conta_azul.sync_result_cache import aplicar_mensagem_sync_cache, gravar_mensagem_sync
 from dashboard.conta_azul_forms import ContaAzulConfigForm, ServicoContaAzulFiscalForm
 from dashboard.models import ContaAzulConfig, ServicoContaAzul
 from empresa.models import Empresa
@@ -85,8 +90,20 @@ def _executar_sync_conta_azul_em_background(empresa_id: int, opcoes: dict) -> No
     """Evita timeout HTTP no Render (sync pode levar vários minutos)."""
     try:
         empresa = Empresa.objects.get(pk=empresa_id)
-        sincronizar_conta_azul(empresa, **opcoes)
-    except Exception:
+        resultado = sincronizar_conta_azul(empresa, **opcoes)
+        nivel, texto = mensagem_sync_para_usuario(resultado)
+        gravar_mensagem_sync(empresa_id, nivel, texto)
+    except ContaAzulAPIError as exc:
+        gravar_mensagem_sync(empresa_id, 'error', f'Conta Azul: {exc}')
+        logger.warning(
+            'Sync Conta Azul em background — API (empresa=%s): %s', empresa_id, exc
+        )
+    except Exception as exc:
+        gravar_mensagem_sync(
+            empresa_id,
+            'error',
+            f'Sincronização Conta Azul falhou: {exc}',
+        )
         logger.exception('Falha na sincronização Conta Azul em background (empresa=%s)', empresa_id)
 
 
@@ -443,7 +460,8 @@ def conta_azul_sincronizar(request, pk):
             msg = (
                 'Sincronização Conta Azul iniciada em segundo plano. '
                 f'Itens: {resumo_flags(flags)}.{periodo_txt} '
-                f'{dica_atualizar_pos_sync(flags)}'
+                f'{dica_atualizar_pos_sync(flags)} '
+                'Quando terminar, atualize esta página ou Notas Fiscais para ver o resultado da integração.'
             )
             messages.info(request, msg)
         except Exception as exc:
@@ -453,6 +471,8 @@ def conta_azul_sincronizar(request, pk):
             f"&{query_flags(flags)}"
         )
         return redirect(f"{reverse('empresa:conta_azul_sincronizar', kwargs={'pk': pk})}{q}")
+
+    aplicar_mensagem_sync_cache(request, empresa.pk)
 
     data_de_g = request.GET.get('data_de')
     data_ate_g = request.GET.get('data_ate')

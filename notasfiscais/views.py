@@ -463,18 +463,11 @@ class NFSeListView(LoginRequiredMixin, ListView):
         return _apply_nfse_sort(queryset, sort_col, sort_dir)
 
     def get_context_data(self, **kwargs):
-        from django.core.cache import cache
-
         empresa_id = self.request.session.get('empresa_id')
         if empresa_id:
-            chave = _cache_chave_msg_nfse_ca(int(empresa_id))
-            payload = cache.get(chave)
-            if payload:
-                cache.delete(chave)
-                nivel = payload.get('nivel') or 'info'
-                texto = payload.get('texto') or ''
-                if texto:
-                    getattr(messages, nivel, messages.info)(self.request, texto)
+            from dashboard.conta_azul.sync_result_cache import aplicar_mensagem_sync_cache
+
+            aplicar_mensagem_sync_cache(self.request, int(empresa_id))
 
         context = super().get_context_data(**kwargs)
         empresa_id = self.request.session.get('empresa_id')
@@ -493,12 +486,14 @@ class NFSeListView(LoginRequiredMixin, ListView):
         paginate_by = str(filters.get('paginate_by', self.paginate_by))
 
         # Verificar quais notas já têm contas a receber
-        notas_ids = [nfse.id for nfse in context['notas']]
-        if notas_ids:
+        context['notas_com_conta'] = set()
+        notas_ids = [nfse.id for nfse in context.get('notas') or []]
+        if notas_ids and empresa_id:
             from contasareceber.models import ContaAReceber
+
             contas_existentes = ContaAReceber.objects.filter(
                 empresa_id=empresa_id,
-                nota_id__in=notas_ids
+                nota_id__in=notas_ids,
             ).values_list('nota_id', flat=True)
             context['notas_com_conta'] = set(contas_existentes)
 
@@ -1994,10 +1989,6 @@ def portal_extensao_importar_pasta_mes(request):
     return redirect("notasfiscais:portal_extensao_import")
 
 
-def _cache_chave_msg_nfse_ca(empresa_id: int) -> str:
-    return f'nfse_ca_import_msg_{empresa_id}'
-
-
 def _aplicar_filtro_periodo_nfse_na_sessao(request, data_de: date, data_ate: date) -> None:
     """Após importar do CA, alinha filtros da lista ao período buscado."""
     filters = dict(request.session.get(NFS_FILTROS_SESSION_KEY) or {})
@@ -2007,22 +1998,9 @@ def _aplicar_filtro_periodo_nfse_na_sessao(request, data_de: date, data_ate: dat
 
 
 def _mensagem_import_nfse_ca(resultado: dict) -> tuple[str, str]:
-    from dashboard.conta_azul.sync import mensagem_resultado_sync
+    from dashboard.conta_azul.sync import mensagem_sync_para_usuario
 
-    nivel, texto = mensagem_resultado_sync(resultado)
-    nfse = resultado.get('nfse_prestador') if isinstance(resultado, dict) else None
-    if isinstance(nfse, dict) and not nfse.get('erro'):
-        criados = int(nfse.get('criados') or 0)
-        atualizados = int(nfse.get('atualizados') or 0)
-        if criados == 0 and atualizados == 0:
-            extra = (
-                ' Nenhuma NFS-e retornada pela API Conta Azul neste intervalo '
-                '(filtro por competência). Confira as datas no ERP ou tente um período menor.'
-            )
-            if nivel == 'success':
-                nivel = 'warning'
-            texto = (texto or 'Importação concluída.') + extra
-    return nivel, texto
+    return mensagem_sync_para_usuario(resultado)
 
 
 @login_required
