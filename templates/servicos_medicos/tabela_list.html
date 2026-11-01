@@ -13,6 +13,9 @@
           <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
         </svg>
         Nova Tabela de Preço</a>
+      <a href="{% url 'servicos_medicos:tabela_replicar' %}{% if cabecalho_selecionado %}?destino={{ cabecalho_selecionado }}{% endif %}" class="btn btn-outline-primary mb-3 ms-2">
+        Replicar de outra tabela
+      </a>
       {% if messages %}
       {% include 'parcial/_messages.html' %}
    {% endif %}

@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block nav_%}
+{% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+<div class="card mb-4">
+  <div class="card-header">{{ descricao }}</div>
+  <div class="card-body">
+    {% if messages %}
+      {% include 'parcial/_messages.html' %}
+    {% endif %}
+
+    <p class="text-muted">
+      Copia todos os exames e preços (sem e com contraste) de uma tabela já cadastrada
+      para outra. Os serviços médicos são os mesmos; só duplica os vínculos de preço
+      no convênio/cabeçalho de destino.
+    </p>
+    <p class="small text-muted mb-4">
+      Exemplo: origem «JARDEL — TABELA - JARDEL» → destino «ADRIANA MARINHO — TABELA - ADRIANA»
+      (crie o cabeçalho de destino antes, se ainda não existir).
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="mb-3">
+          {% if field.name == 'atualizar_existentes' %}
+            <div class="form-check">
+              {{ field }}
+              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+          {% else %}
+            {{ field.label_tag }}
+            {{ field }}
+          {% endif %}
+          {% if field.errors %}
+            <div class="text-danger small">{{ field.errors|striptags }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary">Replicar preços</button>
+        <a href="{% url 'servicos_medicos:cabecalho_list' %}" class="btn btn-outline-secondary">Cabeçalhos</a>
+        <a href="{% url 'servicos_medicos:tabela_list' %}" class="btn btn-outline-secondary">Tabela de preços</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

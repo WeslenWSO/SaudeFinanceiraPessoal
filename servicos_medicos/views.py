@@ -1,12 +1,14 @@
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.shortcuts import render
+from django.shortcuts import redirect
+from django.views import View
 from django.views.generic.list import ListView
 from django.views.generic.edit import UpdateView, CreateView
 from django.contrib import messages
 from django.db.models import Q
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
-from .forms import ConvenioForm, ServicosMedicosForm, TabelaPrecoForm
+from .forms import ConvenioForm, ReplicarTabelaPrecoForm, ServicosMedicosForm, TabelaPrecoForm
+from .replicar_tabela_preco import replicar_tabela_preco
 from empresa.models import Empresa
 
 # Convenio Views
@@ -308,3 +310,75 @@ class CabecalhoUpdate(UpdateView):
         context["descricao"] = 'Alterar Cabeçalho'
         context["titulo"] = 'Cabeçalho'
         return context
+
+
+class ReplicarTabelaPrecoView(View):
+    template_name = "servicos_medicos/replicar_tabela_preco.html"
+
+    def _empresa_id(self, request):
+        return request.session.get("empresa_id")
+
+    def get(self, request):
+        empresa_id = self._empresa_id(request)
+        initial = {}
+        for param, field in (
+            ("origem", "cabecalho_origem"),
+            ("destino", "cabecalho_destino"),
+        ):
+            raw = request.GET.get(param)
+            if raw and raw.isdigit():
+                initial[field] = int(raw)
+        form = ReplicarTabelaPrecoForm(empresa_id=empresa_id, initial=initial)
+        return self._render(request, form)
+
+    def post(self, request):
+        empresa_id = self._empresa_id(request)
+        form = ReplicarTabelaPrecoForm(request.POST, empresa_id=empresa_id)
+        if not form.is_valid():
+            return self._render(request, form)
+
+        origem = form.cleaned_data["cabecalho_origem"]
+        destino = form.cleaned_data["cabecalho_destino"]
+        if empresa_id and (
+            origem.empresa_id != empresa_id or destino.empresa_id != empresa_id
+        ):
+            messages.error(request, "Cabeçalhos fora da empresa da sessão.")
+            return self._render(request, form)
+
+        try:
+            resultado = replicar_tabela_preco(
+                origem,
+                destino,
+                atualizar_existentes=form.cleaned_data["atualizar_existentes"],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return self._render(request, form)
+
+        if resultado.total_origem == 0:
+            messages.warning(
+                request,
+                f"A tabela origem «{origem.nome_tabela}» não possui preços cadastrados.",
+            )
+            return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
+
+        messages.success(
+            request,
+            f"Replicação concluída: {resultado.criados} criados, "
+            f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
+            f"(origem: {resultado.total_origem} itens).",
+        )
+        return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
+
+    def _render(self, request, form):
+        empresa_id = self._empresa_id(request)
+        from django.shortcuts import render
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "descricao": "Replicar tabela de preços",
+            },
+        )

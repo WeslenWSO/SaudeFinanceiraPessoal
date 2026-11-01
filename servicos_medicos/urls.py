@@ -26,5 +26,6 @@ urlpatterns = [
     path("cabecalho/", CabecalhoList.as_view(), name='cabecalho_list'),
     path("cabecalho/create/", CabecalhoCreate.as_view(), name='cabecalho_create'),
     path("cabecalho/<pk>/update/", CabecalhoUpdate.as_view(), name='cabecalho_update'),
+    path("tabela/replicar/", ReplicarTabelaPrecoView.as_view(), name='tabela_replicar'),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

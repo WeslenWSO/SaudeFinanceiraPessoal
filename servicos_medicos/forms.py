@@ -63,3 +63,48 @@ class TabelaPrecoForm(forms.ModelForm):
             self.fields['cabecalho'].queryset = Cabecalho.objects.filter(empresa_id=self.initial['empresa'])
         else:
             self.fields['cabecalho'].queryset = Cabecalho.objects.none()
+
+
+def _rotulo_cabecalho(cabecalho: Cabecalho) -> str:
+    return f"{cabecalho.convenio} — {cabecalho.nome_tabela}"
+
+
+class ReplicarTabelaPrecoForm(forms.Form):
+    cabecalho_origem = forms.ModelChoiceField(
+        queryset=Cabecalho.objects.none(),
+        label="Copiar preços de (tabela origem)",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    cabecalho_destino = forms.ModelChoiceField(
+        queryset=Cabecalho.objects.none(),
+        label="Para (tabela destino)",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    atualizar_existentes = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Atualizar preços que já existirem no destino",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+    def __init__(self, *args, empresa_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Cabecalho.objects.none()
+        if empresa_id:
+            qs = (
+                Cabecalho.objects.filter(empresa_id=empresa_id)
+                .select_related("convenio", "empresa")
+                .order_by("convenio__nome", "nome_tabela")
+            )
+        for name in ("cabecalho_origem", "cabecalho_destino"):
+            field = self.fields[name]
+            field.queryset = qs
+            field.label_from_instance = _rotulo_cabecalho
+
+    def clean(self):
+        cleaned = super().clean()
+        origem = cleaned.get("cabecalho_origem")
+        destino = cleaned.get("cabecalho_destino")
+        if origem and destino and origem.pk == destino.pk:
+            raise forms.ValidationError("Escolha cabeçalhos diferentes para origem e destino.")
+        return cleaned

@@ -13,6 +13,9 @@
           <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
         </svg>
         Novo Cabeçalho</a>
+      <a href="{% url 'servicos_medicos:tabela_replicar' %}" class="btn btn-outline-primary mb-3 ms-2">
+        Replicar tabela de preços
+      </a>
       {% if messages %}
       {% include 'parcial/_messages.html' %}
    {% endif %}
@@ -32,7 +35,7 @@
       <th>Empresa</th>
       <th>Convênio</th>
       <th>Nome da Tabela</th>
-      <th>Edi.</th>
+      <th>Ações</th>
     </tr>
   </thead>
 
@@ -56,8 +59,11 @@
 
         <td>
 
-               <a href="{% url 'servicos_medicos:cabecalho_update' cabecalho.id %}" class="btn btn-primary">
+               <a href="{% url 'servicos_medicos:cabecalho_update' cabecalho.id %}" class="btn btn-primary" title="Editar">
                 <i class="fa-solid fa-pen-to-square"></i>
+               </a>
+               <a href="{% url 'servicos_medicos:tabela_replicar' %}?origem={{ cabecalho.id }}" class="btn btn-outline-secondary btn-sm" title="Usar como origem na replicação">
+                Copiar desta
                </a>
 
         </td>
