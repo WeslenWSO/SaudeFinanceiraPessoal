@@ -170,6 +170,7 @@ def queryset_farmacia_export(
     *,
     busca: str = '',
     somente_alertas: bool = False,
+    somente_saldo: bool = False,
 ):
     from django.db.models import Q
 
@@ -192,4 +193,6 @@ def queryset_farmacia_export(
             | Q(descricao__icontains=busca)
             | Q(marca__icontains=busca),
         )
+    if somente_saldo:
+        qs = qs.filter(quantidade_estoque__gt=0)
     return qs.order_by('descricao')

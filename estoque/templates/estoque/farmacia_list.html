@@ -45,9 +45,9 @@
       </div>
       <div class="d-flex flex-column gap-1">
         {% if not somente_alertas %}
-        <a href="?somente_alertas=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}" class="btn btn-warning btn-sm">Ver todos os alertas</a>
+        <a href="?somente_alertas=1{% if busca %}&amp;q={{ busca|urlencode }}{% endif %}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}" class="btn btn-warning btn-sm">Ver todos os alertas</a>
         {% else %}
-        <a href="{% url 'estoque:farmacia_list' %}{% if busca %}?q={{ busca|urlencode }}{% endif %}" class="btn btn-outline-secondary btn-sm">Ver estoque completo</a>
+        <a href="{% url 'estoque:farmacia_list' %}{% if busca %}?q={{ busca|urlencode }}{% endif %}{% if somente_saldo %}{% if busca %}&amp;{% else %}?{% endif %}somente_saldo=1{% endif %}" class="btn btn-outline-secondary btn-sm">Ver estoque completo</a>
         {% endif %}
       </div>
     </div>
@@ -56,11 +56,18 @@
   <div class="alert alert-success mb-3">Nenhum produto abaixo do estoque mínimo.</div>
   {% endif %}
 
-  <form method="get" class="row g-2 mb-3">
+  <form method="get" class="row g-2 mb-3 align-items-end">
     <div class="col-md-6">
+      <label class="form-label small mb-0">Buscar</label>
       <input type="search" name="q" class="form-control form-control-sm" placeholder="Produto, código ou marca" value="{{ busca }}">
     </div>
-    <div class="col-auto"><button type="submit" class="btn btn-outline-secondary btn-sm">Buscar</button></div>
+    <div class="col-auto">
+      <div class="form-check mb-1">
+        <input class="form-check-input" type="checkbox" name="somente_saldo" value="1" id="somenteSaldoFarmacia"{% if somente_saldo %} checked{% endif %}>
+        <label class="form-check-label small" for="somenteSaldoFarmacia">Somente com estoque &gt; 0</label>
+      </div>
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Buscar</button>
+    </div>
     {% if somente_alertas %}<input type="hidden" name="somente_alertas" value="1">{% endif %}
   </form>
   <div class="card shadow-sm">
@@ -108,9 +115,9 @@
   </div>
   {% if is_paginated %}
   <nav class="mt-3"><ul class="pagination pagination-sm">
-    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ busca|urlencode }}">Anterior</a></li>{% endif %}
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&amp;q={{ busca|urlencode }}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}{% if somente_alertas %}&amp;somente_alertas=1{% endif %}">Anterior</a></li>{% endif %}
     <li class="page-item disabled"><span class="page-link">Pág. {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
-    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ busca|urlencode }}">Próxima</a></li>{% endif %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&amp;q={{ busca|urlencode }}{% if somente_saldo %}&amp;somente_saldo=1{% endif %}{% if somente_alertas %}&amp;somente_alertas=1{% endif %}">Próxima</a></li>{% endif %}
   </ul></nav>
   {% endif %}
 </div>

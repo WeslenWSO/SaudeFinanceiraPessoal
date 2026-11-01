@@ -169,6 +169,10 @@ class EstoqueCopaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, Li
         return ctx
 
 
+def _get_flag_somente_saldo(request) -> bool:
+    return (request.GET.get('somente_saldo') or '').strip() in ('1', 'true', 'sim')
+
+
 class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
     """Visão operacional — farmácia (Fiscal)."""
 
@@ -180,6 +184,8 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin
             qs = queryset_abaixo_estoque_minimo(self.get_empresa_id())
         else:
             qs = self._queryset_base()
+        if _get_flag_somente_saldo(self.request):
+            qs = qs.filter(quantidade_estoque__gt=0)
         return self._aplicar_busca(qs)
 
     def get_context_data(self, **kwargs):
@@ -187,6 +193,7 @@ class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin
         empresa_id = self.get_empresa_id()
         ctx['descricao'] = 'Estoque — Farmácia'
         ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        ctx['somente_saldo'] = _get_flag_somente_saldo(self.request)
         ctx['somente_alertas'] = (self.request.GET.get('somente_alertas') or '').strip() in (
             '1',
             'true',
@@ -212,6 +219,7 @@ def farmacia_exportar_excel(request):
         empresa_id,
         busca=busca,
         somente_alertas=somente_alertas,
+        somente_saldo=_get_flag_somente_saldo(request),
     )
     data = exportar_farmacia_xlsx(qs)
     response = HttpResponse(
