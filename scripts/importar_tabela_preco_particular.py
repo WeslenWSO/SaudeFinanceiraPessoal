@@ -134,7 +134,7 @@ def importar_particular(args: argparse.Namespace, postal) -> int:
         cabecalho = Cabecalho.objects.filter(
             empresa=empresa,
             convenio=convenio,
-            nome_tabela__icontains="PARTICULAR",
+            nome_tabela__icontains=args.cabecalho,
         ).first()
     if not cabecalho:
         cabecalho = Cabecalho.objects.create(
