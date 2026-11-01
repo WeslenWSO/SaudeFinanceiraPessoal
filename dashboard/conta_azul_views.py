@@ -668,6 +668,13 @@ def _url_mes_dashboard(request, ano: int, mes: int) -> str:
 
 def _contexto_dashboard_intervalo(request):
     """Empresa da sessão + mês de referência + regime (Competência / Caixa realizado)."""
+    from dashboard.periodo_dashboard import (
+        MAX_INTERVALO_DASHBOARD_DIAS,
+        parse_data_iso,
+        titulo_periodo as formatar_titulo_periodo,
+        validar_intervalo_dashboard,
+    )
+
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return None, None
@@ -678,6 +685,26 @@ def _contexto_dashboard_intervalo(request):
 
     data_inicio = date(ano_ref, mes_ref, 1)
     data_fim = date(ano_ref, mes_ref, monthrange(ano_ref, mes_ref)[1])
+    filtro_intervalo_personalizado = False
+
+    di_raw = (request.GET.get('data_inicio') or '').strip()
+    df_raw = (request.GET.get('data_fim') or '').strip()
+    if di_raw or df_raw:
+        if not di_raw or not df_raw:
+            messages.warning(request, 'Informe as duas datas (De e Até) para o período personalizado.')
+        else:
+            di = parse_data_iso(di_raw)
+            df = parse_data_iso(df_raw)
+            if not di or not df:
+                messages.warning(request, 'Datas inválidas. Use o formato correto (aaaa-mm-dd).')
+            else:
+                err = validar_intervalo_dashboard(di, df)
+                if err:
+                    messages.warning(request, err)
+                else:
+                    data_inicio, data_fim = di, df
+                    filtro_intervalo_personalizado = True
+                    ano_ref, mes_ref = data_fim.year, data_fim.month
 
     from dashboard.services.montar_visao_geral import REGIME_PADRAO
 
@@ -692,6 +719,11 @@ def _contexto_dashboard_intervalo(request):
     prox = ref + relativedelta(months=1)
     titulo_mes_ref = f'{MESES_PT[mes_ref - 1]} de {ano_ref}'
     mes_filtro = f'{ano_ref:04d}-{mes_ref:02d}'
+    titulo_periodo = formatar_titulo_periodo(
+        data_inicio,
+        data_fim,
+        mensal=not filtro_intervalo_personalizado,
+    )
 
     ctx = {
         'empresa': empresa,
@@ -703,9 +735,12 @@ def _contexto_dashboard_intervalo(request):
         'mes_ref': mes_ref,
         'mes_filtro': mes_filtro,
         'titulo_mes_ref': titulo_mes_ref,
-        'titulo_periodo': titulo_mes_ref,
+        'titulo_periodo': titulo_periodo,
+        'filtro_intervalo_personalizado': filtro_intervalo_personalizado,
+        'max_intervalo_dashboard_dias': MAX_INTERVALO_DASHBOARD_DIAS,
         'url_mes_anterior': _url_mes_dashboard(request, ant.year, ant.month),
         'url_mes_proximo': _url_mes_dashboard(request, prox.year, prox.month),
+        'url_mes_calendario': _url_mes_dashboard(request, ano_ref, mes_ref),
         'regime': regime,
         'regimes': REGIMES,
     }
@@ -780,7 +815,11 @@ def conta_azul_dashboard(request):
             from dashboard.montar_visao_faturamento import montar_visao_faturamento
 
             visao_faturamento = montar_visao_faturamento(
-                empresa.pk, ctx['ano_ref'], ctx['mes_ref']
+                empresa.pk,
+                ctx['ano_ref'],
+                ctx['mes_ref'],
+                data_inicio=ctx['data_inicio'],
+                data_fim=ctx['data_fim'],
             )
     except Exception as exc:
         logger.exception('Dashboard aba=%s empresa=%s', aba_ativa, empresa.pk)
@@ -817,6 +856,9 @@ def conta_azul_dashboard(request):
                 mes=ctx['mes_ref'],
                 regime=ctx['regime'],
                 modelo_codigo=modelo_codigo or None,
+                data_inicio=ctx['data_inicio'],
+                data_fim=ctx['data_fim'],
+                filtro_intervalo_personalizado=ctx['filtro_intervalo_personalizado'],
             )
         except (ProgrammingError, OperationalError) as exc:
             from SaudeFinanceira.db_schema import capturar_erro_schema

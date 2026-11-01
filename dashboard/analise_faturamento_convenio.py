@@ -59,9 +59,17 @@ def _rotulo_convenio_exibicao(nome: str) -> str:
     return n.upper()
 
 
-def montar_relatorio_faturamento_convenio(empresa_id: int, ano: int, mes: int) -> dict:
-    inicio = date(ano, mes, 1)
-    fim = date(ano, mes, monthrange(ano, mes)[1])
+def montar_relatorio_faturamento_convenio(
+    empresa_id: int,
+    ano: int,
+    mes: int,
+    *,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
+    from dashboard.periodo_dashboard import resolver_inicio_fim, rotulo_cabecalho_relatorio
+
+    inicio, fim = resolver_inicio_fim(ano, mes, data_inicio=data_inicio, data_fim=data_fim)
 
     qs = (
         FaturamentoMedico.objects.filter(
@@ -93,7 +101,7 @@ def montar_relatorio_faturamento_convenio(empresa_id: int, ano: int, mes: int) -
             'percentual_fmt': _fmt_percentual(valor, total_valor),
         })
 
-    mes_titulo = f'{MESES_PT[mes].upper()} {ano}'
+    mes_titulo = rotulo_cabecalho_relatorio(ano, mes, inicio, fim)
     return {
         'titulo_relatorio': f'RELATÓRIO DE FATURAMENTO — {mes_titulo}',
         'subtitulo_periodo': (

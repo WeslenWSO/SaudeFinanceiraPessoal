@@ -1,12 +1,103 @@
-<nav class="dashboard-nav-mes d-flex align-items-stretch flex-wrap gap-1" aria-label="Mês de referência">
-  <a href="{{ url_mes_anterior }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
-    <i class="fas fa-chevron-left me-1"></i> Anterior
-  </a>
-  <div class="btn btn-light border fw-semibold text-center px-3 d-flex align-items-center justify-content-center text-nowrap user-select-none"
-       style="min-width: 10rem;">
-    {{ titulo_mes_ref }}
-  </div>
-  <a href="{{ url_mes_proximo }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
-    Próximo <i class="fas fa-chevron-right ms-1"></i>
-  </a>
-</nav>
+<div class="dashboard-periodo-toolbar d-flex flex-wrap align-items-stretch justify-content-end gap-2 w-100 w-md-auto">
+  <form method="get"
+        class="dashboard-periodo-custom d-flex flex-wrap align-items-end gap-2 border rounded px-2 py-1 bg-light-subtle"
+        id="form-dashboard-periodo"
+        aria-label="Período personalizado">
+    {% if aba_ativa %}<input type="hidden" name="aba" value="{{ aba_ativa }}">{% endif %}
+    {% if regime %}<input type="hidden" name="regime" value="{{ regime }}">{% endif %}
+    {% if modelo_analise %}<input type="hidden" name="modelo" value="{{ modelo_analise }}">{% elif request.GET.modelo %}
+      <input type="hidden" name="modelo" value="{{ request.GET.modelo }}">
+    {% endif %}
+    <input type="hidden" name="mes" value="{{ mes_filtro }}">
+    <div class="dashboard-periodo-campo">
+      <label class="form-label small mb-0 text-muted" for="dash-data-inicio">De</label>
+      <input type="date"
+             class="form-control form-control-sm"
+             id="dash-data-inicio"
+             name="data_inicio"
+             value="{% if filtro_intervalo_personalizado %}{{ data_inicio_str }}{% endif %}"
+             max="{{ data_fim_str|default:'' }}">
+    </div>
+    <div class="dashboard-periodo-campo">
+      <label class="form-label small mb-0 text-muted" for="dash-data-fim">Até</label>
+      <input type="date"
+             class="form-control form-control-sm"
+             id="dash-data-fim"
+             name="data_fim"
+             value="{% if filtro_intervalo_personalizado %}{{ data_fim_str }}{% endif %}">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm align-self-end">
+      <i class="fas fa-filter me-1" aria-hidden="true"></i>Aplicar
+    </button>
+    {% if filtro_intervalo_personalizado %}
+      <a href="{{ url_mes_calendario }}{% if aba_ativa %}&amp;aba={{ aba_ativa }}{% endif %}"
+         class="btn btn-outline-secondary btn-sm align-self-end text-nowrap"
+         title="Voltar ao mês calendário">
+        Mês
+      </a>
+    {% endif %}
+  </form>
+
+  <nav class="dashboard-nav-mes d-flex align-items-stretch flex-wrap gap-1" aria-label="Mês de referência">
+    <a href="{{ url_mes_anterior }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+      <i class="fas fa-chevron-left me-1"></i> Anterior
+    </a>
+    <div class="btn btn-light border fw-semibold text-center px-3 d-flex align-items-center justify-content-center text-nowrap user-select-none dashboard-nav-mes-titulo"
+         style="min-width: 10rem;">
+      {{ titulo_periodo }}
+    </div>
+    <a href="{{ url_mes_proximo }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+      Próximo <i class="fas fa-chevron-right ms-1"></i>
+    </a>
+  </nav>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('form-dashboard-periodo');
+  if (!form) return;
+  var maxDias = {{ max_intervalo_dashboard_dias|default:368 }};
+  var di = document.getElementById('dash-data-inicio');
+  var df = document.getElementById('dash-data-fim');
+  function parseIso(s) {
+    if (!s) return null;
+    var p = s.split('-');
+    if (p.length !== 3) return null;
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  form.addEventListener('submit', function (ev) {
+    var a = parseIso(di && di.value);
+    var b = parseIso(df && df.value);
+    if (!di.value && !df.value) return;
+    if (!a || !b) {
+      ev.preventDefault();
+      alert('Informe as duas datas (De e Até).');
+      return;
+    }
+    if (b < a) {
+      ev.preventDefault();
+      alert('A data «Até» deve ser igual ou posterior à data «De».');
+      return;
+    }
+    var dias = Math.round((b - a) / 86400000);
+    if (dias > maxDias) {
+      ev.preventDefault();
+      alert(
+        'O intervalo não pode passar de ' + maxDias + ' dias '
+        + '(selecionado: ' + (dias + 1) + ' dias).'
+      );
+    }
+  });
+})();
+</script>
+
+<style>
+.dashboard-periodo-toolbar { max-width: 100%; }
+.dashboard-periodo-campo input[type="date"] { min-width: 9.5rem; }
+@media (max-width: 575.98px) {
+  .dashboard-periodo-custom { width: 100%; }
+  .dashboard-periodo-campo { flex: 1 1 45%; min-width: 7rem; }
+  .dashboard-nav-mes { width: 100%; justify-content: center; }
+  .dashboard-nav-mes-titulo { flex: 1 1 auto; min-width: 0 !important; font-size: 0.875rem; }
+}
+</style>

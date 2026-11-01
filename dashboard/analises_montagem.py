@@ -23,7 +23,12 @@ def montar_contexto_aba_analises(
     mes: int,
     regime: str,
     modelo_codigo: str | None,
+    data_inicio=None,
+    data_fim=None,
+    filtro_intervalo_personalizado: bool = False,
 ) -> dict:
+    from datetime import date
+
     modelo = modelo_analise_ativo(modelo_codigo) or modelo_analise_padrao()
     mes_filtro = f'{ano:04d}-{mes:02d}'
 
@@ -32,8 +37,18 @@ def montar_contexto_aba_analises(
     q_base['mes'] = mes_filtro
     if regime:
         q_base['regime'] = regime
+    if filtro_intervalo_personalizado and data_inicio and data_fim:
+        q_base['data_inicio'] = data_inicio.isoformat()
+        q_base['data_fim'] = data_fim.isoformat()
+    else:
+        q_base.pop('data_inicio', None)
+        q_base.pop('data_fim', None)
     q_base.pop('modelo', None)
     url_analise_modelo_base = '?' + q_base.urlencode() + '&modelo='
+
+    kw_periodo: dict = {}
+    if filtro_intervalo_personalizado and isinstance(data_inicio, date) and isinstance(data_fim, date):
+        kw_periodo = {'data_inicio': data_inicio, 'data_fim': data_fim}
 
     ev_de, ev_mes_de, ev_ate, ev_mes_ate, ev_aviso = resolver_periodo_evolucao(
         request, ano_ref=ano, mes_ref=mes
@@ -51,17 +66,17 @@ def montar_contexto_aba_analises(
         'dash_aba': 'analises',
         'ev_periodo_de_value': f'{ev_de:04d}-{ev_mes_de:02d}',
         'ev_periodo_ate_value': f'{ev_ate:04d}-{ev_mes_ate:02d}',
-        **urls_relatorio_analises(request, mes_filtro),
+        **urls_relatorio_analises(request, mes_filtro, filtro_intervalo_personalizado=filtro_intervalo_personalizado),
     }
 
     if modelo.codigo == 'validacao_conferencia':
-        ctx.update(montar_relatorio_validacao_conferencia(empresa_id, ano, mes))
+        ctx.update(montar_relatorio_validacao_conferencia(empresa_id, ano, mes, **kw_periodo))
     elif modelo.codigo == 'faturamento_convenio':
-        ctx.update(montar_relatorio_faturamento_convenio(empresa_id, ano, mes))
+        ctx.update(montar_relatorio_faturamento_convenio(empresa_id, ano, mes, **kw_periodo))
     elif modelo.codigo == 'faturamento_modalidade':
-        ctx.update(montar_relatorio_faturamento_modalidade(empresa_id, ano, mes))
+        ctx.update(montar_relatorio_faturamento_modalidade(empresa_id, ano, mes, **kw_periodo))
     elif modelo.codigo == 'detalhes_modalidade_convenio':
-        ctx.update(montar_detalhes_modalidade_convenio(empresa_id, ano, mes))
+        ctx.update(montar_detalhes_modalidade_convenio(empresa_id, ano, mes, **kw_periodo))
     elif modelo.codigo == 'evolucao_faturamento':
         ctx.update(
             montar_evolucao_faturamento(empresa_id, ev_de, ev_mes_de, ev_ate, ev_mes_ate)

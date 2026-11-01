@@ -17,11 +17,21 @@ from dashboard.analise_validacao_conferencia import montar_relatorio_validacao_c
 from dashboard.analises_catalogo import MODELOS_ANALISE, modelos_analise_apresentacao
 
 
-def params_query_relatorio_analises(request, mes_filtro: str) -> str:
+def params_query_relatorio_analises(
+    request,
+    mes_filtro: str,
+    *,
+    filtro_intervalo_personalizado: bool = False,
+) -> str:
     params: dict[str, str] = {'mes': mes_filtro}
     regime = (request.GET.get('regime') or '').strip()
     if regime:
         params['regime'] = regime
+    if filtro_intervalo_personalizado:
+        for chave in ('data_inicio', 'data_fim'):
+            val = (request.GET.get(chave) or '').strip()
+            if val:
+                params[chave] = val
     for chave in ('ev_de', 'ev_ate'):
         val = (request.GET.get(chave) or '').strip()
         if val:
@@ -29,8 +39,15 @@ def params_query_relatorio_analises(request, mes_filtro: str) -> str:
     return urlencode(params)
 
 
-def urls_relatorio_analises(request, mes_filtro: str) -> dict[str, str]:
-    q = params_query_relatorio_analises(request, mes_filtro)
+def urls_relatorio_analises(
+    request,
+    mes_filtro: str,
+    *,
+    filtro_intervalo_personalizado: bool = False,
+) -> dict[str, str]:
+    q = params_query_relatorio_analises(
+        request, mes_filtro, filtro_intervalo_personalizado=filtro_intervalo_personalizado
+    )
     return {
         'url_analises_apresentacao': f"{reverse('dashboard:analises_relatorio')}?{q}",
         'url_analises_pdf': f"{reverse('dashboard:analises_relatorio_pdf')}?{q}",
@@ -38,15 +55,30 @@ def urls_relatorio_analises(request, mes_filtro: str) -> dict[str, str]:
     }
 
 
+def _kw_periodo_relatorio(request) -> dict:
+    from dashboard.periodo_dashboard import parse_data_iso, validar_intervalo_dashboard
+
+    di_raw = (request.GET.get('data_inicio') or '').strip()
+    df_raw = (request.GET.get('data_fim') or '').strip()
+    if not di_raw or not df_raw:
+        return {}
+    di = parse_data_iso(di_raw)
+    df = parse_data_iso(df_raw)
+    if not di or not df or validar_intervalo_dashboard(di, df):
+        return {}
+    return {'data_inicio': di, 'data_fim': df}
+
+
 def _contexto_modelo(empresa_id: int, request, ano: int, mes: int, codigo: str) -> dict:
+    kw = _kw_periodo_relatorio(request)
     if codigo == 'validacao_conferencia':
-        return montar_relatorio_validacao_conferencia(empresa_id, ano, mes)
+        return montar_relatorio_validacao_conferencia(empresa_id, ano, mes, **kw)
     if codigo == 'faturamento_convenio':
-        return montar_relatorio_faturamento_convenio(empresa_id, ano, mes)
+        return montar_relatorio_faturamento_convenio(empresa_id, ano, mes, **kw)
     if codigo == 'faturamento_modalidade':
-        return montar_relatorio_faturamento_modalidade(empresa_id, ano, mes)
+        return montar_relatorio_faturamento_modalidade(empresa_id, ano, mes, **kw)
     if codigo == 'detalhes_modalidade_convenio':
-        return montar_detalhes_modalidade_convenio(empresa_id, ano, mes)
+        return montar_detalhes_modalidade_convenio(empresa_id, ano, mes, **kw)
     if codigo == 'evolucao_faturamento':
         ev_de, ev_mes_de, ev_ate, ev_mes_ate, ev_aviso = resolver_periodo_evolucao(
             request, ano_ref=ano, mes_ref=mes

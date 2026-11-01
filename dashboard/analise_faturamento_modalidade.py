@@ -73,9 +73,17 @@ def _fmt_percentual_1(parte, total) -> str:
     return f'{pct:.1f}'.replace('.', ',') + '%'
 
 
-def montar_relatorio_faturamento_modalidade(empresa_id: int, ano: int, mes: int) -> dict:
-    inicio = date(ano, mes, 1)
-    fim = date(ano, mes, monthrange(ano, mes)[1])
+def montar_relatorio_faturamento_modalidade(
+    empresa_id: int,
+    ano: int,
+    mes: int,
+    *,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
+    from dashboard.periodo_dashboard import resolver_inicio_fim, rotulo_cabecalho_relatorio
+
+    inicio, fim = resolver_inicio_fim(ano, mes, data_inicio=data_inicio, data_fim=data_fim)
 
     qs = (
         FaturamentoMedico.objects.filter(
@@ -138,7 +146,7 @@ def montar_relatorio_faturamento_modalidade(empresa_id: int, ano: int, mes: int)
         chart_ticket.append(float(ticket))
         chart_cores.append(cor)
 
-    mes_titulo = f'{MESES_PT[mes].upper()} {ano}'
+    mes_titulo = rotulo_cabecalho_relatorio(ano, mes, inicio, fim)
     return {
         'titulo_relatorio': f'FATURAMENTO POR MODALIDADE — {mes_titulo}',
         'subtitulo_filtro': LEGENDA_FILTRO_ANALISES,

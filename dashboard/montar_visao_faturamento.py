@@ -70,9 +70,17 @@ def _chart_json(linhas: list[dict]) -> tuple[str, str]:
     return json.dumps(labels, ensure_ascii=False), json.dumps(valores)
 
 
-def montar_visao_faturamento(empresa_id: int, ano: int, mes: int) -> dict:
-    inicio = date(ano, mes, 1)
-    fim = date(ano, mes, monthrange(ano, mes)[1])
+def montar_visao_faturamento(
+    empresa_id: int,
+    ano: int,
+    mes: int,
+    *,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
+    from dashboard.periodo_dashboard import resolver_inicio_fim
+
+    inicio, fim = resolver_inicio_fim(ano, mes, data_inicio=data_inicio, data_fim=data_fim)
 
     qs = NotaFiscalServico.objects.filter(
         empresa_id=empresa_id,

@@ -23,9 +23,17 @@ from dashboard.analises_conferencia import (
 )
 
 
-def montar_relatorio_validacao_conferencia(empresa_id: int, ano: int, mes: int) -> dict:
-    inicio = date(ano, mes, 1)
-    fim = date(ano, mes, monthrange(ano, mes)[1])
+def montar_relatorio_validacao_conferencia(
+    empresa_id: int,
+    ano: int,
+    mes: int,
+    *,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
+    from dashboard.periodo_dashboard import resolver_inicio_fim, rotulo_cabecalho_relatorio
+
+    inicio, fim = resolver_inicio_fim(ano, mes, data_inicio=data_inicio, data_fim=data_fim)
     ids_internos = ids_lotes_empresa(empresa_id)
 
     qs = (
@@ -74,7 +82,7 @@ def montar_relatorio_validacao_conferencia(empresa_id: int, ano: int, mes: int) 
             'valor_fmt': _fmt_moeda(dados['valor']),
         })
 
-    mes_titulo = f'{MESES_PT[mes].upper()} {ano}'
+    mes_titulo = rotulo_cabecalho_relatorio(ano, mes, inicio, fim)
     return {
         'titulo_relatorio': f'VALIDAÇÃO — STATUS DE CONFERÊNCIA — {mes_titulo}',
         'subtitulo_periodo': (
