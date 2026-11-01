@@ -160,10 +160,19 @@ class TabelaPrecoList(ListView):
             qs = qs.filter(cabecalho_id=cabecalho_id)
         search_query = (self.request.GET.get('q') or '').strip()
         if search_query:
-            qs = qs.filter(
-                Q(codigo_servico__codigo__icontains=search_query)
-                | Q(codigo_servico__servicos__icontains=search_query)
-            )
+            q_upper = search_query.upper()
+            if q_upper == "RM":
+                qs = qs.filter(
+                    Q(codigo_servico__servicos__istartswith="RM-")
+                    | Q(codigo_servico__servicos__istartswith="RM ")
+                    | Q(codigo_servico__codigo__startswith="411")
+                    | Q(codigo_servico__codigo__startswith="RM-")
+                )
+            else:
+                qs = qs.filter(
+                    Q(codigo_servico__codigo__icontains=search_query)
+                    | Q(codigo_servico__servicos__icontains=search_query)
+                )
         qs = qs.select_related('empresa', 'convenio', 'cabecalho', 'codigo_servico').order_by("-id")
         return qs
 

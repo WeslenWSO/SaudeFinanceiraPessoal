@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             codigo_exato=extras.get("codigo_exato", False),
             dois_precos=extras.get("dois_precos", False),
         )
-        code = mod.run_import(imp, skip_db_url_check=not args.dry_run)
+        code = mod.run_import(imp, skip_db_url_check=True)
         if code:
             erros += 1
 
