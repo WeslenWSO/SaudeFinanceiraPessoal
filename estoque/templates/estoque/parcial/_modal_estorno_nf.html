@@ -44,13 +44,21 @@
       if (textoAprovador) textoAprovador.classList.remove('d-none');
     }
 
-    function limparModal() {
+    function limparCamposModal() {
       if (inputSenha) inputSenha.value = '';
       if (erroEl) {
         erroEl.textContent = '';
         erroEl.classList.add('d-none');
       }
+    }
+
+    function encerrarModal() {
+      limparCamposModal();
       formPendente = null;
+      if (btnConfirmar) {
+        btnConfirmar.disabled = false;
+        btnConfirmar.textContent = 'Estornar';
+      }
     }
 
     document.querySelectorAll('.js-estornar-nf-form').forEach(function (form) {
@@ -63,7 +71,7 @@
         }
         ev.preventDefault();
         formPendente = form;
-        limparModal();
+        limparCamposModal();
         modal.show();
         if (!semSenha && inputSenha) {
           setTimeout(function () { inputSenha.focus(); }, 200);
@@ -93,13 +101,16 @@
           }
           hidden.value = senha;
         }
-        formPendente.dataset.estornoSenhaOk = '1';
+        var formEnviar = formPendente;
+        formEnviar.dataset.estornoSenhaOk = '1';
+        btnConfirmar.disabled = true;
+        btnConfirmar.textContent = 'Enviando…';
         modal.hide();
-        formPendente.submit();
+        formEnviar.submit();
       });
     }
 
-    modalEl.addEventListener('hidden.bs.modal', limparModal);
+    modalEl.addEventListener('hidden.bs.modal', encerrarModal);
     if (inputSenha) {
       inputSenha.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') {
