@@ -48,8 +48,25 @@ def contagem_linhas_origem(origem: Cabecalho) -> int:
     return queryset_linhas_origem(origem).count()
 
 
-def _linhas_origem(origem: Cabecalho):
-    return list(queryset_linhas_origem(origem))
+def _linhas_origem_valores(origem: Cabecalho) -> list[dict]:
+    """Cada item: codigo TUSS, preços e FK do serviço (nunca usa id de TabelaPreco)."""
+    qs = (
+        queryset_linhas_origem(origem)
+        .values(
+            "codigo_servico_id",
+            "preco_apartamento",
+            "preco_enfermaria",
+            "codigo_servico__codigo",
+        )
+        .order_by("codigo_servico__codigo")
+    )
+    por_codigo: dict[str, dict] = {}
+    for row in qs:
+        codigo = (row.get("codigo_servico__codigo") or "").strip()
+        if not codigo:
+            continue
+        por_codigo[codigo] = row
+    return list(por_codigo.values())
 
 
 def replicar_tabela_preco(
@@ -64,34 +81,34 @@ def replicar_tabela_preco(
         raise ValueError("Origem e destino devem ser da mesma empresa.")
 
     resultado = ResultadoReplicacao()
-    linhas_brutas = _linhas_origem(origem)
-    por_servico: dict[int, TabelaPreco] = {}
-    for tp in linhas_brutas:
-        por_servico[tp.codigo_servico_id] = tp
-    linhas = list(por_servico.values())
+    linhas = _linhas_origem_valores(origem)
     resultado.total_origem = len(linhas)
     if not linhas:
         return resultado
 
     try:
         with transaction.atomic():
-            for tp in linhas:
+            for row in linhas:
+                servico_id = row["codigo_servico_id"]
+                preco_sem = row["preco_apartamento"]
+                preco_com = row["preco_enfermaria"]
+
                 existente = TabelaPreco.objects.filter(
                     empresa_id=destino.empresa_id,
                     convenio_id=destino.convenio_id,
                     cabecalho_id=destino.pk,
-                    codigo_servico_id=tp.codigo_servico_id,
+                    codigo_servico_id=servico_id,
                 ).first()
 
                 if existente:
                     if atualizar_existentes:
                         mudou = (
-                            existente.preco_apartamento != tp.preco_apartamento
-                            or existente.preco_enfermaria != tp.preco_enfermaria
+                            existente.preco_apartamento != preco_sem
+                            or existente.preco_enfermaria != preco_com
                         )
                         if mudou:
-                            existente.preco_apartamento = tp.preco_apartamento
-                            existente.preco_enfermaria = tp.preco_enfermaria
+                            existente.preco_apartamento = preco_sem
+                            existente.preco_enfermaria = preco_com
                             existente.save(
                                 update_fields=["preco_apartamento", "preco_enfermaria"]
                             )
@@ -106,9 +123,9 @@ def replicar_tabela_preco(
                     empresa_id=destino.empresa_id,
                     convenio_id=destino.convenio_id,
                     cabecalho_id=destino.pk,
-                    codigo_servico_id=tp.codigo_servico_id,
-                    preco_apartamento=tp.preco_apartamento,
-                    preco_enfermaria=tp.preco_enfermaria,
+                    codigo_servico_id=servico_id,
+                    preco_apartamento=preco_sem,
+                    preco_enfermaria=preco_com,
                 )
                 resultado.criados += 1
     except IntegrityError as exc:

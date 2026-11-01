@@ -65,18 +65,36 @@ class TabelaPrecoForm(forms.ModelForm):
             self.fields['cabecalho'].queryset = Cabecalho.objects.none()
 
 
+def _nome_convenio(cabecalho: Cabecalho) -> str:
+    conv = cabecalho.convenio
+    if conv is None:
+        return "?"
+    return getattr(conv, "nome", None) or str(conv)
+
+
 def _rotulo_cabecalho(cabecalho: Cabecalho, contagens: dict[int, int] | None = None) -> str:
     n = (contagens or {}).get(cabecalho.pk, 0)
-    return f"{cabecalho.convenio} — {cabecalho.nome_tabela} ({n} preços)"
+    return f"{_nome_convenio(cabecalho)} — {cabecalho.nome_tabela} ({n} preços)"
+
+
+class CabecalhoChoiceField(forms.ModelChoiceField):
+    """Select de cabeçalho com rótulo legível (convênio + tabela + contagem)."""
+
+    def __init__(self, *, contagens: dict[int, int] | None = None, **kwargs):
+        self._contagens = contagens or {}
+        super().__init__(**kwargs)
+
+    def label_from_instance(self, obj: Cabecalho) -> str:
+        return _rotulo_cabecalho(obj, self._contagens)
 
 
 class ReplicarTabelaPrecoForm(forms.Form):
-    cabecalho_origem = forms.ModelChoiceField(
+    cabecalho_origem = CabecalhoChoiceField(
         queryset=Cabecalho.objects.none(),
         label="Copiar preços de (tabela origem)",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    cabecalho_destino = forms.ModelChoiceField(
+    cabecalho_destino = CabecalhoChoiceField(
         queryset=Cabecalho.objects.none(),
         label="Para (tabela destino)",
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -114,13 +132,9 @@ class ReplicarTabelaPrecoForm(forms.Form):
                 ).count()
 
         self.fields["cabecalho_origem"].queryset = qs
-        self.fields["cabecalho_origem"].label_from_instance = (
-            lambda c, cnt=contagens: _rotulo_cabecalho(c, cnt)
-        )
+        self.fields["cabecalho_origem"]._contagens = contagens
         self.fields["cabecalho_destino"].queryset = qs
-        self.fields["cabecalho_destino"].label_from_instance = (
-            lambda c, cnt=contagens_destino: _rotulo_cabecalho(c, cnt)
-        )
+        self.fields["cabecalho_destino"]._contagens = contagens_destino
         for name in ("cabecalho_origem", "cabecalho_destino"):
             field = self.fields[name]
             field.widget.attrs.setdefault("class", "form-select")

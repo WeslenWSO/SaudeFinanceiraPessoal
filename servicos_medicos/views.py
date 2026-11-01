@@ -155,11 +155,17 @@ class TabelaPrecoList(ListView):
     def get_queryset(self):
         qs = super().get_queryset()
         empresa_id = self.request.session.get('empresa_id')
-        if empresa_id:
-            qs = qs.filter(empresa_id=empresa_id)
+        if empresa_id is not None:
+            try:
+                qs = qs.filter(empresa_id=int(empresa_id))
+            except (TypeError, ValueError):
+                pass
         cabecalho_id = self.request.GET.get('cabecalho_id')
         if cabecalho_id:
-            qs = qs.filter(cabecalho_id=cabecalho_id)
+            try:
+                qs = qs.filter(cabecalho_id=int(cabecalho_id))
+            except (TypeError, ValueError):
+                pass
         search_query = (self.request.GET.get('q') or '').strip()
         if search_query:
             q_upper = search_query.upper()
@@ -315,6 +321,13 @@ class CabecalhoUpdate(UpdateView):
 class ReplicarTabelaPrecoView(View):
     template_name = "servicos_medicos/replicar_tabela_preco.html"
 
+    _GET_ID_PARAMS = (
+        ("origem", "cabecalho_origem"),
+        ("destino", "cabecalho_destino"),
+        ("origem_id", "cabecalho_origem"),
+        ("destino_id", "cabecalho_destino"),
+    )
+
     def _empresa_id(self, request):
         raw = request.session.get("empresa_id")
         if raw is None:
@@ -324,19 +337,48 @@ class ReplicarTabelaPrecoView(View):
         except (TypeError, ValueError):
             return None
 
+    def _cabecalho_por_id(self, empresa_id: int, raw_id) -> Cabecalho | None:
+        if raw_id is None:
+            return None
+        text = str(raw_id).strip()
+        if not text.isdigit():
+            return None
+        return (
+            Cabecalho.objects.filter(pk=int(text), empresa_id=empresa_id)
+            .select_related("convenio")
+            .first()
+        )
+
+    def _resolver_cabecalhos_post(self, request, empresa_id: int, form):
+        """Usa o formulário ou, se falhar, os IDs numéricos enviados (ex.: 7 → 6)."""
+        if form.is_valid():
+            return (
+                form.cleaned_data["cabecalho_origem"],
+                form.cleaned_data["cabecalho_destino"],
+                form.cleaned_data["atualizar_existentes"],
+                None,
+            )
+        origem = self._cabecalho_por_id(
+            empresa_id, request.POST.get("cabecalho_origem")
+        )
+        destino = self._cabecalho_por_id(
+            empresa_id, request.POST.get("cabecalho_destino")
+        )
+        if origem and destino:
+            atualizar = request.POST.get("atualizar_existentes") in ("on", "true", "1")
+            return origem, destino, atualizar, None
+        return None, None, True, form.errors
+
     def get(self, request):
         empresa_id = self._empresa_id(request)
         if not empresa_id:
             messages.error(request, "Selecione a empresa (Medicinarte) antes de replicar.")
             return redirect("empresa:lista")
         initial = {}
-        for param, field in (
-            ("origem", "cabecalho_origem"),
-            ("destino", "cabecalho_destino"),
-        ):
+        for param, field in self._GET_ID_PARAMS:
             raw = request.GET.get(param)
-            if raw and raw.isdigit():
-                initial[field] = int(raw)
+            if raw and str(raw).strip().isdigit():
+                initial[field] = int(str(raw).strip())
         form = ReplicarTabelaPrecoForm(empresa_id=empresa_id, initial=initial)
         return self._render(request, form)
 
@@ -346,26 +388,25 @@ class ReplicarTabelaPrecoView(View):
             messages.error(request, "Selecione a empresa (Medicinarte) antes de replicar.")
             return redirect("empresa:lista")
         form = ReplicarTabelaPrecoForm(request.POST, empresa_id=empresa_id)
-        if not form.is_valid():
+        origem, destino, atualizar_existentes, form_errors = self._resolver_cabecalhos_post(
+            request, empresa_id, form
+        )
+        if not origem or not destino:
+            detail = ""
+            if form_errors:
+                detail = f" Detalhe: {form_errors.as_text()}"
             messages.error(
                 request,
-                "Não foi possível replicar. Verifique origem, destino e os campos abaixo.",
+                "Não foi possível replicar. Escolha origem e destino (IDs numéricos "
+                f"do cabeçalho, ex. JARDEL=7, ABDES=6).{detail}",
             )
-            return self._render(request, form)
-
-        origem = form.cleaned_data["cabecalho_origem"]
-        destino = form.cleaned_data["cabecalho_destino"]
-        if empresa_id and (
-            origem.empresa_id != empresa_id or destino.empresa_id != empresa_id
-        ):
-            messages.error(request, "Cabeçalhos fora da empresa da sessão.")
             return self._render(request, form)
 
         try:
             resultado = replicar_tabela_preco(
                 origem,
                 destino,
-                atualizar_existentes=form.cleaned_data["atualizar_existentes"],
+                atualizar_existentes=atualizar_existentes,
             )
         except ValueError as exc:
             messages.error(request, str(exc))
@@ -382,10 +423,9 @@ class ReplicarTabelaPrecoView(View):
         if resultado.criados == 0 and resultado.atualizados == 0:
             messages.error(
                 request,
-                f"Nenhum preço foi gravado no destino «{destino.convenio} — {destino.nome_tabela}» "
-                f"(id {destino.pk}). Origem tinha {resultado.total_origem} itens; "
-                f"{resultado.pulados} já existiam iguais. Se a lista continua vazia, confira se o "
-                f"filtro da lista usa o mesmo cabeçalho (convênio — nome).",
+                f"Nenhum preço foi gravado no destino «{destino.convenio} — {destino.nome_tabela}». "
+                f"Origem tinha {resultado.total_origem} exames; {resultado.pulados} já existiam iguais. "
+                f"Na lista de preços, use o mesmo cabeçalho do combo (convênio — nome da tabela).",
             )
             return self._render(request, form)
 
@@ -393,7 +433,7 @@ class ReplicarTabelaPrecoView(View):
             request,
             f"Replicação concluída: {resultado.criados} criados, "
             f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
-            f"(destino id {destino.pk}).",
+            f"→ «{destino.convenio} — {destino.nome_tabela}».",
         )
         return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
 
