@@ -11,6 +11,7 @@ from estoque.views import (
 )
 from estoque.views_operacional import (
     checklist_farmacia_setor,
+    EstoqueCopaListView,
     EstoqueFarmaciaListView,
     EstoqueImobilizadoListView,
     ProdutoEstoqueOperacionalDetailView,
@@ -41,6 +42,7 @@ from estoque.views_operacional import (
 app_name = 'estoque'
 
 urlpatterns = [
+    path('copa/', EstoqueCopaListView.as_view(), name='copa_list'),
     path('farmacia/', EstoqueFarmaciaListView.as_view(), name='farmacia_list'),
     path('farmacia/exportar-excel/', farmacia_exportar_excel, name='farmacia_exportar_excel'),
     path('farmacia/lista-setor/', lista_farmacia_por_setor, name='farmacia_lista_setores'),

@@ -103,6 +103,72 @@ class _ProdutoEstoqueFiscalListMixin(_EmpresaMixin):
         return qs.order_by('descricao')
 
 
+class EstoqueCopaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
+    """Saldo de consumíveis no setor Copa (transferências a partir da farmácia)."""
+
+    template_name = 'estoque/copa_list.html'
+    setor_codigo = SetorEstoque.COPA
+
+    def get_queryset(self):
+        empresa_id = self.get_empresa_id()
+        if not empresa_id:
+            return ProdutoEstoque.objects.none()
+        somente_saldo = (self.request.GET.get('somente_saldo') or '1').strip() not in (
+            '0',
+            'false',
+            'nao',
+            'não',
+        )
+        saldo_qs = SaldoEstoqueSetor.objects.filter(
+            setor=self.setor_codigo,
+            produto__empresa_id=empresa_id,
+        )
+        if somente_saldo:
+            saldo_qs = saldo_qs.filter(quantidade__gt=0)
+        qs = (
+            self._queryset_base()
+            .filter(pk__in=saldo_qs.values_list('produto_id', flat=True))
+            .prefetch_related(
+                Prefetch(
+                    'saldos_setor',
+                    queryset=SaldoEstoqueSetor.objects.filter(setor=self.setor_codigo),
+                ),
+            )
+        )
+        return self._aplicar_busca(qs)
+
+    def paginate_queryset(self, queryset, page_size):
+        if not self.get_paginate_by(queryset):
+            for p in queryset:
+                self._anexar_quantidade_setor(p)
+            return None
+        paginator, page, object_list, has_other = super().paginate_queryset(queryset, page_size)
+        for p in object_list:
+            self._anexar_quantidade_setor(p)
+        return paginator, page, object_list, has_other
+
+    def _anexar_quantidade_setor(self, produto: ProdutoEstoque) -> None:
+        qtd = Decimal('0')
+        for saldo in produto.saldos_setor.all():
+            qtd = saldo.quantidade or Decimal('0')
+            break
+        produto.quantidade_no_setor = qtd
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['descricao'] = 'Estoque — Copa'
+        ctx['busca'] = (self.request.GET.get('q') or '').strip()
+        ctx['somente_saldo'] = (self.request.GET.get('somente_saldo') or '1').strip() not in (
+            '0',
+            'false',
+            'nao',
+            'não',
+        )
+        ctx['setor_codigo'] = self.setor_codigo
+        ctx['setor_rotulo'] = rotulo_setor(self.setor_codigo)
+        return ctx
+
+
 class EstoqueFarmaciaListView(LoginRequiredMixin, _ProdutoEstoqueFiscalListMixin, ListView):
     """Visão operacional — farmácia (Fiscal)."""
 
@@ -1295,6 +1361,7 @@ def _linhas_branco_lista_cega(request) -> int:
 _CHECKLIST_FARMACIA_SETORES: dict[str, tuple[str, str]] = {
     'sedacao': (SetorEstoque.SEDACAO, 'Checklist — Sedação'),
     'carrinho-urgencia': (SetorEstoque.CARRINHO_URGENCIA, 'Checklist — Carrinho de Urgência'),
+    'copa': (SetorEstoque.COPA, 'Checklist — Copa'),
 }
 
 

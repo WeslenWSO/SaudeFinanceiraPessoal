@@ -125,6 +125,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
         url_name='estoque:farmacia_list',
     ),
     MenuItemDef(
+        'estoque_copa',
+        'Estoque Copa',
+        'fa-mug-hot',
+        'estoque',
+        url_name='estoque:copa_list',
+    ),
+    MenuItemDef(
         'estoque_imobilizado',
         'Estoque imobilizado',
         'fa-warehouse',

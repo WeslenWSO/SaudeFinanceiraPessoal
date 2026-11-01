@@ -18,6 +18,7 @@ class SetorEstoque(models.TextChoices):
     RECEPCAO = 'recepcao', 'Recepção'
     SALA_ESPERA = 'sala_espera', 'Sala de Espera'
     ADMINISTRACAO = 'administracao', 'Administração'
+    COPA = 'copa', 'Copa'
     COZINHA = 'cozinha', 'Cozinha'
 
 

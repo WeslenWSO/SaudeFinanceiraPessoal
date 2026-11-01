@@ -23,6 +23,7 @@
         Alertas ({{ total_alertas_minimo }})
       </a>
       {% endif %}
+      <a href="{% url 'estoque:copa_list' %}" class="btn btn-outline-success btn-sm">Estoque Copa</a>
       <a href="{% url 'notafiscalentrada:produtos_comercio' %}" class="btn btn-success btn-sm">NF Comércio → estoque</a>
     </div>
   </div>
