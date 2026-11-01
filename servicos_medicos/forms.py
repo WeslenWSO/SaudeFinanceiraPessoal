@@ -98,6 +98,7 @@ class ReplicarTabelaPrecoForm(forms.Form):
 
         qs = Cabecalho.objects.none()
         contagens: dict[int, int] = {}
+        contagens_destino: dict[int, int] = {}
         if empresa_id:
             qs = (
                 Cabecalho.objects.filter(empresa_id=empresa_id)
@@ -108,11 +109,20 @@ class ReplicarTabelaPrecoForm(forms.Form):
 
             for cab in qs:
                 contagens[cab.pk] = contagem_linhas_origem(cab)
+                contagens_destino[cab.pk] = TabelaPreco.objects.filter(
+                    cabecalho_id=cab.pk
+                ).count()
 
+        self.fields["cabecalho_origem"].queryset = qs
+        self.fields["cabecalho_origem"].label_from_instance = (
+            lambda c, cnt=contagens: _rotulo_cabecalho(c, cnt)
+        )
+        self.fields["cabecalho_destino"].queryset = qs
+        self.fields["cabecalho_destino"].label_from_instance = (
+            lambda c, cnt=contagens_destino: _rotulo_cabecalho(c, cnt)
+        )
         for name in ("cabecalho_origem", "cabecalho_destino"):
             field = self.fields[name]
-            field.queryset = qs
-            field.label_from_instance = lambda c, cnt=contagens: _rotulo_cabecalho(c, cnt)
             field.widget.attrs.setdefault("class", "form-select")
             field.empty_label = "— Selecione —"
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 
 from servicos_medicos.models import Cabecalho, TabelaPreco
@@ -64,47 +64,57 @@ def replicar_tabela_preco(
         raise ValueError("Origem e destino devem ser da mesma empresa.")
 
     resultado = ResultadoReplicacao()
-    linhas = list(_linhas_origem(origem))
+    linhas_brutas = _linhas_origem(origem)
+    por_servico: dict[int, TabelaPreco] = {}
+    for tp in linhas_brutas:
+        por_servico[tp.codigo_servico_id] = tp
+    linhas = list(por_servico.values())
     resultado.total_origem = len(linhas)
     if not linhas:
         return resultado
 
-    with transaction.atomic():
-        for tp in linhas:
-            existente = TabelaPreco.objects.filter(
-                empresa_id=destino.empresa_id,
-                convenio_id=destino.convenio_id,
-                cabecalho_id=destino.pk,
-                codigo_servico_id=tp.codigo_servico_id,
-            ).first()
+    try:
+        with transaction.atomic():
+            for tp in linhas:
+                existente = TabelaPreco.objects.filter(
+                    empresa_id=destino.empresa_id,
+                    convenio_id=destino.convenio_id,
+                    cabecalho_id=destino.pk,
+                    codigo_servico_id=tp.codigo_servico_id,
+                ).first()
 
-            if existente:
-                if atualizar_existentes:
-                    mudou = (
-                        existente.preco_apartamento != tp.preco_apartamento
-                        or existente.preco_enfermaria != tp.preco_enfermaria
-                    )
-                    if mudou:
-                        existente.preco_apartamento = tp.preco_apartamento
-                        existente.preco_enfermaria = tp.preco_enfermaria
-                        existente.save(
-                            update_fields=["preco_apartamento", "preco_enfermaria"]
+                if existente:
+                    if atualizar_existentes:
+                        mudou = (
+                            existente.preco_apartamento != tp.preco_apartamento
+                            or existente.preco_enfermaria != tp.preco_enfermaria
                         )
-                        resultado.atualizados += 1
+                        if mudou:
+                            existente.preco_apartamento = tp.preco_apartamento
+                            existente.preco_enfermaria = tp.preco_enfermaria
+                            existente.save(
+                                update_fields=["preco_apartamento", "preco_enfermaria"]
+                            )
+                            resultado.atualizados += 1
+                        else:
+                            resultado.pulados += 1
                     else:
                         resultado.pulados += 1
-                else:
-                    resultado.pulados += 1
-                continue
+                    continue
 
-            TabelaPreco.objects.create(
-                empresa_id=destino.empresa_id,
-                convenio_id=destino.convenio_id,
-                cabecalho_id=destino.pk,
-                codigo_servico_id=tp.codigo_servico_id,
-                preco_apartamento=tp.preco_apartamento,
-                preco_enfermaria=tp.preco_enfermaria,
-            )
-            resultado.criados += 1
+                TabelaPreco.objects.create(
+                    empresa_id=destino.empresa_id,
+                    convenio_id=destino.convenio_id,
+                    cabecalho_id=destino.pk,
+                    codigo_servico_id=tp.codigo_servico_id,
+                    preco_apartamento=tp.preco_apartamento,
+                    preco_enfermaria=tp.preco_enfermaria,
+                )
+                resultado.criados += 1
+    except IntegrityError as exc:
+        raise ValueError(
+            "Não foi possível gravar todos os preços (conflito de duplicidade). "
+            "Confira se já existem linhas para este cabeçalho."
+        ) from exc
 
     return resultado

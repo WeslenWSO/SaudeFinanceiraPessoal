@@ -30,7 +30,7 @@
             <select name="cabecalho_id" id="cabecalho_id" class="form-select" onchange="this.form.submit()">
               <option value="">Todos os Cabeçalhos</option>
               {% for cabecalho in cabecalhos %}
-                <option value="{{ cabecalho.id }}" {% if cabecalho.id|stringformat:"s" == cabecalho_selecionado %}selected{% endif %}>{{ cabecalho.nome_tabela }}</option>
+                <option value="{{ cabecalho.id }}" {% if cabecalho.id|stringformat:"s" == cabecalho_selecionado %}selected{% endif %}>{{ cabecalho.convenio }} — {{ cabecalho.nome_tabela }}</option>
               {% endfor %}
             </select>
           </div>

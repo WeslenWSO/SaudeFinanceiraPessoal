@@ -316,7 +316,13 @@ class ReplicarTabelaPrecoView(View):
     template_name = "servicos_medicos/replicar_tabela_preco.html"
 
     def _empresa_id(self, request):
-        return request.session.get("empresa_id")
+        raw = request.session.get("empresa_id")
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
 
     def get(self, request):
         empresa_id = self._empresa_id(request)
@@ -374,18 +380,21 @@ class ReplicarTabelaPrecoView(View):
             return self._render(request, form)
 
         if resultado.criados == 0 and resultado.atualizados == 0:
-            messages.warning(
+            messages.error(
                 request,
-                f"Nenhum preço novo foi gravado ({resultado.pulados} já existiam no destino "
-                f"com os mesmos valores). Marque «Atualizar preços…» ou confira o destino.",
+                f"Nenhum preço foi gravado no destino «{destino.convenio} — {destino.nome_tabela}» "
+                f"(id {destino.pk}). Origem tinha {resultado.total_origem} itens; "
+                f"{resultado.pulados} já existiam iguais. Se a lista continua vazia, confira se o "
+                f"filtro da lista usa o mesmo cabeçalho (convênio — nome).",
             )
-        else:
-            messages.success(
-                request,
-                f"Replicação concluída: {resultado.criados} criados, "
-                f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
-                f"(origem: {resultado.total_origem} itens).",
-            )
+            return self._render(request, form)
+
+        messages.success(
+            request,
+            f"Replicação concluída: {resultado.criados} criados, "
+            f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
+            f"(destino id {destino.pk}).",
+        )
         return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
 
     def _render(self, request, form):
