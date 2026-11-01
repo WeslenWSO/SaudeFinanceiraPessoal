@@ -281,7 +281,13 @@ def run_import(args: argparse.Namespace, *, skip_db_url_check: bool = False) -> 
         linhas = postal._parse_tsv_dois_precos(args.arquivo)
         codigo_exato = True
         args.codigo_exato = True
-    elif codigo_exato:
+    elif codigo_exato or postal._arquivo_requer_codigo_exato(args.arquivo):
+        if not codigo_exato:
+            print(
+                "Detectado codigo com sufixo (ex.: 40103846-SED); "
+                "usando importacao por codigo exato.",
+            )
+            args.codigo_exato = True
         linhas = postal._parse_tsv_codigo_exato(args.arquivo)
     else:
         linhas = postal._parse_tsv(args.arquivo)

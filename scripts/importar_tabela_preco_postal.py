@@ -58,6 +58,24 @@ def _parse_valor(texto: str) -> Decimal:
     return Decimal(s)
 
 
+def _arquivo_requer_codigo_exato(caminho: Path) -> bool:
+    """True se alguma linha tiver codigo diferente de TUSS puro (8 digitos)."""
+    for linha in caminho.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        lower = linha.lower()
+        if lower.startswith("codigo") or lower.startswith("código"):
+            continue
+        partes = linha.split("\t")
+        if not partes:
+            continue
+        codigo = partes[0].strip()
+        if codigo and not TUSS_RE.fullmatch(codigo):
+            return True
+    return False
+
+
 def _parse_tsv_dois_precos(
     caminho: Path,
 ) -> list[tuple[str, str, Decimal, Decimal]]:
