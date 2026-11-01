@@ -65,8 +65,9 @@ class TabelaPrecoForm(forms.ModelForm):
             self.fields['cabecalho'].queryset = Cabecalho.objects.none()
 
 
-def _rotulo_cabecalho(cabecalho: Cabecalho) -> str:
-    return f"{cabecalho.convenio} — {cabecalho.nome_tabela}"
+def _rotulo_cabecalho(cabecalho: Cabecalho, contagens: dict[int, int] | None = None) -> str:
+    n = (contagens or {}).get(cabecalho.pk, 0)
+    return f"{cabecalho.convenio} — {cabecalho.nome_tabela} ({n} preços)"
 
 
 class ReplicarTabelaPrecoForm(forms.Form):
@@ -89,17 +90,31 @@ class ReplicarTabelaPrecoForm(forms.Form):
 
     def __init__(self, *args, empresa_id=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if empresa_id is not None:
+            try:
+                empresa_id = int(empresa_id)
+            except (TypeError, ValueError):
+                empresa_id = None
+
         qs = Cabecalho.objects.none()
+        contagens: dict[int, int] = {}
         if empresa_id:
             qs = (
                 Cabecalho.objects.filter(empresa_id=empresa_id)
                 .select_related("convenio", "empresa")
                 .order_by("convenio__nome", "nome_tabela")
             )
+            from servicos_medicos.replicar_tabela_preco import contagem_linhas_origem
+
+            for cab in qs:
+                contagens[cab.pk] = contagem_linhas_origem(cab)
+
         for name in ("cabecalho_origem", "cabecalho_destino"):
             field = self.fields[name]
             field.queryset = qs
-            field.label_from_instance = _rotulo_cabecalho
+            field.label_from_instance = lambda c, cnt=contagens: _rotulo_cabecalho(c, cnt)
+            field.widget.attrs.setdefault("class", "form-select")
+            field.empty_label = "— Selecione —"
 
     def clean(self):
         cleaned = super().clean()

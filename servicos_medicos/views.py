@@ -320,6 +320,9 @@ class ReplicarTabelaPrecoView(View):
 
     def get(self, request):
         empresa_id = self._empresa_id(request)
+        if not empresa_id:
+            messages.error(request, "Selecione a empresa (Medicinarte) antes de replicar.")
+            return redirect("empresa:lista")
         initial = {}
         for param, field in (
             ("origem", "cabecalho_origem"),
@@ -333,8 +336,15 @@ class ReplicarTabelaPrecoView(View):
 
     def post(self, request):
         empresa_id = self._empresa_id(request)
+        if not empresa_id:
+            messages.error(request, "Selecione a empresa (Medicinarte) antes de replicar.")
+            return redirect("empresa:lista")
         form = ReplicarTabelaPrecoForm(request.POST, empresa_id=empresa_id)
         if not form.is_valid():
+            messages.error(
+                request,
+                "Não foi possível replicar. Verifique origem, destino e os campos abaixo.",
+            )
             return self._render(request, form)
 
         origem = form.cleaned_data["cabecalho_origem"]
@@ -358,16 +368,24 @@ class ReplicarTabelaPrecoView(View):
         if resultado.total_origem == 0:
             messages.warning(
                 request,
-                f"A tabela origem «{origem.nome_tabela}» não possui preços cadastrados.",
+                f"A origem «{origem.convenio} — {origem.nome_tabela}» não tem preços "
+                f"(0 itens). Escolha o cabeçalho que mostra quantidade > 0 na lista.",
             )
-            return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
+            return self._render(request, form)
 
-        messages.success(
-            request,
-            f"Replicação concluída: {resultado.criados} criados, "
-            f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
-            f"(origem: {resultado.total_origem} itens).",
-        )
+        if resultado.criados == 0 and resultado.atualizados == 0:
+            messages.warning(
+                request,
+                f"Nenhum preço novo foi gravado ({resultado.pulados} já existiam no destino "
+                f"com os mesmos valores). Marque «Atualizar preços…» ou confira o destino.",
+            )
+        else:
+            messages.success(
+                request,
+                f"Replicação concluída: {resultado.criados} criados, "
+                f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
+                f"(origem: {resultado.total_origem} itens).",
+            )
         return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
 
     def _render(self, request, form):

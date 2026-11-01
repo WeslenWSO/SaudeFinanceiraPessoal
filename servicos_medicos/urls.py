@@ -20,12 +20,12 @@ urlpatterns = [
     # TabelaPreco
     path("tabela/", TabelaPrecoList.as_view(), name='tabela_list'),
     path("tabela/create/", TabelaPrecoCreate.as_view(), name='tabela_create'),
-    path("tabela/<pk>/update/", TabelaPrecoUpdate.as_view(), name='tabela_update'),
+    path("tabela/replicar/", ReplicarTabelaPrecoView.as_view(), name='tabela_replicar'),
+    path("tabela/<int:pk>/update/", TabelaPrecoUpdate.as_view(), name='tabela_update'),
 
     # Cabecalho
     path("cabecalho/", CabecalhoList.as_view(), name='cabecalho_list'),
     path("cabecalho/create/", CabecalhoCreate.as_view(), name='cabecalho_create'),
-    path("cabecalho/<pk>/update/", CabecalhoUpdate.as_view(), name='cabecalho_update'),
-    path("tabela/replicar/", ReplicarTabelaPrecoView.as_view(), name='tabela_replicar'),
+    path("cabecalho/<int:pk>/update/", CabecalhoUpdate.as_view(), name='cabecalho_update'),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

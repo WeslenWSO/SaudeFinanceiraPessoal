@@ -4,7 +4,7 @@ from __future__ import annotations
 from django.core.management.base import BaseCommand, CommandError
 
 from servicos_medicos.models import Cabecalho
-from servicos_medicos.replicar_tabela_preco import replicar_tabela_preco
+from servicos_medicos.replicar_tabela_preco import contagem_linhas_origem, replicar_tabela_preco
 
 
 class Command(BaseCommand):
@@ -24,6 +24,17 @@ class Command(BaseCommand):
         destino = Cabecalho.objects.filter(pk=options["destino_id"]).first()
         if not origem or not destino:
             raise CommandError("Cabeçalho origem ou destino não encontrado.")
+
+        n_origem = contagem_linhas_origem(origem)
+        self.stdout.write(
+            f"Origem id={origem.pk} ({origem.convenio} — {origem.nome_tabela}): "
+            f"{n_origem} preço(s) detectado(s)."
+        )
+        if n_origem == 0:
+            raise CommandError(
+                "Origem sem preços. Rode importar_tabela_jardel (ou equivalente) "
+                "ou escolha outro cabeçalho."
+            )
 
         try:
             r = replicar_tabela_preco(

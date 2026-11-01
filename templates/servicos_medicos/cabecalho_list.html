@@ -65,6 +65,9 @@
                <a href="{% url 'servicos_medicos:tabela_replicar' %}?origem={{ cabecalho.id }}" class="btn btn-outline-secondary btn-sm" title="Usar como origem na replicação">
                 Copiar desta
                </a>
+               <a href="{% url 'servicos_medicos:tabela_replicar' %}?destino={{ cabecalho.id }}" class="btn btn-outline-success btn-sm" title="Colar preços neste cabeçalho">
+                Colar aqui
+               </a>
 
         </td>
 
