@@ -24,6 +24,7 @@ LOTE = (
     ("rx", DADOS / "tabela_preco_particular_rx.tsv", {}),
     ("us", DADOS / "tabela_preco_particular_us.tsv", {"codigo_exato": True}),
     ("tc", DADOS / "tabela_preco_particular_tc.tsv", {"dois_precos": True}),
+    ("rm", DADOS / "tabela_preco_rm.tsv", {"dois_precos": True}),
     ("mammo", DADOS / "tabela_preco_particular_mammo.tsv", {}),
     ("eg", DADOS / "tabela_preco_particular_eg.tsv", {}),
     ("ecg", DADOS / "tabela_preco_particular_ecg.tsv", {}),
@@ -50,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "modalidades",
         nargs="*",
-        help="Filtrar: rx us tc mammo eg ecg (padrao: todas)",
+        help="Filtrar: rx us tc rm mammo eg ecg (padrao: todas)",
     )
     args = parser.parse_args(argv)
 

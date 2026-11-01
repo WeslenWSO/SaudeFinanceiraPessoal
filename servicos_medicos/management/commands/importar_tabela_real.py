@@ -22,7 +22,7 @@ def _load_real_script():
 class Command(BaseCommand):
     help = (
         "Cadastra/atualiza serviços e preços no convênio REAL CONVÊNIOS, "
-        "cabeçalho TABELA - REAL (RX, US, TC, etc.)."
+        "cabeçalho TABELA - REAL (RX, US, TC, RM, etc.)."
     )
 
     def add_arguments(self, parser):
@@ -34,7 +34,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "modalidades",
             nargs="*",
-            help="Opcional: rx us tc mammo eg ecg",
+            help="Opcional: rx us tc rm mammo eg ecg",
         )
 
     def handle(self, *args, **options):
