@@ -58,6 +58,28 @@ def _parse_valor(texto: str) -> Decimal:
     return Decimal(s)
 
 
+def _parse_tsv_codigo_exato(caminho: Path) -> list[tuple[str, str, Decimal]]:
+    """TSV com codigo unico na 1a coluna (ate 20 chars; pode repetir TUSS com sufixo)."""
+    registros: list[tuple[str, str, Decimal]] = []
+    for linha in caminho.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        lower = linha.lower()
+        if lower.startswith("codigo") or lower.startswith("código"):
+            continue
+        partes = linha.split("\t")
+        if len(partes) < 3:
+            continue
+        codigo = partes[0].strip()[:MAX_CODIGO]
+        if not codigo:
+            continue
+        nome = partes[1].strip()[:MAX_SERVICO]
+        valor = _parse_valor(partes[2])
+        registros.append((codigo, nome, valor))
+    return registros
+
+
 def _parse_tsv(caminho: Path) -> list[tuple[str, str, Decimal]]:
     registros: list[tuple[str, str, Decimal]] = []
     for linha in caminho.read_text(encoding="utf-8").splitlines():

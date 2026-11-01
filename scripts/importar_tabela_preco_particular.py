@@ -24,6 +24,7 @@ CONVENIO_NOME = "PARTICULAR"
 CABECALHO_NOME = "TABELA PARTICULAR"
 EMPRESA_ID_DEFAULT = 1
 TSV_DEFAULT = Path(__file__).resolve().parent / "dados" / "tabela_preco_particular_rx.tsv"
+TSV_US = Path(__file__).resolve().parent / "dados" / "tabela_preco_particular_us.tsv"
 
 
 def _load_postal():
@@ -73,6 +74,41 @@ def _conectar_com_retry() -> int:
     return 1
 
 
+def _resolver_servico_codigo(codigo: str, nome: str, cache: dict[str, object]):
+    from servicos_medicos.models import ServicosMedicos
+
+    if codigo in cache:
+        return cache[codigo], False
+    servico = ServicosMedicos.objects.filter(codigo=codigo).first()
+    criado = False
+    if not servico:
+        servico = ServicosMedicos.objects.create(
+            codigo=codigo[:20], servicos=nome[:200]
+        )
+        criado = True
+    elif nome and servico.servicos != nome:
+        servico.servicos = nome[:200]
+        servico.save(update_fields=["servicos"])
+    cache[codigo] = servico
+    return servico, criado
+
+
+def _buscar_preco_por_servico(empresa, convenio, cabecalho, servico, cache: dict[int, object]):
+    from servicos_medicos.models import TabelaPreco
+
+    if servico.pk in cache:
+        return cache[servico.pk]
+    preco = TabelaPreco.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        cabecalho=cabecalho,
+        codigo_servico=servico,
+    ).first()
+    if preco:
+        cache[servico.pk] = preco
+    return preco
+
+
 def importar_particular(args: argparse.Namespace, postal) -> int:
     from empresa.models import Empresa
     from servicos_medicos.models import Cabecalho, Convenio, ServicosMedicos, TabelaPreco
@@ -107,37 +143,58 @@ def importar_particular(args: argparse.Namespace, postal) -> int:
     print(f"Convênio: {convenio.nome} (id={convenio.pk})")
     print(f"Cabeçalho: {cabecalho.nome_tabela} (id={cabecalho.pk})")
 
+    codigo_exato = getattr(args, "codigo_exato", False)
     indice_servicos = postal._indice_servicos(ServicosMedicos.objects.all())
     cache_servicos: dict[str, object] = {}
-    cache_precos: dict[str, object] = {}
+    cache_precos_tuss: dict[str, object] = {}
+    cache_precos_servico: dict[int, object] = {}
 
     servicos_criados = criados = atualizados = pulados = 0
 
-    for tuss, nome, valor in args.linhas:
-        servico, servico_novo = postal._resolver_servico(
-            tuss, nome, indice_servicos, cache_servicos
-        )
+    for chave, nome, valor in args.linhas:
+        if codigo_exato:
+            servico, servico_novo = _resolver_servico_codigo(chave, nome, cache_servicos)
+        else:
+            servico, servico_novo = postal._resolver_servico(
+                chave, nome, indice_servicos, cache_servicos
+            )
         if servico_novo:
             servicos_criados += 1
 
-        if args.somente_novos:
-            existente = postal._buscar_preco_por_tuss(
-                empresa, convenio, cabecalho, tuss, cache_precos
+        if codigo_exato:
+            if args.somente_novos:
+                existente = _buscar_preco_por_servico(
+                    empresa, convenio, cabecalho, servico, cache_precos_servico
+                )
+                if existente:
+                    pulados += 1
+                    continue
+            preco = _buscar_preco_por_servico(
+                empresa, convenio, cabecalho, servico, cache_precos_servico
             )
-            if existente:
-                pulados += 1
-                continue
+        else:
+            if args.somente_novos:
+                existente = postal._buscar_preco_por_tuss(
+                    empresa, convenio, cabecalho, chave, cache_precos_tuss
+                )
+                if existente:
+                    pulados += 1
+                    continue
+            preco = postal._buscar_preco_por_tuss(
+                empresa, convenio, cabecalho, chave, cache_precos_tuss
+            )
 
-        preco = postal._buscar_preco_por_tuss(
-            empresa, convenio, cabecalho, tuss, cache_precos
-        )
         if preco:
             mudou = False
             if preco.preco_apartamento != valor or preco.preco_enfermaria != valor:
                 preco.preco_apartamento = valor
                 preco.preco_enfermaria = valor
                 mudou = True
-            if postal.TUSS_RE.fullmatch(servico.codigo) and preco.codigo_servico_id != servico.pk:
+            if (
+                not codigo_exato
+                and postal.TUSS_RE.fullmatch(servico.codigo)
+                and preco.codigo_servico_id != servico.pk
+            ):
                 preco.codigo_servico = servico
                 mudou = True
             if mudou:
@@ -152,10 +209,15 @@ def importar_particular(args: argparse.Namespace, postal) -> int:
                 preco_apartamento=valor,
                 preco_enfermaria=valor,
             )
-            cache_precos[tuss] = preco
+            if codigo_exato:
+                cache_precos_servico[servico.pk] = preco
+            else:
+                cache_precos_tuss[chave] = preco
             criados += 1
 
-    removidos = postal._limpar_duplicatas_postal(empresa, convenio, cabecalho)
+    removidos = 0
+    if not codigo_exato:
+        removidos = postal._limpar_duplicatas_postal(empresa, convenio, cabecalho)
 
     total = TabelaPreco.objects.filter(
         empresa=empresa, convenio=convenio, cabecalho=cabecalho
@@ -176,6 +238,7 @@ def build_args(
     convenio: str = CONVENIO_NOME,
     cabecalho: str = CABECALHO_NOME,
     somente_novos: bool = False,
+    codigo_exato: bool = False,
     linhas=None,
 ) -> argparse.Namespace:
     return argparse.Namespace(
@@ -185,6 +248,7 @@ def build_args(
         convenio=convenio,
         cabecalho=cabecalho,
         somente_novos=somente_novos,
+        codigo_exato=codigo_exato,
         linhas=linhas or [],
     )
 
@@ -196,7 +260,11 @@ def run_import(args: argparse.Namespace, *, skip_db_url_check: bool = False) -> 
         print(f"Arquivo não encontrado: {args.arquivo}", file=sys.stderr)
         return 1
 
-    linhas = postal._parse_tsv(args.arquivo)
+    codigo_exato = getattr(args, "codigo_exato", False)
+    if codigo_exato:
+        linhas = postal._parse_tsv_codigo_exato(args.arquivo)
+    else:
+        linhas = postal._parse_tsv(args.arquivo)
     if not linhas:
         print("Nenhuma linha válida no TSV.", file=sys.stderr)
         return 1
@@ -230,6 +298,11 @@ def main() -> int:
     parser.add_argument("--convenio", default=CONVENIO_NOME)
     parser.add_argument("--cabecalho", default=CABECALHO_NOME)
     parser.add_argument("--somente-novos", action="store_true")
+    parser.add_argument(
+        "--codigo-exato",
+        action="store_true",
+        help="1a coluna = codigo unico do servico (US, doppler, biopsias com sufixo)",
+    )
     ns = parser.parse_args()
     args = build_args(
         dry_run=ns.dry_run,
@@ -238,6 +311,7 @@ def main() -> int:
         convenio=ns.convenio,
         cabecalho=ns.cabecalho,
         somente_novos=ns.somente_novos,
+        codigo_exato=ns.codigo_exato,
     )
     return run_import(args)
 
