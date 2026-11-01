@@ -2,18 +2,27 @@
 from __future__ import annotations
 
 import importlib.util
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
 
 
+def _load_particular_script():
+    root = Path(__file__).resolve().parents[3]
+    script = root / "scripts" / "importar_tabela_preco_particular.py"
+    spec = importlib.util.spec_from_file_location("importar_tabela_preco_particular", script)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.path.insert(0, str(root))
+    spec.loader.exec_module(module)
+    return module
+
+
 class Command(BaseCommand):
     help = (
-        "Cadastra serviços e preços a partir de scripts/dados/tabela_preco_particular_rx.tsv "
-        "(convênio/cabeçalho PARTICULAR)."
+        "Cadastra serviços RX e preços em scripts/dados/tabela_preco_particular_rx.tsv "
+        "no convênio/cabeçalho TABELA PARTICULAR (empresa 1)."
     )
 
     def add_arguments(self, parser):
@@ -22,34 +31,26 @@ class Command(BaseCommand):
         parser.add_argument("--empresa-id", type=int, default=1)
         parser.add_argument("--convenio", default="PARTICULAR")
         parser.add_argument("--cabecalho", default="TABELA PARTICULAR")
-        parser.add_argument(
-            "--arquivo",
-            type=Path,
-            default=None,
-            help="TSV alternativo (codigo, nome, valor)",
-        )
+        parser.add_argument("--arquivo", type=Path, default=None)
 
     def handle(self, *args, **options):
+        mod = _load_particular_script()
         root = Path(__file__).resolve().parents[3]
-        script = root / "scripts" / "importar_tabela_preco_particular.py"
-        if not script.is_file():
-            self.stderr.write(f"Script não encontrado: {script}")
-            return 1
+        arquivo = options["arquivo"] or mod.TSV_DEFAULT
+        if not arquivo.is_absolute():
+            arquivo = root / arquivo
 
-        cmd = [sys.executable, str(script)]
-        if options["dry_run"]:
-            cmd.append("--dry-run")
-        if options["somente_novos"]:
-            cmd.append("--somente-novos")
-        cmd.extend(["--empresa-id", str(options["empresa_id"])])
-        cmd.extend(["--convenio", options["convenio"]])
-        cmd.extend(["--cabecalho", options["cabecalho"]])
-        if options["arquivo"]:
-            cmd.extend(["--arquivo", str(options["arquivo"])])
-
-        env = os.environ.copy()
-        if not env.get("DATABASE_URL") and (root / "render_db.url").is_file():
-            env["DATABASE_URL"] = (root / "render_db.url").read_text(encoding="utf-8").strip()
-
-        result = subprocess.run(cmd, cwd=str(root), env=env)
-        return result.returncode
+        args = mod.build_args(
+            dry_run=options["dry_run"],
+            arquivo=arquivo,
+            empresa_id=options["empresa_id"],
+            convenio=options["convenio"],
+            cabecalho=options["cabecalho"],
+            somente_novos=options["somente_novos"],
+        )
+        code = mod.run_import(args, skip_db_url_check=True)
+        if code:
+            self.stderr.write(self.style.ERROR(f"Importação encerrada com código {code}."))
+        else:
+            self.stdout.write(self.style.SUCCESS("Importação concluída."))
+        return code
