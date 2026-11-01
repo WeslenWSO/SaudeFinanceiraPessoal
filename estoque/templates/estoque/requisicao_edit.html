@@ -132,13 +132,17 @@
       <form method="post" class="p-3 border-bottom bg-light">
         {% csrf_token %}
         <input type="hidden" name="acao" value="add_item">
+        <p class="small text-muted mb-2 mb-md-0">
+          Lista apenas produtos com <strong>saldo &gt; 0</strong>
+          {% if requisicao.tipo == 'baixa_setor' %}no setor de origem{% else %}na farmácia{% endif %}.
+        </p>
         <div class="row g-2 align-items-end">
           <div class="col-md-7">
             <label class="form-label small mb-0">Produto</label>
             <select name="produto_id" class="form-select form-select-sm" required>
               <option value="">— Selecione —</option>
               {% for p in produtos %}
-              <option value="{{ p.pk }}">{{ p.codigo_produto }} — {{ p.descricao|truncatechars:70 }}</option>
+              <option value="{{ p.pk }}">{{ p.codigo_produto }} — {{ p.descricao|truncatechars:55 }} (saldo {{ p.saldo_exibir }})</option>
               {% endfor %}
             </select>
           </div>

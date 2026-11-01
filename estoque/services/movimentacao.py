@@ -16,7 +16,7 @@ from estoque.models import (
     RequisicaoEstoqueItem,
     SaldoEstoqueSetor,
 )
-from estoque.setores import SetorEstoque
+from estoque.setores import SetorEstoque, rotulo_setor
 from notafiscalentrada.models import NotaFiscalEntradaItem
 
 
@@ -77,10 +77,48 @@ def _quantidade_farmacia(produto: ProdutoEstoque) -> Decimal:
     return produto.quantidade_estoque or Decimal('0')
 
 
+def _quantidade_no_setor(produto: ProdutoEstoque, setor: str) -> Decimal:
+    if setor == SetorEstoque.FARMACIA:
+        return _quantidade_farmacia(produto)
+    row = SaldoEstoqueSetor.objects.filter(produto=produto, setor=setor).first()
+    return (row.quantidade if row else Decimal('0')) or Decimal('0')
+
+
+def _rotulo_produto_estoque(produto: ProdutoEstoque) -> str:
+    cod = (produto.codigo_produto or '').strip()
+    desc = (produto.descricao or '').strip()
+    if cod and desc:
+        return f'[{cod}] {desc[:120]}'
+    return cod or desc or f'produto #{produto.pk}'
+
+
+def _msg_saldo_insuficiente(
+    *,
+    local: str,
+    produto: ProdutoEstoque,
+    disponivel: Decimal,
+    solicitado: Decimal,
+) -> str:
+    return (
+        f'{local}: {_rotulo_produto_estoque(produto)} — '
+        f'disponível {disponivel}; solicitado {solicitado}. '
+        f'Reduza a quantidade ou remova o item da requisição.'
+    )
+
+
 def _ajustar_farmacia(produto: ProdutoEstoque, delta: Decimal) -> None:
-    nova = _quantidade_farmacia(produto) + delta
+    saldo_atual = _quantidade_farmacia(produto)
+    nova = saldo_atual + delta
     if nova < 0:
-        raise EstoqueErro('Saldo insuficiente na farmácia.')
+        pedido = -delta if delta < 0 else delta
+        raise EstoqueErro(
+            _msg_saldo_insuficiente(
+                local='Saldo insuficiente na farmácia',
+                produto=produto,
+                disponivel=saldo_atual,
+                solicitado=pedido,
+            ),
+        )
     produto.quantidade_estoque = nova
     produto.save(update_fields=['quantidade_estoque', 'atualizado_em'])
 
@@ -90,11 +128,66 @@ def _ajustar_setor(produto: ProdutoEstoque, setor: str, delta: Decimal) -> None:
         _ajustar_farmacia(produto, delta)
         return
     saldo = _saldo_setor(produto, setor)
-    nova = (saldo.quantidade or Decimal('0')) + delta
+    saldo_atual = saldo.quantidade or Decimal('0')
+    nova = saldo_atual + delta
     if nova < 0:
-        raise EstoqueErro(f'Saldo insuficiente no setor {setor}.')
+        pedido = -delta if delta < 0 else delta
+        raise EstoqueErro(
+            _msg_saldo_insuficiente(
+                local=f'Saldo insuficiente no setor {rotulo_setor(setor)}',
+                produto=produto,
+                disponivel=saldo_atual,
+                solicitado=pedido,
+            ),
+        )
     saldo.quantidade = nova
     saldo.save(update_fields=['quantidade'])
+
+
+def _validar_saldos_requisicao(
+    requisicao: RequisicaoEstoque,
+    itens: list[RequisicaoEstoqueItem],
+) -> None:
+    """Antes de movimentar, lista todos os itens sem saldo (evita surpresa no meio da conclusão)."""
+    erros: list[str] = []
+    for linha in itens:
+        q = linha.quantidade or Decimal('0')
+        if q <= 0:
+            continue
+        produto = linha.produto
+        if requisicao.tipo in (
+            RequisicaoEstoque.Tipo.TRANSFERENCIA,
+            RequisicaoEstoque.Tipo.BAIXA_FARMACIA,
+        ):
+            disp = _quantidade_farmacia(produto)
+            if disp < q:
+                erros.append(
+                    _msg_saldo_insuficiente(
+                        local='Farmácia',
+                        produto=produto,
+                        disponivel=disp,
+                        solicitado=q,
+                    ),
+                )
+        elif requisicao.tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+            origem = requisicao.setor_origem
+            if origem and origem != SetorEstoque.FARMACIA:
+                disp = _quantidade_no_setor(produto, origem)
+                if disp < q:
+                    erros.append(
+                        _msg_saldo_insuficiente(
+                            local=f'Setor {rotulo_setor(origem)}',
+                            produto=produto,
+                            disponivel=disp,
+                            solicitado=q,
+                        ),
+                    )
+    if not erros:
+        return
+    if len(erros) == 1:
+        raise EstoqueErro(erros[0])
+    linhas = '\n'.join(f'• {e}' for e in erros)
+    raise EstoqueErro(f'Saldo insuficiente em {len(erros)} item(ns):\n{linhas}')
 
 
 def _resolver_produto_entrada_nota(
@@ -389,6 +482,8 @@ def concluir_requisicao(requisicao: RequisicaoEstoque, *, usuario) -> None:
     itens = list(requisicao.itens.select_related('produto'))
     if not itens:
         raise EstoqueErro('Requisição sem itens.')
+
+    _validar_saldos_requisicao(requisicao, itens)
 
     for linha in itens:
         q = linha.quantidade or Decimal('0')

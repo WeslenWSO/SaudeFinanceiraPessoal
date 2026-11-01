@@ -6,7 +6,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError, OperationalError
-from django.db.models import Prefetch, Q, Sum
+from django.db.models import F, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -538,6 +539,40 @@ def _aplicar_setores_requisicao(req: RequisicaoEstoque) -> None:
         req.setor_consumo = req.setor_origem
 
 
+def _produtos_combo_requisicao(
+    requisicao: RequisicaoEstoque | None,
+    empresa_id: int,
+):
+    """Somente produtos com saldo > 0 na origem da requisição (farmácia ou setor)."""
+    if not empresa_id or not requisicao:
+        return ProdutoEstoque.objects.none()
+
+    qs = ProdutoEstoque.objects.filter(
+        empresa_id=empresa_id,
+        natureza=NaturezaEstoque.CONSUMIVEL,
+    )
+    if requisicao.tipo in (
+        RequisicaoEstoque.Tipo.TRANSFERENCIA,
+        RequisicaoEstoque.Tipo.BAIXA_FARMACIA,
+    ):
+        qs = qs.filter(quantidade_estoque__gt=0).annotate(saldo_exibir=F('quantidade_estoque'))
+    elif requisicao.tipo == RequisicaoEstoque.Tipo.BAIXA_SETOR:
+        origem = (requisicao.setor_origem or '').strip()
+        if not origem or origem == SetorEstoque.FARMACIA:
+            return ProdutoEstoque.objects.none()
+        saldo_sub = SaldoEstoqueSetor.objects.filter(
+            produto_id=OuterRef('pk'),
+            setor=origem,
+        ).values('quantidade')[:1]
+        qs = qs.annotate(
+            saldo_exibir=Coalesce(Subquery(saldo_sub), Value(Decimal('0'))),
+        ).filter(saldo_exibir__gt=0)
+    else:
+        return ProdutoEstoque.objects.none()
+
+    return qs.order_by('descricao')[:800]
+
+
 def _contexto_requisicao_tela(
     request,
     *,
@@ -546,15 +581,7 @@ def _contexto_requisicao_tela(
     empresa_id: int,
 ):
     itens = []
-    produtos = ProdutoEstoque.objects.none()
-    if empresa_id:
-        produtos = (
-            ProdutoEstoque.objects.filter(
-                empresa_id=empresa_id,
-                natureza=NaturezaEstoque.CONSUMIVEL,
-            )
-            .order_by('descricao')[:800]
-        )
+    produtos = _produtos_combo_requisicao(requisicao, empresa_id)
     if requisicao:
         itens = requisicao.itens.select_related('produto')
     if not requisicao:
