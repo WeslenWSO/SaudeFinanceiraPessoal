@@ -26,7 +26,7 @@
             <select name="cabecalho_id" id="cabecalho_id" class="form-select" onchange="this.form.submit()">
               <option value="">Todos os Cabeçalhos</option>
               {% for cabecalho in cabecalhos %}
-                <option value="{{ cabecalho.id }}" {% if cabecalho.id|stringformat:"s" == cabecalho_selecionado %}selected{% endif %}>{{ cabecalho }}</option>
+                <option value="{{ cabecalho.id }}" {% if cabecalho.id|stringformat:"s" == cabecalho_selecionado %}selected{% endif %}>{{ cabecalho.nome_tabela }}</option>
               {% endfor %}
             </select>
           </div>
@@ -68,9 +68,9 @@
    <thead>
      <tr>
        <th>ID</th>
-       <th>Empresa</th>
        <th>Convênio</th>
        <th>Cabeçalho</th>
+       <th>Código</th>
        <th>Serviço</th>
        <th>Preço sem Contraste</th>
        <th>Preço com Contraste</th>
@@ -95,8 +95,11 @@
       <td>
         {{ tabela.cabecalho|default:"Sem Cabeçalho" }}
       </td>
+      <td class="text-nowrap">
+        {{ tabela.codigo_servico.codigo }}
+      </td>
       <td>
-        {{ tabela.codigo_servico }}
+        {{ tabela.codigo_servico.servicos }}
       </td>
       <td>
         {{ tabela.preco_apartamento }}
@@ -116,7 +119,7 @@
     </tr>
     {% empty %}
     <tr>
-      <td colspan="8" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
+      <td colspan="9" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
     </tr>
     {% endfor %}
 
