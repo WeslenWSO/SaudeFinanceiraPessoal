@@ -58,6 +58,35 @@ def _parse_valor(texto: str) -> Decimal:
     return Decimal(s)
 
 
+def _parse_tsv_dois_precos(
+    caminho: Path,
+) -> list[tuple[str, str, Decimal, Decimal]]:
+    """TSV: codigo, nome, preco sem contraste, preco com contraste (4a coluna obrigatoria)."""
+    registros: list[tuple[str, str, Decimal, Decimal]] = []
+    for linha in caminho.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        lower = linha.lower()
+        if lower.startswith("codigo") or lower.startswith("código"):
+            continue
+        partes = linha.split("\t")
+        if len(partes) < 4:
+            continue
+        codigo = partes[0].strip()[:MAX_CODIGO]
+        if not codigo:
+            continue
+        nome = partes[1].strip()[:MAX_SERVICO]
+        sem_txt = (partes[2] or "").strip()
+        com_txt = (partes[3] or "").strip()
+        if not com_txt:
+            continue
+        valor_com = _parse_valor(com_txt)
+        valor_sem = _parse_valor(sem_txt) if sem_txt else valor_com
+        registros.append((codigo, nome, valor_sem, valor_com))
+    return registros
+
+
 def _parse_tsv_codigo_exato(caminho: Path) -> list[tuple[str, str, Decimal]]:
     """TSV com codigo unico na 1a coluna (ate 20 chars; pode repetir TUSS com sufixo)."""
     registros: list[tuple[str, str, Decimal]] = []

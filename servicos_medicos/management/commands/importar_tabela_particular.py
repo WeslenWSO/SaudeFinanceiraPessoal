@@ -22,7 +22,7 @@ def _load_particular_script():
 class Command(BaseCommand):
     help = (
         "Cadastra serviços e preços na TABELA PARTICULAR (empresa 1). "
-        "Padrao: scripts/dados/tabela_preco_particular_rx.tsv; US: --arquivo ..._us.tsv --codigo-exato."
+        "Padrao: RX; US: ..._us.tsv --codigo-exato; TC: ..._tc.tsv --dois-precos."
     )
 
     def add_arguments(self, parser):
@@ -36,6 +36,11 @@ class Command(BaseCommand):
             "--codigo-exato",
             action="store_true",
             help="Usar codigo unico por linha (tabela US/doppler/biopsia).",
+        )
+        parser.add_argument(
+            "--dois-precos",
+            action="store_true",
+            help="Colunas sem e com contraste (tomografia).",
         )
 
     def handle(self, *args, **options):
@@ -53,6 +58,7 @@ class Command(BaseCommand):
             cabecalho=options["cabecalho"],
             somente_novos=options["somente_novos"],
             codigo_exato=options["codigo_exato"],
+            dois_precos=options["dois_precos"],
         )
         code = mod.run_import(args, skip_db_url_check=True)
         if code:
