@@ -39,6 +39,15 @@ def usuario_pode_baixa_setor(user: User, empresa_id: int, setor: str) -> bool:
     return usuario_responsavel_setor(user, empresa_id, setor)
 
 
+def usuario_aprovador_estorno_nf(user: User | None) -> bool:
+    """Logado como Admin/Saude (ou staff) — não precisa redigitar senha no estorno."""
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    return (user.username or '').strip().lower() in _USUARIOS_SENHA_ESTORNO_NF
+
+
 def validar_senha_aprovacao_estorno_nf(senha: str) -> tuple[bool, str]:
     """
     Estorno de NF exige senha de um dos logins Admin ou Saude (username, case insensitive).
@@ -51,3 +60,10 @@ def validar_senha_aprovacao_estorno_nf(senha: str) -> tuple[bool, str]:
         if user and user.is_active and user.check_password(senha):
             return True, ''
     return False, 'Senha incorreta. Somente Admin ou Saude podem autorizar o estorno.'
+
+
+def validar_aprovacao_estorno_nf(request) -> tuple[bool, str]:
+    """Aprovador logado (ex.: saude) ou senha informada no POST."""
+    if usuario_aprovador_estorno_nf(getattr(request, 'user', None)):
+        return True, ''
+    return validar_senha_aprovacao_estorno_nf(request.POST.get('senha_aprovacao'))
