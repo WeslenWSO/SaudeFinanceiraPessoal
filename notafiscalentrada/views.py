@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -1335,11 +1337,26 @@ def produto_comercio_foto_upload(request):
         next_url = reverse('notafiscalentrada:produtos_comercio')
 
     arquivo = request.FILES.get('imagem')
+    if not codigo:
+        messages.error(request, 'Código do produto não informado.')
+        return redirect(next_url)
     try:
         salvar_foto_produto_upload(empresa_id, codigo, nome, arquivo)
         messages.success(request, f'Foto salva para o código {codigo}.')
     except ValueError as exc:
         messages.error(request, str(exc))
+    except Exception as exc:
+        logger = logging.getLogger(__name__)
+        logger.exception(
+            'Upload foto produto comércio (empresa=%s codigo=%s)',
+            empresa_id,
+            codigo,
+        )
+        messages.error(
+            request,
+            f'Erro ao salvar a foto: {exc}. '
+            'Se persistir, verifique migrate notafiscalentrada e disco MEDIA no Render.',
+        )
 
     return redirect(next_url)
 

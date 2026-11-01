@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 import re
+from io import BytesIO
+from pathlib import Path
 from urllib.parse import quote_plus
 
 _MAX_FOTO_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -409,6 +411,67 @@ def _extensao_por_content_type(content_type: str) -> str:
     return 'jpg'
 
 
+def _extensao_por_nome_arquivo(nome: str) -> str:
+    n = (nome or '').lower().rsplit('.', 1)
+    if len(n) == 2 and n[1] in ('jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'):
+        return 'jpg' if n[1] == 'jpeg' else n[1]
+    return ''
+
+
+def _garantir_media_gravavel() -> None:
+    from faturamento_medico.services.media_storage import verificar_media_gravavel
+
+    ok, err = verificar_media_gravavel(Path(settings.MEDIA_ROOT))
+    if not ok:
+        raise ValueError(
+            'Servidor sem pasta de imagens gravável. '
+            f'({err or "MEDIA_ROOT"}) Configure disco persistente ou MEDIA_ROOT no Render.'
+        )
+
+
+def _preparar_conteudo_imagem_upload(arquivo) -> tuple[ContentFile, str]:
+    """
+    Valida tamanho/tipo e normaliza para JPEG (evita falha com HEIC/octet-stream no celular).
+    """
+    from PIL import Image, UnidentifiedImageError
+
+    raw = arquivo.read()
+    if not raw:
+        raise ValueError('Arquivo de imagem vazio.')
+    ctype = (getattr(arquivo, 'content_type', '') or '').split(';')[0].strip().lower()
+    nome = getattr(arquivo, 'name', '') or ''
+    if not ctype or ctype == 'application/octet-stream':
+        ext = _extensao_por_nome_arquivo(nome)
+        ctype = {
+            'png': 'image/png',
+            'webp': 'image/webp',
+            'gif': 'image/gif',
+            'jpg': 'image/jpeg',
+            'heic': 'image/heic',
+            'heif': 'image/heif',
+        }.get(ext, '')
+
+    if ctype and ctype not in _TIPOS_FOTO_UPLOAD:
+        raise ValueError('Formato não suportado. Use JPG, PNG ou WebP.')
+
+    try:
+        img = Image.open(BytesIO(raw))
+        img.load()
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        buf = BytesIO()
+        img.save(buf, format='JPEG', quality=88, optimize=True)
+        return ContentFile(buf.getvalue()), 'jpg'
+    except UnidentifiedImageError as exc:
+        raise ValueError(
+            'Imagem não reconhecida. No celular, escolha JPG/PNG ou desative HEIC nas configurações da câmera.'
+        ) from exc
+    except OSError as exc:
+        raise ValueError(f'Não foi possível ler a imagem: {exc}') from exc
+
+
 def salvar_foto_produto_upload(
     empresa_id: int,
     codigo_produto: str,
@@ -426,9 +489,9 @@ def salvar_foto_produto_upload(
         raise ValueError('Arquivo de imagem vazio.')
     if tamanho > _MAX_FOTO_UPLOAD_BYTES:
         raise ValueError('Imagem muito grande (máximo 5 MB).')
-    ctype = (getattr(arquivo, 'content_type', '') or '').split(';')[0].strip().lower()
-    if ctype and ctype not in _TIPOS_FOTO_UPLOAD:
-        raise ValueError('Formato não suportado. Use JPG, PNG ou WebP.')
+
+    _garantir_media_gravavel()
+    conteudo, ext = _preparar_conteudo_imagem_upload(arquivo)
 
     obj, created = ProdutoComercioFoto.objects.get_or_create(
         empresa_id=empresa_id,
@@ -436,10 +499,12 @@ def salvar_foto_produto_upload(
         defaults={'nome_produto': (nome_produto or '')[:200]},
     )
     if not created and obj.imagem:
-        obj.imagem.delete(save=False)
-    nome_arquivo = re.sub(r'[^\w.-]+', '_', codigo)[:40]
-    ext = _extensao_por_content_type(ctype)
-    obj.imagem.save(f'{nome_arquivo}.{ext}', arquivo, save=False)
+        try:
+            obj.imagem.delete(save=False)
+        except OSError as exc:
+            logger.warning('Remover foto anterior %s: %s', codigo, exc)
+    nome_arquivo = re.sub(r'[^\w.-]+', '_', codigo)[:40] or 'produto'
+    obj.imagem.save(f'{nome_arquivo}.{ext}', conteudo, save=False)
     if nome_produto:
         obj.nome_produto = nome_produto[:200]
     obj.fonte = 'upload'
