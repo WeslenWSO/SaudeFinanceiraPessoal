@@ -23,6 +23,16 @@ class Command(BaseCommand):
             help="Nome do convênio (pode repetir). Ex.: --convenio ADRIANA --convenio ABDES",
         )
         parser.add_argument(
+            "--cabecalho-nome",
+            action="append",
+            dest="cabecalho_nomes",
+            metavar="NOME",
+            help=(
+                "Nome do cabeçalho (nome_tabela). Com --convenio, restringe a esse par. "
+                'Ex.: --convenio "REAL CONVÊNIOS" --cabecalho-nome "TABELA - REAL"'
+            ),
+        )
+        parser.add_argument(
             "--cabecalho-id",
             action="append",
             dest="cabecalho_ids",
@@ -47,6 +57,11 @@ class Command(BaseCommand):
             help="Obrigatório para apagar de verdade (sem isso, só dry-run implícito)",
         )
         parser.add_argument(
+            "--remover-cabecalho",
+            action="store_true",
+            help="Após apagar os preços, remove também o cadastro do Cabeçalho",
+        )
+        parser.add_argument(
             "--id",
             action="append",
             dest="cabecalho_ids",
@@ -57,13 +72,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         convenios = [c.strip() for c in (options["convenios"] or []) if c and c.strip()]
+        cab_nomes = [c.strip() for c in (options["cabecalho_nomes"] or []) if c and c.strip()]
         cab_ids = options["cabecalho_ids"] or []
         empresa_id = options["empresa_id"]
         dry = options["dry_run"] or not options["confirmar"]
+        remover_cabecalho = options["remover_cabecalho"]
 
-        if not convenios and not cab_ids:
+        if not convenios and not cab_ids and not cab_nomes:
             raise CommandError(
-                "Informe --convenio ADRIANA --convenio ABDES e/ou --cabecalho-id 6"
+                "Informe --convenio, --cabecalho-nome e/ou --cabecalho-id "
+                '(ex.: --convenio "REAL CONVÊNIOS" --cabecalho-nome "TABELA - REAL")'
             )
 
         cabecalhos = Cabecalho.objects.filter(empresa_id=empresa_id).select_related(
@@ -72,8 +90,19 @@ class Command(BaseCommand):
         filtros = Q()
         if cab_ids:
             filtros |= Q(pk__in=cab_ids)
-        for nome in convenios:
-            filtros |= Q(convenio__nome__iexact=nome)
+        if convenios and cab_nomes:
+            for conv in convenios:
+                for cab_nome in cab_nomes:
+                    filtros |= Q(
+                        convenio__nome__iexact=conv,
+                        nome_tabela__iexact=cab_nome,
+                    )
+        elif convenios:
+            for nome in convenios:
+                filtros |= Q(convenio__nome__iexact=nome)
+        elif cab_nomes:
+            for cab_nome in cab_nomes:
+                filtros |= Q(nome_tabela__iexact=cab_nome)
 
         cabecalhos = cabecalhos.filter(filtros).order_by("convenio__nome", "nome_tabela")
         if not cabecalhos.exists():
@@ -105,9 +134,17 @@ class Command(BaseCommand):
             self.stdout.write("Nada a apagar.")
             return
 
+        cab_pk_list = list(cabecalhos.values_list("pk", flat=True))
         with transaction.atomic():
-            apagados, _ = TabelaPreco.objects.filter(
-                cabecalho_id__in=cabecalhos.values_list("pk", flat=True)
-            ).delete()
+            apagados, _ = TabelaPreco.objects.filter(cabecalho_id__in=cab_pk_list).delete()
+            if remover_cabecalho:
+                Cabecalho.objects.filter(pk__in=cab_pk_list).delete()
 
-        self.stdout.write(self.style.SUCCESS(f"Apagados: {apagados} registro(s)."))
+        self.stdout.write(self.style.SUCCESS(f"Apagados: {apagados} registro(s) de TabelaPreco."))
+        if remover_cabecalho:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Cabeçalho(s) removido(s): {len(cab_pk_list)} "
+                    f"(cadastro «Cabeçalho» excluído do combo)."
+                )
+            )
