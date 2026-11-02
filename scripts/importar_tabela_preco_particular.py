@@ -110,6 +110,75 @@ def _buscar_preco_por_servico(empresa, convenio, cabecalho, servico, cache: dict
     return preco
 
 
+def _nomes_cabecalho_candidatos(nome: str) -> list[str]:
+    nome = (nome or "").strip()
+    if not nome:
+        return []
+    candidatos = [nome]
+    upper = nome.upper()
+    if "TABELA" in upper and "REAL" in upper:
+        for alt in ("TABELA - REAL", "TABELA REAL", "TABELA- REAL"):
+            if alt not in candidatos:
+                candidatos.append(alt)
+    return candidatos
+
+
+def _resolver_cabecalho(empresa, convenio, nome: str, cabecalho_id: int | None = None):
+    from django.db.models import Count
+    from servicos_medicos.models import Cabecalho
+
+    if cabecalho_id:
+        cab = Cabecalho.objects.filter(
+            pk=cabecalho_id, empresa=empresa, convenio=convenio
+        ).first()
+        if not cab:
+            cab = Cabecalho.objects.filter(pk=cabecalho_id, empresa=empresa).first()
+        if cab:
+            return cab
+        raise ValueError(f"Cabeçalho id={cabecalho_id} não encontrado para esta empresa/convênio.")
+
+    for cand in _nomes_cabecalho_candidatos(nome):
+        cab = Cabecalho.objects.filter(
+            empresa=empresa, convenio=convenio, nome_tabela__iexact=cand
+        ).first()
+        if cab:
+            return cab
+
+    qs = Cabecalho.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        nome_tabela__icontains="TABELA",
+    ).filter(nome_tabela__icontains="REAL")
+    if qs.count() == 1:
+        return qs.first()
+    if qs.count() > 1:
+        anotado = qs.annotate(n_precos=Count("tabelapreco"))
+        cab = anotado.order_by("-n_precos", "id").first()
+        if cab:
+            resumo = ", ".join(
+                f"«{c.nome_tabela}» id={c.pk} ({c.n_precos} preços)"
+                for c in anotado.order_by("-n_precos", "id")
+            )
+            print(
+                f"Aviso: existem vários cabeçalhos REAL no convênio ({resumo}). "
+                f"Os preços serão gravados em «{cab.nome_tabela}» (id={cab.pk}). "
+                f"Use --cabecalho-id para escolher outro.",
+            )
+            return cab
+
+    cab = Cabecalho.objects.filter(
+        empresa=empresa,
+        convenio=convenio,
+        nome_tabela__icontains=nome.strip(),
+    ).first()
+    if cab:
+        return cab
+
+    return Cabecalho.objects.create(
+        empresa=empresa, convenio=convenio, nome_tabela=nome.strip()
+    )
+
+
 def importar_particular(args: argparse.Namespace, postal) -> int:
     from empresa.models import Empresa
     from servicos_medicos.models import Cabecalho, Convenio, ServicosMedicos, TabelaPreco
@@ -127,19 +196,14 @@ def importar_particular(args: argparse.Namespace, postal) -> int:
     if not convenio:
         convenio, _ = Convenio.objects.get_or_create(empresa=empresa, nome=args.convenio)
 
-    cabecalho = Cabecalho.objects.filter(
-        empresa=empresa, convenio=convenio, nome_tabela__iexact=args.cabecalho
-    ).first()
-    if not cabecalho:
-        cabecalho = Cabecalho.objects.filter(
-            empresa=empresa,
-            convenio=convenio,
-            nome_tabela__icontains=args.cabecalho,
-        ).first()
-    if not cabecalho:
-        cabecalho = Cabecalho.objects.create(
-            empresa=empresa, convenio=convenio, nome_tabela=args.cabecalho
+    cabecalho_id = getattr(args, "cabecalho_id", None)
+    try:
+        cabecalho = _resolver_cabecalho(
+            empresa, convenio, args.cabecalho, cabecalho_id=cabecalho_id
         )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     print(f"Convênio: {convenio.nome} (id={convenio.pk})")
     print(f"Cabeçalho: {cabecalho.nome_tabela} (id={cabecalho.pk})")
@@ -250,6 +314,7 @@ def build_args(
     empresa_id: int = EMPRESA_ID_DEFAULT,
     convenio: str = CONVENIO_NOME,
     cabecalho: str = CABECALHO_NOME,
+    cabecalho_id: int | None = None,
     somente_novos: bool = False,
     codigo_exato: bool = False,
     dois_precos: bool = False,
@@ -261,6 +326,7 @@ def build_args(
         empresa_id=empresa_id,
         convenio=convenio,
         cabecalho=cabecalho,
+        cabecalho_id=cabecalho_id,
         somente_novos=somente_novos,
         codigo_exato=codigo_exato,
         dois_precos=dois_precos,

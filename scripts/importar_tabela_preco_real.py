@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DADOS = Path(__file__).resolve().parent / "dados"
 
 CONVENIO_NOME = "REAL CONVÊNIOS"
-# Use --cabecalho "TABELA - REAL" se o cabeçalho no sistema tiver hífen.
-CABECALHO_NOME = "TABELA REAL"
+# TABELA REAL e TABELA - REAL são tratados como o mesmo cabeçalho na importação.
+CABECALHO_NOME = "TABELA - REAL"
 EMPRESA_ID = 1
 
 LOTE = (
@@ -48,6 +48,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--empresa-id", type=int, default=EMPRESA_ID)
     parser.add_argument("--convenio", default=CONVENIO_NOME)
     parser.add_argument("--cabecalho", default=CABECALHO_NOME)
+    parser.add_argument(
+        "--cabecalho-id",
+        type=int,
+        default=None,
+        help="ID do cabeçalho no ERP (use se existir TABELA REAL e TABELA - REAL)",
+    )
     parser.add_argument("--somente-novos", action="store_true")
     parser.add_argument(
         "modalidades",
@@ -74,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             empresa_id=args.empresa_id,
             convenio=args.convenio,
             cabecalho=args.cabecalho,
+            cabecalho_id=args.cabecalho_id,
             somente_novos=args.somente_novos,
             codigo_exato=extras.get("codigo_exato", False),
             dois_precos=extras.get("dois_precos", False),

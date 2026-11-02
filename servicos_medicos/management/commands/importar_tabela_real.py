@@ -30,7 +30,13 @@ class Command(BaseCommand):
         parser.add_argument("--somente-novos", action="store_true")
         parser.add_argument("--empresa-id", type=int, default=1)
         parser.add_argument("--convenio", default="REAL CONVÊNIOS")
-        parser.add_argument("--cabecalho", default="TABELA REAL")
+        parser.add_argument("--cabecalho", default="TABELA - REAL")
+        parser.add_argument(
+            "--cabecalho-id",
+            type=int,
+            default=None,
+            help="ID do cabeçalho (filtro da lista de preços no ERP)",
+        )
         parser.add_argument(
             "modalidades",
             nargs="*",
@@ -47,6 +53,8 @@ class Command(BaseCommand):
         argv.extend(["--empresa-id", str(options["empresa_id"])])
         argv.extend(["--convenio", options["convenio"]])
         argv.extend(["--cabecalho", options["cabecalho"]])
+        if options.get("cabecalho_id"):
+            argv.extend(["--cabecalho-id", str(options["cabecalho_id"])])
         argv.extend(options["modalidades"] or [])
 
         code = mod.main(argv)
