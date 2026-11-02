@@ -77,25 +77,18 @@ def _rotulo_cabecalho(cabecalho: Cabecalho, contagens: dict[int, int] | None = N
     return f"{_nome_convenio(cabecalho)} — {cabecalho.nome_tabela} ({n} preços)"
 
 
-class CabecalhoChoiceField(forms.ModelChoiceField):
-    """Select de cabeçalho com rótulo legível (convênio + tabela + contagem)."""
-
-    def __init__(self, *, contagens: dict[int, int] | None = None, **kwargs):
-        self._contagens = contagens or {}
-        super().__init__(**kwargs)
-
-    def label_from_instance(self, obj: Cabecalho) -> str:
-        return _rotulo_cabecalho(obj, self._contagens)
-
-
 class ReplicarTabelaPrecoForm(forms.Form):
-    cabecalho_origem = CabecalhoChoiceField(
-        queryset=Cabecalho.objects.none(),
+    """Combo envia o id numérico do cabeçalho (value=7), igual ao manage.py --origem-id."""
+
+    cabecalho_origem = forms.TypedChoiceField(
+        coerce=int,
+        choices=[],
         label="Copiar preços de (tabela origem)",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    cabecalho_destino = CabecalhoChoiceField(
-        queryset=Cabecalho.objects.none(),
+    cabecalho_destino = forms.TypedChoiceField(
+        coerce=int,
+        choices=[],
         label="Para (tabela destino)",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
@@ -114,36 +107,35 @@ class ReplicarTabelaPrecoForm(forms.Form):
             except (TypeError, ValueError):
                 empresa_id = None
 
-        qs = Cabecalho.objects.none()
-        contagens: dict[int, int] = {}
-        contagens_destino: dict[int, int] = {}
+        choices_origem: list[tuple[int, str]] = []
+        choices_destino: list[tuple[int, str]] = []
         if empresa_id:
+            from django.db.models import Q
+
+            from servicos_medicos.replicar_tabela_preco import contagem_linhas_origem
+
             qs = (
-                Cabecalho.objects.filter(empresa_id=empresa_id)
+                Cabecalho.objects.filter(
+                    Q(empresa_id=empresa_id) | Q(empresa_id__isnull=True)
+                )
                 .select_related("convenio", "empresa")
                 .order_by("convenio__nome", "nome_tabela")
             )
-            from servicos_medicos.replicar_tabela_preco import contagem_linhas_origem
-
             for cab in qs:
-                contagens[cab.pk] = contagem_linhas_origem(cab)
-                contagens_destino[cab.pk] = TabelaPreco.objects.filter(
-                    cabecalho_id=cab.pk
-                ).count()
+                n_orig = contagem_linhas_origem(cab)
+                n_dest = TabelaPreco.objects.filter(cabecalho_id=cab.pk).count()
+                choices_origem.append((cab.pk, _rotulo_cabecalho(cab, {cab.pk: n_orig})))
+                choices_destino.append((cab.pk, _rotulo_cabecalho(cab, {cab.pk: n_dest})))
 
-        self.fields["cabecalho_origem"].queryset = qs
-        self.fields["cabecalho_origem"]._contagens = contagens
-        self.fields["cabecalho_destino"].queryset = qs
-        self.fields["cabecalho_destino"]._contagens = contagens_destino
+        self.fields["cabecalho_origem"].choices = [("", "— Selecione —")] + choices_origem
+        self.fields["cabecalho_destino"].choices = [("", "— Selecione —")] + choices_destino
         for name in ("cabecalho_origem", "cabecalho_destino"):
-            field = self.fields[name]
-            field.widget.attrs.setdefault("class", "form-select")
-            field.empty_label = "— Selecione —"
+            self.fields[name].widget.attrs.setdefault("class", "form-select")
 
     def clean(self):
         cleaned = super().clean()
-        origem = cleaned.get("cabecalho_origem")
-        destino = cleaned.get("cabecalho_destino")
-        if origem and destino and origem.pk == destino.pk:
+        origem_id = cleaned.get("cabecalho_origem")
+        destino_id = cleaned.get("cabecalho_destino")
+        if origem_id and destino_id and origem_id == destino_id:
             raise forms.ValidationError("Escolha cabeçalhos diferentes para origem e destino.")
         return cleaned

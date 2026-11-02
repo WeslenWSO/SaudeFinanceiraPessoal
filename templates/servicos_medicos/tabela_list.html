@@ -23,6 +23,13 @@
 <div class="card mb-4 card-servicos-medicos-lista">
    <div class="card-header"> {{ descricao }}   </div>
     <div class="card-body">
+      {% if grid_editavel %}
+      <div class="alert alert-info py-2 small mb-3">
+        Edição rápida ativa (Saude / superusuário): altere <strong>serviço</strong> e <strong>preços</strong> na tabela;
+        ao sair do campo, a alteração é salva e o nome em Serviços Médicos é atualizado junto.
+      </div>
+      {% csrf_token %}
+      {% endif %}
       <form method="get" class="mb-3" id="filtro-tabela-preco">
         <div class="row g-2 align-items-end">
           <div class="col-md-4">
@@ -86,7 +93,7 @@
 
     {% for tabela in object_list %}
 
-     <tr>
+     <tr{% if grid_editavel %} data-tabela-preco-id="{{ tabela.id }}" class="tabela-preco-grid-row"{% endif %}>
       <td>
         {{ tabela.id }}
             </td>
@@ -100,13 +107,45 @@
         {{ tabela.codigo_servico.codigo }}
       </td>
       <td>
+        {% if grid_editavel %}
+        <input type="text"
+               class="form-control form-control-sm grid-editavel grid-campo-servicos"
+               name="servicos_{{ tabela.id }}"
+               value="{{ tabela.codigo_servico.servicos }}"
+               data-original-value="{{ tabela.codigo_servico.servicos }}"
+               maxlength="200"
+               aria-label="Descrição do serviço">
+        {% else %}
         {{ tabela.codigo_servico.servicos }}
+        {% endif %}
       </td>
       <td>
+        {% if grid_editavel %}
+        <input type="text"
+               inputmode="decimal"
+               class="form-control form-control-sm grid-editavel grid-campo-preco text-end"
+               name="preco_sem_{{ tabela.id }}"
+               value="{{ tabela.preco_apartamento }}"
+               data-original-value="{{ tabela.preco_apartamento }}"
+               data-campo="preco_apartamento"
+               aria-label="Preço sem contraste">
+        {% else %}
         {{ tabela.preco_apartamento }}
+        {% endif %}
       </td>
       <td>
+        {% if grid_editavel %}
+        <input type="text"
+               inputmode="decimal"
+               class="form-control form-control-sm grid-editavel grid-campo-preco text-end"
+               name="preco_com_{{ tabela.id }}"
+               value="{{ tabela.preco_enfermaria }}"
+               data-original-value="{{ tabela.preco_enfermaria }}"
+               data-campo="preco_enfermaria"
+               aria-label="Preço com contraste">
+        {% else %}
         {{ tabela.preco_enfermaria }}
+        {% endif %}
       </td>
 
         <td>
@@ -168,5 +207,95 @@
    </div>
 </div>
 </div>
+
+{% if grid_editavel %}
+<style>
+  .tabela-preco-grid-row.is-saving .grid-editavel { opacity: 0.65; }
+  .tabela-preco-grid-row.is-ok .grid-editavel { border-color: #198754; }
+  .tabela-preco-grid-row.is-erro .grid-editavel { border-color: #dc3545; }
+</style>
+<script>
+(function () {
+  const url = "{% url 'servicos_medicos:tabela_grid_atualizar' %}";
+  const tokenEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  const csrf = tokenEl ? tokenEl.value : '';
+
+  function payloadCampo(input) {
+    if (input.classList.contains('grid-campo-servicos')) {
+      return { servicos: input.value };
+    }
+    const campo = input.dataset.campo;
+    if (campo === 'preco_apartamento') {
+      return { preco_apartamento: input.value };
+    }
+    if (campo === 'preco_enfermaria') {
+      return { preco_enfermaria: input.value };
+    }
+    return {};
+  }
+
+  async function salvarLinha(row, input) {
+    if (input.dataset.saving === '1') return;
+    if (input.value === input.dataset.originalValue) return;
+
+    const id = row.getAttribute('data-tabela-preco-id');
+    const body = Object.assign({ id: parseInt(id, 10) }, payloadCampo(input));
+
+    row.classList.remove('is-ok', 'is-erro');
+    row.classList.add('is-saving');
+    input.dataset.saving = '1';
+
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error((data && data.erro) || 'Falha ao salvar.');
+      }
+      const d = data.dados;
+      const serv = row.querySelector('.grid-campo-servicos');
+      const sem = row.querySelector('[data-campo="preco_apartamento"]');
+      const com = row.querySelector('[data-campo="preco_enfermaria"]');
+      if (serv) {
+        serv.value = d.servicos;
+        serv.dataset.originalValue = d.servicos;
+      }
+      if (sem) {
+        sem.value = d.preco_apartamento;
+        sem.dataset.originalValue = d.preco_apartamento;
+      }
+      if (com) {
+        com.value = d.preco_enfermaria;
+        com.dataset.originalValue = d.preco_enfermaria;
+      }
+      row.classList.add('is-ok');
+      setTimeout(function () { row.classList.remove('is-ok'); }, 1200);
+    } catch (err) {
+      row.classList.add('is-erro');
+      window.alert(err.message || 'Erro ao salvar.');
+    } finally {
+      row.classList.remove('is-saving');
+      input.dataset.saving = '0';
+    }
+  }
+
+  document.querySelectorAll('.tabela-preco-grid-row .grid-editavel').forEach(function (input) {
+    input.addEventListener('change', function () {
+      salvarLinha(input.closest('tr'), input);
+    });
+    input.addEventListener('blur', function () {
+      salvarLinha(input.closest('tr'), input);
+    });
+  });
+})();
+</script>
+{% endif %}
 
 {%endblock%}

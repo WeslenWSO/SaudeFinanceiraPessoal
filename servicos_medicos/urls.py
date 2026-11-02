@@ -19,6 +19,7 @@ urlpatterns = [
 
     # TabelaPreco
     path("tabela/", TabelaPrecoList.as_view(), name='tabela_list'),
+    path("tabela/grid/atualizar/", TabelaPrecoGridAtualizarView.as_view(), name='tabela_grid_atualizar'),
     path("tabela/create/", TabelaPrecoCreate.as_view(), name='tabela_create'),
     path("tabela/replicar/", ReplicarTabelaPrecoView.as_view(), name='tabela_replicar'),
     path("tabela/<int:pk>/update/", TabelaPrecoUpdate.as_view(), name='tabela_update'),
