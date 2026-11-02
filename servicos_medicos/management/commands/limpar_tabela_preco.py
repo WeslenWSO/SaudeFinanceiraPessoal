@@ -46,6 +46,14 @@ class Command(BaseCommand):
             action="store_true",
             help="Obrigatório para apagar de verdade (sem isso, só dry-run implícito)",
         )
+        parser.add_argument(
+            "--id",
+            action="append",
+            dest="cabecalho_ids",
+            type=int,
+            metavar="ID",
+            help="Atalho: mesmo que --cabecalho-id",
+        )
 
     def handle(self, *args, **options):
         convenios = [c.strip() for c in (options["convenios"] or []) if c and c.strip()]
