@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Importa preços (RX, US, etc.) para REAL CONVÊNIOS / cabeçalho TABELA - REAL (Medicinarte).
+Importa preços (RX, US, etc.) para REAL CONVÊNIOS / cabeçalho TABELA REAL (Medicinarte).
 
   python scripts/importar_tabela_preco_real.py
   python scripts/importar_tabela_preco_real.py --dry-run
@@ -17,13 +17,14 @@ ROOT = Path(__file__).resolve().parent.parent
 DADOS = Path(__file__).resolve().parent / "dados"
 
 CONVENIO_NOME = "REAL CONVÊNIOS"
-CABECALHO_NOME = "TABELA - REAL"
+# Use --cabecalho "TABELA - REAL" se o cabeçalho no sistema tiver hífen.
+CABECALHO_NOME = "TABELA REAL"
 EMPRESA_ID = 1
 
 LOTE = (
     ("rx", DADOS / "tabela_preco_particular_rx.tsv", {}),
     ("us", DADOS / "tabela_preco_particular_us.tsv", {"codigo_exato": True}),
-    ("tc", DADOS / "tabela_preco_particular_tc.tsv", {"dois_precos": True}),
+    ("tc", DADOS / "tabela_preco_real_tc.tsv", {"dois_precos": True}),
     ("rm", DADOS / "tabela_preco_rm.tsv", {"dois_precos": True}),
     ("mammo", DADOS / "tabela_preco_particular_mammo.tsv", {}),
     ("eg", DADOS / "tabela_preco_particular_eg.tsv", {}),

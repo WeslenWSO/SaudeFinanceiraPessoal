@@ -1,4 +1,4 @@
-"""Importa preços na TABELA - REAL (convênio REAL CONVÊNIOS, empresa 1)."""
+"""Importa preços na TABELA REAL (convênio REAL CONVÊNIOS, empresa 1)."""
 from __future__ import annotations
 
 import importlib.util
@@ -22,7 +22,7 @@ def _load_real_script():
 class Command(BaseCommand):
     help = (
         "Cadastra/atualiza serviços e preços no convênio REAL CONVÊNIOS, "
-        "cabeçalho TABELA - REAL (RX, US, TC, RM, etc.)."
+        "cabeçalho TABELA REAL (RX, US, TC, RM, etc.)."
     )
 
     def add_arguments(self, parser):
@@ -30,7 +30,7 @@ class Command(BaseCommand):
         parser.add_argument("--somente-novos", action="store_true")
         parser.add_argument("--empresa-id", type=int, default=1)
         parser.add_argument("--convenio", default="REAL CONVÊNIOS")
-        parser.add_argument("--cabecalho", default="TABELA - REAL")
+        parser.add_argument("--cabecalho", default="TABELA REAL")
         parser.add_argument(
             "modalidades",
             nargs="*",
@@ -52,6 +52,5 @@ class Command(BaseCommand):
         code = mod.main(argv)
         if code:
             self.stderr.write(self.style.ERROR("Importação REAL encerrada com erros."))
-        else:
-            self.stdout.write(self.style.SUCCESS("Importação REAL concluída."))
-        return code
+            raise SystemExit(code)
+        self.stdout.write(self.style.SUCCESS("Importação REAL concluída."))
