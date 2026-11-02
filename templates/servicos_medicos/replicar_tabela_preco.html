@@ -13,27 +13,33 @@
     {% endif %}
 
     <p class="text-muted">
-      Copia todos os exames e preços (sem e com contraste) de uma tabela já cadastrada
-      para outra. Os serviços médicos são os mesmos; só duplica os vínculos de preço
-      no convênio/cabeçalho de destino.
+      Copia exames e preços (sem e com contraste) da tabela origem para o destino.
+      Por padrão, inclui <strong>somente os serviços que ainda não existem</strong> no destino,
+      sem alterar os preços já cadastrados lá.
     </p>
     <p class="small text-muted mb-4">
       Escolha origem e destino nos combos (o sistema grava pelo <strong>id numérico</strong> do cabeçalho,
       visível na lista de Cabeçalhos — ex. JARDEL id <strong>7</strong>, ABDES id <strong>6</strong>).
       A origem precisa mostrar <strong>quantidade &gt; 0</strong> no combo.
       Atalho na URL: <code>?origem_id=7&amp;destino_id=6</code>.
-      Shell Render: <code>python manage.py replicar_tabela_preco --origem-id 7 --destino-id 6</code>.
+      Shell (só faltantes): <code>python manage.py replicar_tabela_preco --origem-id 7 --destino-id 6</code>.
+      Para atualizar os que já existem: acrescente <code>--atualizar-existentes</code>.
     </p>
 
     <form method="post" novalidate>
       {% csrf_token %}
       {% for field in form %}
         <div class="mb-3">
-          {% if field.name == 'atualizar_existentes' %}
-            <div class="form-check">
-              {{ field }}
-              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            </div>
+          {% if field.name == 'modo_replicacao' %}
+            <fieldset class="border-0 p-0 m-0">
+              <legend class="form-label fs-6 mb-2">{{ field.label }}</legend>
+              {% for radio in field %}
+              <div class="form-check mb-2">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+              </div>
+              {% endfor %}
+            </fieldset>
           {% else %}
             {{ field.label_tag }}
             {{ field }}

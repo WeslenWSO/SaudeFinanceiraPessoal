@@ -1,4 +1,6 @@
 from django import forms
+from servicos_medicos.replicar_tabela_preco import MODO_COMPLETO, MODO_SOMENTE_FALTANTES
+
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 
 class ConvenioForm(forms.ModelForm):
@@ -92,11 +94,20 @@ class ReplicarTabelaPrecoForm(forms.Form):
         label="Para (tabela destino)",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    atualizar_existentes = forms.BooleanField(
-        required=False,
-        initial=True,
-        label="Atualizar preços que já existirem no destino",
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    modo_replicacao = forms.ChoiceField(
+        label="Modo de replicação",
+        choices=(
+            (
+                MODO_SOMENTE_FALTANTES,
+                "Somente serviços que faltam no destino (não altera os já cadastrados)",
+            ),
+            (
+                MODO_COMPLETO,
+                "Completar faltantes e atualizar preços que já existem no destino",
+            ),
+        ),
+        initial=MODO_SOMENTE_FALTANTES,
+        widget=forms.RadioSelect,
     )
 
     def __init__(self, *args, empresa_id=None, **kwargs):

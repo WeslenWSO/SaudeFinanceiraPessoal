@@ -15,6 +15,12 @@ class ResultadoReplicacao:
     atualizados: int = 0
     pulados: int = 0
     total_origem: int = 0
+    faltantes_no_destino: int = 0
+    ja_no_destino: int = 0
+
+
+MODO_SOMENTE_FALTANTES = "faltantes"
+MODO_COMPLETO = "completo"
 
 
 def _ids_cabecalhos_equivalentes(origem: Cabecalho) -> list[int]:
@@ -69,6 +75,33 @@ def _linhas_origem_valores(origem: Cabecalho) -> list[dict]:
     return list(por_codigo.values())
 
 
+def _ids_servico_no_destino(destino: Cabecalho) -> set[int]:
+    return set(
+        TabelaPreco.objects.filter(
+            empresa_id=destino.empresa_id,
+            convenio_id=destino.convenio_id,
+            cabecalho_id=destino.pk,
+        ).values_list("codigo_servico_id", flat=True)
+    )
+
+
+def contagem_faltantes_no_destino(origem: Cabecalho, destino: Cabecalho) -> tuple[int, int]:
+    """Retorna (quantidade que falta copiar, quantidade já presente no destino)."""
+    linhas = _linhas_origem_valores(origem)
+    if not linhas:
+        return 0, 0
+    no_destino = _ids_servico_no_destino(destino)
+    faltantes = 0
+    ja = 0
+    for row in linhas:
+        sid = row["codigo_servico_id"]
+        if sid in no_destino:
+            ja += 1
+        else:
+            faltantes += 1
+    return faltantes, ja
+
+
 def replicar_tabela_preco(
     origem: Cabecalho,
     destino: Cabecalho,
@@ -83,6 +116,9 @@ def replicar_tabela_preco(
     resultado = ResultadoReplicacao()
     linhas = _linhas_origem_valores(origem)
     resultado.total_origem = len(linhas)
+    falt, ja = contagem_faltantes_no_destino(origem, destino)
+    resultado.faltantes_no_destino = falt
+    resultado.ja_no_destino = ja
     if not linhas:
         return resultado
 

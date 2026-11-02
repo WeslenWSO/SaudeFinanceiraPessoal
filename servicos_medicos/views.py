@@ -14,7 +14,12 @@ from django.db.models import Q
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 from .forms import ConvenioForm, ReplicarTabelaPrecoForm, ServicosMedicosForm, TabelaPrecoForm
 from .permissoes import usuario_pode_editar_tabela_preco_grid
-from .replicar_tabela_preco import replicar_tabela_preco
+from .replicar_tabela_preco import (
+    MODO_COMPLETO,
+    MODO_SOMENTE_FALTANTES,
+    contagem_faltantes_no_destino,
+    replicar_tabela_preco,
+)
 from .tabela_preco_grid import ErroGridTabelaPreco, atualizar_linha_grid
 from empresa.models import Empresa
 
@@ -417,14 +422,19 @@ class ReplicarTabelaPrecoView(View):
             return None
         return cab
 
+    def _modo_para_atualizar(self, request, form) -> bool:
+        modo = request.POST.get("modo_replicacao", MODO_SOMENTE_FALTANTES)
+        if form.is_valid():
+            modo = form.cleaned_data.get("modo_replicacao", modo)
+        return modo == MODO_COMPLETO
+
     def _resolver_cabecalhos_post(self, request, empresa_id: int, form):
         """Resolve cabeçalhos pelos ids inteiros (7 → 6), como no manage.py."""
-        atualizar = request.POST.get("atualizar_existentes") in ("on", "true", "1")
+        atualizar = self._modo_para_atualizar(request, form)
         origem_id = destino_id = None
         if form.is_valid():
             origem_id = form.cleaned_data.get("cabecalho_origem")
             destino_id = form.cleaned_data.get("cabecalho_destino")
-            atualizar = form.cleaned_data.get("atualizar_existentes", atualizar)
         if origem_id is None:
             raw = request.POST.get("cabecalho_origem")
             origem_id = int(raw) if raw and str(raw).strip().isdigit() else None
@@ -470,6 +480,17 @@ class ReplicarTabelaPrecoView(View):
             )
             return self._render(request, form)
 
+        faltantes_prev, ja_prev = contagem_faltantes_no_destino(origem, destino)
+        if not atualizar_existentes and faltantes_prev == 0 and ja_prev > 0:
+            messages.info(
+                request,
+                f"O destino «{destino.convenio} — {destino.nome_tabela}» já contém todos os "
+                f"{ja_prev} serviço(s) da origem. Nada a copiar no modo «somente faltantes».",
+            )
+            return redirect(
+                f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}"
+            )
+
         try:
             resultado = replicar_tabela_preco(
                 origem,
@@ -493,9 +514,9 @@ class ReplicarTabelaPrecoView(View):
             if total_destino > 0:
                 messages.success(
                     request,
-                    f"O destino «{destino.convenio} — {destino.nome_tabela}» (id {destino.pk}) "
-                    f"já tem {total_destino} preços ({resultado.pulados} iguais à origem). "
-                    f"Abrindo a lista filtrada por este cabeçalho.",
+                    f"Nenhum preço novo: destino já tinha os {resultado.ja_no_destino} serviço(s) "
+                    f"da origem ({resultado.pulados} com os mesmos valores). "
+                    f"Total no destino: {total_destino}.",
                 )
                 return redirect(
                     f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}"
@@ -508,12 +529,17 @@ class ReplicarTabelaPrecoView(View):
             return self._render(request, form)
 
         total_destino = TabelaPreco.objects.filter(cabecalho_id=destino.pk).count()
+        modo_txt = (
+            "somente faltantes"
+            if not atualizar_existentes
+            else "completar e atualizar existentes"
+        )
         messages.success(
             request,
-            f"Replicação concluída: {resultado.criados} criados, "
-            f"{resultado.atualizados} atualizados, {resultado.pulados} mantidos "
-            f"→ «{destino.convenio} — {destino.nome_tabela}» (id {destino.pk}, "
-            f"total no destino: {total_destino}).",
+            f"Replicação ({modo_txt}): {resultado.criados} serviço(s) incluídos "
+            f"(faltavam {resultado.faltantes_no_destino} na origem vs destino), "
+            f"{resultado.atualizados} atualizados, {resultado.pulados} já existiam iguais "
+            f"→ «{destino.convenio} — {destino.nome_tabela}» (total no destino: {total_destino}).",
         )
         return redirect(f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}")
 
