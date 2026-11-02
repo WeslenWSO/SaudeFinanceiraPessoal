@@ -135,7 +135,7 @@
               <tbody>
                 {% for c in bloco.categorias %}
                 <tr>
-                  <td class="small">{{ c.classificacao }} {{ c.nome }}</td>
+                  <td class="small">{{ c.nome }}</td>
                   <td class="small text-muted">{{ c.grupo }}</td>
                   <td class="text-end small">R$ {{ c.total|floatformat:2 }}</td>
                 </tr>
