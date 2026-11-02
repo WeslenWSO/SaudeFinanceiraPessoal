@@ -18,10 +18,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
-if not os.environ.get("DATABASE_URL", "").strip():
+_db = (os.environ.get("DATABASE_URL") or "").strip()
+if not _db:
     _render_db = ROOT / "render_db.url"
     if _render_db.is_file():
         os.environ["DATABASE_URL"] = _render_db.read_text(encoding="utf-8").strip()
+elif _db.startswith("sqlite") and (ROOT / "render_db.url").is_file():
+    # Dev local: db.sqlite3 vazio — preferir Postgres Render se render_db.url existir
+    os.environ["DATABASE_URL"] = (ROOT / "render_db.url").read_text(encoding="utf-8").strip()
 
 
 def _setup_django():
