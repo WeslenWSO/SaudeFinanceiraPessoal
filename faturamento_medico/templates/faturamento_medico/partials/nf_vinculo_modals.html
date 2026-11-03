@@ -285,7 +285,7 @@
             .then(function(data) {
                 var notas = data.notas || [];
                 if (!notas.length) {
-                    vincularListaEl.innerHTML = '<div class="text-muted">Nenhuma NF encontrada no intervalo do exame (+15 dias).</div>';
+                    vincularListaEl.innerHTML = '<div class="text-muted">Nenhuma NF encontrada no intervalo do exame (−20 a +20 dias).</div>';
                     return;
                 }
                 vincularListaEl.innerHTML = '';

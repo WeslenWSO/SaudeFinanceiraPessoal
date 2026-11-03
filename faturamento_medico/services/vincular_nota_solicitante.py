@@ -14,7 +14,8 @@ from django.urls import reverse
 from faturamento_medico.services.atualizar_faturamento_convenio import _similaridade
 from notasfiscais.models import NotaFiscalServico
 
-JANELA_DIAS_APOS_EXAME = 15
+JANELA_DIAS_ANTES_EXAME = 20
+JANELA_DIAS_APOS_EXAME = 20
 SIMILARIDADE_MIN_PACIENTE = 0.82
 
 _RE_INICIO_PACIENTE = re.compile(
@@ -343,12 +344,13 @@ def carregar_notas_por_data(
     empresa_id: int | None,
     data_inicio: date,
     data_fim: date,
-    janela_dias: int = JANELA_DIAS_APOS_EXAME,
+    janela_antes: int = JANELA_DIAS_ANTES_EXAME,
+    janela_apos: int = JANELA_DIAS_APOS_EXAME,
 ) -> dict[date, list[NotaFiscalServico]]:
-    """Carrega NFSe indexadas por data_emissao (período + janela após o fim)."""
+    """Carrega NFSe indexadas por data_emissao (período ± janela em torno do exame)."""
     qs = NotaFiscalServico.objects.filter(
-        data_emissao__gte=data_inicio,
-        data_emissao__lte=data_fim + timedelta(days=janela_dias),
+        data_emissao__gte=data_inicio - timedelta(days=janela_antes),
+        data_emissao__lte=data_fim + timedelta(days=janela_apos),
         data_cancelamento__isnull=True,
     ).select_related('forma_pagamento')
     if empresa_id:
@@ -364,13 +366,14 @@ def buscar_notas_paciente(
     notas_por_data: dict[date, list[NotaFiscalServico]],
     nome_paciente: str,
     data_exame: date | None,
-    janela_dias: int = JANELA_DIAS_APOS_EXAME,
+    janela_antes: int = JANELA_DIAS_ANTES_EXAME,
+    janela_apos: int = JANELA_DIAS_APOS_EXAME,
 ) -> list[NotaFiscalServico]:
-    """NFSe cujo tomador coincide com o paciente entre o exame e +janela_dias."""
+    """NFSe cujo tomador coincide com o paciente entre −janela_antes e +janela_apos do exame."""
     if not data_exame or not (nome_paciente or '').strip() or nome_paciente == '-':
         return []
     matches: list[NotaFiscalServico] = []
-    for offset in range(janela_dias + 1):
+    for offset in range(-janela_antes, janela_apos + 1):
         dia = data_exame + timedelta(days=offset)
         for nota in notas_por_data.get(dia, []):
             if _nota_coincide_paciente(nota, nome_paciente):
@@ -519,7 +522,7 @@ def buscar_notas_para_vinculo(
     ).select_related('forma_pagamento')
     if data_exame:
         qs = qs.filter(
-            data_emissao__gte=data_exame,
+            data_emissao__gte=data_exame - timedelta(days=JANELA_DIAS_ANTES_EXAME),
             data_emissao__lte=data_exame + timedelta(days=JANELA_DIAS_APOS_EXAME),
         )
     termo = (termo or '').strip()

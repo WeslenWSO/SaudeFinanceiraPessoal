@@ -23,7 +23,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
 
 CONVENIO_NOME = "POSTAL SAÚDE"
 CABECALHO_NOME = "TABELA - POSTAL"
-EMPRESA_ID_DEFAULT = 16
+EMPRESA_ID_DEFAULT = 1  # Postgres Render (Medicinarte)
 TSV_DEFAULT = Path(__file__).resolve().parent / "dados" / "tabela_preco_postal.tsv"
 TSV_COMPLEMENTO = Path(__file__).resolve().parent / "dados" / "tabela_preco_postal_complemento.tsv"
 
