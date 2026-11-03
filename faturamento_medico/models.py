@@ -489,6 +489,14 @@ class ItemServico(models.Model):
             if update_fields is not None:
                 kwargs['update_fields'] = list(set(update_fields) | {'status_conferencia', 'total'})
         super().save(*args, **kwargs)
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and set(update_fields) <= {'valor_pago'}:
+            return
+        from faturamento_medico.services.valor_pago_exibicao import (
+            sincronizar_valor_pago_apos_preco,
+        )
+
+        sincronizar_valor_pago_apos_preco(self, forcar=True)
 
     def status_conferencia_badge(self, tem_preco_tabela=None):
         """

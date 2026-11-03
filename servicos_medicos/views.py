@@ -185,9 +185,7 @@ class TabelaPrecoList(ListView):
         if cid is not None:
             qs = qs.filter(cabecalho_id=cid)
             if emp_int is not None:
-                qs_emp = qs.filter(empresa_id=emp_int)
-                if qs_emp.exists():
-                    qs = qs_emp
+                qs = qs.filter(empresa_id=emp_int)
         elif emp_int is not None:
             qs = qs.filter(empresa_id=emp_int)
         search_query = (self.request.GET.get('q') or '').strip()

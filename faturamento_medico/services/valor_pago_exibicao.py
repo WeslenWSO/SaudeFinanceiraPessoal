@@ -70,7 +70,11 @@ def valor_agregacao_analises(item: ItemServico | None, faturamento) -> Decimal:
     return Decimal('0')
 
 
-def sincronizar_valor_pago_apos_preco(item: ItemServico) -> None:
+def sincronizar_valor_pago_apos_preco(
+    item: ItemServico,
+    *,
+    forcar: bool = False,
+) -> None:
     """Após corrigir valor na tabela, alinha valor_pago ao total calculado."""
     total = item.total if item.total is not None else item.valor
     if total is None:
@@ -79,8 +83,12 @@ def sincronizar_valor_pago_apos_preco(item: ItemServico) -> None:
     if total_dec <= 0:
         return
     vp_atual = _decimal_campo(item.valor_pago)
-    if vp_atual is not None and vp_atual > total_dec + _EPS:
+    if (
+        not forcar
+        and vp_atual is not None
+        and vp_atual > total_dec + _EPS
+    ):
         return
     if item.valor_pago != total_dec:
+        ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
         item.valor_pago = total_dec
-        item.save(update_fields=['valor_pago'])

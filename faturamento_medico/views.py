@@ -5107,11 +5107,6 @@ def verificar_corrigir_precos(request):
                 if cod_tab and not (item.codigo_servico or '').strip():
                     item.codigo_servico = cod_tab
                 item.save()
-                from faturamento_medico.services.valor_pago_exibicao import (
-                    sincronizar_valor_pago_apos_preco,
-                )
-
-                sincronizar_valor_pago_apos_preco(item)
                 faturamentos_atualizar.add(fat.id)
                 corrigidos += 1
 
@@ -5122,7 +5117,11 @@ def verificar_corrigir_precos(request):
                     pass
 
             if corrigidos:
-                messages.success(request, f'{corrigidos} procedimento(s) atualizado(s) com o preço da tabela.')
+                messages.success(
+                    request,
+                    f'{corrigidos} procedimento(s) atualizado(s): valor, total e valor pago '
+                    f'ajustados ao preço da tabela.',
+                )
             if sem_preco:
                 messages.warning(request, f'{sem_preco} item(ns) sem preço correspondente na tabela.')
 
@@ -5975,11 +5974,6 @@ def editar_item_servico(request, pk):
         if form.is_valid():
             logger.info("Salvando form")
             saved_item = form.save()
-            from faturamento_medico.services.valor_pago_exibicao import (
-                sincronizar_valor_pago_apos_preco,
-            )
-
-            sincronizar_valor_pago_apos_preco(saved_item)
             logger.info(f"Item salvo: {saved_item.id}, valor: {saved_item.valor}, qt: {saved_item.qt}, total: {saved_item.total}")
             # Atualiza o total do faturamento
             item.faturamento.atualizar_total()

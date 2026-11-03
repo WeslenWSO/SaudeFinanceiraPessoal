@@ -1,5 +1,5 @@
 from decimal import Decimal
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
@@ -42,3 +42,19 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         )
         sincronizar_valor_pago_apos_preco(item)
         item.save.assert_not_called()
+
+    def test_sincronizar_forcar_atualiza_valor_pago_maior_que_tabela(self):
+        item = MagicMock(
+            pk=7,
+            total=Decimal('856.10'),
+            valor=Decimal('856.10'),
+            valor_pago=Decimal('1070.12'),
+        )
+        with patch('faturamento_medico.services.valor_pago_exibicao.ItemServico') as model:
+            model.objects.filter.return_value.update = MagicMock()
+            sincronizar_valor_pago_apos_preco(item, forcar=True)
+            model.objects.filter.assert_called_once_with(pk=7)
+            model.objects.filter.return_value.update.assert_called_once_with(
+                valor_pago=Decimal('856.10'),
+            )
+            self.assertEqual(item.valor_pago, Decimal('856.10'))
