@@ -63,6 +63,7 @@ def _linhas_origem_valores(origem: Cabecalho) -> list[dict]:
             "preco_apartamento",
             "preco_enfermaria",
             "codigo_servico__codigo",
+            "codigo_servico__servicos",
         )
         .order_by("codigo_servico__codigo")
     )
@@ -102,11 +103,35 @@ def contagem_faltantes_no_destino(origem: Cabecalho, destino: Cabecalho) -> tupl
     return faltantes, ja
 
 
+def linhas_origem_para_selecao(
+    origem: Cabecalho,
+    destino: Cabecalho | None = None,
+) -> list[dict]:
+    """Lista exames da origem com preços que serão copiados (sem alteração)."""
+    no_destino = _ids_servico_no_destino(destino) if destino else set()
+    out: list[dict] = []
+    for row in _linhas_origem_valores(origem):
+        sid = row["codigo_servico_id"]
+        out.append(
+            {
+                "servico_id": sid,
+                "codigo": (row.get("codigo_servico__codigo") or "").strip(),
+                "nome": (row.get("codigo_servico__servicos") or "").strip()[:200],
+                "sem_contraste": row["preco_apartamento"],
+                "com_contraste": row["preco_enfermaria"],
+                "ja_no_destino": sid in no_destino,
+            }
+        )
+    out.sort(key=lambda x: x["codigo"])
+    return out
+
+
 def replicar_tabela_preco(
     origem: Cabecalho,
     destino: Cabecalho,
     *,
     atualizar_existentes: bool = True,
+    servico_ids: frozenset[int] | None = None,
 ) -> ResultadoReplicacao:
     if origem.pk == destino.pk:
         raise ValueError("Origem e destino devem ser cabeçalhos diferentes.")
@@ -115,6 +140,8 @@ def replicar_tabela_preco(
 
     resultado = ResultadoReplicacao()
     linhas = _linhas_origem_valores(origem)
+    if servico_ids is not None:
+        linhas = [r for r in linhas if r["codigo_servico_id"] in servico_ids]
     resultado.total_origem = len(linhas)
     falt, ja = contagem_faltantes_no_destino(origem, destino)
     resultado.faltantes_no_destino = falt

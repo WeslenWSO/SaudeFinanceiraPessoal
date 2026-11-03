@@ -24,8 +24,8 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SaudeFinanceira.settings")
 
 CONVENIO_NOME = "CORPO DE BOMBEIRO"
-CABECALHO_NOME = "TABELA - BOMBEIRO"
-EMPRESA_ID_DEFAULT = 16
+CABECALHO_NOME = "TABELA - CORPO DE BOMBEIRO"
+EMPRESA_ID_DEFAULT = 1  # Postgres Render (Medicinarte)
 TSV_DEFAULT = Path(__file__).resolve().parent / "dados" / "tabela_preco_bombeiro.tsv"
 
 MAX_CODIGO = 20

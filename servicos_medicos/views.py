@@ -18,6 +18,7 @@ from .replicar_tabela_preco import (
     MODO_COMPLETO,
     MODO_SOMENTE_FALTANTES,
     contagem_faltantes_no_destino,
+    linhas_origem_para_selecao,
     replicar_tabela_preco,
 )
 from .tabela_preco_grid import ErroGridTabelaPreco, atualizar_linha_grid
@@ -445,11 +446,44 @@ class ReplicarTabelaPrecoView(View):
             return origem, destino, atualizar, None
         return None, None, atualizar, form.errors
 
+    def _parse_servico_ids_post(self, request) -> frozenset[int] | None:
+        raw = request.POST.getlist("servico_id")
+        if not raw:
+            return None
+        ids = frozenset(int(x) for x in raw if str(x).strip().isdigit())
+        return ids if ids else None
+
+    def _json_linhas_origem(self, request, empresa_id: int):
+        origem_id = request.GET.get("origem_id") or request.GET.get("origem")
+        destino_id = request.GET.get("destino_id") or request.GET.get("destino")
+        origem = self._cabecalho_por_id(empresa_id, origem_id)
+        if not origem:
+            return JsonResponse({"erro": "Origem inválida."}, status=400)
+        destino = (
+            self._cabecalho_por_id(empresa_id, destino_id) if destino_id else None
+        )
+        linhas = linhas_origem_para_selecao(origem, destino)
+        payload = []
+        for row in linhas:
+            payload.append(
+                {
+                    "servico_id": row["servico_id"],
+                    "codigo": row["codigo"],
+                    "nome": row["nome"],
+                    "sem_contraste": str(row["sem_contraste"]),
+                    "com_contraste": str(row["com_contraste"]),
+                    "ja_no_destino": row["ja_no_destino"],
+                }
+            )
+        return JsonResponse({"linhas": payload, "total": len(payload)})
+
     def get(self, request):
         empresa_id = self._empresa_id(request)
         if not empresa_id:
             messages.error(request, "Selecione a empresa (Medicinarte) antes de replicar.")
             return redirect("empresa:lista")
+        if request.GET.get("acao") == "linhas":
+            return self._json_linhas_origem(request, empresa_id)
         initial = {}
         for param, field in self._GET_ID_PARAMS:
             raw = request.GET.get(param)
@@ -489,11 +523,17 @@ class ReplicarTabelaPrecoView(View):
                 f"{reverse('servicos_medicos:tabela_list')}?cabecalho_id={destino.pk}"
             )
 
+        servico_ids = self._parse_servico_ids_post(request)
+        if servico_ids is not None and len(servico_ids) == 0:
+            messages.error(request, "Marque ao menos um exame para replicar.")
+            return self._render(request, form)
+
         try:
             resultado = replicar_tabela_preco(
                 origem,
                 destino,
                 atualizar_existentes=atualizar_existentes,
+                servico_ids=servico_ids,
             )
         except ValueError as exc:
             messages.error(request, str(exc))

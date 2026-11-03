@@ -13,20 +13,18 @@
     {% endif %}
 
     <p class="text-muted">
-      Copia exames e preços (sem e com contraste) da tabela origem para o destino.
-      Por padrão, inclui <strong>somente os serviços que ainda não existem</strong> no destino,
-      sem alterar os preços já cadastrados lá.
+      Copia exames da tabela <strong>origem</strong> para o <strong>destino</strong>.
+      Os preços copiados são sempre os da origem:
+      <strong>sem contraste</strong> → campo «Preço sem contraste» no destino;
+      <strong>com contraste</strong> → «Preço com contraste». Você não digita valor aqui — escolhe quais linhas replicar.
     </p>
     <p class="small text-muted mb-4">
-      Escolha origem e destino nos combos (o sistema grava pelo <strong>id numérico</strong> do cabeçalho,
-      visível na lista de Cabeçalhos — ex. JARDEL id <strong>7</strong>, ABDES id <strong>6</strong>).
-      A origem precisa mostrar <strong>quantidade &gt; 0</strong> no combo.
-      Atalho na URL: <code>?origem_id=7&amp;destino_id=6</code>.
-      Shell (só faltantes): <code>python manage.py replicar_tabela_preco --origem-id 7 --destino-id 6</code>.
-      Para atualizar os que já existem: acrescente <code>--atualizar-existentes</code>.
+      Modo «somente faltantes»: só inclui exames marcados que ainda não existem no destino (não altera preços já lá).
+      Modo «completar e atualizar»: copia faltantes e sobrescreve sem/com nos que já existem no destino.
+      Atalho: <code>?origem_id=7&amp;destino_id=6</code>.
     </p>
 
-    <form method="post" novalidate>
+    <form method="post" novalidate id="form-replicar-tabela">
       {% csrf_token %}
       {% for field in form %}
         <div class="mb-3">
@@ -53,6 +51,38 @@
         <div class="alert alert-danger">{{ form.non_field_errors }}</div>
       {% endif %}
 
+      <div id="painel-exames-origem" class="mb-4 d-none">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <strong class="me-2">Exames na origem (preços que serão copiados)</strong>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-marcar-todos">Marcar todos</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-desmarcar-todos">Desmarcar todos</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-so-faltantes">Só os que faltam no destino</button>
+          <input type="search" class="form-control form-control-sm ms-auto" style="max-width: 220px;"
+                 id="filtro-exames" placeholder="Filtrar código ou nome…">
+        </div>
+        <p class="small text-muted mb-2">
+          <span id="contagem-selecionados">0</span> selecionado(s).
+          Se nenhum estiver marcado, a replicação não roda.
+        </p>
+        <div class="table-responsive border rounded" style="max-height: 420px; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" class="form-check-input" id="chk-cabecalho-todos" checked></th>
+                <th>Código</th>
+                <th>Exame</th>
+                <th class="text-end">Sem contraste</th>
+                <th class="text-end">Com contraste</th>
+                <th>Destino</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-exames-origem"></tbody>
+          </table>
+        </div>
+        <div id="exames-origem-vazio" class="text-muted small d-none">Nenhum preço na origem selecionada.</div>
+        <div id="exames-origem-erro" class="text-danger small d-none"></div>
+      </div>
+
       <div class="d-flex flex-wrap gap-2">
         <button type="submit" class="btn btn-primary">Replicar preços</button>
         <a href="{% url 'servicos_medicos:cabecalho_list' %}" class="btn btn-outline-secondary">Cabeçalhos</a>
@@ -61,4 +91,147 @@
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  var selOrigem = document.getElementById('id_cabecalho_origem');
+  var selDestino = document.getElementById('id_cabecalho_destino');
+  var painel = document.getElementById('painel-exames-origem');
+  var tbody = document.getElementById('tbody-exames-origem');
+  var vazio = document.getElementById('exames-origem-vazio');
+  var erroEl = document.getElementById('exames-origem-erro');
+  var contagemEl = document.getElementById('contagem-selecionados');
+  var filtro = document.getElementById('filtro-exames');
+  var chkCab = document.getElementById('chk-cabecalho-todos');
+  var baseUrl = "{% url 'servicos_medicos:tabela_replicar' %}";
+
+  function fmtMoney(s) {
+    var n = parseFloat(s);
+    if (isNaN(n)) return s;
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function atualizarContagem() {
+    var n = tbody.querySelectorAll('input[name=servico_id]:checked:not(:disabled)').length;
+    contagemEl.textContent = String(n);
+  }
+
+  function linhaVisivel(tr, termo) {
+    if (!termo) return true;
+    var t = termo.toLowerCase();
+    var txt = (tr.getAttribute('data-busca') || '').toLowerCase();
+    return txt.indexOf(t) !== -1;
+  }
+
+  function aplicarFiltro() {
+    var termo = (filtro && filtro.value || '').trim();
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+      tr.classList.toggle('d-none', !linhaVisivel(tr, termo));
+    });
+  }
+
+  function renderLinhas(linhas) {
+    tbody.innerHTML = '';
+    if (!linhas.length) {
+      vazio.classList.remove('d-none');
+      painel.classList.remove('d-none');
+      atualizarContagem();
+      return;
+    }
+    vazio.classList.add('d-none');
+    linhas.forEach(function (row) {
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-busca', row.codigo + ' ' + row.nome);
+      if (row.ja_no_destino) tr.classList.add('table-secondary');
+      var destinoBadge = row.ja_no_destino
+        ? '<span class="badge bg-secondary">Já no destino</span>'
+        : '<span class="badge bg-success">Novo</span>';
+      tr.innerHTML =
+        '<td><input type="checkbox" class="form-check-input chk-exame" name="servico_id" value="' +
+        row.servico_id + '" checked></td>' +
+        '<td><code>' + row.codigo + '</code></td>' +
+        '<td>' + (row.nome || '—') + '</td>' +
+        '<td class="text-end">R$ ' + fmtMoney(row.sem_contraste) + '</td>' +
+        '<td class="text-end">R$ ' + fmtMoney(row.com_contraste) + '</td>' +
+        '<td>' + destinoBadge + '</td>';
+      tbody.appendChild(tr);
+    });
+    painel.classList.remove('d-none');
+    if (chkCab) chkCab.checked = true;
+    aplicarFiltro();
+    atualizarContagem();
+  }
+
+  function carregarLinhas() {
+    var origem = selOrigem && selOrigem.value;
+    if (!origem) {
+      painel.classList.add('d-none');
+      tbody.innerHTML = '';
+      return;
+    }
+    var destino = selDestino && selDestino.value ? selDestino.value : '';
+    var url = baseUrl + '?acao=linhas&origem_id=' + encodeURIComponent(origem);
+    if (destino) url += '&destino_id=' + encodeURIComponent(destino);
+    erroEl.classList.add('d-none');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-3">Carregando…</td></tr>';
+    painel.classList.remove('d-none');
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          erroEl.textContent = res.j.erro || 'Erro ao carregar exames.';
+          erroEl.classList.remove('d-none');
+          tbody.innerHTML = '';
+          return;
+        }
+        renderLinhas(res.j.linhas || []);
+      })
+      .catch(function () {
+        erroEl.textContent = 'Falha ao carregar a lista de exames.';
+        erroEl.classList.remove('d-none');
+      });
+  }
+
+  if (selOrigem) selOrigem.addEventListener('change', carregarLinhas);
+  if (selDestino) selDestino.addEventListener('change', carregarLinhas);
+  if (filtro) filtro.addEventListener('input', aplicarFiltro);
+
+  tbody.addEventListener('change', function (e) {
+    if (e.target && e.target.name === 'servico_id') atualizarContagem();
+  });
+
+  document.getElementById('btn-marcar-todos').addEventListener('click', function () {
+    tbody.querySelectorAll('input[name=servico_id]').forEach(function (c) {
+      if (!c.closest('tr').classList.contains('d-none')) c.checked = true;
+    });
+    if (chkCab) chkCab.checked = true;
+    atualizarContagem();
+  });
+  document.getElementById('btn-desmarcar-todos').addEventListener('click', function () {
+    tbody.querySelectorAll('input[name=servico_id]').forEach(function (c) { c.checked = false; });
+    if (chkCab) chkCab.checked = false;
+    atualizarContagem();
+  });
+  document.getElementById('btn-so-faltantes').addEventListener('click', function () {
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+      var chk = tr.querySelector('input[name=servico_id]');
+      if (!chk) return;
+      var novo = tr.querySelector('.bg-success');
+      chk.checked = !!novo;
+    });
+    atualizarContagem();
+  });
+  if (chkCab) {
+    chkCab.addEventListener('change', function () {
+      var on = chkCab.checked;
+      tbody.querySelectorAll('input[name=servico_id]').forEach(function (c) {
+        if (!c.closest('tr').classList.contains('d-none')) c.checked = on;
+      });
+      atualizarContagem();
+    });
+  }
+
+  if (selOrigem && selOrigem.value) carregarLinhas();
+})();
+</script>
 {% endblock %}

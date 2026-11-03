@@ -81,6 +81,33 @@ class ReplicarTabelaPrecoTests(TestCase):
             ).exists()
         )
 
+    def test_replica_somente_servicos_selecionados(self):
+        servico2 = ServicosMedicos.objects.create(codigo="40802013", servicos="US TESTE")
+        TabelaPreco.objects.create(
+            empresa=self.empresa,
+            convenio=self.conv_a,
+            cabecalho=self.cab_origem,
+            codigo_servico=servico2,
+            preco_apartamento=Decimal("50.00"),
+            preco_enfermaria=Decimal("60.00"),
+        )
+        r = replicar_tabela_preco(
+            self.cab_origem,
+            self.cab_destino,
+            servico_ids=frozenset({servico2.pk}),
+        )
+        self.assertEqual(r.criados, 1)
+        self.assertFalse(
+            TabelaPreco.objects.filter(
+                cabecalho=self.cab_destino, codigo_servico=self.servico
+            ).exists()
+        )
+        dest = TabelaPreco.objects.get(
+            cabecalho=self.cab_destino, codigo_servico=servico2
+        )
+        self.assertEqual(dest.preco_apartamento, Decimal("50.00"))
+        self.assertEqual(dest.preco_enfermaria, Decimal("60.00"))
+
     def test_copia_quando_preco_esta_em_cabecalho_duplicado(self):
         cab_dup = Cabecalho.objects.create(
             empresa=self.empresa, convenio=self.conv_a, nome_tabela="TABELA - JARDEL"
