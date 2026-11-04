@@ -263,6 +263,10 @@
     {% endif %}
     {% endif %}
 
+    {% if filtros_resumo %}
+    <p class="periodo">Filtros: {{ filtros_resumo }}</p>
+    {% endif %}
+
     {% for bloco in blocos_impressao %}
     <section class="secao-caixa">
         <h1>
