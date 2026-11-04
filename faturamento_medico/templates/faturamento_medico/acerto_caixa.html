@@ -124,6 +124,21 @@
                 </div>
                 <div class="row g-2 mt-2 align-items-end">
                     <div class="col-md-6">
+                        <label class="form-label small mb-1">Check-in por (múltipla seleção)</label>
+                        <div class="fm-solicitante-lista">
+                            {% for op in checkin_disponiveis %}
+                            <label class="fm-solicitante-item">
+                                <input type="checkbox" name="checkin_por" value="{{ op }}"
+                                       {% if op in filtros.checkin_por %}checked{% endif %}>
+                                <span>{{ op }}</span>
+                            </label>
+                            {% empty %}
+                            <span class="text-muted small">Nenhum operador de check-in no período.</span>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Vazio = todos os operadores do período.</div>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label small mb-1">Status agendamento (múltipla seleção)</label>
                         <div class="fm-solicitante-lista">
                             {% for st in status_disponiveis %}
@@ -138,7 +153,9 @@
                         </div>
                         <div class="form-text">Vazio = exclui cancelados, desistência e deletados.</div>
                     </div>
-                    <div class="col-md-4">
+                </div>
+                <div class="row g-2 mt-2 align-items-end">
+                    <div class="col-md-6">
                         <label class="form-check mb-0">
                             <input type="checkbox" class="form-check-input" name="somente_marcados" value="1"
                                    {% if filtros.somente_marcados %}checked{% endif %}>

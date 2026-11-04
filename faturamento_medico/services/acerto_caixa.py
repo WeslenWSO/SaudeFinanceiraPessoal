@@ -113,6 +113,37 @@ def _filtrar_status(qs, status_sel: list[str]):
     return qs.filter(q_status) if q_status else qs
 
 
+def _operadores_checkin_filtro(filtros: dict) -> list[str]:
+    """Operadores selecionados (lista) ou legado `checkin` (texto parcial)."""
+    raw = filtros.get('checkin_por')
+    if isinstance(raw, list):
+        ops = [str(x).strip() for x in raw if str(x).strip()]
+        if ops:
+            return ops
+    leg = (filtros.get('checkin') or '').strip()
+    return [leg] if leg else []
+
+
+def _filtrar_checkin_por(qs, operadores: list[str], *, legado_parcial: str = ''):
+    if operadores:
+        return qs.filter(checkin_por__in=operadores)
+    texto = (legado_parcial or '').strip()
+    if texto:
+        return qs.filter(checkin_por__icontains=texto)
+    return qs
+
+
+def _faturamento_passa_filtro_checkin(fat: FaturamentoMedico, filtros: dict) -> bool:
+    operadores = _operadores_checkin_filtro(filtros)
+    if operadores:
+        nome = (fat.checkin_por or '').strip()
+        return any(op.lower() == nome.lower() for op in operadores)
+    leg = (filtros.get('checkin') or '').strip()
+    if leg:
+        return leg.lower() in (fat.checkin_por or '').lower()
+    return True
+
+
 def _badge_status(status):
     texto = (status or '').strip() or '-'
     norm = (
@@ -176,9 +207,13 @@ def _faturamentos_escopo_fechamento_caixa(
         .order_by('pk')
     )
     qs = _filtrar_status(qs, status_sel)
-    checkin = (filtros_snap.get('checkin') or '').strip()
-    if checkin:
-        qs = qs.filter(checkin_por__icontains=checkin)
+    qs = _filtrar_checkin_por(
+        qs,
+        _operadores_checkin_filtro(filtros_snap),
+        legado_parcial=(filtros_snap.get('checkin') or '').strip()
+        if not filtros_snap.get('checkin_por')
+        else '',
+    )
     if filtros_snap.get('somente_marcados'):
         qs = qs.filter(marcado_acerto_caixa=True)
     return qs
@@ -246,6 +281,7 @@ def _primeira_nota(linhas_nota):
 def _filtros_para_snapshot(filtros: dict) -> dict:
     return {
         'checkin': filtros.get('checkin') or '',
+        'checkin_por': list(filtros.get('checkin_por') or []),
         'caixa': list(filtros.get('caixa') or []),
         'somente_marcados': bool(filtros.get('somente_marcados')),
         'hora_inicial': filtros.get('hora_inicial') or '',
@@ -274,8 +310,7 @@ def _fechamento_cobre_faturamento(fech: AcertoCaixaFechamento, fat: FaturamentoM
         return False
 
     snap = fech.filtros or {}
-    checkin = (snap.get('checkin') or '').strip()
-    if checkin and checkin.lower() not in (fat.checkin_por or '').lower():
+    if not _faturamento_passa_filtro_checkin(fat, snap):
         return False
 
     if snap.get('somente_marcados') and not fat.marcado_acerto_caixa:
@@ -490,6 +525,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     if di > df:
         di, df = df, di
 
+    checkin_por_sel = [
+        s.strip() for s in request.GET.getlist('checkin_por') if s and str(s).strip()
+    ]
     checkin = (request.GET.get('checkin') or '').strip()
     valores_caixa_ativos = caixas_acerto_valores(empresa_id)
     valores_caixa = valores_caixa_ativos | CAIXAS_ACERTO_VALORES
@@ -522,10 +560,21 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         },
         key=str.lower,
     )
+    checkin_disponiveis = sorted(
+        {
+            (nome or '').strip()
+            for nome in qs_periodo.values_list('checkin_por', flat=True).distinct()
+            if (nome or '').strip()
+        },
+        key=str.lower,
+    )
 
     qs = _filtrar_status(qs_periodo, status_sel)
-    if checkin:
-        qs = qs.filter(checkin_por__icontains=checkin)
+    qs = _filtrar_checkin_por(
+        qs,
+        checkin_por_sel,
+        legado_parcial=checkin if not checkin_por_sel else '',
+    )
     if caixas_sel:
         qs = qs.filter(caixa_acerto__in=caixas_sel)
     if somente_marcados:
@@ -816,7 +865,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     filtros_dict = {
         'data_inicio': di.isoformat(),
         'data_fim': df.isoformat(),
-        'checkin': checkin,
+        'checkin': checkin if not checkin_por_sel else '',
+        'checkin_por': checkin_por_sel,
         'caixa': caixas_sel,
         'somente_marcados': somente_marcados,
         'hora_inicial': hora_ini_str,
@@ -837,6 +887,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'total_pagamentos_nf_fmt': _moeda_br(total_pagamentos_nf),
         'status_disponiveis': status_disponiveis,
+        'checkin_disponiveis': checkin_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,
         'fechamentos_caixa': fechamentos_caixa,
