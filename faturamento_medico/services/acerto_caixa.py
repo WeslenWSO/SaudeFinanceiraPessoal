@@ -338,6 +338,8 @@ def _filtros_para_snapshot(filtros: dict) -> dict:
         'hora_inicial': filtros.get('hora_inicial') or '',
         'hora_final': filtros.get('hora_final') or '',
         'status_agendamento': list(filtros.get('status_agendamento') or []),
+        'paciente': (filtros.get('paciente') or '').strip(),
+        'convenio': list(filtros.get('convenio') or []),
     }
 
 
@@ -385,6 +387,15 @@ def _fechamento_cobre_faturamento(fech: AcertoCaixaFechamento, fat: FaturamentoM
         return False
     if hora_fim_min is not None and (mins is None or mins > hora_fim_min):
         return False
+
+    paciente = (snap.get('paciente') or '').strip()
+    if paciente and paciente.lower() not in (fat.nome or '').lower():
+        return False
+    convenios_snap = snap.get('convenio') or []
+    if convenios_snap:
+        conv = (fat.convenio or '').strip()
+        if conv not in convenios_snap:
+            return False
     return True
 
 
@@ -580,8 +591,43 @@ def filtrar_linhas_acerto_caixa(
             continue
         if hora_fim is not None and (mins is None or mins > hora_fim):
             continue
+        paciente = (filtros.get('paciente') or '').strip()
+        if paciente and paciente.lower() not in (linha.get('paciente') or '').lower():
+            continue
+        convenios_sel = list(filtros.get('convenio') or [])
+        if convenios_sel:
+            conv = (linha.get('convenio') or '').strip()
+            if conv not in convenios_sel:
+                continue
         filtradas.append(linha)
     return filtradas
+
+
+def montar_resumo_filtros_acerto(filtros: dict, data_inicio: date, data_fim: date) -> str:
+    """Texto curto para o cabeçalho retrátil dos filtros."""
+    partes = [f'{data_inicio.strftime("%d/%m/%Y")}–{data_fim.strftime("%d/%m/%Y")}']
+    caixas = filtros.get('caixa') or []
+    if caixas:
+        partes.append(f'{len(caixas)} caixa(s)')
+    checkins = filtros.get('checkin_por') or []
+    if checkins:
+        partes.append(f'{len(checkins)} check-in')
+    status = filtros.get('status_agendamento') or []
+    if status:
+        partes.append(f'{len(status)} status')
+    convenios = filtros.get('convenio') or []
+    if convenios:
+        partes.append(f'{len(convenios)} convênio(s)')
+    paciente = (filtros.get('paciente') or '').strip()
+    if paciente:
+        partes.append(f'paciente «{paciente[:24]}{"…" if len(paciente) > 24 else ""}»')
+    if filtros.get('hora_inicial') or filtros.get('hora_final'):
+        hi = filtros.get('hora_inicial') or '…'
+        hf = filtros.get('hora_final') or '…'
+        partes.append(f'hora {hi}–{hf}')
+    if filtros.get('somente_marcados'):
+        partes.append('só marcados')
+    return ' · '.join(partes)
 
 
 def _valor_pago_resumo_linha(linha: dict) -> Decimal:
@@ -756,9 +802,22 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     status_sel = [
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
+    paciente_filtro = (request.GET.get('paciente') or '').strip()
+    convenios_sel = [
+        s.strip() for s in request.GET.getlist('convenio') if s and str(s).strip()
+    ]
 
     qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
+
+    convenios_disponiveis = sorted(
+        {
+            (nome or '').strip()
+            for nome in qs_periodo.values_list('convenio', flat=True).distinct()
+            if (nome or '').strip()
+        },
+        key=str.lower,
+    )
 
     status_disponiveis = sorted(
         {
@@ -782,6 +841,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         checkin_por_sel,
         legado_parcial=checkin if not checkin_por_sel else '',
     )
+    if paciente_filtro:
+        qs = qs.filter(nome__icontains=paciente_filtro)
+    if convenios_sel:
+        qs = qs.filter(convenio__in=convenios_sel)
     if caixas_sel:
         qs = qs.filter(caixa_acerto__in=caixas_sel)
     if somente_marcados:
@@ -1086,6 +1149,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'hora_inicial': hora_ini_str,
         'hora_final': hora_fim_str,
         'status_agendamento': status_sel,
+        'paciente': paciente_filtro,
+        'convenio': convenios_sel,
     }
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
@@ -1102,7 +1167,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
     return {
         'linhas': linhas_grade,
-        'quantidade_linhas': len(linhas),
+        'quantidade_linhas': len(linhas_grade),
         'blocos_impressao': blocos_impressao,
         'resumo_pagamento': resumo_pagamento_lista,
         'resumo_por_caixa': resumo_por_caixa_lista,
@@ -1112,8 +1177,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_resumo_geral_fmt': _moeda_br(total_resumo_geral),
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
+        'convenios_disponiveis': convenios_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,
+        'filtros_resumo': montar_resumo_filtros_acerto(filtros_dict, di, df),
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',

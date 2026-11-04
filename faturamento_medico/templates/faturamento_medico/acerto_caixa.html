@@ -73,6 +73,51 @@
     line-height: 1.3;
     word-break: break-word;
 }
+.filtro-retratil-toggle {
+    border-radius: 8px;
+    padding: 0.55rem 0.85rem;
+    background: #f8fafc;
+}
+.filtro-retratil-toggle:hover { background: #eef2f7; }
+.filtro-retratil-chevron { transition: transform 0.2s ease; }
+.filtro-retratil.is-collapsed .filtro-retratil-chevron { transform: rotate(180deg); }
+.filtro-retratil-painel {
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.2s ease;
+    max-height: 1200px;
+    opacity: 1;
+}
+.filtro-retratil.is-collapsed .filtro-retratil-painel {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0 !important;
+    pointer-events: none;
+}
+.acerto-filtro-bloco {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    background: #fff;
+    height: 100%;
+}
+.acerto-filtro-bloco-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+}
+.acerto-filtro-bloco-head .btn-link {
+    font-size: 0.72rem;
+    padding: 0;
+    text-decoration: none;
+}
+.acerto-filtro-busca {
+    font-size: 0.78rem;
+    margin-bottom: 0.35rem;
+}
+.acerto-periodo-atalhos .btn { font-size: 0.72rem; padding: 0.15rem 0.45rem; }
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -103,96 +148,170 @@
             <p class="small mb-3"><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</p>
             {% endif %}
 
-            <form method="get" class="mb-4">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-2">
-                        <label class="form-label small mb-1" for="data_inicio">Data início</label>
-                        <input type="date" id="data_inicio" name="data_inicio" class="form-control form-control-sm"
-                               value="{{ filtros.data_inicio }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small mb-1" for="data_fim">Data fim</label>
-                        <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
-                               value="{{ filtros.data_fim }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small mb-1">Caixa (múltiplo) — só ativos</label>
-                        <div class="fm-solicitante-lista" style="max-height: 7rem;">
-                            {% for valor, rotulo in caixas_acerto %}
-                            <label class="fm-solicitante-item">
-                                <input type="checkbox" name="caixa" value="{{ valor }}"
-                                       {% if valor in filtros.caixa %}checked{% endif %}>
-                                <span>{{ rotulo }}</span>
-                            </label>
-                            {% empty %}
-                            <span class="text-muted small">
-                                Nenhuma conta de caixa ativa (tipo Caixa, Outros ou descrição com “caixa”).
-                                <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a>
-                            </span>
-                            {% endfor %}
+            <div class="filtro-retratil mb-4" id="acertoFiltroWrap">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm filtro-retratil-toggle w-100 text-start d-flex align-items-center justify-content-between"
+                        id="btnToggleFiltrosAcerto"
+                        aria-expanded="true"
+                        aria-controls="painelFiltrosAcerto">
+                    <span>
+                        <i class="fas fa-filter me-1"></i>
+                        <strong>Filtros</strong>
+                        <span class="text-muted small ms-2">{{ filtros_resumo }}</span>
+                        {% if quantidade_linhas %}
+                        <span class="badge bg-secondary ms-1">{{ quantidade_linhas }} linha(s)</span>
+                        {% endif %}
+                    </span>
+                    <i class="fas fa-chevron-up filtro-retratil-chevron" aria-hidden="true"></i>
+                </button>
+                <div class="filtro-retratil-painel mt-2" id="painelFiltrosAcerto">
+                    <form method="get" id="formFiltrosAcerto">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-lg-4">
+                                <label class="form-label small mb-1">Período</label>
+                                <div class="d-flex gap-2 mb-1">
+                                    <input type="date" id="data_inicio" name="data_inicio" class="form-control form-control-sm"
+                                           value="{{ filtros.data_inicio }}" aria-label="Data início">
+                                    <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
+                                           value="{{ filtros.data_fim }}" aria-label="Data fim">
+                                </div>
+                                <div class="acerto-periodo-atalhos btn-group btn-group-sm flex-wrap" role="group" aria-label="Atalhos de período">
+                                    <button type="button" class="btn btn-outline-secondary js-acerto-periodo" data-preset="hoje">Hoje</button>
+                                    <button type="button" class="btn btn-outline-secondary js-acerto-periodo" data-preset="mes">Este mês</button>
+                                    <button type="button" class="btn btn-outline-secondary js-acerto-periodo" data-preset="mes_anterior">Mês anterior</button>
+                                </div>
+                            </div>
+                            <div class="col-lg-2 col-md-4">
+                                <label class="form-label small mb-1" for="paciente">Paciente</label>
+                                <input type="search" id="paciente" name="paciente" class="form-control form-control-sm"
+                                       placeholder="Nome (contém)" value="{{ filtros.paciente|default:'' }}" autocomplete="off">
+                            </div>
+                            <div class="col-lg-2 col-md-4">
+                                <label class="form-label small mb-1" for="hora_inicial">Hora</label>
+                                <div class="d-flex gap-1">
+                                    <input type="time" id="hora_inicial" name="hora_inicial" class="form-control form-control-sm"
+                                           value="{{ filtros.hora_inicial }}" title="Hora inicial">
+                                    <input type="time" id="hora_final" name="hora_final" class="form-control form-control-sm"
+                                           value="{{ filtros.hora_final }}" title="Hora final">
+                                </div>
+                            </div>
+                            <div class="col-lg-2 col-md-4 d-flex flex-wrap gap-2 align-items-end">
+                                <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                                    <i class="fas fa-search"></i> Filtrar
+                                </button>
+                                <a href="{% url 'faturamento_medico:acerto_caixa' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                            </div>
+                            <div class="col-lg-2 col-md-6">
+                                <label class="form-check mb-0 mt-lg-4">
+                                    <input type="checkbox" class="form-check-input" name="somente_marcados" value="1"
+                                           {% if filtros.somente_marcados %}checked{% endif %}>
+                                    <span class="form-check-label small">Somente marcados no acerto</span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="form-text">
-                            Apenas caixas <strong>ativos</strong>.
-                            <a href="{% url 'extrato:conta_bancaria_list' %}">Contas bancárias</a> — «Inativo no acerto de caixa».
+                        <div class="row g-2 mt-2">
+                            <div class="col-lg-3 col-md-6">
+                                <div class="acerto-filtro-bloco">
+                                    <div class="acerto-filtro-bloco-head">
+                                        <span class="small fw-semibold">Caixa (ativos)</span>
+                                        <span>
+                                            <button type="button" class="btn btn-link js-acerto-chk-all" data-target="caixa">Todos</button>
+                                            <button type="button" class="btn btn-link js-acerto-chk-none" data-target="caixa">Nenhum</button>
+                                        </span>
+                                    </div>
+                                    <input type="search" class="form-control form-control-sm acerto-filtro-busca js-acerto-lista-busca"
+                                           data-lista="lista-caixa" placeholder="Buscar caixa…" autocomplete="off">
+                                    <div class="fm-solicitante-lista js-acerto-lista" id="lista-caixa" style="max-height: 7rem;">
+                                        {% for valor, rotulo in caixas_acerto %}
+                                        <label class="fm-solicitante-item js-acerto-lista-item">
+                                            <input type="checkbox" name="caixa" value="{{ valor }}"
+                                                   {% if valor in filtros.caixa %}checked{% endif %}>
+                                            <span>{{ rotulo }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <span class="text-muted small">Nenhum caixa ativo. <a href="{% url 'extrato:conta_bancaria_list' %}">Contas</a></span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="acerto-filtro-bloco">
+                                    <div class="acerto-filtro-bloco-head">
+                                        <span class="small fw-semibold">Check-in por</span>
+                                        <span>
+                                            <button type="button" class="btn btn-link js-acerto-chk-all" data-target="checkin_por">Todos</button>
+                                            <button type="button" class="btn btn-link js-acerto-chk-none" data-target="checkin_por">Nenhum</button>
+                                        </span>
+                                    </div>
+                                    <input type="search" class="form-control form-control-sm acerto-filtro-busca js-acerto-lista-busca"
+                                           data-lista="lista-checkin" placeholder="Buscar operador…" autocomplete="off">
+                                    <div class="fm-solicitante-lista js-acerto-lista" id="lista-checkin">
+                                        {% for op in checkin_disponiveis %}
+                                        <label class="fm-solicitante-item js-acerto-lista-item">
+                                            <input type="checkbox" name="checkin_por" value="{{ op }}"
+                                                   {% if op in filtros.checkin_por %}checked{% endif %}>
+                                            <span>{{ op }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <span class="text-muted small">Nenhum no período.</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="form-text mb-0">Vazio = todos.</div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="acerto-filtro-bloco">
+                                    <div class="acerto-filtro-bloco-head">
+                                        <span class="small fw-semibold">Convênio</span>
+                                        <span>
+                                            <button type="button" class="btn btn-link js-acerto-chk-all" data-target="convenio">Todos</button>
+                                            <button type="button" class="btn btn-link js-acerto-chk-none" data-target="convenio">Nenhum</button>
+                                        </span>
+                                    </div>
+                                    <input type="search" class="form-control form-control-sm acerto-filtro-busca js-acerto-lista-busca"
+                                           data-lista="lista-convenio" placeholder="Buscar convênio…" autocomplete="off">
+                                    <div class="fm-solicitante-lista js-acerto-lista" id="lista-convenio" style="max-height: 7rem;">
+                                        {% for conv in convenios_disponiveis %}
+                                        <label class="fm-solicitante-item js-acerto-lista-item">
+                                            <input type="checkbox" name="convenio" value="{{ conv }}"
+                                                   {% if conv in filtros.convenio %}checked{% endif %}>
+                                            <span>{{ conv }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <span class="text-muted small">Nenhum no período.</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="acerto-filtro-bloco">
+                                    <div class="acerto-filtro-bloco-head">
+                                        <span class="small fw-semibold">Status agendamento</span>
+                                        <span>
+                                            <button type="button" class="btn btn-link js-acerto-chk-all" data-target="status_agendamento">Todos</button>
+                                            <button type="button" class="btn btn-link js-acerto-chk-none" data-target="status_agendamento">Nenhum</button>
+                                        </span>
+                                    </div>
+                                    <input type="search" class="form-control form-control-sm acerto-filtro-busca js-acerto-lista-busca"
+                                           data-lista="lista-status" placeholder="Buscar status…" autocomplete="off">
+                                    <div class="fm-solicitante-lista js-acerto-lista" id="lista-status">
+                                        {% for st in status_disponiveis %}
+                                        <label class="fm-solicitante-item js-acerto-lista-item">
+                                            <input type="checkbox" name="status_agendamento" value="{{ st }}"
+                                                   {% if st in filtros.status_agendamento %}checked{% endif %}>
+                                            <span>{{ st }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <span class="text-muted small">Nenhum no período.</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="form-text mb-0">Vazio = exclui cancelados/desistência.</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small mb-1" for="hora_inicial">Hora inicial</label>
-                        <input type="time" id="hora_inicial" name="hora_inicial" class="form-control form-control-sm"
-                               value="{{ filtros.hora_inicial }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small mb-1" for="hora_final">Hora final</label>
-                        <input type="time" id="hora_final" name="hora_final" class="form-control form-control-sm"
-                               value="{{ filtros.hora_final }}">
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-                        <a href="{% url 'faturamento_medico:acerto_caixa' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
-                    </div>
+                    </form>
                 </div>
-                <div class="row g-2 mt-2 align-items-end">
-                    <div class="col-md-6">
-                        <label class="form-label small mb-1">Check-in por (múltipla seleção)</label>
-                        <div class="fm-solicitante-lista">
-                            {% for op in checkin_disponiveis %}
-                            <label class="fm-solicitante-item">
-                                <input type="checkbox" name="checkin_por" value="{{ op }}"
-                                       {% if op in filtros.checkin_por %}checked{% endif %}>
-                                <span>{{ op }}</span>
-                            </label>
-                            {% empty %}
-                            <span class="text-muted small">Nenhum operador de check-in no período.</span>
-                            {% endfor %}
-                        </div>
-                        <div class="form-text">Vazio = todos os operadores do período.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small mb-1">Status agendamento (múltipla seleção)</label>
-                        <div class="fm-solicitante-lista">
-                            {% for st in status_disponiveis %}
-                            <label class="fm-solicitante-item">
-                                <input type="checkbox" name="status_agendamento" value="{{ st }}"
-                                       {% if st in filtros.status_agendamento %}checked{% endif %}>
-                                <span>{{ st }}</span>
-                            </label>
-                            {% empty %}
-                            <span class="text-muted small">Nenhum status no período.</span>
-                            {% endfor %}
-                        </div>
-                        <div class="form-text">Vazio = exclui cancelados, desistência e deletados.</div>
-                    </div>
-                </div>
-                <div class="row g-2 mt-2 align-items-end">
-                    <div class="col-md-6">
-                        <label class="form-check mb-0">
-                            <input type="checkbox" class="form-check-input" name="somente_marcados" value="1"
-                                   {% if filtros.somente_marcados %}checked{% endif %}>
-                            <span class="form-check-label small">Somente marcados para acerto de caixa</span>
-                        </label>
-                    </div>
-                </div>
-            </form>
+            </div>
 
             <div class="row g-3 mb-4">
                 <div class="col-lg-6">
