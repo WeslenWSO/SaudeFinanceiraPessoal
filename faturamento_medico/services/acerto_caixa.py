@@ -520,6 +520,70 @@ def montar_status_fechamentos_caixa(
     return status_list
 
 
+def _caixa_linha_ativo_no_acerto(empresa_id: int, caixa_val: str) -> bool:
+    chave = (caixa_val or '').strip()
+    if not chave:
+        return True
+    return (
+        caixa_valor_ativo_no_acerto(empresa_id, chave)
+        or chave in CAIXAS_ACERTO_VALORES
+    )
+
+
+def _linha_status_cancelado(linha: dict) -> bool:
+    st = (linha.get('status_agendamento') or '').strip()
+    if not st or st == '-':
+        return False
+    st_low = st.lower()
+    return any(st_low == cancel.lower() for cancel in STATUS_CANCELADOS)
+
+
+def filtrar_linhas_acerto_caixa(
+    linhas: list[dict],
+    empresa_id: int,
+    filtros: dict,
+) -> list[dict]:
+    """Mesmas regras do queryset + grade (caixa ativo, GET do formulário)."""
+    caixas_sel = [str(c).strip() for c in (filtros.get('caixa') or []) if str(c).strip()]
+    status_sel = list(filtros.get('status_agendamento') or [])
+    somente_marcados = bool(filtros.get('somente_marcados'))
+    operadores = _operadores_checkin_filtro(filtros)
+    checkin_legado = (filtros.get('checkin') or '').strip()
+    hora_ini = _parse_hora_minutos(filtros.get('hora_inicial'))
+    hora_fim = _parse_hora_minutos(filtros.get('hora_final'))
+
+    filtradas: list[dict] = []
+    for linha in linhas:
+        caixa_val = (linha.get('caixa_acerto') or '').strip()
+        if caixa_val and not _caixa_linha_ativo_no_acerto(empresa_id, caixa_val):
+            continue
+        if caixas_sel and caixa_val not in caixas_sel:
+            continue
+        if somente_marcados and not linha.get('marcado_acerto_caixa'):
+            continue
+        if operadores:
+            nome = (linha.get('checkin_por') or '').strip()
+            if not any(op.lower() == nome.lower() for op in operadores):
+                continue
+        elif checkin_legado:
+            if checkin_legado.lower() not in (linha.get('checkin_por') or '').lower():
+                continue
+        st = (linha.get('status_agendamento') or '').strip()
+        if status_sel:
+            st_cmp = st if st else 'Não informado'
+            if st_cmp not in status_sel:
+                continue
+        elif _linha_status_cancelado(linha):
+            continue
+        mins = _parse_hora_minutos(linha.get('horario_inicio'))
+        if hora_ini is not None and (mins is None or mins < hora_ini):
+            continue
+        if hora_fim is not None and (mins is None or mins > hora_fim):
+            continue
+        filtradas.append(linha)
+    return filtradas
+
+
 def _valor_pago_resumo_linha(linha: dict) -> Decimal:
     """Mesma base da coluna «Valor pago» da grade (— na tela = 0 no total)."""
     vp = linha.get('valor_pago')
@@ -531,8 +595,15 @@ def _valor_pago_resumo_linha(linha: dict) -> Decimal:
         return Decimal('0')
 
 
-def montar_resumo_modalidades_acerto(linhas: list[dict]) -> dict:
+def montar_resumo_modalidades_acerto(
+    linhas: list[dict],
+    *,
+    empresa_id: int | None = None,
+    filtros: dict | None = None,
+) -> dict:
     """Quantidade por modalidade; totais e gráfico usam valor pago (coluna da grade)."""
+    if empresa_id is not None and filtros is not None:
+        linhas = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros)
     contagem = {codigo: 0 for codigo, _ in MODALIDADES_RESUMO_ACERTO}
     valor_por_codigo = {codigo: Decimal('0') for codigo, _ in MODALIDADES_RESUMO_ACERTO}
     valor_total = Decimal('0')
@@ -586,7 +657,10 @@ def montar_resumo_modalidades_acerto(linhas: list[dict]) -> dict:
     for item in modalidades_fora_resumo:
         item['valor_fmt'] = _moeda_br(item['valor'])
 
-    grafico_modalidades = [m for m in resumo_modalidades if m['quantidade'] > 0]
+    grafico_modalidades = [
+        m for m in resumo_modalidades
+        if (m.get('valor') or Decimal('0')) > 0 or m['quantidade'] > 0
+    ]
     return {
         'resumo_modalidades': resumo_modalidades,
         'resumo_quantidade_total': len(linhas),
@@ -803,6 +877,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             aguardando_faturamento = _eh_aguardando_faturamento(status_txt)
 
             caixa_valor = (fat.caixa_acerto or '').strip()
+            if caixa_valor and not _caixa_linha_ativo_no_acerto(empresa_id, caixa_valor):
+                return
             if caixa_valor:
                 caixa_exib = rotulo_caixa_acerto(caixa_valor, empresa_id)
             else:
@@ -1013,11 +1089,19 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     }
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
-    blocos_impressao = montar_blocos_impressao_acerto_caixa(linhas, resumo_por_caixa_lista)
-    resumo_modalidades_ctx = montar_resumo_modalidades_acerto(linhas)
+    linhas_grade = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros_dict)
+    blocos_impressao = montar_blocos_impressao_acerto_caixa(
+        linhas_grade,
+        resumo_por_caixa_lista,
+    )
+    resumo_modalidades_ctx = montar_resumo_modalidades_acerto(
+        linhas_grade,
+        empresa_id=empresa_id,
+        filtros=filtros_dict,
+    )
 
     return {
-        'linhas': linhas,
+        'linhas': linhas_grade,
         'quantidade_linhas': len(linhas),
         'blocos_impressao': blocos_impressao,
         'resumo_pagamento': resumo_pagamento_lista,

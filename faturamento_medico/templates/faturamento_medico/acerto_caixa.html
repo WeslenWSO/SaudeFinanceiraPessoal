@@ -373,6 +373,7 @@
                         {% for linha in linhas %}
                         <tr data-faturamento-id="{{ linha.faturamento_id }}"
                             data-valor-pago="{{ linha.valor_pago|default:'' }}"
+                            data-modalidade="{{ linha.modalidade|default:'' }}"
                             data-valor-tabela="{{ linha.valor_tabela }}"
                             {% if linha.caixa_bloqueado %}data-caixa-bloqueado="1"{% endif %}>
                             <td class="text-nowrap">{{ linha.data_fmt }}</td>
@@ -561,8 +562,8 @@
                     </div>
                     {% endif %}
                     <p class="small text-muted mt-2 mb-0">
-                        Procedimentos do filtro (soma da coluna <strong>Valor pago</strong> da grade).
-                        Gráfico em R$ por modalidade (deve fechar com o valor pago total).
+                        Mesmos filtros do formulário (período, caixa, check-in, status, hora, marcados).
+                        Soma da coluna <strong>Valor pago</strong> das linhas da grade abaixo.
                     </p>
                 </div>
                 <div class="col-lg-4 col-md-6">

@@ -7,6 +7,7 @@ from decimal import Decimal
 from faturamento_medico.services.acerto_caixa import (
     _eh_aguardando_faturamento,
     _item_conferencia_pendente,
+    filtrar_linhas_acerto_caixa,
     montar_resumo_modalidades_acerto,
 )
 
@@ -56,3 +57,30 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(mr['quantidade'], 1)
         self.assertEqual(us['quantidade'], 1)
         self.assertAlmostEqual(sum(ctx['grafico_modalidade_valores']), 2150.0)
+
+    def test_filtrar_linhas_respeita_somente_marcados(self):
+        linhas = [
+            {
+                'caixa_acerto': '',
+                'marcado_acerto_caixa': True,
+                'valor_pago': Decimal('10'),
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+                'horario_inicio': '10:00',
+            },
+            {
+                'caixa_acerto': '',
+                'marcado_acerto_caixa': False,
+                'valor_pago': Decimal('99'),
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+                'horario_inicio': '10:00',
+            },
+        ]
+        out = filtrar_linhas_acerto_caixa(
+            linhas,
+            empresa_id=1,
+            filtros={'somente_marcados': True},
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['valor_pago'], Decimal('10'))
