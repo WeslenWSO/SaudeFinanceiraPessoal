@@ -25,6 +25,34 @@
 .acerto-resumo-sub td:first-child { padding-left: 1.25rem; font-size: 0.82rem; color: #495057; }
 .acerto-resumo-grupo td { border-top: 1px solid #dee2e6; }
 .acerto-resumo-total td { border-top: 2px solid #495057; font-size: 0.9rem; }
+.resumo-ris {
+    font-size: 0.85rem;
+    background: #fff;
+}
+.resumo-ris td,
+.resumo-ris th {
+    border: 1px solid #212529 !important;
+    vertical-align: middle;
+}
+.resumo-ris-header {
+    background-color: #b8d4e8 !important;
+    color: #000;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.resumo-ris tbody td:first-child {
+    text-transform: uppercase;
+}
+.resumo-ris-valor-label {
+    background-color: #b8d4e8 !important;
+}
+.resumo-ris-valor-cell {
+    background-color: #c6efce !important;
+    white-space: nowrap;
+}
+.acerto-resumo-modalidade-chart .card-header {
+    font-size: 0.9rem;
+}
 .acerto-table thead th { font-size: 0.72rem; white-space: nowrap; vertical-align: middle; }
 .acerto-table td { font-size: 0.78rem; vertical-align: middle; }
 .acerto-table .fm-celula-discriminacao[title] { cursor: help; }
@@ -306,6 +334,52 @@
                         {% else %}
                         <p class="text-muted small mb-0">Sem dados no filtro.</p>
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4 align-items-stretch">
+                <div class="col-lg-4 col-md-6">
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0 resumo-ris">
+                            <thead>
+                                <tr>
+                                    <th colspan="2" class="resumo-ris-header text-center">RESUMO</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in resumo_modalidades %}
+                                <tr>
+                                    <td class="text-center fw-bold">{{ item.label }}</td>
+                                    <td class="text-center">{{ item.quantidade }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr>
+                                    <td class="text-center fw-bold">QUANTIDADE TOTAL:</td>
+                                    <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-center fw-bold resumo-ris-valor-label">VALOR TOTAL:</td>
+                                    <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">
+                        Procedimentos do filtro (soma da coluna valor do procedimento).
+                    </p>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="card border shadow-sm h-100 acerto-resumo-modalidade-chart">
+                        <div class="card-header py-2 fw-semibold">
+                            <i class="fas fa-chart-pie me-1 text-primary"></i>
+                            Por modalidade
+                        </div>
+                        <div class="card-body d-flex align-items-center justify-content-center">
+                            <div class="w-100" style="max-height: 320px;">
+                                <canvas id="acertoGraficoModalidade" aria-label="Gráfico por modalidade"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -813,6 +887,56 @@
               }).catch(function() { alert('Erro ao salvar pagamentos.'); });
         });
     }
+})();
+</script>
+{{ grafico_modalidade_labels|json_script:"acerto-graf-mod-labels" }}
+{{ grafico_modalidade_valores|json_script:"acerto-graf-mod-valores" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function initAcertoResumoModalidadeChart() {
+    if (typeof Chart === 'undefined') return;
+    var canvas = document.getElementById('acertoGraficoModalidade');
+    var elLabels = document.getElementById('acerto-graf-mod-labels');
+    var elValores = document.getElementById('acerto-graf-mod-valores');
+    if (!canvas || !elLabels || !elValores) return;
+    var labelsRaw = JSON.parse(elLabels.textContent || '[]');
+    var valoresRaw = JSON.parse(elValores.textContent || '[]');
+    var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669'];
+    var labels = [];
+    var valores = [];
+    var cores = [];
+    labelsRaw.forEach(function(label, i) {
+        if ((valoresRaw[i] || 0) > 0) {
+            labels.push(label);
+            valores.push(valoresRaw[i]);
+            cores.push(coresAll[i % coresAll.length]);
+        }
+    });
+    if (!labels.length) {
+        labels.push('Sem dados');
+        valores.push(1);
+        cores.push('#e5e7eb');
+    }
+    new Chart(canvas.getContext('2d'), {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Quantidade',
+                data: valores,
+                backgroundColor: cores,
+                borderColor: '#fff',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+            },
+        },
+    });
 })();
 </script>
 {% endblock %}

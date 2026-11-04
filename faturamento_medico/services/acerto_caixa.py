@@ -42,6 +42,26 @@ STATUS_CANCELADOS = (
     'Delecao',
 )
 
+MODALIDADES_RESUMO_ACERTO = (
+    ('US', 'QUANTIDADE DE ULTRASSONOGRAFIA'),
+    ('CT', 'QUANTIDADE DE TOMOGRAFIA'),
+    ('MG', 'QUANTIDADE DE MAMOGRAFIA'),
+    ('CR', 'QUANTIDADE DE RAIO X'),
+    ('MR', 'QUANTIDADE DE RESSONÂNCIA'),
+    ('EG', 'QUANTIDADE DE ELETROENCEFALOGRAMA'),
+    ('EC', 'QUANTIDADE DE ELETROCARDIOGRAMA'),
+)
+
+MODALIDADES_LABEL_CURTO_ACERTO = {
+    'US': 'Ultrassonografia',
+    'CT': 'Tomografia',
+    'MG': 'Mamografia',
+    'CR': 'Raio X',
+    'MR': 'Ressonância',
+    'EG': 'EEG',
+    'EC': 'ECG',
+}
+
 
 def _q_status_cancelados():
     q = Q()
@@ -469,6 +489,40 @@ def montar_status_fechamentos_caixa(
     return status_list
 
 
+def montar_resumo_modalidades_acerto(linhas: list[dict]) -> dict:
+    """Quantidade por modalidade e valor total dos procedimentos no filtro."""
+    contagem = {codigo: 0 for codigo, _ in MODALIDADES_RESUMO_ACERTO}
+    valor_total = Decimal('0')
+    for linha in linhas:
+        codigo_mod = (linha.get('modalidade') or '').strip().upper()
+        if codigo_mod == 'RX':
+            codigo_mod = 'CR'
+        if codigo_mod in contagem:
+            contagem[codigo_mod] += 1
+        try:
+            valor_total += Decimal(str(linha.get('total_item') or 0))
+        except Exception:
+            pass
+    resumo_modalidades = [
+        {
+            'codigo': codigo,
+            'label': label,
+            'quantidade': contagem[codigo],
+        }
+        for codigo, label in MODALIDADES_RESUMO_ACERTO
+    ]
+    return {
+        'resumo_modalidades': resumo_modalidades,
+        'resumo_quantidade_total': len(linhas),
+        'resumo_valor_total_fmt': _moeda_br(valor_total),
+        'grafico_modalidade_labels': [
+            MODALIDADES_LABEL_CURTO_ACERTO.get(m['codigo'], m['codigo'])
+            for m in resumo_modalidades
+        ],
+        'grafico_modalidade_valores': [m['quantidade'] for m in resumo_modalidades],
+    }
+
+
 def montar_blocos_impressao_acerto_caixa(
     linhas: list[dict],
     resumo_por_caixa: list[dict],
@@ -881,6 +935,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
     blocos_impressao = montar_blocos_impressao_acerto_caixa(linhas, resumo_por_caixa_lista)
+    resumo_modalidades_ctx = montar_resumo_modalidades_acerto(linhas)
 
     return {
         'linhas': linhas,
@@ -903,4 +958,5 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'formas_pagamento_acerto': list(
             Cobranca.objects.all().order_by('descricao').values('id', 'descricao')
         ),
+        **resumo_modalidades_ctx,
     }
