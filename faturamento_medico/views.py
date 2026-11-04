@@ -5387,6 +5387,16 @@ def clonar_faturamento_view(request, pk):
     return redirect('faturamento_medico:editar', pk=novo.pk)
 
 
+def _url_voltar_faturamento(request, *, padrao=None):
+    voltar = (request.GET.get('next') or request.POST.get('voltar') or '').strip()
+    if voltar.startswith('/'):
+        return voltar
+    ref = (request.META.get('HTTP_REFERER') or '').strip()
+    if ref:
+        return ref
+    return padrao or reverse('faturamento_medico:ftlistar')
+
+
 def editar_faturamento(request, pk):
     """Edita um faturamento médico existente"""
     faturamento = get_object_or_404(
@@ -5398,12 +5408,16 @@ def editar_faturamento(request, pk):
         pk=pk,
     )
     empresa_id = request.session.get('empresa_id')
+    voltar = _url_voltar_faturamento(request)
 
     if request.method == 'POST':
         form = FaturamentoMedicoForm(request.POST, instance=faturamento, empresa_id=empresa_id)
         if form.is_valid():
             form.save()
             messages.success(request, 'Faturamento médico atualizado com sucesso!')
+            voltar_post = (request.POST.get('voltar') or '').strip()
+            if voltar_post.startswith('/'):
+                return redirect(voltar_post)
             return _redirect_ftlistar_com_filtros_sessao(request)
     else:
         form = FaturamentoMedicoForm(instance=faturamento, empresa_id=empresa_id)
@@ -5418,6 +5432,7 @@ def editar_faturamento(request, pk):
         'faturamento': faturamento,
         'titulo': 'Editar Faturamento Médico',
         'total_anestesista': total_anestesista,
+        'voltar': voltar,
     }
 
     return render(request, 'faturamento_medico/form.html', context)
