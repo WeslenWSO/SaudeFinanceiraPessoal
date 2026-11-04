@@ -257,6 +257,7 @@
                                         </th>
                                         <th class="grid-ris-th" data-col="data">DATA</th>
                                         <th class="grid-ris-th" data-col="paciente">PACIENTE</th>
+                                        <th class="grid-ris-th" data-col="medico_solicitante">MÉDICO SOLICITANTE</th>
                                         <th class="grid-ris-th" data-col="nome_associado">NOME ASSOCIADO</th>
                                         <th class="grid-ris-th" data-col="guia">NÚMERO DA GUIA</th>
                                         <th class="grid-ris-th" data-col="codigo_procedimento">CÓDIGO PROCEDIMENTO</th>
@@ -292,6 +293,7 @@
                                         </td>
                                         <td data-col="data">{{ linha.faturamento.data|date:"d/m/Y" }}</td>
                                         <td data-col="paciente">{{ linha.paciente }}</td>
+                                        <td data-col="medico_solicitante">{{ linha.medico_solicitante }}</td>
                                         <td data-col="nome_associado">{{ linha.nome_associado }}</td>
                                         <td class="text-center" data-col="guia">{{ linha.faturamento.guia|default:"-" }}</td>
                                         <td class="text-center" data-col="codigo_procedimento">
@@ -996,7 +998,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var STORAGE_KEY = 'faturamento_ris_colunas_v1';
         var LOCKED = { sel: true, acoes: true };
         var COLS = [
-            'sel', 'data', 'paciente', 'nome_associado', 'guia', 'codigo_procedimento', 'procedimento',
+            'sel', 'data', 'paciente', 'medico_solicitante', 'nome_associado', 'guia', 'codigo_procedimento', 'procedimento',
             'modalidade', 'contraste', 'valor', 'valor_pago', 'conferencia', 'status_conferencia',
             'convenio', 'anestesista', 'nf_pagamento', 'acoes'
         ];
@@ -1004,6 +1006,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sel: 'Seleção (lote)',
             data: 'Data',
             paciente: 'Paciente',
+            medico_solicitante: 'Médico solicitante',
             nome_associado: 'Nome associado',
             guia: 'Número da guia',
             codigo_procedimento: 'Código procedimento',
