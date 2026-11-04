@@ -162,6 +162,77 @@
             padding: 24px;
             font-size: 11px;
         }
+        .secao-resumo-modalidade {
+            page-break-before: always;
+            padding-top: 10px;
+            margin-top: 8px;
+        }
+        .resumo-modalidade-impressao {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+            justify-content: center;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        .resumo-ris {
+            font-size: 9px;
+            background: #fff;
+            border-collapse: collapse;
+            min-width: 300px;
+        }
+        .resumo-ris td,
+        .resumo-ris th {
+            border: 1px solid #212529 !important;
+            vertical-align: middle;
+            padding: 4px 6px;
+        }
+        .resumo-ris-header {
+            background-color: #b8d4e8 !important;
+            color: #000;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .resumo-ris tbody td:first-child {
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .resumo-ris-valor-label {
+            background-color: #b8d4e8 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .resumo-ris-valor-cell {
+            background-color: #c6efce !important;
+            text-align: right;
+            font-weight: bold;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .chart-modalidade-impressao {
+            flex: 1 1 260px;
+            max-width: 340px;
+            min-height: 260px;
+        }
+        .chart-modalidade-impressao h2 {
+            font-size: 10px;
+            text-align: center;
+            margin: 0 0 8px;
+            text-transform: uppercase;
+        }
+        .chart-modalidade-impressao canvas {
+            max-width: 100%;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .resumo-modalidade-nota {
+            text-align: center;
+            font-size: 8px;
+            color: #555;
+            margin-top: 8px;
+        }
         @media print {
             body { margin: 0; }
             .no-print { display: none !important; }
@@ -171,6 +242,9 @@
                 page-break-before: always;
             }
             .secao-resumo-final {
+                page-break-before: always;
+            }
+            .secao-resumo-modalidade {
                 page-break-before: always;
             }
         }
@@ -340,5 +414,97 @@
         </div>
     </section>
     {% endif %}
+
+    {% if blocos_impressao %}
+    <section class="secao-resumo-modalidade">
+        <h1>Resumo por modalidade</h1>
+        <p class="periodo">Período: {{ periodo_fmt }} · <strong>{{ resumo_quantidade_total }}</strong> procedimento(s)</p>
+        <div class="resumo-modalidade-impressao">
+            <table class="resumo-ris">
+                <thead>
+                    <tr>
+                        <th colspan="2" class="resumo-ris-header text-center">RESUMO</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resumo_modalidades %}
+                    <tr>
+                        <td class="text-center">{{ item.label }}</td>
+                        <td class="text-center">{{ item.quantidade }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td class="text-center">QUANTIDADE TOTAL:</td>
+                        <td class="text-center"><strong>{{ resumo_quantidade_total }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="resumo-ris-valor-label text-center">VALOR TOTAL:</td>
+                        <td class="resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="chart-modalidade-impressao">
+                <h2>Por modalidade</h2>
+                <canvas id="acertoImpressaoGraficoModalidade" width="320" height="320" aria-label="Gráfico por modalidade"></canvas>
+            </div>
+        </div>
+        <p class="resumo-modalidade-nota">Procedimentos do filtro (soma do valor do procedimento).</p>
+    </section>
+    {% endif %}
+
+    {{ grafico_modalidade_labels|json_script:"acerto-impressao-graf-mod-labels" }}
+    {{ grafico_modalidade_valores|json_script:"acerto-impressao-graf-mod-valores" }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    (function () {
+        if (typeof Chart === 'undefined') return;
+        var canvas = document.getElementById('acertoImpressaoGraficoModalidade');
+        var elLabels = document.getElementById('acerto-impressao-graf-mod-labels');
+        var elValores = document.getElementById('acerto-impressao-graf-mod-valores');
+        if (!canvas || !elLabels || !elValores) return;
+        var labelsRaw = JSON.parse(elLabels.textContent || '[]');
+        var valoresRaw = JSON.parse(elValores.textContent || '[]');
+        var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669'];
+        var labels = [];
+        var valores = [];
+        var cores = [];
+        labelsRaw.forEach(function (label, i) {
+            if ((valoresRaw[i] || 0) > 0) {
+                labels.push(label);
+                valores.push(valoresRaw[i]);
+                cores.push(coresAll[i % coresAll.length]);
+            }
+        });
+        if (!labels.length) {
+            labels.push('Sem dados');
+            valores.push(1);
+            cores.push('#e5e7eb');
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Quantidade',
+                    data: valores,
+                    backgroundColor: cores,
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 10, font: { size: 9 } },
+                    },
+                },
+            },
+        });
+    })();
+    </script>
 </body>
 </html>
