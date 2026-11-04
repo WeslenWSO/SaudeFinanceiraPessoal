@@ -681,7 +681,7 @@
                     </div>
                     {% endif %}
                     <p class="small text-muted mt-2 mb-0">
-                        Mesmos filtros do formulário (período, caixa, check-in, status, hora, marcados).
+                        Mesmos filtros do formulário (período, paciente, convênio, caixa, check-in, status, hora, marcados).
                         Soma da coluna <strong>Valor pago</strong> das linhas da grade abaixo.
                     </p>
                 </div>
@@ -731,6 +731,80 @@
 </div>
 
 <script>
+(function initAcertoFiltrosUi() {
+    var wrap = document.getElementById('acertoFiltroWrap');
+    var btnToggle = document.getElementById('btnToggleFiltrosAcerto');
+    if (wrap && btnToggle) {
+        var storageKey = 'acerto_caixa_filtros_abertos';
+        function setOpen(open) {
+            wrap.classList.toggle('is-collapsed', !open);
+            btnToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            try { localStorage.setItem(storageKey, open ? '1' : '0'); } catch (e) {}
+        }
+        var saved = null;
+        try { saved = localStorage.getItem(storageKey); } catch (e) {}
+        var linhas = {{ quantidade_linhas|default:0 }};
+        setOpen(saved === '0' && linhas > 0 ? false : true);
+        btnToggle.addEventListener('click', function() {
+            setOpen(wrap.classList.contains('is-collapsed'));
+        });
+    }
+
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    function fmtDate(d) {
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    document.querySelectorAll('.js-acerto-periodo').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var ini = document.getElementById('data_inicio');
+            var fim = document.getElementById('data_fim');
+            if (!ini || !fim) return;
+            var hoje = new Date();
+            var preset = btn.getAttribute('data-preset');
+            if (preset === 'hoje') {
+                ini.value = fmtDate(hoje);
+                fim.value = fmtDate(hoje);
+            } else if (preset === 'mes') {
+                ini.value = fmtDate(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+                fim.value = fmtDate(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0));
+            } else if (preset === 'mes_anterior') {
+                ini.value = fmtDate(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1));
+                fim.value = fmtDate(new Date(hoje.getFullYear(), hoje.getMonth(), 0));
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-acerto-lista-busca').forEach(function(input) {
+        input.addEventListener('input', function() {
+            var lista = document.getElementById(input.getAttribute('data-lista'));
+            if (!lista) return;
+            var q = (input.value || '').trim().toLowerCase();
+            lista.querySelectorAll('.js-acerto-lista-item').forEach(function(row) {
+                var txt = (row.textContent || '').toLowerCase();
+                row.style.display = !q || txt.indexOf(q) !== -1 ? '' : 'none';
+            });
+        });
+    });
+
+    function toggleNamedChecks(name, checked) {
+        document.querySelectorAll('input[name="' + name + '"]').forEach(function(cb) {
+            var row = cb.closest('.js-acerto-lista-item');
+            if (row && row.style.display === 'none') return;
+            cb.checked = checked;
+        });
+    }
+    document.querySelectorAll('.js-acerto-chk-all').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            toggleNamedChecks(btn.getAttribute('data-target'), true);
+        });
+    });
+    document.querySelectorAll('.js-acerto-chk-none').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            toggleNamedChecks(btn.getAttribute('data-target'), false);
+        });
+    });
+})();
+
 (function initFecharAcertoCaixa() {
     var chk = document.getElementById('chkValoresConferidos');
     var btn = document.getElementById('btnFecharAcertoCaixa');

@@ -84,3 +84,30 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         )
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]['valor_pago'], Decimal('10'))
+
+    def test_filtrar_linhas_paciente_e_convenio(self):
+        linhas = [
+            {
+                'paciente': 'Maria Silva',
+                'convenio': 'GEAP',
+                'caixa_acerto': '',
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+                'horario_inicio': '10:00',
+            },
+            {
+                'paciente': 'João Souza',
+                'convenio': 'Bradesco',
+                'caixa_acerto': '',
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+                'horario_inicio': '10:00',
+            },
+        ]
+        out = filtrar_linhas_acerto_caixa(
+            linhas,
+            empresa_id=1,
+            filtros={'paciente': 'maria', 'convenio': ['GEAP']},
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['paciente'], 'Maria Silva')
