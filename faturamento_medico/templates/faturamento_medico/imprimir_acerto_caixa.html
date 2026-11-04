@@ -438,7 +438,7 @@
                         <td class="text-center"><strong>{{ resumo_quantidade_total }}</strong></td>
                     </tr>
                     <tr>
-                        <td class="resumo-ris-valor-label text-center">VALOR TOTAL:</td>
+                        <td class="resumo-ris-valor-label text-center">VALOR PAGO TOTAL:</td>
                         <td class="resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
                     </tr>
                 </tbody>
@@ -448,7 +448,14 @@
                 <canvas id="acertoImpressaoGraficoModalidade" width="320" height="320" aria-label="Gráfico por modalidade"></canvas>
             </div>
         </div>
-        <p class="resumo-modalidade-nota">Procedimentos do filtro (soma do valor do procedimento).</p>
+        {% if modalidades_fora_resumo %}
+        <p class="resumo-modalidade-nota"><strong>Fora do resumo padrão:</strong>
+            {% for item in modalidades_fora_resumo %}
+            {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+            {% endfor %}
+        </p>
+        {% endif %}
+        <p class="resumo-modalidade-nota">Procedimentos do filtro (soma da coluna Valor pago). Gráfico em R$.</p>
     </section>
     {% endif %}
 
@@ -480,12 +487,15 @@
             valores.push(1);
             cores.push('#e5e7eb');
         }
+        function fmtMoeda(v) {
+            return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
         new Chart(canvas.getContext('2d'), {
             type: 'pie',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Quantidade',
+                    label: 'Valor (R$)',
                     data: valores,
                     backgroundColor: cores,
                     borderColor: '#fff',
@@ -497,6 +507,13 @@
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.label + ': ' + fmtMoeda(ctx.parsed || 0);
+                            }
+                        }
+                    },
                     legend: {
                         position: 'bottom',
                         labels: { boxWidth: 10, font: { size: 9 } },

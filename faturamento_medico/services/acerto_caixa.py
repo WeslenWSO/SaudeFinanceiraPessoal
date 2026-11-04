@@ -12,7 +12,11 @@ from django.db.utils import OperationalError, ProgrammingError
 from django.utils import timezone
 
 from cobranca.models import Cobranca
-from faturamento_medico.lote_relatorio import _modalidade_item
+from faturamento_medico.lote_relatorio import (
+    _inferir_modalidade,
+    _modalidade_item,
+    _normalizar_codigo_modalidade,
+)
 from faturamento_medico.log_status_conferencia import registrar_log_status_conferencia_item
 from faturamento_medico.models import (
     AcertoCaixaFechamento,
@@ -60,7 +64,34 @@ MODALIDADES_LABEL_CURTO_ACERTO = {
     'MR': 'Ressonância',
     'EG': 'EEG',
     'EC': 'ECG',
+    'OUTROS': 'Outras modalidades',
 }
+
+_CODIGOS_MODALIDADE_RESUMO_ACERTO = frozenset(c for c, _ in MODALIDADES_RESUMO_ACERTO)
+
+
+def _codigo_modalidade_para_resumo_acerto(linha: dict) -> str:
+    """Normaliza modalidade da linha para contagem no resumo (inclui inferência pelo procedimento)."""
+    bruto = (linha.get('modalidade') or '').strip()
+    codigo = _normalizar_codigo_modalidade(bruto)
+    if codigo == '-':
+        codigo = ''
+    if codigo in _CODIGOS_MODALIDADE_RESUMO_ACERTO:
+        return codigo
+    if codigo == 'RM':
+        return 'MR'
+    if codigo == 'TC':
+        return 'CT'
+    inferido = _normalizar_codigo_modalidade(
+        _inferir_modalidade(linha.get('procedimento') or '', bruto)
+    )
+    if inferido and inferido != '-' and inferido in _CODIGOS_MODALIDADE_RESUMO_ACERTO:
+        return inferido
+    if codigo:
+        return codigo
+    if inferido and inferido != '-':
+        return inferido
+    return bruto.upper() if bruto else '-'
 
 
 def _q_status_cancelados():
@@ -489,37 +520,85 @@ def montar_status_fechamentos_caixa(
     return status_list
 
 
+def _valor_pago_resumo_linha(linha: dict) -> Decimal:
+    """Mesma base da coluna «Valor pago» da grade (— na tela = 0 no total)."""
+    vp = linha.get('valor_pago')
+    if vp is None:
+        return Decimal('0')
+    try:
+        return Decimal(str(vp))
+    except Exception:
+        return Decimal('0')
+
+
 def montar_resumo_modalidades_acerto(linhas: list[dict]) -> dict:
-    """Quantidade por modalidade e valor total dos procedimentos no filtro."""
+    """Quantidade por modalidade; totais e gráfico usam valor pago (coluna da grade)."""
     contagem = {codigo: 0 for codigo, _ in MODALIDADES_RESUMO_ACERTO}
+    valor_por_codigo = {codigo: Decimal('0') for codigo, _ in MODALIDADES_RESUMO_ACERTO}
     valor_total = Decimal('0')
+    outros_qtd = 0
+    outros_valor = Decimal('0')
+    detalhe_fora: dict[str, dict] = {}
+
     for linha in linhas:
-        codigo_mod = (linha.get('modalidade') or '').strip().upper()
-        if codigo_mod == 'RX':
-            codigo_mod = 'CR'
+        val_item = _valor_pago_resumo_linha(linha)
+        valor_total += val_item
+
+        codigo_mod = _codigo_modalidade_para_resumo_acerto(linha)
         if codigo_mod in contagem:
             contagem[codigo_mod] += 1
-        try:
-            valor_total += Decimal(str(linha.get('total_item') or 0))
-        except Exception:
-            pass
+            valor_por_codigo[codigo_mod] += val_item
+            continue
+
+        outros_qtd += 1
+        outros_valor += val_item
+        chave = codigo_mod or '-'
+        if chave not in detalhe_fora:
+            detalhe_fora[chave] = {'codigo': chave, 'quantidade': 0, 'valor': Decimal('0')}
+        detalhe_fora[chave]['quantidade'] += 1
+        detalhe_fora[chave]['valor'] += val_item
+
     resumo_modalidades = [
         {
             'codigo': codigo,
             'label': label,
             'quantidade': contagem[codigo],
+            'valor': valor_por_codigo[codigo],
+            'valor_fmt': _moeda_br(valor_por_codigo[codigo]),
         }
         for codigo, label in MODALIDADES_RESUMO_ACERTO
     ]
+    if outros_qtd:
+        resumo_modalidades.append(
+            {
+                'codigo': 'OUTROS',
+                'label': 'QUANTIDADE OUTRAS MODALIDADES',
+                'quantidade': outros_qtd,
+                'valor': outros_valor,
+                'valor_fmt': _moeda_br(outros_valor),
+            }
+        )
+
+    modalidades_fora_resumo = sorted(
+        detalhe_fora.values(),
+        key=lambda x: (-x['valor'], x['codigo']),
+    )
+    for item in modalidades_fora_resumo:
+        item['valor_fmt'] = _moeda_br(item['valor'])
+
+    grafico_modalidades = [m for m in resumo_modalidades if m['quantidade'] > 0]
     return {
         'resumo_modalidades': resumo_modalidades,
         'resumo_quantidade_total': len(linhas),
         'resumo_valor_total_fmt': _moeda_br(valor_total),
+        'resumo_outros_quantidade': outros_qtd,
+        'resumo_outros_valor_fmt': _moeda_br(outros_valor) if outros_qtd else '',
+        'modalidades_fora_resumo': modalidades_fora_resumo,
         'grafico_modalidade_labels': [
             MODALIDADES_LABEL_CURTO_ACERTO.get(m['codigo'], m['codigo'])
-            for m in resumo_modalidades
+            for m in grafico_modalidades
         ],
-        'grafico_modalidade_valores': [m['quantidade'] for m in resumo_modalidades],
+        'grafico_modalidade_valores': [float(m['valor']) for m in grafico_modalidades],
     }
 
 
