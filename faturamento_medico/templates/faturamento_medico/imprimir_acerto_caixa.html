@@ -229,6 +229,12 @@
                 </tr>
                 {% endfor %}
                 {% endif %}
+                {% if bloco.resumo.pagamentos or bloco.resumo.aguardando %}
+                <tr class="resumo-grupo">
+                    <td><strong>Total</strong></td>
+                    <td><strong>R$ {{ bloco.resumo.total_geral_fmt }}</strong></td>
+                </tr>
+                {% endif %}
             </table>
         </div>
         {% endif %}
@@ -323,6 +329,12 @@
                     <td>R$ {{ row.total_fmt }}</td>
                 </tr>
                 {% endfor %}
+                {% endif %}
+                {% if resumo_pagamento or resumo_aguardando_faturamento %}
+                <tr class="resumo-grupo">
+                    <td><strong>Total geral</strong></td>
+                    <td><strong>R$ {{ total_resumo_geral_fmt }}</strong></td>
+                </tr>
                 {% endif %}
             </table>
         </div>

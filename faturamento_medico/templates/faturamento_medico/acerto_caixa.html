@@ -24,6 +24,7 @@
 .acerto-resumo-card { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.5rem; padding: 1rem; }
 .acerto-resumo-sub td:first-child { padding-left: 1.25rem; font-size: 0.82rem; color: #495057; }
 .acerto-resumo-grupo td { border-top: 1px solid #dee2e6; }
+.acerto-resumo-total td { border-top: 2px solid #495057; font-size: 0.9rem; }
 .acerto-table thead th { font-size: 0.72rem; white-space: nowrap; vertical-align: middle; }
 .acerto-table td { font-size: 0.78rem; vertical-align: middle; }
 .acerto-table .fm-celula-discriminacao[title] { cursor: help; }
@@ -189,6 +190,12 @@
                             </tr>
                             {% endfor %}
                             {% endif %}
+                            {% if resumo_pagamento or resumo_aguardando_faturamento %}
+                            <tr class="acerto-resumo-total">
+                                <td class="fw-bold pt-2">Total geral</td>
+                                <td class="text-end fw-bold pt-2">R$ {{ total_resumo_geral_fmt }}</td>
+                            </tr>
+                            {% endif %}
                             {% if not resumo_pagamento and not resumo_aguardando_faturamento %}
                             <tr><td class="text-muted">Sem dados no filtro.</td></tr>
                             {% endif %}
@@ -284,6 +291,12 @@
                                             <td class="text-end">R$ {{ row.total_fmt }}</td>
                                         </tr>
                                         {% endfor %}
+                                        {% endif %}
+                                        {% if grupo.pagamentos or grupo.aguardando %}
+                                        <tr class="acerto-resumo-total">
+                                            <td class="fw-bold pt-2">Total</td>
+                                            <td class="text-end fw-bold pt-2">R$ {{ grupo.total_geral_fmt }}</td>
+                                        </tr>
                                         {% endif %}
                                     </table>
                                 </div>

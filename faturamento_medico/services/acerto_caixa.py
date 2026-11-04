@@ -795,6 +795,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     )
     total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
     total_pagamentos_nf = sum((row['total'] for row in resumo_pagamento_lista), Decimal('0'))
+    total_resumo_geral = total_pagamentos_nf + total_aguardando
 
     resumo_por_caixa_lista: list[dict] = []
     for chave in sorted(
@@ -818,6 +819,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         )
         total_pag_caixa = sum((r['total'] for r in pagamentos_caixa), Decimal('0'))
         total_ag_caixa = sum((r['total'] for r in aguardando_caixa), Decimal('0'))
+        total_geral_caixa = total_pag_caixa + total_ag_caixa
         resumo_por_caixa_lista.append(
             {
                 'caixa': bloco['caixa'],
@@ -826,7 +828,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'aguardando': aguardando_caixa,
                 'total_pagamentos': total_pag_caixa,
                 'total_pagamentos_fmt': _moeda_br(total_pag_caixa),
+                'total_aguardando': total_ag_caixa,
                 'total_aguardando_fmt': _moeda_br(total_ag_caixa),
+                'total_geral': total_geral_caixa,
+                'total_geral_fmt': _moeda_br(total_geral_caixa),
             },
         )
 
@@ -886,6 +891,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_aguardando_faturamento': resumo_aguardando_lista,
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'total_pagamentos_nf_fmt': _moeda_br(total_pagamentos_nf),
+        'total_resumo_geral_fmt': _moeda_br(total_resumo_geral),
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
