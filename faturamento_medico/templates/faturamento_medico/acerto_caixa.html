@@ -1708,12 +1708,12 @@
                     </div>
                 </div>
                 {% endif %}
+                {% if not resumo_matriz_mes %}
                 <div class="row g-3 resumo-visao-mes">
                     <div class="col-lg-6">
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
-                                {% if resumo_matriz_mes %}<span class="text-muted fw-normal small">(total do mês)</span>{% endif %}
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-sm acerto-modal-table mb-0">
@@ -1754,7 +1754,6 @@
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-hospital"></i> Viabilidade (convênio) — qt · valor pago
-                                {% if resumo_matriz_mes %}<span class="text-muted fw-normal small">(total do mês)</span>{% endif %}
                             </div>
                             <div class="acerto-modal-scroll-tabela">
                                 <table class="table table-sm acerto-modal-table mb-0">
@@ -1788,6 +1787,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 <div class="row g-3 mt-1 resumo-visao-mes">
                     <div class="col-lg-5">
                         <div class="acerto-modal-panel h-100">
