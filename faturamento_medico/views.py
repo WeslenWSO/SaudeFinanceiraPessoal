@@ -6218,6 +6218,11 @@ def acerto_caixa(request):
 
         empresa = Empresa.objects.filter(pk=empresa_id).first()
         contexto = montar_contexto_acerto_caixa(request, empresa_id)
+        contexto.setdefault('grade_oculta_resumo_ano', False)
+        contexto.setdefault('resumo_pode_abrir_direto', False)
+        contexto.setdefault('periodo_resumo_fmt', contexto.get('periodo_fmt', ''))
+        contexto.setdefault('dias_resumo', [])
+        contexto.setdefault('modo_resumo_ano_leve', False)
         contexto['empresa'] = empresa
         contexto['redirect_qs'] = request.GET.urlencode()
         return render(request, 'faturamento_medico/acerto_caixa.html', contexto)

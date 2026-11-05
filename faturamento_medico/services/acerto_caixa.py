@@ -240,6 +240,13 @@ def _botoes_anos(
     return botoes
 
 
+def _filtros_query_periodo(filtros: dict) -> dict:
+    """Filtros para links da régua (dia/mês): não arrasta dias_resumo antigos."""
+    base = dict(filtros or {})
+    base['dias_resumo'] = []
+    return base
+
+
 def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> str:
     """Query string GET preservando filtros e alterando só o período."""
     pares: list[tuple[str, str]] = [
@@ -286,7 +293,11 @@ def parse_dias_resumo_request(request) -> list[str]:
         if s and _parse_data_filtro(s):
             dias.append(s)
     if not dias:
-        bruto = (request.GET.get('dias_resumo') or '').strip()
+        bruto_raw = get.get('dias_resumo')
+        if isinstance(bruto_raw, (list, tuple)):
+            bruto = ','.join(str(x) for x in bruto_raw if x)
+        else:
+            bruto = (bruto_raw or '').strip()
         if bruto:
             for parte in bruto.split(','):
                 s = parte.strip()
@@ -354,7 +365,7 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
                 'no_intervalo': data_inicio <= dia <= data_fim,
                 'escolhido_resumo': iso in dias_resumo_pick,
                 'fim_semana': dia.weekday() >= 5,
-                'url_query': url_query_acerto_caixa(filtros, dia, dia),
+                'url_query': url_query_acerto_caixa(_filtros_query_periodo(filtros), dia, dia),
             }
         )
 
@@ -366,9 +377,11 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
     return {
         'regua_titulo': f'{titulo_mes} {y}',
         'regua_ano': y,
-        'regua_url_botao_mes': url_query_acerto_caixa(filtros, primeiro, ultimo),
+        'regua_url_botao_mes': url_query_acerto_caixa(
+            _filtros_query_periodo(filtros), primeiro, ultimo
+        ),
         'regua_url_botao_ano': url_query_acerto_caixa(
-            filtros, ano_regua_ini, ano_regua_fim
+            _filtros_query_periodo(filtros), ano_regua_ini, ano_regua_fim
         ),
         'regua_botao_mes_ativo': (
             periodo_eh_mes_inteiro(data_inicio, data_fim)
@@ -2068,6 +2081,9 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     if di > df:
         di, df = df, di
 
+    visao_resumo = (request.GET.get('visao_resumo') or '').strip().lower()
+    modo_resumo_ano_leve = periodo_eh_ano_inteiro(di, df) and visao_resumo == 'ano'
+
     checkin_por_sel = [
         s.strip() for s in request.GET.getlist('checkin_por') if s and str(s).strip()
     ]
@@ -2140,17 +2156,23 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     if somente_marcados:
         qs = qs.filter(marcado_acerto_caixa=True)
 
-    qs = (
-        qs.order_by('data', 'horario_inicio', 'nome')
-        .prefetch_related('itens_servico')
-        .defer('pagamentos_acerto_json')
-    )
-    notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+    qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
+    if modo_resumo_ano_leve:
+        notas_por_data = {}
+    else:
+        try:
+            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+        except Exception:
+            notas_por_data = {}
     fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
     fats_bloqueio: dict[int, bool] = {}
-    cobrancas_por_id = {c.pk: c for c in Cobranca.objects.all()}
+    try:
+        cobrancas_por_id = {c.pk: c for c in Cobranca.objects.all()}
+    except (ProgrammingError, OperationalError):
+        cobrancas_por_id = {}
 
     linhas = []
+    # Não usar iterator() aqui: anula prefetch_related e gera N+1 (timeout no Render).
 
     for fat in qs:
         mins = _parse_hora_minutos(fat.horario_inicio or fat.horario)
@@ -2159,14 +2181,21 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         if hora_fim_min is not None and (mins is None or mins > hora_fim_min):
             continue
 
-        notas = resolver_notas_linha(
-            notas_por_data,
-            empresa_id,
-            fat.nome or '',
-            fat.data,
-            fat.nota_fiscal,
-        )
-        nota = _primeira_nota(notas)
+        if modo_resumo_ano_leve:
+            notas = []
+            nota = None
+        else:
+            try:
+                notas = resolver_notas_linha(
+                    notas_por_data,
+                    empresa_id,
+                    fat.nome or '',
+                    fat.data,
+                    fat.nota_fiscal,
+                )
+            except Exception:
+                notas = []
+            nota = _primeira_nota(notas)
         from faturamento_medico.services.pagamentos_acerto_caixa import (
             pagamentos_efetivos_faturamento,
             pagamentos_manuais_faturamento,
@@ -2192,7 +2221,11 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         primeira_linha_faturamento = True
         data_iso = fat.data.isoformat() if fat.data else ''
         qtd_notas = len(notas)
-        notas_json = notas_linha_para_json(notas) if qtd_notas > 1 else ''
+        notas_json = (
+            ''
+            if modo_resumo_ano_leve
+            else (notas_linha_para_json(notas) if qtd_notas > 1 else '')
+        )
 
         def _add_linha(item=None):
             nonlocal primeira_linha_faturamento
@@ -2273,9 +2306,13 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 'valor_tabela': valor_tabela,
                 'nota_fiscal': numero_nf or '-',
                 'forma_pgto': forma_linha,
-                'pagamentos_acerto_json': serializar_pagamentos_json(
-                    pagamentos_manuais_faturamento(
-                        fat, cobrancas_por_id=cobrancas_por_id
+                'pagamentos_acerto_json': (
+                    ''
+                    if modo_resumo_ano_leve
+                    else serializar_pagamentos_json(
+                        pagamentos_manuais_faturamento(
+                            fat, cobrancas_por_id=cobrancas_por_id
+                        )
                     )
                 ),
                 'pagamentos_acerto': pagamentos_efetivos,
@@ -2336,6 +2373,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'filtros_dict': filtros_dict,
         'dias_resumo': dias_resumo,
         'resumo_pode_abrir_direto': pode_abrir_resumo_acerto_direto(request, di, df),
+        'modo_resumo_ano_leve': modo_resumo_ano_leve,
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
@@ -2419,7 +2457,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     )
     visao_resumo = (request.GET.get('visao_resumo') or '').strip().lower()
     ano_inteiro_ctx = periodo_eh_ano_inteiro(di, df)
-    if ano_inteiro_ctx and len(linhas_grade) > 800:
+    modo_resumo_ano_leve = base.get('modo_resumo_ano_leve', False)
+    if modo_resumo_ano_leve or (ano_inteiro_ctx and len(linhas_grade) > 800):
         blocos_impressao = []
     else:
         blocos_impressao = montar_blocos_impressao_acerto_caixa(
@@ -2455,7 +2494,15 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             'matriz anual acerto falhou ano=%s: %s', di.year, exc_matriz
         )
         matriz_anual_ctx = {'resumo_matriz_anual': False}
-    matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)
+    try:
+        matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)
+    except Exception as exc_matriz_mes:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            'matriz mês/dia acerto falhou %s–%s: %s', di, df, exc_matriz_mes
+        )
+        matriz_mes_dia_ctx = {'resumo_matriz_mes': False}
     limite_linhas_grade_tela = 2500
     if ano_inteiro_ctx and visao_resumo == 'ano':
         limite_linhas_grade_tela = 0
@@ -2513,6 +2560,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'periodo_resumo_fmt': periodo_resumo_fmt,
         'dias_resumo': dias_resumo,
         'resumo_pode_abrir_direto': resumo_pode_abrir_direto,
+        'modo_resumo_ano_leve': modo_resumo_ano_leve,
         'nome_caixa_acerto': nome_caixa_acerto,
         'formas_pagamento_acerto': list(
             Cobranca.objects.all().order_by('descricao').values('id', 'descricao')

@@ -1023,7 +1023,12 @@
             </div>
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
-            {% if grade_oculta_resumo_ano %}
+            {% if modo_resumo_ano_leve %}
+            <div class="alert alert-warning py-2 small mb-2">
+                Resumo anual rápido: formas de pagamento usam rateio manual da grade (NF omitida nesta carga).
+                Para conferência item a item com NF, filtre por <strong>Mês</strong> ou um dia na régua.
+            </div>
+            {% elif grade_oculta_resumo_ano %}
             <div class="alert alert-info py-2 small mb-2">
                 Resumo anual: a grade detalhada foi omitida para agilizar o carregamento
                 (<strong>{{ quantidade_linhas }}</strong> linha(s) no ano).
