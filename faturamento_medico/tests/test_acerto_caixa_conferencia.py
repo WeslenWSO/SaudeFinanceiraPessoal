@@ -432,6 +432,7 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         aplicar_rotulo_solicitante_resumo_linhas(linhas, {})
         det = montar_detalhe_medico_solicitante_acerto(linhas)
         self.assertIn('Dr. A', det)
+        self.assertGreaterEqual(len(det['Dr. A']['modalidade']), 1)
         self.assertEqual(det['Dr. A']['total_viabilidade_qt'], 2)
         viabs = {v['viabilidade']: v['quantidade'] for v in det['Dr. A']['viabilidade']}
         self.assertEqual(viabs['FUSEX'], 1)

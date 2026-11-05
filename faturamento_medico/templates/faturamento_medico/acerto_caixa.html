@@ -329,6 +329,16 @@
 #modalDetalheSolicitanteAcerto {
     z-index: 1065;
 }
+#modalDetalheSolicitanteAcerto .modal-dialog.modal-detalhe-solicitante-dialog {
+    width: 70vw;
+    max-width: 70vw;
+}
+@media (max-width: 991px) {
+    #modalDetalheSolicitanteAcerto .modal-dialog.modal-detalhe-solicitante-dialog {
+        width: 94vw;
+        max-width: 94vw;
+    }
+}
 #modalDetalheSolicitanteAcerto .modal-header {
     background: linear-gradient(135deg, #312e81 0%, #4f46e5 100%);
     color: #fff;
@@ -1852,7 +1862,7 @@
 </div>
 
 <div class="modal fade" id="modalDetalheSolicitanteAcerto" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-detalhe-solicitante-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -1865,7 +1875,26 @@
             </div>
             <div class="modal-body">
                 <div class="row g-3">
-                    <div class="col-md-6">
+                    <div class="col-lg-4">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-list-ol"></i> Modalidade — qt · valor
+                            </div>
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                                <table class="table table-sm acerto-modal-table mb-0">
+                                    <thead class="sticky-top">
+                                        <tr class="text-center">
+                                            <th class="text-start">Modalidade</th>
+                                            <th>Qt</th>
+                                            <th>Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="js-detalhe-sol-modalidade"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-handshake"></i> Viabilidade — qt · valor
@@ -1884,7 +1913,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-lg-4">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-wallet"></i> Forma de pagamento · valor
@@ -2579,6 +2608,7 @@
 
     var detalhesSolicitante = parseJsonScript('acerto-solicitante-detalhes', {});
     var modalDetalheSol = document.getElementById('modalDetalheSolicitanteAcerto');
+    var tbodyDetMod = document.querySelector('.js-detalhe-sol-modalidade');
     var tbodyDetViab = document.querySelector('.js-detalhe-sol-viabilidade');
     var tbodyDetPag = document.querySelector('.js-detalhe-sol-pagamento');
     var tituloDetNome = document.querySelector('.js-detalhe-sol-nome');
@@ -2597,6 +2627,20 @@
             return;
         }
         if (tituloDetNome) tituloDetNome.textContent = nome;
+        if (tbodyDetMod) {
+            var htmlM = '';
+            (bloco.modalidade || []).forEach(function(row) {
+                htmlM += '<tr><td>' + escapeHtmlTexto(row.modalidade) + '</td>' +
+                    '<td class="text-center">' + escapeHtmlTexto(String(row.quantidade)) + '</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(row.valor_fmt) + '</td></tr>';
+            });
+            if (bloco.total_modalidade_qt) {
+                htmlM += '<tr class="row-total row-total-valor"><td>Total</td>' +
+                    '<td class="text-center">' + bloco.total_modalidade_qt + '</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(bloco.total_modalidade_valor_fmt) + '</td></tr>';
+            }
+            tbodyDetMod.innerHTML = htmlM || '<tr><td colspan="3" class="text-muted text-center py-3">Sem dados.</td></tr>';
+        }
         if (tbodyDetViab) {
             var htmlV = '';
             (bloco.viabilidade || []).forEach(function(row) {

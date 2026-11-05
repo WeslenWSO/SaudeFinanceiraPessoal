@@ -1253,7 +1253,7 @@ def montar_resumo_solicitante_acerto(linhas: list[dict]) -> list[dict]:
 
 def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, dict]:
     """
-    Por médico solicitante: viabilidade (qt · valor) e formas de pagamento (valor),
+    Por médico solicitante: modalidade, viabilidade (qt · valor) e pagamento (valor),
     para drill-down no resumo (duplo clique na grade).
     """
     por_sol: dict[str, list[dict]] = defaultdict(list)
@@ -1262,6 +1262,16 @@ def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, di
 
     detalhes: dict[str, dict] = {}
     for nome, sub in por_sol.items():
+        mod_ctx = montar_resumo_modalidades_acerto(sub)
+        modalidades = [
+            {
+                'modalidade': r['label'],
+                'quantidade': r['quantidade'],
+                'valor_fmt': r['valor_fmt'],
+            }
+            for r in mod_ctx.get('resumo_modalidades') or []
+            if (r.get('quantidade') or 0) > 0 or (r.get('valor') or Decimal('0')) > 0
+        ]
         viab = montar_resumo_viabilidade_acerto(sub)
         resumo_pag, resumo_aguard, _ = recomputar_resumos_acerto_caixa_de_linhas(sub)
         pagamentos: list[dict] = [
@@ -1281,7 +1291,11 @@ def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, di
                 }
             )
         total_valor = sum((r['valor'] for r in viab), Decimal('0'))
+        total_mod_qt = mod_ctx.get('resumo_quantidade_total') or sum(
+            r['quantidade'] for r in modalidades
+        )
         detalhes[nome] = {
+            'modalidade': modalidades,
             'viabilidade': [
                 {
                     'viabilidade': r['viabilidade'],
@@ -1291,6 +1305,9 @@ def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, di
                 for r in viab
             ],
             'pagamento': pagamentos,
+            'total_modalidade_qt': total_mod_qt,
+            'total_modalidade_valor_fmt': mod_ctx.get('resumo_valor_total_fmt')
+            or _moeda_br(total_valor),
             'total_viabilidade_qt': sum(r['quantidade'] for r in viab),
             'total_viabilidade_valor_fmt': _moeda_br(total_valor),
             'total_pagamento_fmt': _moeda_br(total_valor),
