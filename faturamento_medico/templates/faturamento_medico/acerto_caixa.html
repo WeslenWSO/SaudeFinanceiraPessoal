@@ -2043,8 +2043,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function initAcertoResumoModalidadeChart() {
-    if (typeof Chart === 'undefined') return;
-
     function parseJsonScript(id, fallback) {
         var el = document.getElementById(id);
         if (!el) return fallback;
@@ -2216,6 +2214,7 @@
     }
 
     function montarChartsModal() {
+        if (typeof Chart === 'undefined') return;
         destruirChartsModal();
         if (visaoResumoAtiva() === 'ano' && torreUsarMeses) {
             var c1 = criarGraficoTorre(
@@ -2263,8 +2262,6 @@
         if (sol) chartsModal.push(sol);
     }
 
-    criarGraficoModalidade(document.getElementById('acertoGraficoModalidade'));
-
     var modalEl = document.getElementById('modalResumoAcerto');
     var defaultVisaoResumo = {% if regua_botao_ano_ativo %}'ano'{% else %}'mes'{% endif %};
     document.querySelectorAll('.js-resumo-visao-tab').forEach(function(btn) {
@@ -2284,12 +2281,24 @@
             aplicarVisaoResumo(visao);
         });
     }
-    (function abrirResumoSePedido() {
+    function abrirResumoSePedidoNaUrl() {
         var qs = new URLSearchParams(window.location.search);
-        if (qs.get('visao_resumo') && modalEl && window.bootstrap) {
+        if (!qs.get('visao_resumo') || !modalEl) return;
+        function tentarAbrir() {
+            if (!window.bootstrap || !window.bootstrap.Modal) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
-    })();
+        if (window.bootstrap && window.bootstrap.Modal) {
+            tentarAbrir();
+        } else {
+            window.addEventListener('load', tentarAbrir, { once: true });
+        }
+    }
+    abrirResumoSePedidoNaUrl();
+
+    if (typeof Chart === 'undefined') return;
+
+    criarGraficoModalidade(document.getElementById('acertoGraficoModalidade'));
 })();
 </script>
 {% endblock %}
