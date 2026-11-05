@@ -4,11 +4,16 @@ from django.test import SimpleTestCase
 
 from decimal import Decimal
 
+from datetime import date
+
 from faturamento_medico.services.acerto_caixa import (
     _eh_aguardando_faturamento,
     _item_conferencia_pendente,
     filtrar_linhas_acerto_caixa,
+    montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
+    recomputar_resumos_acerto_caixa_de_linhas,
+    url_query_acerto_caixa,
 )
 
 
@@ -111,3 +116,39 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         )
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]['paciente'], 'Maria Silva')
+
+    def test_regua_dias_mes_e_urls(self):
+        filtros = {'caixa': ['1'], 'somente_marcados': True}
+        ctx = montar_regua_dias_acerto(filtros, date(2026, 11, 1), date(2026, 11, 30))
+        self.assertEqual(len(ctx['regua_dias']), 30)
+        self.assertIn('Novembro', ctx['regua_titulo'])
+        dia15 = next(d for d in ctx['regua_dias'] if d['numero'] == 15)
+        self.assertTrue(dia15['no_intervalo'])
+        qs = url_query_acerto_caixa(filtros, date(2026, 11, 15), date(2026, 11, 15))
+        self.assertIn('data_inicio=2026-11-15', qs)
+        self.assertIn('caixa=1', qs)
+
+    def test_resumo_bate_soma_valor_pago_linhas(self):
+        linhas = [
+            {
+                'faturamento_id': 1,
+                'aguardando_faturamento': False,
+                'valor_pago': Decimal('180'),
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('360')}],
+                'forma_pgto': 'PIX R$ 360,00',
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+            {
+                'faturamento_id': 1,
+                'aguardando_faturamento': False,
+                'valor_pago': Decimal('180'),
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('360')}],
+                'forma_pgto': '-',
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+        ]
+        pag, ag, _cx = recomputar_resumos_acerto_caixa_de_linhas(linhas)
+        self.assertEqual(pag.get('PIX'), Decimal('360'))
+        self.assertEqual(sum(pag.values()) + sum(ag.values()), Decimal('360'))

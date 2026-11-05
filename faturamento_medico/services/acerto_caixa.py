@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import re
+from urllib.parse import urlencode
 
 from django.db import transaction
 from django.db.models import Q
@@ -122,9 +123,98 @@ def _parse_data_filtro(valor) -> date | None:
 def _periodo_padrao(hoje: date | None = None) -> tuple[date, date]:
     hoje = hoje or date.today()
     ini = hoje.replace(day=1)
-    proximo = hoje.replace(day=28) + timedelta(days=4)
-    fim = proximo - timedelta(days=proximo.day)
+    fim = _ultimo_dia_mes(ini)
     return ini, fim
+
+
+def _ultimo_dia_mes(d: date) -> date:
+    proximo = d.replace(day=28) + timedelta(days=4)
+    return proximo - timedelta(days=proximo.day)
+
+
+MESES_REGUA_PT = (
+    '',
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+)
+
+DIAS_SEMANA_CURTO = ('Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb')
+
+
+def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> str:
+    """Query string GET preservando filtros e alterando só o período."""
+    pares: list[tuple[str, str]] = [
+        ('data_inicio', data_inicio.isoformat()),
+        ('data_fim', data_fim.isoformat()),
+    ]
+    for chave in ('caixa', 'checkin_por', 'status_agendamento', 'convenio'):
+        for val in filtros.get(chave) or []:
+            if val:
+                pares.append((chave, str(val)))
+    if filtros.get('checkin'):
+        pares.append(('checkin', str(filtros['checkin'])))
+    if filtros.get('hora_inicial'):
+        pares.append(('hora_inicial', str(filtros['hora_inicial'])))
+    if filtros.get('hora_final'):
+        pares.append(('hora_final', str(filtros['hora_final'])))
+    if filtros.get('paciente'):
+        pares.append(('paciente', str(filtros['paciente'])))
+    if filtros.get('somente_marcados'):
+        pares.append(('somente_marcados', '1'))
+    return urlencode(pares)
+
+
+def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -> dict:
+    """Régua horizontal: mês anterior | dias do mês | mês seguinte."""
+    ref = data_inicio
+    y, m = ref.year, ref.month
+    if data_fim.year == data_inicio.year and data_fim.month == data_inicio.month:
+        ref = data_inicio
+        y, m = ref.year, ref.month
+    elif data_fim < data_inicio:
+        y, m = data_fim.year, data_fim.month
+    primeiro = date(y, m, 1)
+    ultimo = _ultimo_dia_mes(primeiro)
+
+    dia_antes = primeiro - timedelta(days=1)
+    mes_ant_ini = date(dia_antes.year, dia_antes.month, 1)
+    mes_ant_fim = _ultimo_dia_mes(mes_ant_ini)
+
+    mes_seg_ini = ultimo + timedelta(days=1)
+    mes_seg_fim = _ultimo_dia_mes(mes_seg_ini)
+
+    dias = []
+    for num in range(1, ultimo.day + 1):
+        dia = date(y, m, num)
+        dias.append(
+            {
+                'numero': num,
+                'iso': dia.isoformat(),
+                'dia_semana': DIAS_SEMANA_CURTO[dia.weekday()],
+                'ativo_dia': data_inicio == data_fim == dia,
+                'no_intervalo': data_inicio <= dia <= data_fim,
+                'fim_semana': dia.weekday() >= 5,
+                'url_query': url_query_acerto_caixa(filtros, dia, dia),
+            }
+        )
+
+    titulo_mes = MESES_REGUA_PT[m] if 1 <= m <= 12 else str(m)
+    return {
+        'regua_titulo': f'{titulo_mes} {y}',
+        'regua_url_mes_anterior': url_query_acerto_caixa(filtros, mes_ant_ini, mes_ant_fim),
+        'regua_url_mes_seguinte': url_query_acerto_caixa(filtros, mes_seg_ini, mes_seg_fim),
+        'regua_dias': dias,
+    }
 
 
 def _parse_hora_minutos(valor) -> int | None:
@@ -1281,6 +1371,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,
         'filtros_resumo': montar_resumo_filtros_acerto(filtros_dict, di, df),
+        **montar_regua_dias_acerto(filtros_dict, di, df),
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',

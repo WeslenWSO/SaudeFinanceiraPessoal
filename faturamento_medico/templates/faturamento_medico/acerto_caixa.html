@@ -118,6 +118,75 @@
     margin-bottom: 0.35rem;
 }
 .acerto-periodo-atalhos .btn { font-size: 0.72rem; padding: 0.15rem 0.45rem; }
+.acerto-regua-dias {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    background: #f8fafc;
+}
+.acerto-regua-dias-scroll {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    -webkit-overflow-scrolling: touch;
+}
+.acerto-regua-nav {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.5rem;
+    max-width: 7rem;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    color: #0d6efd;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    line-height: 1.2;
+}
+.acerto-regua-nav:hover { background: #e7f1ff; color: #0a58ca; }
+.acerto-regua-dia {
+    flex: 0 0 auto;
+    min-width: 2.35rem;
+    padding: 0.2rem 0.15rem 0.25rem;
+    text-align: center;
+    text-decoration: none;
+    color: #212529;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    line-height: 1.1;
+}
+.acerto-regua-dia .dow {
+    display: block;
+    font-size: 0.58rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+.acerto-regua-dia .num {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.acerto-regua-dia.weekend { background: #f1f3f5; }
+.acerto-regua-dia.in-range:not(.active) {
+    background: #e7f1ff;
+    border-color: #b6d4fe;
+}
+.acerto-regua-dia.active {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+.acerto-regua-dia.active .dow { color: rgba(255,255,255,0.85); }
+.acerto-regua-dia:hover:not(.active) { background: #eef2f7; }
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -166,6 +235,28 @@
                 </button>
                 <div class="filtro-retratil-painel mt-2" id="painelFiltrosAcerto">
                     <form method="get" id="formFiltrosAcerto">
+                        <div class="acerto-regua-dias mb-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-1">
+                                <span class="small fw-semibold">{{ regua_titulo }}</span>
+                                <span class="text-muted small">Clique no dia (filtra só aquele dia) · extremos mudam o mês</span>
+                            </div>
+                            <div class="acerto-regua-dias-scroll" role="navigation" aria-label="Régua de dias">
+                                <a class="acerto-regua-nav"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_anterior }}"
+                                   title="Período = mês anterior inteiro">‹ Mês anterior</a>
+                                {% for d in regua_dias %}
+                                <a class="acerto-regua-dia{% if d.ativo_dia %} active{% elif d.no_intervalo %} in-range{% endif %}{% if d.fim_semana %} weekend{% endif %}"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ d.url_query }}"
+                                   title="{{ d.iso }}">
+                                    <span class="dow">{{ d.dia_semana }}</span>
+                                    <span class="num">{{ d.numero }}</span>
+                                </a>
+                                {% endfor %}
+                                <a class="acerto-regua-nav"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_seguinte }}"
+                                   title="Período = mês seguinte inteiro">Mês seguinte ›</a>
+                            </div>
+                        </div>
                         <div class="row g-2 align-items-end">
                             <div class="col-lg-4">
                                 <label class="form-label small mb-1">Período</label>
@@ -316,8 +407,11 @@
             <div class="row g-3 mb-4">
                 <div class="col-lg-6">
                     <div class="acerto-resumo-card h-100">
-                        <h6 class="mb-2">Resumo por forma de pagamento (NF)</h6>
-                        <p class="small text-muted mb-2">Total geral do filtro (todos os caixas).</p>
+                        <h6 class="mb-2">Resumo por forma de pagamento</h6>
+                        <p class="small text-muted mb-2">
+                            Soma da coluna <strong>Valor pago</strong> da grade (todos os caixas).
+                            Total conferência: R$ {{ total_valor_pago_grade_fmt }}.
+                        </p>
                         <table class="table table-sm table-borderless mb-0">
                             {% for row in resumo_pagamento %}
                             <tr>
@@ -423,7 +517,7 @@
                                         {% endfor %}
                                         {% if grupo.pagamentos %}
                                         <tr class="acerto-resumo-grupo">
-                                            <td class="fw-semibold pt-1">Subtotal NF</td>
+                                            <td class="fw-semibold pt-1">Subtotal recebido</td>
                                             <td class="text-end fw-semibold pt-1">R$ {{ grupo.total_pagamentos_fmt }}</td>
                                         </tr>
                                         {% endif %}
