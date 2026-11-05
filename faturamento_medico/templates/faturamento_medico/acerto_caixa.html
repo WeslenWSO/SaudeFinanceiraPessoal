@@ -1519,11 +1519,120 @@
                 </div>
                 </div>
                 {% endif %}
+                {% if resumo_matriz_mes %}
+                <div class="row g-3 mb-2 resumo-visao-mes">
+                    <div class="col-lg-6">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-list-ol"></i> Modalidade — por dia
+                                <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
+                            </div>
+                            <div class="acerto-matriz-anual-wrap">
+                                <table class="acerto-matriz-anual mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-fixa" rowspan="2">Modalidade</th>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                                title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
+                                            {% endfor %}
+                                            <th colspan="2">Total</th>
+                                        </tr>
+                                        <tr>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                            {% endfor %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in modalidades_matriz_dia_linhas %}
+                                        <tr>
+                                            <td class="col-fixa">{{ item.label }}</td>
+                                            {% for cel in item.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ item.total_qt }}</td>
+                                            <td class="subcol-val">{{ item.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="row-total">
+                                            <td class="col-fixa">Total</td>
+                                            {% for tot in modalidades_matriz_dia_totais %}
+                                            <td class="subcol">{{ tot.qt }}</td>
+                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ resumo_quantidade_total }}</td>
+                                            <td class="subcol-val">{{ resumo_valor_total_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-hospital"></i> Viabilidade — por dia
+                                <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
+                            </div>
+                            <div class="acerto-matriz-anual-wrap">
+                                <table class="acerto-matriz-anual mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-fixa" rowspan="2">Viabilidade</th>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                                title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
+                                            {% endfor %}
+                                            <th colspan="2">Total</th>
+                                        </tr>
+                                        <tr>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                            {% endfor %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in viabilidade_matriz_dia_linhas %}
+                                        <tr>
+                                            <td class="col-fixa">{{ row.viabilidade|truncatechars:36 }}</td>
+                                            {% for cel in row.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ row.total_qt }}</td>
+                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="row-total">
+                                            <td class="col-fixa">Total</td>
+                                            {% for tot in viabilidade_matriz_dia_totais %}
+                                            <td class="subcol">{{ tot.qt }}</td>
+                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ resumo_viabilidade_total_qt }}</td>
+                                            <td class="subcol-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="row g-3 resumo-visao-mes">
                     <div class="col-lg-6">
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
+                                {% if resumo_matriz_mes %}<span class="text-muted fw-normal small">(total do mês)</span>{% endif %}
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-sm acerto-modal-table mb-0">
@@ -1564,6 +1673,7 @@
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-hospital"></i> Viabilidade (convênio) — qt · valor pago
+                                {% if resumo_matriz_mes %}<span class="text-muted fw-normal small">(total do mês)</span>{% endif %}
                             </div>
                             <div class="acerto-modal-scroll-tabela">
                                 <table class="table table-sm acerto-modal-table mb-0">

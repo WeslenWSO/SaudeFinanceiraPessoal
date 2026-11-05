@@ -19,6 +19,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_resumo_viabilidade_matriz_mes,
     montar_resumo_viabilidade_por_mes_acerto,
     montar_contexto_matriz_anual_acerto,
+    montar_contexto_matriz_mensal_por_dia,
     montar_graficos_resumo_acerto_caixa,
     periodo_eh_ano_inteiro,
     recomputar_resumos_acerto_caixa_de_linhas,
@@ -217,6 +218,58 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(geap['meses'][1]['qt'], 2)
         self.assertEqual(ctx['viabilidade_matriz_totais_mes'][0]['qt'], 1)
         self.assertEqual(ctx['viabilidade_matriz_totais_mes'][1]['qt'], 2)
+
+    def test_matriz_mes_modalidade_e_viabilidade_por_dia(self):
+        linhas = [
+            {
+                'data_iso': '2026-11-03',
+                'convenio': 'CASSI',
+                'modalidade': 'US',
+                'codigo_servico': 'US',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'data_iso': '2026-11-03',
+                'convenio': 'GEAP',
+                'modalidade': 'MR',
+                'codigo_servico': 'MR',
+                'valor_pago': Decimal('200'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'data_iso': '2026-11-05',
+                'convenio': 'CASSI',
+                'modalidade': 'US',
+                'codigo_servico': 'US',
+                'valor_pago': Decimal('50'),
+                'aguardando_faturamento': False,
+            },
+        ]
+        ctx = montar_contexto_matriz_mensal_por_dia(
+            linhas, date(2026, 11, 1), date(2026, 11, 30)
+        )
+        self.assertTrue(ctx['resumo_matriz_mes'])
+        self.assertEqual(len(ctx['resumo_dias_colunas']), 30)
+        self.assertEqual(ctx['resumo_dias_colunas'][2]['dia'], 3)
+        us = next(
+            r for r in ctx['modalidades_matriz_dia_linhas'] if r['codigo'] == 'US'
+        )
+        self.assertEqual(us['meses'][2]['qt'], 1)
+        self.assertEqual(us['meses'][4]['qt'], 1)
+        cassi = next(
+            r for r in ctx['viabilidade_matriz_dia_linhas'] if r['viabilidade'] == 'CASSI'
+        )
+        self.assertEqual(cassi['meses'][2]['qt'], 1)
+        self.assertEqual(cassi['meses'][4]['qt'], 1)
+        self.assertEqual(ctx['modalidades_matriz_dia_totais'][2]['qt'], 2)
+        self.assertEqual(ctx['modalidades_matriz_dia_totais'][4]['qt'], 1)
+
+    def test_matriz_mes_por_dia_nao_aplica_fora_mes_inteiro(self):
+        ctx = montar_contexto_matriz_mensal_por_dia(
+            [], date(2026, 11, 1), date(2026, 11, 15)
+        )
+        self.assertFalse(ctx['resumo_matriz_mes'])
 
     def test_matriz_anual_modalidade_e_pagamento_por_mes(self):
         self.assertTrue(
