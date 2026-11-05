@@ -1023,7 +1023,14 @@
             </div>
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
-            {% if grade_extensa_oculta %}
+            {% if grade_oculta_resumo_ano %}
+            <div class="alert alert-info py-2 small mb-2">
+                Resumo anual: a grade detalhada foi omitida para agilizar o carregamento
+                (<strong>{{ quantidade_linhas }}</strong> linha(s) no ano).
+                O modal <strong>Resumo → Ano</strong> usa o período completo.
+                Para item a item, use <strong>Mês</strong> ou filtre um intervalo menor.
+            </div>
+            {% elif grade_extensa_oculta %}
             <div class="alert alert-info py-2 small mb-2">
                 Ano inteiro com muitos registros: a grade abaixo mostra só as primeiras
                 {{ linhas_grade_exibir|length }} de {{ grade_extensa_total }} linhas.
@@ -1326,7 +1333,7 @@
                         <i class="fas fa-chart-pie me-2 opacity-75"></i>Resumo — Acerto de Caixa
                     </h5>
                     <p class="acerto-modal-subtitulo mb-0">
-                        {{ periodo_resumo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
+                        {{ periodo_resumo_fmt|default:periodo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
                     </p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>

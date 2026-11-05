@@ -32,6 +32,22 @@ from faturamento_medico.services.acerto_caixa import (
 )
 
 
+class _FakeQueryDict:
+    def __init__(self, data: dict):
+        self._data = data
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def getlist(self, key):
+        val = self._data.get(key)
+        if val is None:
+            return []
+        if isinstance(val, list):
+            return val
+        return [val]
+
+
 class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
     def test_aguardando_faturamento_agendamento(self):
         self.assertTrue(_eh_aguardando_faturamento('Aguardando faturamento'))
@@ -483,21 +499,21 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         di_mes = date(2026, 11, 1)
         df_mes = date(2026, 11, 30)
         req_mes = MagicMock()
-        req_mes.GET = {'visao_resumo': 'mes'}
+        req_mes.GET = _FakeQueryDict({'visao_resumo': 'mes'})
         self.assertTrue(
             periodo_eh_mes_inteiro(di_mes, df_mes)
             and pode_abrir_resumo_acerto_direto(req_mes, di_mes, df_mes)
         )
         req_sem = MagicMock()
-        req_sem.GET = {}
+        req_sem.GET = _FakeQueryDict({})
         self.assertFalse(pode_abrir_resumo_acerto_direto(req_sem, di_mes, df_mes))
         req_dia = MagicMock()
-        req_dia.GET = {}
+        req_dia.GET = _FakeQueryDict({})
         self.assertTrue(
             pode_abrir_resumo_acerto_direto(req_dia, date(2026, 11, 3), date(2026, 11, 3))
         )
         req_dias = MagicMock()
-        req_dias.GET = {'dias_resumo': ['2026-11-03', '2026-11-05']}
+        req_dias.GET = _FakeQueryDict({'dias_resumo': ['2026-11-03', '2026-11-05']})
         self.assertTrue(pode_abrir_resumo_acerto_direto(req_dias, di_mes, df_mes))
 
     def test_filtrar_linhas_por_dias_resumo(self):
@@ -512,5 +528,7 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
 
     def test_parse_dias_resumo_request(self):
         req = MagicMock()
-        req.GET = {'dias_resumo': ['2026-11-03', '2026-11-05', 'invalido']}
+        req.GET = _FakeQueryDict(
+            {'dias_resumo': ['2026-11-03', '2026-11-05', 'invalido']}
+        )
         self.assertEqual(parse_dias_resumo_request(req), ['2026-11-03', '2026-11-05'])

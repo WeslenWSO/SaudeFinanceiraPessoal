@@ -26,7 +26,11 @@ def _rotulo_cobranca(cob: Cobranca) -> str:
     return (cob.descricao or '').strip().replace('_', ' ')
 
 
-def pagamentos_manuais_faturamento(faturamento) -> list[dict[str, Any]]:
+def pagamentos_manuais_faturamento(
+    faturamento,
+    *,
+    cobrancas_por_id: dict[int, Cobranca] | None = None,
+) -> list[dict[str, Any]]:
     try:
         raw = faturamento.pagamentos_acerto_json
     except (ProgrammingError, OperationalError, AttributeError):
@@ -51,8 +55,18 @@ def pagamentos_manuais_faturamento(faturamento) -> list[dict[str, Any]]:
         if cid is None or val is None or val <= 0:
             continue
         try:
-            cob = Cobranca.objects.get(pk=int(cid))
-        except (Cobranca.DoesNotExist, TypeError, ValueError):
+            cid_int = int(cid)
+        except (TypeError, ValueError):
+            continue
+        cob = None
+        if cobrancas_por_id is not None:
+            cob = cobrancas_por_id.get(cid_int)
+        else:
+            try:
+                cob = Cobranca.objects.get(pk=cid_int)
+            except Cobranca.DoesNotExist:
+                cob = None
+        if cob is None:
             continue
         out.append({
             'cobranca_id': cob.pk,
@@ -200,8 +214,15 @@ def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[s
     return pagamentos_manuais_faturamento(faturamento)
 
 
-def pagamentos_efetivos_faturamento(faturamento, nota: dict | None) -> list[dict[str, Any]]:
-    manual = pagamentos_manuais_faturamento(faturamento)
+def pagamentos_efetivos_faturamento(
+    faturamento,
+    nota: dict | None,
+    *,
+    cobrancas_por_id: dict[int, Cobranca] | None = None,
+) -> list[dict[str, Any]]:
+    manual = pagamentos_manuais_faturamento(
+        faturamento, cobrancas_por_id=cobrancas_por_id
+    )
     if manual:
         return manual
     valor_ref = None

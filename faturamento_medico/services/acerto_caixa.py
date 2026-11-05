@@ -266,10 +266,22 @@ def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> 
     return urlencode(pares)
 
 
+def _query_param_list(get, chave: str) -> list[str]:
+    if hasattr(get, 'getlist'):
+        return list(get.getlist(chave))
+    val = get.get(chave)
+    if val is None:
+        return []
+    if isinstance(val, (list, tuple)):
+        return [str(v) for v in val]
+    return [str(val)]
+
+
 def parse_dias_resumo_request(request) -> list[str]:
     """Datas ISO (YYYY-MM-DD) escolhidas na régua para o resumo (um ou mais dias)."""
+    get = request.GET
     dias: list[str] = []
-    for raw in request.GET.getlist('dias_resumo'):
+    for raw in _query_param_list(get, 'dias_resumo'):
         s = (raw or '').strip()
         if s and _parse_data_filtro(s):
             dias.append(s)
@@ -2136,6 +2148,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     notas_por_data = carregar_notas_por_data(empresa_id, di, df)
     fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
     fats_bloqueio: dict[int, bool] = {}
+    cobrancas_por_id = {c.pk: c for c in Cobranca.objects.all()}
 
     linhas = []
 
@@ -2161,7 +2174,9 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
             texto_forma_pgto,
         )
 
-        pagamentos_efetivos = pagamentos_efetivos_faturamento(fat, nota)
+        pagamentos_efetivos = pagamentos_efetivos_faturamento(
+            fat, nota, cobrancas_por_id=cobrancas_por_id
+        )
         forma_pgto = texto_forma_pgto(pagamentos_efetivos)
         pagamentos_nf = (nota.get('pagamentos_detalhados') or []) if nota else []
         valor_nota = None
@@ -2259,7 +2274,9 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 'nota_fiscal': numero_nf or '-',
                 'forma_pgto': forma_linha,
                 'pagamentos_acerto_json': serializar_pagamentos_json(
-                    pagamentos_manuais_faturamento(fat)
+                    pagamentos_manuais_faturamento(
+                        fat, cobrancas_por_id=cobrancas_por_id
+                    )
                 ),
                 'pagamentos_acerto': pagamentos_efetivos,
                 'mostrar_forma_pgto_celula': mostrar_nf,
@@ -2400,10 +2417,15 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         (_valor_contabil_linha_acerto(l) for l in linhas_grade),
         Decimal('0'),
     )
-    blocos_impressao = montar_blocos_impressao_acerto_caixa(
-        linhas_grade,
-        resumo_por_caixa_lista,
-    )
+    visao_resumo = (request.GET.get('visao_resumo') or '').strip().lower()
+    ano_inteiro_ctx = periodo_eh_ano_inteiro(di, df)
+    if ano_inteiro_ctx and len(linhas_grade) > 800:
+        blocos_impressao = []
+    else:
+        blocos_impressao = montar_blocos_impressao_acerto_caixa(
+            linhas_grade,
+            resumo_por_caixa_lista,
+        )
     resumo_modalidades_ctx = montar_resumo_modalidades_acerto(linhas_grade)
     resumo_viabilidade = montar_resumo_viabilidade_acerto(linhas_grade)
     total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
@@ -2424,11 +2446,21 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         periodo_resumo_fmt = f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}'
 
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
-    matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
+    try:
+        matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
+    except Exception as exc_matriz:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            'matriz anual acerto falhou ano=%s: %s', di.year, exc_matriz
+        )
+        matriz_anual_ctx = {'resumo_matriz_anual': False}
     matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)
     limite_linhas_grade_tela = 2500
-    grade_extensa = len(linhas_grade) > limite_linhas_grade_tela
-    ano_inteiro = periodo_eh_ano_inteiro(di, df)
+    if ano_inteiro_ctx and visao_resumo == 'ano':
+        limite_linhas_grade_tela = 0
+    grade_extensa = len(linhas_grade) > 2500
+    ano_inteiro = ano_inteiro_ctx
     ocultar_grade_extensa = grade_extensa and ano_inteiro
     graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
         resumo_pagamento_lista,
@@ -2446,9 +2478,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     return {
         'linhas': linhas_grade,
         'linhas_grade_exibir': (
-            linhas_grade[:limite_linhas_grade_tela]
-            if ocultar_grade_extensa
-            else linhas_grade
+            []
+            if limite_linhas_grade_tela == 0
+            else (
+                linhas_grade[:limite_linhas_grade_tela]
+                if ocultar_grade_extensa
+                else linhas_grade
+            )
+        ),
+        'grade_oculta_resumo_ano': (
+            limite_linhas_grade_tela == 0 and ano_inteiro and visao_resumo == 'ano'
         ),
         'grade_extensa_oculta': ocultar_grade_extensa,
         'grade_extensa_total': len(linhas_grade),
