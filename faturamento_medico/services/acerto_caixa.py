@@ -148,7 +148,7 @@ MESES_REGUA_PT = (
     'Dezembro',
 )
 
-DIAS_SEMANA_CURTO = ('Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb')
+DIAS_SEMANA_CURTO = ('Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom')
 
 
 def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> str:
