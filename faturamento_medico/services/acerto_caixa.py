@@ -308,6 +308,189 @@ def conferir_itens_pendentes_ao_fechar_caixa(
     return atualizados
 
 
+def _valor_contabil_linha_acerto(linha: dict) -> Decimal:
+    """Valor que entra no resumo e deve bater com a coluna Valor pago da grade."""
+    vp = _valor_pago_resumo_linha(linha)
+    if vp > 0:
+        return vp
+    if linha.get('aguardando_faturamento'):
+        try:
+            return Decimal(str(linha.get('total_item') or 0))
+        except Exception:
+            return Decimal('0')
+    return Decimal('0')
+
+
+def _distribuir_valor_formas_pagamento(
+    total: Decimal,
+    pagamentos: list,
+) -> list[tuple[str, Decimal]]:
+    from faturamento_medico.services.pagamentos_acerto_caixa import pagamentos_para_resumo
+
+    if total <= 0:
+        return []
+    pares = pagamentos_para_resumo(pagamentos) if pagamentos else []
+    if not pares:
+        return []
+    soma = sum(v for _, v in pares)
+    if soma <= 0:
+        return [(pares[0][0], total)]
+    out: list[tuple[str, Decimal]] = []
+    acum = Decimal('0')
+    for i, (chave, val) in enumerate(pares):
+        if i == len(pares) - 1:
+            out.append((chave, total - acum))
+        else:
+            parte = (total * val / soma).quantize(Decimal('0.01'))
+            out.append((chave, parte))
+            acum += parte
+    return out
+
+
+def _bucket_caixa_resumo(
+    resumo_caixas: dict[str, dict],
+    caixa_val: str,
+    rotulo: str,
+) -> dict:
+    chave = (caixa_val or '').strip()
+    if chave not in resumo_caixas:
+        resumo_caixas[chave] = {
+            'caixa': chave,
+            'rotulo': rotulo,
+            'pagamento': defaultdict(Decimal),
+            'aguardando': defaultdict(Decimal),
+        }
+    return resumo_caixas[chave]
+
+
+def recomputar_resumos_acerto_caixa_de_linhas(
+    linhas: list[dict],
+) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, dict]]:
+    """
+    Soma por forma de pagamento / convênio a partir da coluna Valor pago (por item),
+    agrupando formas no nível do faturamento quando há NF/pagamentos manuais.
+    """
+    resumo_pagamento: dict[str, Decimal] = defaultdict(Decimal)
+    resumo_aguardando: dict[str, Decimal] = defaultdict(Decimal)
+    resumo_caixas: dict[str, dict] = {}
+    por_fat: dict[int, list[dict]] = defaultdict(list)
+
+    for linha in linhas:
+        caixa_val = (linha.get('caixa_acerto') or '').strip()
+        rotulo = (
+            (linha.get('caixa_exibicao') or linha.get('caixa') or 'Sem caixa definido') or ''
+        ).strip()
+        bucket = _bucket_caixa_resumo(resumo_caixas, caixa_val, rotulo)
+        if linha.get('aguardando_faturamento'):
+            val = _valor_contabil_linha_acerto(linha)
+            conv = (linha.get('convenio') or '-').strip() or '-'
+            resumo_aguardando[conv] += val
+            bucket['aguardando'][conv] += val
+        else:
+            por_fat[linha['faturamento_id']].append(linha)
+
+    for fat_linhas in por_fat.values():
+        total_vp = sum(_valor_contabil_linha_acerto(l) for l in fat_linhas)
+        if total_vp <= 0:
+            continue
+        first = fat_linhas[0]
+        caixa_val = (first.get('caixa_acerto') or '').strip()
+        rotulo = (
+            (first.get('caixa_exibicao') or first.get('caixa') or 'Sem caixa definido') or ''
+        ).strip()
+        bucket = _bucket_caixa_resumo(resumo_caixas, caixa_val, rotulo)
+        pags = first.get('pagamentos_acerto') or []
+        if pags:
+            distrib = _distribuir_valor_formas_pagamento(total_vp, pags)
+        else:
+            chave = _agrupar_forma_pagamento(first.get('forma_pgto') or '-')
+            distrib = [(chave, total_vp)]
+        for chave, val in distrib:
+            resumo_pagamento[chave] += val
+            bucket['pagamento'][chave] += val
+
+    return resumo_pagamento, resumo_aguardando, resumo_caixas
+
+
+def _montar_listas_resumo_acerto(
+    resumo_pagamento: dict[str, Decimal],
+    resumo_aguardando_faturamento: dict[str, Decimal],
+    resumo_caixas: dict[str, dict],
+    empresa_id: int,
+) -> tuple[list[dict], list[dict], list[dict], Decimal, Decimal, Decimal]:
+    resumo_pagamento_lista = sorted(
+        [
+            {'rotulo': k, 'total': v, 'total_fmt': _moeda_br(v)}
+            for k, v in resumo_pagamento.items()
+        ],
+        key=lambda x: -x['total'],
+    )
+    resumo_aguardando_lista = sorted(
+        [
+            {'convenio': k, 'total': v, 'total_fmt': _moeda_br(v)}
+            for k, v in resumo_aguardando_faturamento.items()
+        ],
+        key=lambda x: (-x['total'], x['convenio'].lower()),
+    )
+    total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
+    total_pagamentos_nf = sum((row['total'] for row in resumo_pagamento_lista), Decimal('0'))
+    total_resumo_geral = total_pagamentos_nf + total_aguardando
+
+    resumo_por_caixa_lista: list[dict] = []
+    for chave in sorted(
+        resumo_caixas.keys(),
+        key=lambda k: (resumo_caixas[k]['rotulo'] or '').lower(),
+    ):
+        bloco = resumo_caixas[chave]
+        pagamentos_caixa = sorted(
+            [
+                {'rotulo': rot, 'total': tot, 'total_fmt': _moeda_br(tot)}
+                for rot, tot in bloco['pagamento'].items()
+            ],
+            key=lambda x: -x['total'],
+        )
+        aguardando_caixa = sorted(
+            [
+                {'convenio': conv, 'total': tot, 'total_fmt': _moeda_br(tot)}
+                for conv, tot in bloco['aguardando'].items()
+            ],
+            key=lambda x: (-x['total'], x['convenio'].lower()),
+        )
+        total_pag_caixa = sum((r['total'] for r in pagamentos_caixa), Decimal('0'))
+        total_ag_caixa = sum((r['total'] for r in aguardando_caixa), Decimal('0'))
+        total_geral_caixa = total_pag_caixa + total_ag_caixa
+        resumo_por_caixa_lista.append(
+            {
+                'caixa': bloco['caixa'],
+                'rotulo': bloco['rotulo'],
+                'pagamentos': pagamentos_caixa,
+                'aguardando': aguardando_caixa,
+                'total_pagamentos': total_pag_caixa,
+                'total_pagamentos_fmt': _moeda_br(total_pag_caixa),
+                'total_aguardando': total_ag_caixa,
+                'total_aguardando_fmt': _moeda_br(total_ag_caixa),
+                'total_geral': total_geral_caixa,
+                'total_geral_fmt': _moeda_br(total_geral_caixa),
+            },
+        )
+
+    resumo_por_caixa_lista = [
+        grupo
+        for grupo in resumo_por_caixa_lista
+        if not (grupo.get('caixa') or '').strip()
+        or caixa_valor_ativo_no_acerto(empresa_id, grupo['caixa'])
+        or str(grupo['caixa']).strip() in CAIXAS_ACERTO_VALORES
+    ]
+    return (
+        resumo_pagamento_lista,
+        resumo_aguardando_lista,
+        resumo_por_caixa_lista,
+        total_aguardando,
+        total_pagamentos_nf,
+        total_resumo_geral,
+    )
+
+
 def _agrupar_forma_pagamento(forma: str) -> str:
     f = (forma or '').strip().upper()
     if not f or f == '-':
@@ -860,20 +1043,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     fats_bloqueio: dict[int, bool] = {}
 
     linhas = []
-    resumo_pagamento: dict[str, Decimal] = defaultdict(Decimal)
-    resumo_aguardando_faturamento: dict[str, Decimal] = defaultdict(Decimal)
-    resumo_caixas: dict[str, dict] = {}
-
-    def _bucket_caixa(caixa_val: str, rotulo: str) -> dict:
-        chave = (caixa_val or '').strip()
-        if chave not in resumo_caixas:
-            resumo_caixas[chave] = {
-                'caixa': chave,
-                'rotulo': rotulo,
-                'pagamento': defaultdict(Decimal),
-                'aguardando': defaultdict(Decimal),
-            }
-        return resumo_caixas[chave]
 
     for fat in qs:
         mins = _parse_hora_minutos(fat.horario_inicio or fat.horario)
@@ -892,7 +1061,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         nota = _primeira_nota(notas)
         from faturamento_medico.services.pagamentos_acerto_caixa import (
             pagamentos_efetivos_faturamento,
-            pagamentos_para_resumo,
             pagamentos_manuais_faturamento,
             serializar_pagamentos_json,
             texto_forma_pgto,
@@ -911,7 +1079,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         convenio = (fat.convenio or '-').strip() or '-'
 
         itens = list(fat.itens_servico.all())
-        pagamento_contabilizado = False
         primeira_linha_faturamento = True
         data_iso = fat.data.isoformat() if fat.data else ''
         qtd_notas = len(notas)
@@ -919,7 +1086,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
         def _add_linha(item=None):
             nonlocal primeira_linha_faturamento
-            nonlocal pagamento_contabilizado
             if item:
                 procedimento = item.servico or '-'
                 codigo = item.codigo_servico or fat.codigo_servico or '-'
@@ -946,31 +1112,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 caixa_exib = rotulo_caixa_acerto(caixa_valor, empresa_id)
             else:
                 caixa_exib = (fat.checkin_por or '-').strip() or '-'
-            rotulo_bucket = caixa_exib if caixa_valor else 'Sem caixa definido'
-            bucket = _bucket_caixa(caixa_valor, rotulo_bucket)
-
-            if not pagamento_contabilizado:
-                if not aguardando_faturamento:
-                    pares_resumo = pagamentos_para_resumo(pagamentos_efetivos)
-                    if pares_resumo:
-                        for chave_pag, val_dec in pares_resumo:
-                            resumo_pagamento[chave_pag] += val_dec
-                            bucket['pagamento'][chave_pag] += val_dec
-                    else:
-                        chave_pag = _agrupar_forma_pagamento(forma_pgto)
-                        if valor_nota is not None:
-                            val_dec = Decimal(str(valor_nota))
-                        else:
-                            val_dec = Decimal(str(total_item or 0))
-                        resumo_pagamento[chave_pag] += val_dec
-                        bucket['pagamento'][chave_pag] += val_dec
-                pagamento_contabilizado = True
-
-            if aguardando_faturamento:
-                val_ag = Decimal(str(total_item or 0))
-                resumo_aguardando_faturamento[convenio] += val_ag
-                bucket['aguardando'][convenio] += val_ag
-
             mostrar_acerto = primeira_linha_faturamento
             mostrar_nf = primeira_linha_faturamento and not aguardando_faturamento
             primeira_linha_faturamento = False
@@ -1050,95 +1191,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         else:
             _add_linha(None)
 
-    resumo_pagamento_lista = sorted(
-        [
-            {'rotulo': k, 'total': v, 'total_fmt': _moeda_br(v)}
-            for k, v in resumo_pagamento.items()
-        ],
-        key=lambda x: -x['total'],
-    )
-
-    resumo_aguardando_lista = sorted(
-        [
-            {'convenio': k, 'total': v, 'total_fmt': _moeda_br(v)}
-            for k, v in resumo_aguardando_faturamento.items()
-        ],
-        key=lambda x: (-x['total'], x['convenio'].lower()),
-    )
-    total_aguardando = sum((row['total'] for row in resumo_aguardando_lista), Decimal('0'))
-    total_pagamentos_nf = sum((row['total'] for row in resumo_pagamento_lista), Decimal('0'))
-    total_resumo_geral = total_pagamentos_nf + total_aguardando
-
-    resumo_por_caixa_lista: list[dict] = []
-    for chave in sorted(
-        resumo_caixas.keys(),
-        key=lambda k: (resumo_caixas[k]['rotulo'] or '').lower(),
-    ):
-        bloco = resumo_caixas[chave]
-        pagamentos_caixa = sorted(
-            [
-                {'rotulo': rot, 'total': tot, 'total_fmt': _moeda_br(tot)}
-                for rot, tot in bloco['pagamento'].items()
-            ],
-            key=lambda x: -x['total'],
-        )
-        aguardando_caixa = sorted(
-            [
-                {'convenio': conv, 'total': tot, 'total_fmt': _moeda_br(tot)}
-                for conv, tot in bloco['aguardando'].items()
-            ],
-            key=lambda x: (-x['total'], x['convenio'].lower()),
-        )
-        total_pag_caixa = sum((r['total'] for r in pagamentos_caixa), Decimal('0'))
-        total_ag_caixa = sum((r['total'] for r in aguardando_caixa), Decimal('0'))
-        total_geral_caixa = total_pag_caixa + total_ag_caixa
-        resumo_por_caixa_lista.append(
-            {
-                'caixa': bloco['caixa'],
-                'rotulo': bloco['rotulo'],
-                'pagamentos': pagamentos_caixa,
-                'aguardando': aguardando_caixa,
-                'total_pagamentos': total_pag_caixa,
-                'total_pagamentos_fmt': _moeda_br(total_pag_caixa),
-                'total_aguardando': total_ag_caixa,
-                'total_aguardando_fmt': _moeda_br(total_ag_caixa),
-                'total_geral': total_geral_caixa,
-                'total_geral_fmt': _moeda_br(total_geral_caixa),
-            },
-        )
-
-    resumo_por_caixa_lista = [
-        grupo
-        for grupo in resumo_por_caixa_lista
-        if not (grupo.get('caixa') or '').strip()
-        or caixa_valor_ativo_no_acerto(empresa_id, grupo['caixa'])
-        or str(grupo['caixa']).strip() in CAIXAS_ACERTO_VALORES
-    ]
-
-    if caixas_sel:
-        nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)
-    else:
-        caixas_unicos = sorted(
-            {
-                linha.get('caixa_acerto') or ''
-                for linha in linhas
-                if linha.get('caixa_acerto')
-            },
-            key=str.lower,
-        )
-        if caixas_unicos:
-            nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_unicos)
-        else:
-            operadores = sorted(
-                {
-                    (linha.get('checkin_por') or '').strip()
-                    for linha in linhas
-                    if (linha.get('checkin_por') or '').strip() and linha.get('checkin_por') != '-'
-                },
-                key=str.lower,
-            )
-            nome_caixa_acerto = ', '.join(operadores) if operadores else '—'
-
     filtros_dict = {
         'data_inicio': di.isoformat(),
         'data_fim': df.isoformat(),
@@ -1155,6 +1207,53 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
     linhas_grade = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros_dict)
+
+    if caixas_sel:
+        nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)
+    else:
+        caixas_unicos = sorted(
+            {
+                linha.get('caixa_acerto') or ''
+                for linha in linhas_grade
+                if linha.get('caixa_acerto')
+            },
+            key=str.lower,
+        )
+        if caixas_unicos:
+            nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_unicos)
+        else:
+            operadores = sorted(
+                {
+                    (linha.get('checkin_por') or '').strip()
+                    for linha in linhas_grade
+                    if (linha.get('checkin_por') or '').strip() and linha.get('checkin_por') != '-'
+                },
+                key=str.lower,
+            )
+            nome_caixa_acerto = ', '.join(operadores) if operadores else '—'
+
+    (
+        resumo_pagamento,
+        resumo_aguardando_faturamento,
+        resumo_caixas,
+    ) = recomputar_resumos_acerto_caixa_de_linhas(linhas_grade)
+    (
+        resumo_pagamento_lista,
+        resumo_aguardando_lista,
+        resumo_por_caixa_lista,
+        total_aguardando,
+        total_pagamentos_nf,
+        total_resumo_geral,
+    ) = _montar_listas_resumo_acerto(
+        resumo_pagamento,
+        resumo_aguardando_faturamento,
+        resumo_caixas,
+        empresa_id,
+    )
+    total_valor_pago_grade = sum(
+        (_valor_contabil_linha_acerto(l) for l in linhas_grade),
+        Decimal('0'),
+    )
     blocos_impressao = montar_blocos_impressao_acerto_caixa(
         linhas_grade,
         resumo_por_caixa_lista,
@@ -1175,6 +1274,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'total_aguardando_faturamento_fmt': _moeda_br(total_aguardando),
         'total_pagamentos_nf_fmt': _moeda_br(total_pagamentos_nf),
         'total_resumo_geral_fmt': _moeda_br(total_resumo_geral),
+        'total_valor_pago_grade_fmt': _moeda_br(total_valor_pago_grade),
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
