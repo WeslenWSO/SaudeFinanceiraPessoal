@@ -320,6 +320,23 @@
     border-top: 1px solid #e2e8f0;
     padding: 0.75rem 1.35rem;
 }
+.acerto-solicitante-row-drill {
+    cursor: pointer;
+}
+.acerto-solicitante-row-drill:hover {
+    background: rgba(37, 99, 235, 0.08) !important;
+}
+#modalDetalheSolicitanteAcerto {
+    z-index: 1065;
+}
+#modalDetalheSolicitanteAcerto .modal-header {
+    background: linear-gradient(135deg, #312e81 0%, #4f46e5 100%);
+    color: #fff;
+    border: none;
+}
+#modalDetalheSolicitanteAcerto .modal-header .btn-close {
+    filter: brightness(0) invert(1);
+}
 .acerto-modal-panel {
     background: #fff;
     border: 1px solid #e2e8f0;
@@ -1586,6 +1603,7 @@
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-user-md"></i> Médico solicitante — qt · valor pago
+                                <span class="text-muted fw-normal small ms-1">(duplo clique na linha)</span>
                             </div>
                             <div class="acerto-modal-scroll-tabela">
                                 <table class="table table-sm acerto-modal-table mb-0">
@@ -1598,7 +1616,9 @@
                                     </thead>
                                     <tbody>
                                         {% for row in resumo_solicitante %}
-                                        <tr>
+                                        <tr class="js-acerto-solicitante-row acerto-solicitante-row-drill"
+                                            data-solicitante="{{ row.solicitante }}"
+                                            title="Duplo clique para viabilidade e formas de pagamento">
                                             <td>{{ row.solicitante|truncatechars:48 }}</td>
                                             <td class="text-center">{{ row.quantidade }}</td>
                                             <td class="text-end">R$ {{ row.valor_fmt }}</td>
@@ -1626,6 +1646,66 @@
                     <i class="fas fa-print me-1"></i> Imprimir
                 </a>
                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalheSolicitanteAcerto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="modalDetalheSolicitanteTitulo">
+                        <i class="fas fa-user-md me-2"></i><span class="js-detalhe-sol-nome">Médico solicitante</span>
+                    </h5>
+                    <p class="mb-0 small opacity-75">{{ periodo_fmt }} · valor pago (grade)</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-handshake"></i> Viabilidade — qt · valor
+                            </div>
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                                <table class="table table-sm acerto-modal-table mb-0">
+                                    <thead class="sticky-top">
+                                        <tr class="text-center">
+                                            <th class="text-start">Viabilidade</th>
+                                            <th>Qt</th>
+                                            <th>Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="js-detalhe-sol-viabilidade"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-wallet"></i> Forma de pagamento · valor
+                            </div>
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                                <table class="table table-sm acerto-modal-table mb-0">
+                                    <thead class="sticky-top">
+                                        <tr>
+                                            <th>Forma</th>
+                                            <th class="text-end">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="js-detalhe-sol-pagamento"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -2036,6 +2116,7 @@
 {{ grafico_convenio_valores|json_script:"acerto-graf-conv-valores" }}
 {{ grafico_solicitante_labels|json_script:"acerto-graf-sol-labels" }}
 {{ grafico_solicitante_valores|json_script:"acerto-graf-sol-valores" }}
+{{ resumo_solicitante_detalhes|json_script:"acerto-solicitante-detalhes" }}
 {{ grafico_torre_usar_meses|json_script:"acerto-graf-torre-usar-meses" }}
 {{ grafico_torre_meses_labels|json_script:"acerto-graf-torre-meses-labels" }}
 {{ grafico_torre_meses_modalidade_valores|json_script:"acerto-graf-torre-meses-mod-valores" }}
@@ -2295,6 +2376,70 @@
         }
     }
     abrirResumoSePedidoNaUrl();
+
+    var detalhesSolicitante = parseJsonScript('acerto-solicitante-detalhes', {});
+    var modalDetalheSol = document.getElementById('modalDetalheSolicitanteAcerto');
+    var tbodyDetViab = document.querySelector('.js-detalhe-sol-viabilidade');
+    var tbodyDetPag = document.querySelector('.js-detalhe-sol-pagamento');
+    var tituloDetNome = document.querySelector('.js-detalhe-sol-nome');
+
+    function escapeHtmlTexto(s) {
+        var d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    function abrirDetalheSolicitante(nome) {
+        if (!nome || !modalDetalheSol) return;
+        var bloco = detalhesSolicitante[nome];
+        if (!bloco) {
+            alert('Sem detalhes para este solicitante no período filtrado.');
+            return;
+        }
+        if (tituloDetNome) tituloDetNome.textContent = nome;
+        if (tbodyDetViab) {
+            var htmlV = '';
+            (bloco.viabilidade || []).forEach(function(row) {
+                htmlV += '<tr><td>' + escapeHtmlTexto(row.viabilidade) + '</td>' +
+                    '<td class="text-center">' + escapeHtmlTexto(String(row.quantidade)) + '</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(row.valor_fmt) + '</td></tr>';
+            });
+            if (bloco.total_viabilidade_qt) {
+                htmlV += '<tr class="row-total row-total-valor"><td>Total</td>' +
+                    '<td class="text-center">' + bloco.total_viabilidade_qt + '</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(bloco.total_viabilidade_valor_fmt) + '</td></tr>';
+            }
+            tbodyDetViab.innerHTML = htmlV || '<tr><td colspan="3" class="text-muted text-center py-3">Sem dados.</td></tr>';
+        }
+        if (tbodyDetPag) {
+            var htmlP = '';
+            (bloco.pagamento || []).forEach(function(row) {
+                htmlP += '<tr><td>' + escapeHtmlTexto(row.rotulo) + '</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(row.valor_fmt) + '</td></tr>';
+            });
+            if (bloco.total_pagamento_fmt) {
+                htmlP += '<tr class="row-total row-total-valor"><td>Total</td>' +
+                    '<td class="text-end">R$ ' + escapeHtmlTexto(bloco.total_pagamento_fmt) + '</td></tr>';
+            }
+            tbodyDetPag.innerHTML = htmlP || '<tr><td colspan="2" class="text-muted text-center py-3">Sem dados.</td></tr>';
+        }
+        function showModal() {
+            if (!window.bootstrap || !window.bootstrap.Modal) return;
+            bootstrap.Modal.getOrCreateInstance(modalDetalheSol).show();
+        }
+        if (window.bootstrap && window.bootstrap.Modal) {
+            showModal();
+        } else {
+            window.addEventListener('load', showModal, { once: true });
+        }
+    }
+
+    document.querySelectorAll('.js-acerto-solicitante-row').forEach(function(tr) {
+        tr.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            abrirDetalheSolicitante(tr.getAttribute('data-solicitante'));
+        });
+    });
 
     if (typeof Chart === 'undefined') return;
 

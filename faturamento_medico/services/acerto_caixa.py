@@ -21,6 +21,7 @@ from faturamento_medico.lote_relatorio import (
 from faturamento_medico.log_status_conferencia import registrar_log_status_conferencia_item
 from faturamento_medico.models import (
     AcertoCaixaFechamento,
+    ApelidoSolicitante,
     CAIXAS_ACERTO_VALORES,
     FaturamentoMedico,
     ItemServico,
@@ -1158,11 +1159,70 @@ def montar_resumo_viabilidade_acerto(linhas: list[dict]) -> list[dict]:
     )
 
 
+SOLICITANTE_NAO_INFORMADO_ACERTO = 'Não informado'
+
+
+def _carregar_mapa_apelidos_solicitante(empresa_id: int) -> dict[str, str]:
+    """Grafia RIS → apelido cadastrado (empresa)."""
+    if not empresa_id:
+        return {}
+    mapa: dict[str, str] = {}
+    for row in ApelidoSolicitante.objects.filter(empresa_id=empresa_id).order_by(
+        'apelido', 'grafia'
+    ):
+        grafia = (row.grafia or '').strip()
+        apelido = (row.apelido or '').strip()
+        if grafia and apelido:
+            mapa[grafia] = apelido
+    return mapa
+
+
+def _lookup_apelido_grafia_solicitante(
+    grafia: str, grafia_para_apelido: dict[str, str]
+) -> str | None:
+    original = (grafia or '').strip()
+    if not original or not grafia_para_apelido:
+        return None
+    if original in grafia_para_apelido:
+        return grafia_para_apelido[original]
+    chave = original.casefold()
+    for cadastrada, apelido in grafia_para_apelido.items():
+        if (cadastrada or '').strip().casefold() == chave:
+            return apelido
+    return None
+
+
+def _rotulo_solicitante_resumo_acerto(
+    raw: str, grafia_para_apelido: dict[str, str]
+) -> str:
+    """Apelido cadastrado; senão, grafia do médico solicitante."""
+    original = (raw or '').strip()
+    if not original:
+        return SOLICITANTE_NAO_INFORMADO_ACERTO
+    apelido = _lookup_apelido_grafia_solicitante(original, grafia_para_apelido)
+    return apelido if apelido else original
+
+
+def aplicar_rotulo_solicitante_resumo_linhas(
+    linhas: list[dict], grafia_para_apelido: dict[str, str]
+) -> None:
+    for linha in linhas:
+        linha['solicitante_resumo'] = _rotulo_solicitante_resumo_acerto(
+            linha.get('medico_solicitante'),
+            grafia_para_apelido,
+        )
+
+
+def _chave_medico_solicitante_linha(linha: dict) -> str:
+    rotulo = (linha.get('solicitante_resumo') or linha.get('medico_solicitante') or '').strip()
+    return rotulo or SOLICITANTE_NAO_INFORMADO_ACERTO
+
+
 def montar_resumo_solicitante_acerto(linhas: list[dict]) -> list[dict]:
     """Agrupa por médico solicitante: quantidade e valor pago (coluna da grade)."""
     agreg: dict[str, dict] = {}
     for linha in linhas:
-        chave = (linha.get('medico_solicitante') or '').strip() or 'Não informado'
+        chave = _chave_medico_solicitante_linha(linha)
         if chave not in agreg:
             agreg[chave] = {'quantidade': 0, 'valor': Decimal('0')}
         agreg[chave]['quantidade'] += 1
@@ -1179,6 +1239,53 @@ def montar_resumo_solicitante_acerto(linhas: list[dict]) -> list[dict]:
         ],
         key=lambda x: (-x['valor'], x['solicitante'].lower()),
     )
+
+
+def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, dict]:
+    """
+    Por médico solicitante: viabilidade (qt · valor) e formas de pagamento (valor),
+    para drill-down no resumo (duplo clique na grade).
+    """
+    por_sol: dict[str, list[dict]] = defaultdict(list)
+    for linha in linhas:
+        por_sol[_chave_medico_solicitante_linha(linha)].append(linha)
+
+    detalhes: dict[str, dict] = {}
+    for nome, sub in por_sol.items():
+        viab = montar_resumo_viabilidade_acerto(sub)
+        resumo_pag, resumo_aguard, _ = recomputar_resumos_acerto_caixa_de_linhas(sub)
+        pagamentos: list[dict] = [
+            {'rotulo': rotulo, 'valor_fmt': _moeda_br(valor)}
+            for rotulo, valor in sorted(resumo_pag.items(), key=lambda x: -x[1])
+        ]
+        for conv, val in sorted(
+            resumo_aguard.items(),
+            key=lambda x: (-x[1], x[0].lower()),
+        ):
+            if val <= 0:
+                continue
+            pagamentos.append(
+                {
+                    'rotulo': f'Aguardando faturamento — {conv}',
+                    'valor_fmt': _moeda_br(val),
+                }
+            )
+        total_valor = sum((r['valor'] for r in viab), Decimal('0'))
+        detalhes[nome] = {
+            'viabilidade': [
+                {
+                    'viabilidade': r['viabilidade'],
+                    'quantidade': r['quantidade'],
+                    'valor_fmt': r['valor_fmt'],
+                }
+                for r in viab
+            ],
+            'pagamento': pagamentos,
+            'total_viabilidade_qt': sum(r['quantidade'] for r in viab),
+            'total_viabilidade_valor_fmt': _moeda_br(total_valor),
+            'total_pagamento_fmt': _moeda_br(total_valor),
+        }
+    return detalhes
 
 
 def montar_resumo_viabilidade_por_mes_acerto(
@@ -1842,6 +1949,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
     linhas_grade = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros_dict)
+    aplicar_rotulo_solicitante_resumo_linhas(
+        linhas_grade,
+        _carregar_mapa_apelidos_solicitante(empresa_id),
+    )
 
     if caixas_sel:
         nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)
@@ -1900,6 +2011,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_solicitante = montar_resumo_solicitante_acerto(linhas_grade)
     total_sol_qt = sum(r['quantidade'] for r in resumo_solicitante)
     total_sol_valor = sum((r['valor'] for r in resumo_solicitante), Decimal('0'))
+    resumo_solicitante_detalhes = montar_detalhe_medico_solicitante_acerto(linhas_grade)
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
     graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
@@ -1947,6 +2059,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_solicitante': resumo_solicitante,
         'resumo_solicitante_total_qt': total_sol_qt,
         'resumo_solicitante_total_valor_fmt': _moeda_br(total_sol_valor),
+        'resumo_solicitante_detalhes': resumo_solicitante_detalhes,
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
         **matriz_anual_ctx,
         **graficos_resumo_ctx,

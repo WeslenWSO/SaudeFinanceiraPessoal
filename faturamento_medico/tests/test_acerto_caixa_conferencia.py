@@ -13,6 +13,8 @@ from faturamento_medico.services.acerto_caixa import (
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
+    aplicar_rotulo_solicitante_resumo_linhas,
+    montar_detalhe_medico_solicitante_acerto,
     montar_resumo_solicitante_acerto,
     montar_resumo_viabilidade_matriz_mes,
     montar_resumo_viabilidade_por_mes_acerto,
@@ -292,6 +294,83 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['quantidade'], 2)
         self.assertEqual(rows[0]['valor'], Decimal('150'))
+
+    def test_solicitante_agrupa_por_apelido(self):
+        mapa = {
+            'VINICIUS DE MACEDO MAGALHAES': 'VINICIUS MACEDO',
+            'VINICIUS MACEDO MAGALHAES': 'VINICIUS MACEDO',
+        }
+        linhas = [
+            {
+                'medico_solicitante': 'VINICIUS DE MACEDO MAGALHAES',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'medico_solicitante': 'VINICIUS MACEDO MAGALHAES',
+                'valor_pago': Decimal('50'),
+                'aguardando_faturamento': False,
+            },
+        ]
+        aplicar_rotulo_solicitante_resumo_linhas(linhas, mapa)
+        rows = montar_resumo_solicitante_acerto(linhas)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['solicitante'], 'VINICIUS MACEDO')
+        self.assertEqual(rows[0]['quantidade'], 2)
+        self.assertEqual(rows[0]['valor'], Decimal('150'))
+
+    def test_solicitante_sem_apelido_usa_grafia(self):
+        linhas = [
+            {
+                'medico_solicitante': 'DR. UNICO',
+                'valor_pago': Decimal('10'),
+                'aguardando_faturamento': False,
+            },
+        ]
+        aplicar_rotulo_solicitante_resumo_linhas(linhas, {})
+        rows = montar_resumo_solicitante_acerto(linhas)
+        self.assertEqual(rows[0]['solicitante'], 'DR. UNICO')
+
+    def test_detalhe_solicitante_viabilidade_e_pagamento(self):
+        linhas = [
+            {
+                'faturamento_id': 1,
+                'medico_solicitante': 'Dr. A',
+                'convenio': 'FUSEX',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+                'forma_pgto': 'PIX',
+                'pagamentos_acerto': [],
+            },
+            {
+                'faturamento_id': 2,
+                'medico_solicitante': 'Dr. A',
+                'convenio': 'PARTICULAR',
+                'valor_pago': Decimal('40'),
+                'aguardando_faturamento': False,
+                'forma_pgto': 'DINHEIRO',
+                'pagamentos_acerto': [],
+            },
+            {
+                'faturamento_id': 3,
+                'medico_solicitante': 'Dr. B',
+                'convenio': 'GEAP',
+                'valor_pago': Decimal('20'),
+                'aguardando_faturamento': False,
+                'forma_pgto': 'PIX',
+                'pagamentos_acerto': [],
+            },
+        ]
+        aplicar_rotulo_solicitante_resumo_linhas(linhas, {})
+        det = montar_detalhe_medico_solicitante_acerto(linhas)
+        self.assertIn('Dr. A', det)
+        self.assertEqual(det['Dr. A']['total_viabilidade_qt'], 2)
+        viabs = {v['viabilidade']: v['quantidade'] for v in det['Dr. A']['viabilidade']}
+        self.assertEqual(viabs['FUSEX'], 1)
+        self.assertEqual(viabs['PARTICULAR'], 1)
+        rotulos = [p['rotulo'] for p in det['Dr. A']['pagamento']]
+        self.assertIn('PIX', rotulos)
+        self.assertIn('Dinheiro', rotulos)
 
     def test_grafico_convenio_torre(self):
         viab = [
