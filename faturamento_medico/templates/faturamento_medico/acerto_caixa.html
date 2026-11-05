@@ -1520,9 +1520,9 @@
                 </div>
                 {% endif %}
                 {% if resumo_matriz_mes %}
-                <div class="row g-3 mb-2 resumo-visao-mes">
-                    <div class="col-lg-6">
-                        <div class="acerto-modal-panel h-100">
+                <div class="row g-3 mb-2 resumo-visao-mes resumo-matriz-mes-empilhada">
+                    <div class="col-12">
+                        <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — por dia
                                 <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
@@ -1573,8 +1573,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-6">
-                        <div class="acerto-modal-panel h-100">
+                    <div class="col-12">
+                        <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-hospital"></i> Viabilidade — por dia
                                 <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
@@ -1625,8 +1625,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="row g-3 mb-2 resumo-visao-mes">
                     <div class="col-12">
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">

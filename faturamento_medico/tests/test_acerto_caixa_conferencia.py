@@ -276,7 +276,8 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         pix = next(
             r for r in ctx['pagamento_matriz_dia_formas'] if r['rotulo'] == 'PIX'
         )
-        self.assertEqual(pix['meses'][2]['qt'], 1)
+        self.assertEqual(pix['meses'][2]['qt'], 2)
+        self.assertEqual(pix['meses'][4]['qt'], 0)
 
     def test_matriz_mes_por_dia_nao_aplica_fora_mes_inteiro(self):
         ctx = montar_contexto_matriz_mensal_por_dia(
