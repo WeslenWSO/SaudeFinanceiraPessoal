@@ -219,53 +219,6 @@
             </table>
         </div>
     </div>
-
-    <div class="resumo-impressao-bloco page-break-before">
-        <h2>Viabilidade por mês — {{ resumo_viabilidade_por_mes_ano }}</h2>
-        <div class="matriz-impressao-wrap">
-            <table class="matriz-impressao">
-                <thead>
-                    <tr>
-                        <th class="col-fixa" rowspan="2">Viabilidade</th>
-                        {% for col in viabilidade_matriz_colunas %}
-                        <th colspan="2">{{ col.label_curto }}</th>
-                        {% endfor %}
-                        <th colspan="2">Total</th>
-                    </tr>
-                    <tr>
-                        {% for col in viabilidade_matriz_colunas %}
-                        <th>Qt</th><th>R$</th>
-                        {% endfor %}
-                        <th>Qt</th><th>R$</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in viabilidade_matriz_linhas %}
-                    <tr>
-                        <td class="col-fixa">{{ row.viabilidade }}</td>
-                        {% for cel in row.meses %}
-                        <td class="num">{{ cel.qt }}</td>
-                        <td class="num">{{ cel.valor_fmt }}</td>
-                        {% endfor %}
-                        <td class="num">{{ row.total_qt }}</td>
-                        <td class="num">{{ row.total_valor_fmt }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if viabilidade_matriz_linhas %}
-                    <tr class="total-linha">
-                        <td class="col-fixa">Total</td>
-                        {% for tot in viabilidade_matriz_totais_mes %}
-                        <td class="num">{{ tot.qt }}</td>
-                        <td class="num">{{ tot.valor_fmt }}</td>
-                        {% endfor %}
-                        <td class="num">{{ resumo_viabilidade_total_qt }}</td>
-                        <td class="num">{{ resumo_viabilidade_total_valor_fmt }}</td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
 </section>
 
 {{ grafico_modalidade_labels|json_script:"acerto-impressao-graf-mod-labels" }}

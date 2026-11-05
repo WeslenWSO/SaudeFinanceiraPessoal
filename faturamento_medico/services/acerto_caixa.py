@@ -1843,9 +1843,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
     total_viab_valor = sum((r['valor'] for r in resumo_viabilidade), Decimal('0'))
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
-    viabilidade_matriz_ctx = montar_resumo_viabilidade_matriz_mes(
-        linhas_grade, regua_ctx['regua_ano']
-    )
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
     graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
         resumo_pagamento_lista,
@@ -1888,7 +1885,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade_total_qt': total_viab_qt,
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
-        **viabilidade_matriz_ctx,
         **matriz_anual_ctx,
         **graficos_resumo_ctx,
     }

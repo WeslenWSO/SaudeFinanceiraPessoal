@@ -557,14 +557,14 @@
                 <small class="text-muted">Período: {{ periodo_fmt }}</small>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_mes }}"
+                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_mes }}&visao_resumo=mes"
                    class="btn btn-sm {% if regua_botao_mes_ativo %}btn-primary{% else %}btn-outline-primary{% endif %}"
-                   title="Período = mês inteiro ({{ regua_botao_mes_titulo }}) — mantém filtros">
+                   title="Mês inteiro ({{ regua_botao_mes_titulo }}) + resumo do período">
                     <i class="fas fa-calendar-day"></i> Mês
                 </a>
-                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_ano }}"
+                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_ano }}&visao_resumo=ano"
                    class="btn btn-sm {% if regua_botao_ano_ativo %}btn-success{% else %}btn-outline-success{% endif %}"
-                   title="Período = ano {{ regua_botao_ano_titulo }} inteiro — mantém filtros">
+                   title="Ano {{ regua_botao_ano_titulo }} inteiro + resumo anual">
                     <i class="fas fa-calendar"></i> Ano
                 </a>
                 <span class="text-muted d-none d-md-inline">|</span>
@@ -1243,16 +1243,103 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
+                <div class="btn-group btn-group-sm mb-3 resumo-modal-visao-tabs" role="group" aria-label="Visão do resumo">
+                    <button type="button"
+                            class="btn btn-primary js-resumo-visao-tab active"
+                            data-visao="mes">
+                        <i class="fas fa-calendar-day me-1"></i> Mês / período
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-primary js-resumo-visao-tab"
+                            data-visao="ano"
+                            {% if not resumo_matriz_anual %}disabled title="Selecione o ano inteiro (botão Ano no topo)"{% endif %}>
+                        <i class="fas fa-calendar me-1"></i> Ano {{ regua_ano }}
+                    </button>
+                </div>
                 <div class="row g-3 mb-3">
-                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-5{% endif %}">
+                    <div class="col-lg-5 resumo-visao-mes">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-wallet"></i> Formas de pagamento
-                                {% if resumo_matriz_anual %}
-                                <span class="acerto-matriz-anual-badge">Ano {{ resumo_matriz_ano }} · colunas por mês</span>
-                                {% endif %}
                             </div>
-                            {% if resumo_matriz_anual %}
+                            <table class="table table-sm acerto-modal-table acerto-modal-pagamento mb-0">
+                                <tbody>
+                                    {% for row in resumo_pagamento %}
+                                    <tr>
+                                        <td>{{ row.rotulo }}</td>
+                                        <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if resumo_aguardando_faturamento %}
+                                    <tr>
+                                        <td class="fw-semibold pt-2">Aguardando faturamento</td>
+                                        <td class="text-end fw-semibold pt-2">R$ {{ total_aguardando_faturamento_fmt }}</td>
+                                    </tr>
+                                    {% for row in resumo_aguardando_faturamento %}
+                                    <tr>
+                                        <td class="ps-3 text-muted small">{{ row.convenio }}</td>
+                                        <td class="text-end small">R$ {{ row.total_fmt }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                            <div class="acerto-modal-kpi">
+                                <div class="acerto-modal-kpi-item">
+                                    <div class="label">Total geral</div>
+                                    <div class="valor">R$ {{ total_resumo_geral_fmt }}</div>
+                                </div>
+                                <div class="acerto-modal-kpi-item">
+                                    <div class="label">Valor pago (grade)</div>
+                                    <div class="valor">R$ {{ total_valor_pago_grade_fmt }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7 resumo-visao-mes">
+                        <div class="row g-2 acerto-modal-charts-grid h-100">
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-pie"></i> Modalidade (pizza)
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico pizza por modalidade"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-column"></i> Modalidade (torre)
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoTorreModalidadeModal" aria-label="Gráfico torre por modalidade"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-column"></i> Forma de pagamento
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoPagamentoModal" aria-label="Gráfico por forma de pagamento"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if resumo_matriz_anual %}
+                <div class="resumo-visao-ano d-none">
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-wallet"></i> Formas de pagamento
+                                <span class="acerto-matriz-anual-badge">Ano {{ resumo_matriz_ano }} · colunas por mês</span>
+                            </div>
                             <div class="acerto-matriz-anual-wrap mb-2">
                                 <table class="acerto-matriz-anual mb-0">
                                     <thead>
@@ -1312,80 +1399,15 @@
                                     </tbody>
                                 </table>
                             </div>
-                            {% else %}
-                            <table class="table table-sm acerto-modal-table acerto-modal-pagamento mb-0">
-                                <tbody>
-                                    {% for row in resumo_pagamento %}
-                                    <tr>
-                                        <td>{{ row.rotulo }}</td>
-                                        <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    {% if resumo_aguardando_faturamento %}
-                                    <tr>
-                                        <td class="fw-semibold pt-2">Aguardando faturamento</td>
-                                        <td class="text-end fw-semibold pt-2">R$ {{ total_aguardando_faturamento_fmt }}</td>
-                                    </tr>
-                                    {% for row in resumo_aguardando_faturamento %}
-                                    <tr>
-                                        <td class="ps-3 text-muted small">{{ row.convenio }}</td>
-                                        <td class="text-end small">R$ {{ row.total_fmt }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    {% endif %}
-                                </tbody>
-                            </table>
-                            {% endif %}
                             <div class="acerto-modal-kpi">
                                 <div class="acerto-modal-kpi-item">
-                                    <div class="label">Total geral</div>
+                                    <div class="label">Total geral (ano)</div>
                                     <div class="valor">R$ {{ total_resumo_geral_fmt }}</div>
                                 </div>
-                                <div class="acerto-modal-kpi-item">
-                                    <div class="label">Valor pago (grade)</div>
-                                    <div class="valor">R$ {{ total_valor_pago_grade_fmt }}</div>
-                                </div>
                             </div>
                         </div>
                     </div>
-                    {% if not resumo_matriz_anual %}
-                    <div class="col-lg-7">
-                        <div class="row g-2 acerto-modal-charts-grid h-100">
-                            <div class="col-md-4">
-                                <div class="acerto-modal-panel h-100">
-                                    <div class="acerto-modal-panel-title">
-                                        <i class="fas fa-chart-pie"></i> Modalidade (pizza)
-                                    </div>
-                                    <div class="acerto-modal-chart-wrap">
-                                        <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico pizza por modalidade"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="acerto-modal-panel h-100">
-                                    <div class="acerto-modal-panel-title">
-                                        <i class="fas fa-chart-column"></i> Modalidade (torre)
-                                    </div>
-                                    <div class="acerto-modal-chart-wrap">
-                                        <canvas id="acertoGraficoTorreModalidadeModal" aria-label="Gráfico torre por modalidade"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="acerto-modal-panel h-100">
-                                    <div class="acerto-modal-panel-title">
-                                        <i class="fas fa-chart-column"></i> Forma de pagamento
-                                    </div>
-                                    <div class="acerto-modal-chart-wrap">
-                                        <canvas id="acertoGraficoPagamentoModal" aria-label="Gráfico por forma de pagamento"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
-                {% if resumo_matriz_anual %}
                 <div class="row g-3 mb-3 acerto-modal-charts-grid">
                     <div class="col-md-6">
                         <div class="acerto-modal-panel">
@@ -1408,17 +1430,13 @@
                         </div>
                     </div>
                 </div>
-                {% endif %}
-                <div class="row g-3">
-                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-6{% endif %}">
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
-                                {% if resumo_matriz_anual %}
                                 <span class="acerto-matriz-anual-badge">Ano {{ resumo_matriz_ano }}</span>
-                                {% endif %}
                             </div>
-                            {% if resumo_matriz_anual %}
                             <div class="acerto-matriz-anual-wrap">
                                 <table class="acerto-matriz-anual mb-0">
                                     <thead>
@@ -1462,7 +1480,25 @@
                                     </tbody>
                                 </table>
                             </div>
-                            {% else %}
+                            {% if modalidades_fora_resumo %}
+                            <div class="acerto-modal-alerta">
+                                <strong>Fora do padrão:</strong>
+                                {% for item in modalidades_fora_resumo %}
+                                {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                </div>
+                {% endif %}
+                <div class="row g-3 resumo-visao-mes">
+                    <div class="col-lg-6">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-sm acerto-modal-table mb-0">
                                     <thead>
@@ -1488,7 +1524,6 @@
                                     </tbody>
                                 </table>
                             </div>
-                            {% endif %}
                             {% if modalidades_fora_resumo %}
                             <div class="acerto-modal-alerta">
                                 <strong>Fora do padrão:</strong>
@@ -1534,64 +1569,6 @@
                                 </table>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div class="acerto-modal-panel mt-3">
-                    <div class="acerto-modal-panel-title">
-                        <i class="fas fa-calendar-alt"></i>
-                        Viabilidade por mês — {{ resumo_viabilidade_por_mes_ano }}
-                        <span class="text-muted fw-normal small">(qt · valor pago, conforme filtro)</span>
-                    </div>
-                    <div class="acerto-matriz-anual-wrap">
-                        <table class="acerto-matriz-anual mb-0">
-                            <thead>
-                                <tr>
-                                    <th class="col-fixa" rowspan="2">Viabilidade</th>
-                                    {% for col in viabilidade_matriz_colunas %}
-                                    <th colspan="2">{{ col.label_curto }}</th>
-                                    {% endfor %}
-                                    <th colspan="2">Total ano</th>
-                                </tr>
-                                <tr>
-                                    {% for col in viabilidade_matriz_colunas %}
-                                    <th class="subcol">Qt</th>
-                                    <th class="subcol-val">R$</th>
-                                    {% endfor %}
-                                    <th class="subcol">Qt</th>
-                                    <th class="subcol-val">R$</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in viabilidade_matriz_linhas %}
-                                <tr>
-                                    <td class="col-fixa">{{ row.viabilidade }}</td>
-                                    {% for cel in row.meses %}
-                                    <td class="subcol">{{ cel.qt }}</td>
-                                    <td class="subcol-val">{{ cel.valor_fmt }}</td>
-                                    {% endfor %}
-                                    <td class="subcol">{{ row.total_qt }}</td>
-                                    <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td class="col-fixa text-muted" colspan="{{ viabilidade_matriz_colunas|length|add:viabilidade_matriz_colunas|length|add:3 }}">
-                                        Sem viabilidade no filtro para {{ resumo_viabilidade_por_mes_ano }}.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                                {% if viabilidade_matriz_linhas %}
-                                <tr class="row-total">
-                                    <td class="col-fixa">Total</td>
-                                    {% for tot in viabilidade_matriz_totais_mes %}
-                                    <td class="subcol">{{ tot.qt }}</td>
-                                    <td class="subcol-val">{{ tot.valor_fmt }}</td>
-                                    {% endfor %}
-                                    <td class="subcol">{{ resumo_viabilidade_total_qt }}</td>
-                                    <td class="subcol-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
-                                </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
@@ -2161,9 +2138,30 @@
         chartsModal = [];
     }
 
+    function visaoResumoAtiva() {
+        var btn = document.querySelector('.js-resumo-visao-tab.active');
+        return btn && btn.getAttribute('data-visao') === 'ano' ? 'ano' : 'mes';
+    }
+
+    function aplicarVisaoResumo(visao) {
+        document.querySelectorAll('.js-resumo-visao-tab').forEach(function(btn) {
+            if (btn.disabled) return;
+            var ativo = btn.getAttribute('data-visao') === visao;
+            btn.classList.toggle('btn-primary', ativo);
+            btn.classList.toggle('btn-outline-primary', !ativo);
+            btn.classList.toggle('active', ativo);
+        });
+        document.querySelectorAll('.resumo-visao-mes').forEach(function(el) {
+            el.classList.toggle('d-none', visao === 'ano');
+        });
+        var anoEl = document.querySelector('.resumo-visao-ano');
+        if (anoEl) anoEl.classList.toggle('d-none', visao !== 'ano');
+        montarChartsModal();
+    }
+
     function montarChartsModal() {
         destruirChartsModal();
-        if (torreUsarMeses) {
+        if (visaoResumoAtiva() === 'ano' && torreUsarMeses) {
             var c1 = criarGraficoTorre(
                 document.getElementById('acertoGraficoTorreMesesModalidadeModal'),
                 mesesLabels,
@@ -2200,9 +2198,30 @@
     criarGraficoModalidade(document.getElementById('acertoGraficoModalidade'));
 
     var modalEl = document.getElementById('modalResumoAcerto');
+    var defaultVisaoResumo = {% if regua_botao_ano_ativo %}'ano'{% else %}'mes'{% endif %};
+    document.querySelectorAll('.js-resumo-visao-tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (btn.disabled) return;
+            aplicarVisaoResumo(btn.getAttribute('data-visao'));
+        });
+    });
     if (modalEl) {
-        modalEl.addEventListener('shown.bs.modal', montarChartsModal);
+        modalEl.addEventListener('shown.bs.modal', function() {
+            var qs = new URLSearchParams(window.location.search);
+            var visao = qs.get('visao_resumo');
+            if (visao !== 'mes' && visao !== 'ano') visao = defaultVisaoResumo;
+            if (visao === 'ano' && document.querySelector('.js-resumo-visao-tab[data-visao="ano"][disabled]')) {
+                visao = 'mes';
+            }
+            aplicarVisaoResumo(visao);
+        });
     }
+    (function abrirResumoSePedido() {
+        var qs = new URLSearchParams(window.location.search);
+        if (qs.get('visao_resumo') && modalEl && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    })();
 })();
 </script>
 {% endblock %}
