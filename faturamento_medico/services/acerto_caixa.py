@@ -1158,6 +1158,29 @@ def montar_resumo_viabilidade_acerto(linhas: list[dict]) -> list[dict]:
     )
 
 
+def montar_resumo_solicitante_acerto(linhas: list[dict]) -> list[dict]:
+    """Agrupa por médico solicitante: quantidade e valor pago (coluna da grade)."""
+    agreg: dict[str, dict] = {}
+    for linha in linhas:
+        chave = (linha.get('medico_solicitante') or '').strip() or 'Não informado'
+        if chave not in agreg:
+            agreg[chave] = {'quantidade': 0, 'valor': Decimal('0')}
+        agreg[chave]['quantidade'] += 1
+        agreg[chave]['valor'] += _valor_contabil_linha_acerto(linha)
+    return sorted(
+        [
+            {
+                'solicitante': nome,
+                'quantidade': dados['quantidade'],
+                'valor': dados['valor'],
+                'valor_fmt': _moeda_br(dados['valor']),
+            }
+            for nome, dados in agreg.items()
+        ],
+        key=lambda x: (-x['valor'], x['solicitante'].lower()),
+    )
+
+
 def montar_resumo_viabilidade_por_mes_acerto(
     linhas: list[dict], ano: int
 ) -> list[dict]:
@@ -1442,6 +1465,7 @@ def montar_graficos_resumo_acerto_caixa(
     grafico_modalidade_labels: list,
     grafico_modalidade_valores: list,
     resumo_viabilidade: list[dict] | None = None,
+    resumo_solicitante: list[dict] | None = None,
     matriz_anual: bool = False,
     meses_colunas: list[dict] | None = None,
     modalidades_totais_mes: list[dict] | None = None,
@@ -1462,11 +1486,22 @@ def montar_graficos_resumo_acerto_caixa(
         conv_labels.append(_rotulo_curto_grafico(row.get('viabilidade') or ''))
         conv_valores.append(float(val))
 
+    sol_labels: list[str] = []
+    sol_valores: list[float] = []
+    for row in resumo_solicitante or []:
+        val = row.get('valor') or Decimal('0')
+        if val <= 0 and not (row.get('quantidade') or 0):
+            continue
+        sol_labels.append(_rotulo_curto_grafico(row.get('solicitante') or ''))
+        sol_valores.append(float(val))
+
     ctx: dict = {
         'grafico_pagamento_labels': pag_labels,
         'grafico_pagamento_valores': pag_valores,
         'grafico_convenio_labels': conv_labels,
         'grafico_convenio_valores': conv_valores,
+        'grafico_solicitante_labels': sol_labels,
+        'grafico_solicitante_valores': sol_valores,
         'grafico_torre_modalidade_labels': list(grafico_modalidade_labels),
         'grafico_torre_modalidade_valores': list(grafico_modalidade_valores),
         'grafico_torre_usar_meses': False,
@@ -1778,6 +1813,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
                 'status_agendamento': status_txt,
                 'status_css': status_css,
                 'convenio': convenio,
+                'medico_solicitante': (fat.medico_solicitante or '').strip() or 'Não informado',
                 'horario_inicio': fat.horario_inicio or fat.horario or '-',
                 'horario_fim': fat.horario_fim or '-',
                 'motivo_cancelamento': fat.motivo_cancelamento or '-',
@@ -1861,6 +1897,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_viabilidade = montar_resumo_viabilidade_acerto(linhas_grade)
     total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
     total_viab_valor = sum((r['valor'] for r in resumo_viabilidade), Decimal('0'))
+    resumo_solicitante = montar_resumo_solicitante_acerto(linhas_grade)
+    total_sol_qt = sum(r['quantidade'] for r in resumo_solicitante)
+    total_sol_valor = sum((r['valor'] for r in resumo_solicitante), Decimal('0'))
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
     graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
@@ -1869,6 +1908,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         grafico_modalidade_labels=resumo_modalidades_ctx.get('grafico_modalidade_labels') or [],
         grafico_modalidade_valores=resumo_modalidades_ctx.get('grafico_modalidade_valores') or [],
         resumo_viabilidade=resumo_viabilidade,
+        resumo_solicitante=resumo_solicitante,
         matriz_anual=bool(matriz_anual_ctx.get('resumo_matriz_anual')),
         meses_colunas=matriz_anual_ctx.get('resumo_meses_colunas'),
         modalidades_totais_mes=matriz_anual_ctx.get('modalidades_matriz_totais_mes'),
@@ -1904,6 +1944,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade': resumo_viabilidade,
         'resumo_viabilidade_total_qt': total_viab_qt,
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
+        'resumo_solicitante': resumo_solicitante,
+        'resumo_solicitante_total_qt': total_sol_qt,
+        'resumo_solicitante_total_valor_fmt': _moeda_br(total_sol_valor),
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
         **matriz_anual_ctx,
         **graficos_resumo_ctx,

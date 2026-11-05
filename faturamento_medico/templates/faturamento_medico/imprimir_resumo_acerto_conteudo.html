@@ -219,6 +219,41 @@
             </table>
         </div>
     </div>
+
+    <div class="resumo-impressao-duas-colunas page-break-before">
+        <div class="resumo-impressao-bloco">
+            <h2>Médico solicitante (torre)</h2>
+            <div class="chart-box" style="max-width:100%;">
+                <canvas id="acertoImpressaoGraficoSolicitante" height="220"></canvas>
+            </div>
+        </div>
+        <div class="resumo-impressao-bloco">
+            <h2>Médico solicitante — qt · valor pago</h2>
+            <table class="resumo-tabela resumo-tabela-3col">
+                <thead>
+                    <tr><th>Solicitante</th><th>Qt</th><th>Valor</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in resumo_solicitante %}
+                    <tr>
+                        <td>{{ row.solicitante }}</td>
+                        <td class="num">{{ row.quantidade }}</td>
+                        <td class="num">R$ {{ row.valor_fmt }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Sem dados.</td></tr>
+                    {% endfor %}
+                    {% if resumo_solicitante %}
+                    <tr class="total-linha">
+                        <td>Total</td>
+                        <td class="num">{{ resumo_solicitante_total_qt }}</td>
+                        <td class="num">R$ {{ resumo_solicitante_total_valor_fmt }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </section>
 
 {{ grafico_modalidade_labels|json_script:"acerto-impressao-graf-mod-labels" }}
@@ -227,6 +262,8 @@
 {{ grafico_torre_modalidade_valores|json_script:"acerto-impressao-torre-mod-valores" }}
 {{ grafico_convenio_labels|json_script:"acerto-impressao-conv-labels" }}
 {{ grafico_convenio_valores|json_script:"acerto-impressao-conv-valores" }}
+{{ grafico_solicitante_labels|json_script:"acerto-impressao-sol-labels" }}
+{{ grafico_solicitante_valores|json_script:"acerto-impressao-sol-valores" }}
 {{ grafico_pagamento_labels|json_script:"acerto-impressao-pag-labels" }}
 {{ grafico_pagamento_valores|json_script:"acerto-impressao-pag-valores" }}
 {{ grafico_torre_usar_meses|json_script:"acerto-impressao-torre-usar-meses" }}
@@ -327,6 +364,12 @@
             parseJson('acerto-impressao-pag-labels', []),
             parseJson('acerto-impressao-pag-valores', []),
             '#0d9488'
+        );
+        criarBarra(
+            document.getElementById('acertoImpressaoGraficoSolicitante'),
+            parseJson('acerto-impressao-sol-labels', []),
+            parseJson('acerto-impressao-sol-valores', []),
+            '#6366f1'
         );
     }
 

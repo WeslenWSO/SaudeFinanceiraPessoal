@@ -13,6 +13,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
+    montar_resumo_solicitante_acerto,
     montar_resumo_viabilidade_matriz_mes,
     montar_resumo_viabilidade_por_mes_acerto,
     montar_contexto_matriz_anual_acerto,
@@ -273,6 +274,24 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertIn('PIX', g['grafico_pagamento_labels'])
         self.assertIn('Aguardando faturamento', g['grafico_pagamento_labels'])
         self.assertEqual(len(g['grafico_pagamento_valores']), 2)
+
+    def test_resumo_solicitante_qt_valor(self):
+        linhas = [
+            {
+                'medico_solicitante': 'Dr. Silva',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'medico_solicitante': 'Dr. Silva',
+                'valor_pago': Decimal('50'),
+                'aguardando_faturamento': False,
+            },
+        ]
+        rows = montar_resumo_solicitante_acerto(linhas)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['quantidade'], 2)
+        self.assertEqual(rows[0]['valor'], Decimal('150'))
 
     def test_grafico_convenio_torre(self):
         viab = [
