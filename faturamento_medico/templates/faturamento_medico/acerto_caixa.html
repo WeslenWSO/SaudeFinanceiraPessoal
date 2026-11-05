@@ -542,6 +542,7 @@
 .acerto-matriz-anual .subcol { min-width: 2.1rem; text-align: center; }
 .acerto-matriz-anual .subcol-val { min-width: 3.5rem; text-align: right; }
 .acerto-matriz-anual tr.row-total td { background: #eff6ff; font-weight: 700; }
+.acerto-matriz-anual th.dia-fim-semana { color: #64748b; font-weight: 600; }
 .acerto-matriz-anual tr.row-secao td {
     background: #f8fafc;
     font-weight: 700;
@@ -959,6 +960,14 @@
             </div>
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+            {% if grade_extensa_oculta %}
+            <div class="alert alert-info py-2 small mb-2">
+                Ano inteiro com muitos registros: a grade abaixo mostra só as primeiras
+                {{ linhas_grade_exibir|length }} de {{ grade_extensa_total }} linhas.
+                Use <strong>Mês</strong> no topo ou filtros para conferir item a item; o
+                <strong>Resumo → Ano</strong> e a impressão usam o período completo.
+            </div>
+            {% endif %}
 
             {% csrf_token %}
             <div class="table-responsive">
@@ -990,7 +999,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for linha in linhas %}
+                        {% for linha in linhas_grade_exibir|default:linhas %}
                         <tr data-faturamento-id="{{ linha.faturamento_id }}"
                             data-valor-pago="{{ linha.valor_pago|default:'' }}"
                             data-modalidade="{{ linha.modalidade|default:'' }}"
@@ -1390,7 +1399,7 @@
                                         {% endfor %}
                                         {% if pagamento_matriz_aguardando %}
                                         <tr class="row-secao">
-                                            <td class="col-fixa" colspan="{{ resumo_meses_colunas|length|add:resumo_meses_colunas|length|add:3 }}">Aguardando faturamento</td>
+                                            <td class="col-fixa" colspan="{{ matriz_anual_colspan_secao|default:27 }}">Aguardando faturamento</td>
                                         </tr>
                                         {% for row in pagamento_matriz_aguardando %}
                                         <tr>

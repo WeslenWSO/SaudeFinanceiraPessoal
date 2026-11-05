@@ -593,7 +593,10 @@ def recomputar_resumos_acerto_caixa_de_linhas(
             resumo_aguardando[conv] += val
             bucket['aguardando'][conv] += val
         else:
-            por_fat[linha['faturamento_id']].append(linha)
+            fat_id = linha.get('faturamento_id')
+            if fat_id is None:
+                continue
+            por_fat[fat_id].append(linha)
 
     for fat_linhas in por_fat.values():
         total_vp = sum(_valor_contabil_linha_acerto(l) for l in fat_linhas)
@@ -624,7 +627,10 @@ def _contagem_formas_pagamento_mes(linhas: list[dict]) -> dict[str, int]:
     for linha in linhas:
         if linha.get('aguardando_faturamento'):
             continue
-        por_fat[linha['faturamento_id']].append(linha)
+        fat_id = linha.get('faturamento_id')
+        if fat_id is None:
+            continue
+        por_fat[fat_id].append(linha)
     contagem: dict[str, int] = defaultdict(int)
     for fat_linhas in por_fat.values():
         total_vp = sum(_valor_contabil_linha_acerto(l) for l in fat_linhas)
@@ -1167,13 +1173,17 @@ def _carregar_mapa_apelidos_solicitante(empresa_id: int) -> dict[str, str]:
     if not empresa_id:
         return {}
     mapa: dict[str, str] = {}
-    for row in ApelidoSolicitante.objects.filter(empresa_id=empresa_id).order_by(
-        'apelido', 'grafia'
-    ):
-        grafia = (row.grafia or '').strip()
-        apelido = (row.apelido or '').strip()
-        if grafia and apelido:
-            mapa[grafia] = apelido
+    try:
+        qs = ApelidoSolicitante.objects.filter(empresa_id=empresa_id).order_by(
+            'apelido', 'grafia'
+        )
+        for row in qs:
+            grafia = (row.grafia or '').strip()
+            apelido = (row.apelido or '').strip()
+            if grafia and apelido:
+                mapa[grafia] = apelido
+    except (ProgrammingError, OperationalError):
+        return {}
     return mapa
 
 
@@ -1402,6 +1412,36 @@ def _filtrar_linhas_mes_ano(linhas: list[dict], ano: int, mes: int) -> list[dict
     ]
 
 
+def _filtrar_linhas_dia(linhas: list[dict], iso_dia: str) -> list[dict]:
+    chave = (iso_dia or '').strip()
+    return [
+        linha
+        for linha in linhas
+        if (linha.get('data_iso') or '').strip() == chave
+    ]
+
+
+def montar_colunas_dias_resumo(data_inicio: date, data_fim: date) -> list[dict]:
+    """Colunas da matriz diária quando o filtro é o mês inteiro."""
+    if not periodo_eh_mes_inteiro(data_inicio, data_fim):
+        return []
+    colunas: list[dict] = []
+    d = data_inicio
+    while d <= data_fim:
+        colunas.append(
+            {
+                'iso': d.isoformat(),
+                'dia': d.day,
+                'label_curto': str(d.day),
+                'label': d.strftime('%d/%m'),
+                'dia_semana': DIAS_SEMANA_CURTO[d.weekday()],
+                'fim_semana': d.weekday() >= 5,
+            }
+        )
+        d += timedelta(days=1)
+    return colunas
+
+
 def montar_colunas_meses_resumo() -> list[dict]:
     return [
         {
@@ -1468,6 +1508,161 @@ def montar_resumo_modalidades_matriz_mes(linhas: list[dict], ano: int) -> dict:
     return {
         'modalidades_matriz_linhas': linhas_matriz,
         'modalidades_matriz_totais_mes': totais_mes,
+    }
+
+
+def montar_resumo_modalidades_matriz_dia(
+    linhas: list[dict], colunas_dias: list[dict]
+) -> dict:
+    """Linhas = modalidades; colunas = dias do mês (qt · valor pago)."""
+    ctx_por_dia = [
+        montar_resumo_modalidades_acerto(_filtrar_linhas_dia(linhas, col['iso']))
+        for col in colunas_dias
+    ]
+    codigos_ordem: list[tuple[str, str]] = list(MODALIDADES_RESUMO_ACERTO)
+    if any(ctx['resumo_outros_quantidade'] for ctx in ctx_por_dia):
+        codigos_ordem.append(('OUTROS', 'QUANTIDADE OUTRAS MODALIDADES'))
+
+    linhas_matriz: list[dict] = []
+    for codigo, label in codigos_ordem:
+        dias_cel: list[dict] = []
+        total_qt = 0
+        total_valor = Decimal('0')
+        for ctx in ctx_por_dia:
+            item = next(
+                (m for m in ctx['resumo_modalidades'] if m['codigo'] == codigo),
+                None,
+            )
+            if item:
+                qt = item['quantidade']
+                val = item['valor']
+                vf = item['valor_fmt']
+            else:
+                qt = 0
+                val = Decimal('0')
+                vf = _moeda_br(Decimal('0'))
+            dias_cel.append({'qt': qt, 'valor_fmt': vf})
+            total_qt += qt
+            total_valor += val
+        linhas_matriz.append(
+            {
+                'codigo': codigo,
+                'label': label,
+                'meses': dias_cel,
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+            }
+        )
+
+    totais_dia: list[dict] = []
+    for col in colunas_dias:
+        sub = _filtrar_linhas_dia(linhas, col['iso'])
+        valor_dia = sum((_valor_contabil_linha_acerto(l) for l in sub), Decimal('0'))
+        totais_dia.append(
+            {
+                'qt': len(sub),
+                'valor': valor_dia,
+                'valor_fmt': _moeda_br(valor_dia),
+            }
+        )
+    return {
+        'modalidades_matriz_dia_linhas': linhas_matriz,
+        'modalidades_matriz_dia_totais': totais_dia,
+    }
+
+
+def montar_resumo_viabilidade_matriz_dia(
+    linhas: list[dict], colunas_dias: list[dict]
+) -> dict:
+    """Linhas = viabilidade; colunas = dias do mês (qt · valor pago)."""
+    viab_por_dia: list[list[dict]] = []
+    for col in colunas_dias:
+        sub = _filtrar_linhas_dia(linhas, col['iso'])
+        viab_por_dia.append(montar_resumo_viabilidade_acerto(sub))
+
+    nomes = sorted(
+        {v['viabilidade'] for dia in viab_por_dia for v in dia},
+        key=lambda k: (
+            -sum(
+                next(
+                    (x['valor'] for x in viab_por_dia[i] if x['viabilidade'] == k),
+                    Decimal('0'),
+                )
+                for i in range(len(viab_por_dia))
+            ),
+            k.lower(),
+        ),
+    )
+
+    linhas_matriz: list[dict] = []
+    for nome in nomes:
+        dias_cel: list[dict] = []
+        total_qt = 0
+        total_valor = Decimal('0')
+        for i in range(len(colunas_dias)):
+            item = next(
+                (v for v in viab_por_dia[i] if v['viabilidade'] == nome),
+                None,
+            )
+            if item:
+                qt = item['quantidade']
+                val = item['valor']
+                vf = item['valor_fmt']
+            else:
+                qt = 0
+                val = Decimal('0')
+                vf = _moeda_br(Decimal('0'))
+            dias_cel.append({'qt': qt, 'valor_fmt': vf})
+            total_qt += qt
+            total_valor += val
+        linhas_matriz.append(
+            {
+                'viabilidade': nome,
+                'meses': dias_cel,
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+            }
+        )
+
+    totais_dia: list[dict] = []
+    for col in colunas_dias:
+        sub = _filtrar_linhas_dia(linhas, col['iso'])
+        valor_dia = sum((_valor_contabil_linha_acerto(l) for l in sub), Decimal('0'))
+        totais_dia.append(
+            {
+                'qt': len(sub),
+                'valor': valor_dia,
+                'valor_fmt': _moeda_br(valor_dia),
+            }
+        )
+
+    return {
+        'viabilidade_matriz_dia_linhas': linhas_matriz,
+        'viabilidade_matriz_dia_totais': totais_dia,
+    }
+
+
+def montar_contexto_matriz_mensal_por_dia(
+    linhas: list[dict], data_inicio: date, data_fim: date
+) -> dict:
+    """Matriz modalidade/viabilidade por dia (mês inteiro no filtro)."""
+    if not periodo_eh_mes_inteiro(data_inicio, data_fim):
+        return {'resumo_matriz_mes': False}
+    colunas = montar_colunas_dias_resumo(data_inicio, data_fim)
+    if not colunas:
+        return {'resumo_matriz_mes': False}
+    titulo_mes = (
+        MESES_REGUA_PT[data_inicio.month]
+        if 1 <= data_inicio.month <= 12
+        else str(data_inicio.month)
+    )
+    return {
+        'resumo_matriz_mes': True,
+        'resumo_matriz_mes_titulo': f'{titulo_mes} {data_inicio.year}',
+        'resumo_dias_colunas': colunas,
+        'matriz_mes_colspan_secao': len(colunas) * 2 + 3,
+        **montar_resumo_modalidades_matriz_dia(linhas, colunas),
+        **montar_resumo_viabilidade_matriz_dia(linhas, colunas),
     }
 
 
@@ -1637,10 +1832,13 @@ def montar_contexto_matriz_anual_acerto(linhas: list[dict], di: date, df: date) 
     if not periodo_eh_ano_inteiro(di, df):
         return {'resumo_matriz_anual': False}
     ano = di.year
+    meses_colunas = montar_colunas_meses_resumo()
+    n_meses = len(meses_colunas)
     return {
         'resumo_matriz_anual': True,
         'resumo_matriz_ano': ano,
-        'resumo_meses_colunas': montar_colunas_meses_resumo(),
+        'resumo_meses_colunas': meses_colunas,
+        'matriz_anual_colspan_secao': n_meses * 2 + 3,
         **montar_resumo_modalidades_matriz_mes(linhas, ano),
         **montar_resumo_pagamento_matriz_mes(linhas, ano),
     }
@@ -2014,6 +2212,11 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_solicitante_detalhes = montar_detalhe_medico_solicitante_acerto(linhas_grade)
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
+    matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)
+    limite_linhas_grade_tela = 2500
+    grade_extensa = len(linhas_grade) > limite_linhas_grade_tela
+    ano_inteiro = periodo_eh_ano_inteiro(di, df)
+    ocultar_grade_extensa = grade_extensa and ano_inteiro
     graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
         resumo_pagamento_lista,
         total_aguardando,
@@ -2029,6 +2232,13 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
 
     return {
         'linhas': linhas_grade,
+        'linhas_grade_exibir': (
+            linhas_grade[:limite_linhas_grade_tela]
+            if ocultar_grade_extensa
+            else linhas_grade
+        ),
+        'grade_extensa_oculta': ocultar_grade_extensa,
+        'grade_extensa_total': len(linhas_grade),
         'quantidade_linhas': len(linhas_grade),
         'blocos_impressao': blocos_impressao,
         'resumo_pagamento': resumo_pagamento_lista,
@@ -2062,5 +2272,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_solicitante_detalhes': resumo_solicitante_detalhes,
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
         **matriz_anual_ctx,
+        **matriz_mes_dia_ctx,
         **graficos_resumo_ctx,
     }

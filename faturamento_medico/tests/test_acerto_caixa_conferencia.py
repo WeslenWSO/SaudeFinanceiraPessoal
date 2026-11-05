@@ -257,6 +257,7 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
             linhas, date(2026, 1, 1), date(2026, 12, 31)
         )
         self.assertTrue(ctx['resumo_matriz_anual'])
+        self.assertEqual(ctx['matriz_anual_colspan_secao'], 27)
         us = next(
             r for r in ctx['modalidades_matriz_linhas'] if r['codigo'] == 'US'
         )
