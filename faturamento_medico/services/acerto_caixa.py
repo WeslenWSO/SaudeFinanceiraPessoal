@@ -995,6 +995,29 @@ def montar_resumo_modalidades_acerto(
     }
 
 
+def montar_resumo_viabilidade_acerto(linhas: list[dict]) -> list[dict]:
+    """Agrupa por convênio/viabilidade (coluna da grade): quantidade e valor pago."""
+    agreg: dict[str, dict] = {}
+    for linha in linhas:
+        chave = (linha.get('convenio') or '').strip() or 'Não informado'
+        if chave not in agreg:
+            agreg[chave] = {'quantidade': 0, 'valor': Decimal('0')}
+        agreg[chave]['quantidade'] += 1
+        agreg[chave]['valor'] += _valor_contabil_linha_acerto(linha)
+    return sorted(
+        [
+            {
+                'viabilidade': nome,
+                'quantidade': dados['quantidade'],
+                'valor': dados['valor'],
+                'valor_fmt': _moeda_br(dados['valor']),
+            }
+            for nome, dados in agreg.items()
+        ],
+        key=lambda x: (-x['valor'], x['viabilidade'].lower()),
+    )
+
+
 def montar_blocos_impressao_acerto_caixa(
     linhas: list[dict],
     resumo_por_caixa: list[dict],
@@ -1348,11 +1371,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         linhas_grade,
         resumo_por_caixa_lista,
     )
-    resumo_modalidades_ctx = montar_resumo_modalidades_acerto(
-        linhas_grade,
-        empresa_id=empresa_id,
-        filtros=filtros_dict,
-    )
+    resumo_modalidades_ctx = montar_resumo_modalidades_acerto(linhas_grade)
+    resumo_viabilidade = montar_resumo_viabilidade_acerto(linhas_grade)
+    total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
+    total_viab_valor = sum((r['valor'] for r in resumo_viabilidade), Decimal('0'))
 
     return {
         'linhas': linhas_grade,
@@ -1380,4 +1402,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
             Cobranca.objects.all().order_by('descricao').values('id', 'descricao')
         ),
         **resumo_modalidades_ctx,
+        'resumo_viabilidade': resumo_viabilidade,
+        'resumo_viabilidade_total_qt': total_viab_qt,
+        'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
     }

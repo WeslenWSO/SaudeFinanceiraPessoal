@@ -201,6 +201,13 @@
                 <small class="text-muted">Período: {{ periodo_fmt }}</small>
             </div>
             <div class="d-flex flex-wrap gap-2">
+                <button type="button"
+                        class="btn btn-outline-success btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalResumoAcerto"
+                        title="Resumo do filtro atual (pagamento, modalidade, viabilidade)">
+                    <i class="fas fa-chart-pie"></i> Resumo
+                </button>
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
                    class="btn btn-outline-primary btn-sm"
                    target="_blank"
@@ -740,22 +747,30 @@
                         <table class="table table-bordered mb-0 resumo-ris">
                             <thead>
                                 <tr>
-                                    <th colspan="2" class="resumo-ris-header text-center">RESUMO</th>
+                                    <th colspan="3" class="resumo-ris-header text-center">RESUMO — MODALIDADE</th>
+                                </tr>
+                                <tr class="small text-center">
+                                    <th></th>
+                                    <th>Qt</th>
+                                    <th>Valor pago</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in resumo_modalidades %}
                                 <tr>
-                                    <td class="text-center fw-bold">{{ item.label }}</td>
+                                    <td class="fw-bold">{{ item.label }}</td>
                                     <td class="text-center">{{ item.quantidade }}</td>
+                                    <td class="text-end">R$ {{ item.valor_fmt }}</td>
                                 </tr>
                                 {% endfor %}
                                 <tr>
-                                    <td class="text-center fw-bold">QUANTIDADE TOTAL:</td>
+                                    <td class="fw-bold">QUANTIDADE TOTAL</td>
                                     <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
+                                    <td></td>
                                 </tr>
                                 <tr>
-                                    <td class="text-center fw-bold resumo-ris-valor-label">VALOR PAGO TOTAL:</td>
+                                    <td class="fw-bold resumo-ris-valor-label">VALOR PAGO TOTAL</td>
+                                    <td></td>
                                     <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ resumo_valor_total_fmt }}</td>
                                 </tr>
                             </tbody>
@@ -780,6 +795,40 @@
                     </p>
                 </div>
                 <div class="col-lg-4 col-md-6">
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered mb-0 resumo-ris">
+                            <thead>
+                                <tr>
+                                    <th colspan="3" class="resumo-ris-header text-center">VIABILIDADE (CONVÊNIO)</th>
+                                </tr>
+                                <tr class="small text-center">
+                                    <th>Viabilidade</th>
+                                    <th>Qt</th>
+                                    <th>Valor pago</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in resumo_viabilidade %}
+                                <tr>
+                                    <td>{{ row.viabilidade|truncatechars:32 }}</td>
+                                    <td class="text-center">{{ row.quantidade }}</td>
+                                    <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted">Sem dados no filtro.</td></tr>
+                                {% endfor %}
+                                {% if resumo_viabilidade %}
+                                <tr>
+                                    <td class="fw-bold">TOTAL</td>
+                                    <td class="text-center fw-bold">{{ resumo_viabilidade_total_qt }}</td>
+                                    <td class="text-end fw-bold resumo-ris-valor-cell">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
                     <div class="card border shadow-sm h-100 acerto-resumo-modalidade-chart">
                         <div class="card-header py-2 fw-semibold">
                             <i class="fas fa-chart-pie me-1 text-primary"></i>
@@ -796,6 +845,137 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="modalResumoAcerto" tabindex="-1" aria-labelledby="modalResumoAcertoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <div>
+                    <h5 class="modal-title" id="modalResumoAcertoTitulo">Resumo — Acerto de Caixa</h5>
+                    <p class="small text-muted mb-0">{{ periodo_fmt }} · {{ filtros_resumo }} · {{ quantidade_linhas }} linha(s)</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <h6 class="fw-semibold">Formas de pagamento</h6>
+                        <table class="table table-sm table-borderless mb-2">
+                            {% for row in resumo_pagamento %}
+                            <tr>
+                                <td>{{ row.rotulo }}</td>
+                                <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if resumo_aguardando_faturamento %}
+                            <tr class="border-top">
+                                <td class="fw-semibold pt-2">Aguardando faturamento</td>
+                                <td class="text-end fw-semibold pt-2">R$ {{ total_aguardando_faturamento_fmt }}</td>
+                            </tr>
+                            {% for row in resumo_aguardando_faturamento %}
+                            <tr>
+                                <td class="ps-3 small text-muted">{{ row.convenio }}</td>
+                                <td class="text-end small">R$ {{ row.total_fmt }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                            <tr class="border-top">
+                                <td class="fw-bold pt-2">Total geral</td>
+                                <td class="text-end fw-bold pt-2">R$ {{ total_resumo_geral_fmt }}</td>
+                            </tr>
+                            <tr>
+                                <td class="small text-muted">Conferência (Valor pago grade)</td>
+                                <td class="text-end small fw-semibold">R$ {{ total_valor_pago_grade_fmt }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-7">
+                        <div style="max-height: 220px;">
+                            <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico por modalidade"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-lg-6">
+                        <h6 class="fw-semibold">Modalidade — qt · valor pago</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered resumo-ris mb-0">
+                                <thead>
+                                    <tr class="small text-center">
+                                        <th>Modalidade</th>
+                                        <th>Qt</th>
+                                        <th>Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in resumo_modalidades %}
+                                    <tr>
+                                        <td class="small">{{ item.label }}</td>
+                                        <td class="text-center">{{ item.quantidade }}</td>
+                                        <td class="text-end">R$ {{ item.valor_fmt }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    <tr>
+                                        <td class="fw-bold">Total</td>
+                                        <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
+                                        <td class="text-end fw-bold">R$ {{ resumo_valor_total_fmt }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if modalidades_fora_resumo %}
+                        <p class="small text-warning mb-0 mt-2">
+                            Detalhe fora do padrão:
+                            {% for item in modalidades_fora_resumo %}
+                            {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-6">
+                        <h6 class="fw-semibold">Viabilidade (convênio) — qt · valor pago</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered resumo-ris mb-0">
+                                <thead>
+                                    <tr class="small text-center">
+                                        <th>Viabilidade</th>
+                                        <th>Qt</th>
+                                        <th>Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in resumo_viabilidade %}
+                                    <tr>
+                                        <td class="small">{{ row.viabilidade }}</td>
+                                        <td class="text-center">{{ row.quantidade }}</td>
+                                        <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="3" class="text-muted text-center">Sem dados.</td></tr>
+                                    {% endfor %}
+                                    {% if resumo_viabilidade %}
+                                    <tr>
+                                        <td class="fw-bold">Total</td>
+                                        <td class="text-center fw-bold">{{ resumo_viabilidade_total_qt }}</td>
+                                        <td class="text-end fw-bold">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
+                   class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
+                    <i class="fas fa-print"></i> Imprimir
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 
 {{ formas_pagamento_acerto|json_script:"formas-pagamento-acerto-data" }}
@@ -1197,61 +1377,80 @@
 <script>
 (function initAcertoResumoModalidadeChart() {
     if (typeof Chart === 'undefined') return;
-    var canvas = document.getElementById('acertoGraficoModalidade');
     var elLabels = document.getElementById('acerto-graf-mod-labels');
     var elValores = document.getElementById('acerto-graf-mod-valores');
-    if (!canvas || !elLabels || !elValores) return;
+    if (!elLabels || !elValores) return;
     var labelsRaw = JSON.parse(elLabels.textContent || '[]');
     var valoresRaw = JSON.parse(elValores.textContent || '[]');
     var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669'];
-    var labels = [];
-    var valores = [];
-    var cores = [];
-    labelsRaw.forEach(function(label, i) {
-        if ((valoresRaw[i] || 0) > 0) {
-            labels.push(label);
-            valores.push(valoresRaw[i]);
-            cores.push(coresAll[i % coresAll.length]);
-        }
-    });
-    if (!labels.length) {
-        labels.push('Sem dados');
-        valores.push(1);
-        cores.push('#e5e7eb');
-    }
+    var chartModalInst = null;
+
     function fmtMoeda(v) {
         return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
-    new Chart(canvas.getContext('2d'), {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Valor (R$)',
-                data: valores,
-                backgroundColor: cores,
-                borderColor: '#fff',
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-                tooltip: {
-                    callbacks: {
-                        label: function(ctx) {
-                            var val = ctx.parsed || 0;
-                            var tot = (ctx.dataset.data || []).reduce(function(a, b) { return a + b; }, 0);
-                            var pct = tot ? Math.round((val / tot) * 1000) / 10 : 0;
-                            return ctx.label + ': ' + fmtMoeda(val) + ' (' + pct + '%)';
+
+    function criarGraficoModalidade(canvas) {
+        if (!canvas) return null;
+        var labels = [];
+        var valores = [];
+        var cores = [];
+        labelsRaw.forEach(function(label, i) {
+            if ((valoresRaw[i] || 0) > 0) {
+                labels.push(label);
+                valores.push(valoresRaw[i]);
+                cores.push(coresAll[i % coresAll.length]);
+            }
+        });
+        if (!labels.length) {
+            labels.push('Sem dados');
+            valores.push(1);
+            cores.push('#e5e7eb');
+        }
+        return new Chart(canvas.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Valor (R$)',
+                    data: valores,
+                    backgroundColor: cores,
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                var val = ctx.parsed || 0;
+                                var tot = (ctx.dataset.data || []).reduce(function(a, b) { return a + b; }, 0);
+                                var pct = tot ? Math.round((val / tot) * 1000) / 10 : 0;
+                                return ctx.label + ': ' + fmtMoeda(val) + ' (' + pct + '%)';
+                            }
                         }
-                    }
+                    },
                 },
             },
-        },
-    });
+        });
+    }
+
+    criarGraficoModalidade(document.getElementById('acertoGraficoModalidade'));
+
+    var modalEl = document.getElementById('modalResumoAcerto');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function() {
+            var canvasModal = document.getElementById('acertoGraficoModalidadeModal');
+            if (chartModalInst) {
+                chartModalInst.destroy();
+                chartModalInst = null;
+            }
+            chartModalInst = criarGraficoModalidade(canvasModal);
+        });
+    }
 })();
 </script>
 {% endblock %}

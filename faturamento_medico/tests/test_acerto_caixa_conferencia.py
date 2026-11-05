@@ -12,6 +12,7 @@ from faturamento_medico.services.acerto_caixa import (
     filtrar_linhas_acerto_caixa,
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
+    montar_resumo_viabilidade_acerto,
     recomputar_resumos_acerto_caixa_de_linhas,
     url_query_acerto_caixa,
 )
@@ -152,3 +153,15 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         pag, ag, _cx = recomputar_resumos_acerto_caixa_de_linhas(linhas)
         self.assertEqual(pag.get('PIX'), Decimal('360'))
         self.assertEqual(sum(pag.values()) + sum(ag.values()), Decimal('360'))
+
+    def test_resumo_viabilidade_qt_valor(self):
+        linhas = [
+            {'convenio': 'CASSI', 'valor_pago': Decimal('100'), 'aguardando_faturamento': False},
+            {'convenio': 'CASSI', 'valor_pago': Decimal('50'), 'aguardando_faturamento': False},
+            {'convenio': 'GEAP', 'valor_pago': Decimal('80'), 'aguardando_faturamento': True, 'total_item': Decimal('80')},
+        ]
+        rows = montar_resumo_viabilidade_acerto(linhas)
+        self.assertEqual(len(rows), 2)
+        cassi = next(r for r in rows if r['viabilidade'] == 'CASSI')
+        self.assertEqual(cassi['quantidade'], 2)
+        self.assertEqual(cassi['valor'], Decimal('150'))
