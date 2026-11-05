@@ -1531,34 +1531,56 @@
                         Viabilidade por mês — {{ resumo_viabilidade_por_mes_ano }}
                         <span class="text-muted fw-normal small">(qt · valor pago, conforme filtro)</span>
                     </div>
-                    <div class="acerto-modal-viab-meses">
-                        {% for bloco in resumo_viabilidade_por_mes %}
-                        <div class="acerto-modal-viab-mes{% if not bloco.tem_dados %} empty{% endif %}">
-                            <div class="acerto-modal-viab-mes-head">
-                                <span>{{ bloco.label }}</span>
-                                {% if bloco.tem_dados %}
-                                <span class="totais">{{ bloco.total_qt }} · R$ {{ bloco.total_valor_fmt }}</span>
-                                {% else %}
-                                <span class="totais text-muted">0 · R$ 0,00</span>
-                                {% endif %}
-                            </div>
-                            {% if bloco.viabilidades %}
-                            <table>
-                                <tbody>
-                                    {% for row in bloco.viabilidades %}
-                                    <tr>
-                                        <td>{{ row.viabilidade }}</td>
-                                        <td class="text-center">{{ row.quantidade }}</td>
-                                        <td class="text-end">R$ {{ row.valor_fmt }}</td>
-                                    </tr>
+                    <div class="acerto-matriz-anual-wrap">
+                        <table class="acerto-matriz-anual mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="col-fixa" rowspan="2">Viabilidade</th>
+                                    {% for col in viabilidade_matriz_colunas %}
+                                    <th colspan="2">{{ col.label_curto }}</th>
                                     {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <div class="sem-dados">Sem movimento no período</div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
+                                    <th colspan="2">Total ano</th>
+                                </tr>
+                                <tr>
+                                    {% for col in viabilidade_matriz_colunas %}
+                                    <th class="subcol">Qt</th>
+                                    <th class="subcol-val">R$</th>
+                                    {% endfor %}
+                                    <th class="subcol">Qt</th>
+                                    <th class="subcol-val">R$</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in viabilidade_matriz_linhas %}
+                                <tr>
+                                    <td class="col-fixa">{{ row.viabilidade }}</td>
+                                    {% for cel in row.meses %}
+                                    <td class="subcol">{{ cel.qt }}</td>
+                                    <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                    {% endfor %}
+                                    <td class="subcol">{{ row.total_qt }}</td>
+                                    <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td class="col-fixa text-muted" colspan="{{ viabilidade_matriz_colunas|length|add:viabilidade_matriz_colunas|length|add:3 }}">
+                                        Sem viabilidade no filtro para {{ resumo_viabilidade_por_mes_ano }}.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if viabilidade_matriz_linhas %}
+                                <tr class="row-total">
+                                    <td class="col-fixa">Total</td>
+                                    {% for tot in viabilidade_matriz_totais_mes %}
+                                    <td class="subcol">{{ tot.qt }}</td>
+                                    <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                    {% endfor %}
+                                    <td class="subcol">{{ resumo_viabilidade_total_qt }}</td>
+                                    <td class="subcol-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

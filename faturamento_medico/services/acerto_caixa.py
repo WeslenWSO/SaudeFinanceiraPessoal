@@ -1167,6 +1167,73 @@ def montar_resumo_viabilidade_por_mes_acerto(
     return blocos
 
 
+def montar_resumo_viabilidade_matriz_mes(linhas: list[dict], ano: int) -> dict:
+    """Uma tabela: linhas = viabilidade; colunas = Jan–Dez (qt · valor pago)."""
+    viab_por_mes: list[list[dict]] = []
+    for mes in range(1, 13):
+        sub = _filtrar_linhas_mes_ano(linhas, ano, mes)
+        viab_por_mes.append(montar_resumo_viabilidade_acerto(sub))
+
+    nomes = sorted(
+        {v['viabilidade'] for mes in viab_por_mes for v in mes},
+        key=lambda k: (
+            -sum(
+                next(
+                    (x['valor'] for x in viab_por_mes[i] if x['viabilidade'] == k),
+                    Decimal('0'),
+                )
+                for i in range(12)
+            ),
+            k.lower(),
+        ),
+    )
+
+    linhas_matriz: list[dict] = []
+    for nome in nomes:
+        meses_cel: list[dict] = []
+        total_qt = 0
+        total_valor = Decimal('0')
+        for i in range(12):
+            item = next((v for v in viab_por_mes[i] if v['viabilidade'] == nome), None)
+            if item:
+                qt = item['quantidade']
+                val = item['valor']
+                vf = item['valor_fmt']
+            else:
+                qt = 0
+                val = Decimal('0')
+                vf = _moeda_br(Decimal('0'))
+            meses_cel.append({'qt': qt, 'valor_fmt': vf})
+            total_qt += qt
+            total_valor += val
+        linhas_matriz.append(
+            {
+                'viabilidade': nome,
+                'meses': meses_cel,
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+            }
+        )
+
+    totais_mes: list[dict] = []
+    for mes in range(1, 13):
+        sub = _filtrar_linhas_mes_ano(linhas, ano, mes)
+        valor_mes = sum((_valor_contabil_linha_acerto(l) for l in sub), Decimal('0'))
+        totais_mes.append(
+            {
+                'qt': len(sub),
+                'valor': valor_mes,
+                'valor_fmt': _moeda_br(valor_mes),
+            }
+        )
+
+    return {
+        'viabilidade_matriz_colunas': montar_colunas_meses_resumo(),
+        'viabilidade_matriz_linhas': linhas_matriz,
+        'viabilidade_matriz_totais_mes': totais_mes,
+    }
+
+
 def periodo_eh_ano_inteiro(data_inicio: date, data_fim: date) -> bool:
     if data_inicio.year != data_fim.year:
         return False
@@ -1754,7 +1821,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
     total_viab_valor = sum((r['valor'] for r in resumo_viabilidade), Decimal('0'))
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
-    resumo_viabilidade_por_mes = montar_resumo_viabilidade_por_mes_acerto(
+    viabilidade_matriz_ctx = montar_resumo_viabilidade_matriz_mes(
         linhas_grade, regua_ctx['regua_ano']
     )
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
@@ -1798,8 +1865,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade': resumo_viabilidade,
         'resumo_viabilidade_total_qt': total_viab_qt,
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
-        'resumo_viabilidade_por_mes': resumo_viabilidade_por_mes,
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
+        **viabilidade_matriz_ctx,
         **matriz_anual_ctx,
         **graficos_resumo_ctx,
     }

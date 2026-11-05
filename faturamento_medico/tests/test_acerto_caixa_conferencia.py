@@ -13,6 +13,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
+    montar_resumo_viabilidade_matriz_mes,
     montar_resumo_viabilidade_por_mes_acerto,
     montar_contexto_matriz_anual_acerto,
     montar_graficos_resumo_acerto_caixa,
@@ -183,7 +184,7 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(cassi['quantidade'], 2)
         self.assertEqual(cassi['valor'], Decimal('150'))
 
-    def test_viabilidade_por_mes_janeiro_dezembro(self):
+    def test_viabilidade_matriz_meses_colunas(self):
         linhas = [
             {
                 'data_iso': '2026-01-15',
@@ -204,14 +205,15 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
                 'aguardando_faturamento': False,
             },
         ]
-        blocos = montar_resumo_viabilidade_por_mes_acerto(linhas, 2026)
-        self.assertEqual(len(blocos), 12)
-        self.assertEqual(blocos[0]['label'], 'Janeiro')
-        self.assertTrue(blocos[0]['tem_dados'])
-        self.assertEqual(blocos[0]['total_qt'], 1)
-        self.assertEqual(blocos[1]['total_qt'], 2)
-        self.assertFalse(blocos[2]['tem_dados'])
-        self.assertEqual(blocos[11]['label'], 'Dezembro')
+        ctx = montar_resumo_viabilidade_matriz_mes(linhas, 2026)
+        self.assertEqual(len(ctx['viabilidade_matriz_colunas']), 12)
+        cassi = next(r for r in ctx['viabilidade_matriz_linhas'] if r['viabilidade'] == 'CASSI')
+        self.assertEqual(cassi['meses'][0]['qt'], 1)
+        self.assertEqual(cassi['meses'][1]['qt'], 0)
+        geap = next(r for r in ctx['viabilidade_matriz_linhas'] if r['viabilidade'] == 'GEAP')
+        self.assertEqual(geap['meses'][1]['qt'], 2)
+        self.assertEqual(ctx['viabilidade_matriz_totais_mes'][0]['qt'], 1)
+        self.assertEqual(ctx['viabilidade_matriz_totais_mes'][1]['qt'], 2)
 
     def test_matriz_anual_modalidade_e_pagamento_por_mes(self):
         self.assertTrue(
