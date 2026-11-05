@@ -556,7 +556,18 @@
                 </h3>
                 <small class="text-muted">Período: {{ periodo_fmt }}</small>
             </div>
-            <div class="d-flex flex-wrap gap-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_mes }}"
+                   class="btn btn-sm {% if regua_botao_mes_ativo %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                   title="Período = mês inteiro ({{ regua_botao_mes_titulo }}) — mantém filtros">
+                    <i class="fas fa-calendar-day"></i> Mês
+                </a>
+                <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_ano }}"
+                   class="btn btn-sm {% if regua_botao_ano_ativo %}btn-success{% else %}btn-outline-success{% endif %}"
+                   title="Período = ano {{ regua_botao_ano_titulo }} inteiro — mantém filtros">
+                    <i class="fas fa-calendar"></i> Ano
+                </a>
+                <span class="text-muted d-none d-md-inline">|</span>
                 <button type="button"
                         class="btn btn-outline-success btn-sm"
                         data-bs-toggle="modal"

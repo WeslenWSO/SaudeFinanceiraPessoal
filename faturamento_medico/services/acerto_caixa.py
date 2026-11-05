@@ -132,6 +132,19 @@ def _ultimo_dia_mes(d: date) -> date:
     return proximo - timedelta(days=proximo.day)
 
 
+def periodo_eh_mes_inteiro(data_inicio: date, data_fim: date) -> bool:
+    if data_inicio.year != data_fim.year or data_inicio.month != data_fim.month:
+        return False
+    return data_inicio.day == 1 and data_fim == _ultimo_dia_mes(data_fim)
+
+
+def periodo_eh_ano_inteiro(data_inicio: date, data_fim: date) -> bool:
+    if data_inicio.year != data_fim.year:
+        return False
+    ano = data_inicio.year
+    return data_inicio == date(ano, 1, 1) and data_fim == _ultimo_dia_mes(date(ano, 12, 1))
+
+
 MESES_REGUA_PT = (
     '',
     'Janeiro',
@@ -286,9 +299,25 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
     titulo_mes = MESES_REGUA_PT[m] if 1 <= m <= 12 else str(m)
     ano_ant = y - 1
     ano_seg = y + 1
+    ano_regua_ini = date(y, 1, 1)
+    ano_regua_fim = _ultimo_dia_mes(date(y, 12, 1))
     return {
         'regua_titulo': f'{titulo_mes} {y}',
         'regua_ano': y,
+        'regua_url_botao_mes': url_query_acerto_caixa(filtros, primeiro, ultimo),
+        'regua_url_botao_ano': url_query_acerto_caixa(
+            filtros, ano_regua_ini, ano_regua_fim
+        ),
+        'regua_botao_mes_ativo': (
+            periodo_eh_mes_inteiro(data_inicio, data_fim)
+            and data_inicio == primeiro
+            and data_fim == ultimo
+        ),
+        'regua_botao_ano_ativo': (
+            periodo_eh_ano_inteiro(data_inicio, data_fim) and data_inicio.year == y
+        ),
+        'regua_botao_mes_titulo': f'{titulo_mes} {y}',
+        'regua_botao_ano_titulo': str(y),
         'regua_url_mes_anterior': url_query_acerto_caixa(filtros, mes_ant_ini, mes_ant_fim),
         'regua_url_mes_seguinte': url_query_acerto_caixa(filtros, mes_seg_ini, mes_seg_fim),
         'regua_url_ano_anterior': url_query_acerto_caixa(
@@ -1232,13 +1261,6 @@ def montar_resumo_viabilidade_matriz_mes(linhas: list[dict], ano: int) -> dict:
         'viabilidade_matriz_linhas': linhas_matriz,
         'viabilidade_matriz_totais_mes': totais_mes,
     }
-
-
-def periodo_eh_ano_inteiro(data_inicio: date, data_fim: date) -> bool:
-    if data_inicio.year != data_fim.year:
-        return False
-    ano = data_inicio.year
-    return data_inicio == date(ano, 1, 1) and data_fim == _ultimo_dia_mes(date(ano, 12, 1))
 
 
 def _filtrar_linhas_mes_ano(linhas: list[dict], ano: int, mes: int) -> list[dict]:
