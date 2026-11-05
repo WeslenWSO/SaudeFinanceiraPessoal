@@ -260,7 +260,53 @@ def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> 
         pares.append(('paciente', str(filtros['paciente'])))
     if filtros.get('somente_marcados'):
         pares.append(('somente_marcados', '1'))
+    for dia_iso in filtros.get('dias_resumo') or []:
+        if dia_iso:
+            pares.append(('dias_resumo', str(dia_iso)))
     return urlencode(pares)
+
+
+def parse_dias_resumo_request(request) -> list[str]:
+    """Datas ISO (YYYY-MM-DD) escolhidas na régua para o resumo (um ou mais dias)."""
+    dias: list[str] = []
+    for raw in request.GET.getlist('dias_resumo'):
+        s = (raw or '').strip()
+        if s and _parse_data_filtro(s):
+            dias.append(s)
+    if not dias:
+        bruto = (request.GET.get('dias_resumo') or '').strip()
+        if bruto:
+            for parte in bruto.split(','):
+                s = parte.strip()
+                if s and _parse_data_filtro(s):
+                    dias.append(s)
+    return sorted(set(dias))
+
+
+def filtrar_linhas_por_dias_resumo(
+    linhas: list[dict], dias_iso: list[str] | None
+) -> list[dict]:
+    if not dias_iso:
+        return linhas
+    permitidos = set(dias_iso)
+    return [l for l in linhas if (l.get('data_iso') or '').strip() in permitidos]
+
+
+def pode_abrir_resumo_acerto_direto(request, data_inicio: date, data_fim: date) -> bool:
+    """
+    Resumo sem escolher dias na régua: botões Mês/Ano (visao_resumo), um único dia,
+    ou dias_resumo já confirmados na URL.
+    """
+    visao = (request.GET.get('visao_resumo') or '').strip().lower()
+    if visao == 'mes' and periodo_eh_mes_inteiro(data_inicio, data_fim):
+        return True
+    if visao == 'ano' and periodo_eh_ano_inteiro(data_inicio, data_fim):
+        return True
+    if data_inicio == data_fim:
+        return True
+    if parse_dias_resumo_request(request):
+        return True
+    return False
 
 
 def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -> dict:
@@ -282,16 +328,19 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
     mes_seg_ini = ultimo + timedelta(days=1)
     mes_seg_fim = _ultimo_dia_mes(mes_seg_ini)
 
+    dias_resumo_pick = set(filtros.get('dias_resumo') or [])
     dias = []
     for num in range(1, ultimo.day + 1):
         dia = date(y, m, num)
+        iso = dia.isoformat()
         dias.append(
             {
                 'numero': num,
-                'iso': dia.isoformat(),
+                'iso': iso,
                 'dia_semana': DIAS_SEMANA_CURTO[dia.weekday()],
                 'ativo_dia': data_inicio == data_fim == dia,
                 'no_intervalo': data_inicio <= dia <= data_fim,
+                'escolhido_resumo': iso in dias_resumo_pick,
                 'fim_semana': dia.weekday() >= 5,
                 'url_query': url_query_acerto_caixa(filtros, dia, dia),
             }
@@ -2238,6 +2287,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         else:
             _add_linha(None)
 
+    dias_resumo = parse_dias_resumo_request(request)
     filtros_dict = {
         'data_inicio': di.isoformat(),
         'data_fim': df.isoformat(),
@@ -2250,10 +2300,12 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'status_agendamento': status_sel,
         'paciente': paciente_filtro,
         'convenio': convenios_sel,
+        'dias_resumo': dias_resumo,
     }
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
     linhas_grade = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros_dict)
+    linhas_grade = filtrar_linhas_por_dias_resumo(linhas_grade, dias_resumo or None)
     aplicar_rotulo_solicitante_resumo_linhas(
         linhas_grade,
         _carregar_mapa_apelidos_solicitante(empresa_id),
@@ -2265,6 +2317,8 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'linhas': linhas,
         'linhas_grade': linhas_grade,
         'filtros_dict': filtros_dict,
+        'dias_resumo': dias_resumo,
+        'resumo_pode_abrir_direto': pode_abrir_resumo_acerto_direto(request, di, df),
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
@@ -2359,6 +2413,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     total_sol_valor = sum((r['valor'] for r in resumo_solicitante), Decimal('0'))
     # Drill-down carregado via AJAX (evita HTML pesado / timeout no Render).
     resumo_solicitante_detalhes: dict = {}
+    dias_resumo = base.get('dias_resumo') or []
+    resumo_pode_abrir_direto = base.get('resumo_pode_abrir_direto', False)
+    if len(dias_resumo) == 1:
+        d1 = _parse_data_filtro(dias_resumo[0])
+        periodo_resumo_fmt = d1.strftime('%d/%m/%Y') if d1 else dias_resumo[0]
+    elif len(dias_resumo) > 1:
+        periodo_resumo_fmt = f'{len(dias_resumo)} dias selecionados'
+    else:
+        periodo_resumo_fmt = f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}'
+
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
     matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)
@@ -2407,6 +2471,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+        'periodo_resumo_fmt': periodo_resumo_fmt,
+        'dias_resumo': dias_resumo,
+        'resumo_pode_abrir_direto': resumo_pode_abrir_direto,
         'nome_caixa_acerto': nome_caixa_acerto,
         'formas_pagamento_acerto': list(
             Cobranca.objects.all().order_by('descricao').values('id', 'descricao')

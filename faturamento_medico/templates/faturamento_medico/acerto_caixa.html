@@ -269,6 +269,29 @@
 }
 .acerto-regua-dia.active .dow { color: rgba(255,255,255,0.85); }
 .acerto-regua-dia:hover:not(.active) { background: #eef2f7; }
+.acerto-regua-dia.picked-resumo {
+    background: #198754;
+    border-color: #198754;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.35);
+}
+.acerto-regua-dia.picked-resumo .dow { color: rgba(255, 255, 255, 0.9); }
+.acerto-regua-modo-resumo {
+    outline: 2px solid #198754;
+    outline-offset: 2px;
+    background: #f0fdf4;
+}
+.acerto-resumo-dias-aviso {
+    display: none;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 0.375rem;
+    background: #fff3cd;
+    border: 1px solid #ffecb5;
+    color: #664d03;
+}
+.acerto-regua-modo-resumo .acerto-resumo-dias-aviso { display: block; }
 
 /* Modal resumo — ~90% da tela, visual atualizado */
 #modalResumoAcerto .modal-dialog.modal-resumo-acerto-dialog {
@@ -622,10 +645,9 @@
                 <span class="text-muted d-none d-md-inline">|</span>
                 <button type="button"
                         class="btn btn-outline-success btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalResumoAcerto"
-                        title="Resumo do filtro atual (pagamento, modalidade, viabilidade)">
-                    <i class="fas fa-chart-pie"></i> Resumo
+                        id="btnAbrirResumoAcerto"
+                        title="Resumo: use Mês/Ano ou selecione um ou mais dias na régua">
+                    <i class="fas fa-chart-pie"></i> <span class="js-btn-resumo-label">Resumo</span>
                 </button>
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
                    class="btn btn-outline-primary btn-sm"
@@ -661,7 +683,13 @@
                 </button>
                 <div class="filtro-retratil-painel mt-2" id="painelFiltrosAcerto">
                     <form method="get" id="formFiltrosAcerto">
-                        <div class="acerto-regua-dias mb-3">
+                        <div class="acerto-regua-dias mb-3" id="acertoReguaDiasWrap">
+                            <div class="acerto-resumo-dias-aviso" id="acertoResumoDiasAviso" role="status">
+                                <i class="fas fa-hand-pointer me-1"></i>
+                                Selecione <strong>um ou mais dias</strong> na régua (clique para marcar/desmarcar).
+                                Depois clique em <strong>Abrir resumo</strong>.
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="btnCancelarModoResumoDias">Cancelar</button>
+                            </div>
                             <div class="acerto-regua-anos" role="navigation" aria-label="Anos">
                                 <span class="acerto-regua-anos-label">Ano</span>
                                 {% for ba in regua_botoes_anos %}
@@ -687,8 +715,9 @@
                                    href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_anterior }}"
                                    title="Período = mês anterior inteiro">‹ Mês anterior</a>
                                 {% for d in regua_dias %}
-                                <a class="acerto-regua-dia{% if d.ativo_dia %} active{% elif d.no_intervalo %} in-range{% endif %}{% if d.fim_semana %} weekend{% endif %}"
+                                <a class="acerto-regua-dia js-regua-dia{% if d.ativo_dia %} active{% elif d.no_intervalo %} in-range{% endif %}{% if d.escolhido_resumo %} picked-resumo{% endif %}{% if d.fim_semana %} weekend{% endif %}"
                                    href="{% url 'faturamento_medico:acerto_caixa' %}?{{ d.url_query }}"
+                                   data-iso="{{ d.iso }}"
                                    title="{{ d.iso }}">
                                     <span class="dow">{{ d.dia_semana }}</span>
                                     <span class="num">{{ d.numero }}</span>
@@ -1297,7 +1326,7 @@
                         <i class="fas fa-chart-pie me-2 opacity-75"></i>Resumo — Acerto de Caixa
                     </h5>
                     <p class="acerto-modal-subtitulo mb-0">
-                        {{ periodo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
+                        {{ periodo_resumo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
                     </p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -2601,12 +2630,108 @@
             aplicarVisaoResumo(visao);
         });
     }
+    var resumoPodeAbrirDireto = {{ resumo_pode_abrir_direto|yesno:"true,false" }};
+    var reguaWrap = document.getElementById('acertoReguaDiasWrap');
+    var btnResumo = document.getElementById('btnAbrirResumoAcerto');
+    var btnResumoLabel = document.querySelector('.js-btn-resumo-label');
+    var btnCancelarModoResumo = document.getElementById('btnCancelarModoResumoDias');
+    var modoResumoDias = false;
+    var diasPickedResumo = new Set();
+    document.querySelectorAll('.js-regua-dia.picked-resumo').forEach(function(el) {
+        var iso = el.getAttribute('data-iso');
+        if (iso) diasPickedResumo.add(iso);
+    });
+    document.querySelectorAll('.js-regua-dia.active').forEach(function(el) {
+        var iso = el.getAttribute('data-iso');
+        if (iso && diasPickedResumo.size === 0) diasPickedResumo.add(iso);
+    });
+
+    function atualizarLabelBtnResumo() {
+        if (!btnResumoLabel) return;
+        if (modoResumoDias) {
+            var n = diasPickedResumo.size;
+            btnResumoLabel.textContent = n > 0 ? ('Abrir resumo (' + n + ' dia' + (n > 1 ? 's' : '') + ')') : 'Selecione os dias';
+        } else {
+            btnResumoLabel.textContent = 'Resumo';
+        }
+    }
+
+    function setModoResumoDias(ativo) {
+        modoResumoDias = !!ativo;
+        if (reguaWrap) reguaWrap.classList.toggle('acerto-regua-modo-resumo', modoResumoDias);
+        if (btnResumo) {
+            btnResumo.classList.toggle('btn-success', modoResumoDias);
+            btnResumo.classList.toggle('btn-outline-success', !modoResumoDias);
+        }
+        atualizarLabelBtnResumo();
+    }
+
+    document.querySelectorAll('.js-regua-dia').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            if (!modoResumoDias) return;
+            e.preventDefault();
+            var iso = el.getAttribute('data-iso');
+            if (!iso) return;
+            if (diasPickedResumo.has(iso)) {
+                diasPickedResumo.delete(iso);
+                el.classList.remove('picked-resumo');
+            } else {
+                diasPickedResumo.add(iso);
+                el.classList.add('picked-resumo');
+            }
+            atualizarLabelBtnResumo();
+        });
+    });
+
+    function navegarResumoComDias() {
+        var qs = new URLSearchParams(window.location.search);
+        qs.delete('dias_resumo');
+        qs.delete('visao_resumo');
+        qs.delete('abrir_resumo');
+        diasPickedResumo.forEach(function(iso) { qs.append('dias_resumo', iso); });
+        qs.set('abrir_resumo', '1');
+        window.location.href = window.location.pathname + '?' + qs.toString();
+    }
+
+    function abrirModalResumo() {
+        if (!modalEl || !window.bootstrap || !window.bootstrap.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    if (btnResumo) {
+        btnResumo.addEventListener('click', function() {
+            if (resumoPodeAbrirDireto && !modoResumoDias) {
+                abrirModalResumo();
+                return;
+            }
+            if (modoResumoDias) {
+                if (diasPickedResumo.size < 1) {
+                    alert('Selecione ao menos um dia na régua (destacados em verde).');
+                    return;
+                }
+                navegarResumoComDias();
+                return;
+            }
+            setModoResumoDias(true);
+        });
+    }
+    if (btnCancelarModoResumo) {
+        btnCancelarModoResumo.addEventListener('click', function() {
+            setModoResumoDias(false);
+        });
+    }
+
     function abrirResumoSePedidoNaUrl() {
         var qs = new URLSearchParams(window.location.search);
-        if (!qs.get('visao_resumo') || !modalEl) return;
+        var abrir = qs.get('visao_resumo') || qs.get('abrir_resumo');
+        if (!abrir || !modalEl) return;
         function tentarAbrir() {
-            if (!window.bootstrap || !window.bootstrap.Modal) return;
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            abrirModalResumo();
+            if (qs.get('abrir_resumo')) {
+                qs.delete('abrir_resumo');
+                var nova = qs.toString();
+                window.history.replaceState({}, '', window.location.pathname + (nova ? ('?' + nova) : ''));
+            }
         }
         if (window.bootstrap && window.bootstrap.Modal) {
             tentarAbrir();

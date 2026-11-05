@@ -23,6 +23,10 @@ from faturamento_medico.services.acerto_caixa import (
     montar_contexto_matriz_mensal_por_dia,
     montar_graficos_resumo_acerto_caixa,
     periodo_eh_ano_inteiro,
+    periodo_eh_mes_inteiro,
+    pode_abrir_resumo_acerto_direto,
+    filtrar_linhas_por_dias_resumo,
+    parse_dias_resumo_request,
     recomputar_resumos_acerto_caixa_de_linhas,
     url_query_acerto_caixa,
 )
@@ -474,3 +478,39 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         )
         self.assertEqual(g['grafico_convenio_labels'][0], 'FUSEX')
         self.assertEqual(g['grafico_convenio_valores'][0], 100.0)
+
+    def test_pode_abrir_resumo_mes_ano_ou_dias(self):
+        di_mes = date(2026, 11, 1)
+        df_mes = date(2026, 11, 30)
+        req_mes = MagicMock()
+        req_mes.GET = {'visao_resumo': 'mes'}
+        self.assertTrue(
+            periodo_eh_mes_inteiro(di_mes, df_mes)
+            and pode_abrir_resumo_acerto_direto(req_mes, di_mes, df_mes)
+        )
+        req_sem = MagicMock()
+        req_sem.GET = {}
+        self.assertFalse(pode_abrir_resumo_acerto_direto(req_sem, di_mes, df_mes))
+        req_dia = MagicMock()
+        req_dia.GET = {}
+        self.assertTrue(
+            pode_abrir_resumo_acerto_direto(req_dia, date(2026, 11, 3), date(2026, 11, 3))
+        )
+        req_dias = MagicMock()
+        req_dias.GET = {'dias_resumo': ['2026-11-03', '2026-11-05']}
+        self.assertTrue(pode_abrir_resumo_acerto_direto(req_dias, di_mes, df_mes))
+
+    def test_filtrar_linhas_por_dias_resumo(self):
+        linhas = [
+            {'data_iso': '2026-11-03', 'valor_pago': Decimal('1')},
+            {'data_iso': '2026-11-04', 'valor_pago': Decimal('2')},
+            {'data_iso': '2026-11-05', 'valor_pago': Decimal('3')},
+        ]
+        out = filtrar_linhas_por_dias_resumo(linhas, ['2026-11-03', '2026-11-05'])
+        self.assertEqual(len(out), 2)
+        self.assertEqual(out[0]['data_iso'], '2026-11-03')
+
+    def test_parse_dias_resumo_request(self):
+        req = MagicMock()
+        req.GET = {'dias_resumo': ['2026-11-03', '2026-11-05', 'invalido']}
+        self.assertEqual(parse_dias_resumo_request(req), ['2026-11-03', '2026-11-05'])
