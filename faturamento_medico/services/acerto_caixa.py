@@ -150,6 +150,81 @@ MESES_REGUA_PT = (
 
 DIAS_SEMANA_CURTO = ('Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom')
 
+MESES_BOTAO_CURTO = (
+    '',
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez',
+)
+
+
+def _botoes_meses_ano(
+    filtros: dict, data_inicio: date, data_fim: date, ano: int
+) -> list[dict]:
+    """Um botão por mês do ano (período = mês inteiro), preservando filtros GET."""
+    botoes = []
+    for mes in range(1, 13):
+        ini = date(ano, mes, 1)
+        fim = _ultimo_dia_mes(ini)
+        ativo = data_inicio == ini and data_fim == fim
+        parcial = (
+            not ativo
+            and data_inicio <= fim
+            and data_fim >= ini
+            and (data_inicio != ini or data_fim != fim)
+        )
+        botoes.append(
+            {
+                'mes': mes,
+                'label': MESES_BOTAO_CURTO[mes],
+                'ativo': ativo,
+                'parcial': parcial,
+                'url_query': url_query_acerto_caixa(filtros, ini, fim),
+            }
+        )
+    return botoes
+
+
+def _botoes_anos(
+    filtros: dict,
+    data_inicio: date,
+    data_fim: date,
+    ano_central: int,
+    *,
+    raio: int = 4,
+) -> list[dict]:
+    """Botões de ano (período = ano inteiro), centrados no ano da régua."""
+    botoes = []
+    for ano in range(ano_central - raio, ano_central + raio + 1):
+        ini = date(ano, 1, 1)
+        fim = _ultimo_dia_mes(date(ano, 12, 1))
+        ativo = data_inicio == ini and data_fim == fim
+        parcial = (
+            not ativo
+            and data_inicio <= fim
+            and data_fim >= ini
+            and (data_inicio != ini or data_fim != fim)
+        )
+        botoes.append(
+            {
+                'ano': ano,
+                'label': str(ano),
+                'ativo': ativo,
+                'parcial': parcial,
+                'url_query': url_query_acerto_caixa(filtros, ini, fim),
+            }
+        )
+    return botoes
+
 
 def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> str:
     """Query string GET preservando filtros e alterando só o período."""
@@ -209,10 +284,21 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
         )
 
     titulo_mes = MESES_REGUA_PT[m] if 1 <= m <= 12 else str(m)
+    ano_ant = y - 1
+    ano_seg = y + 1
     return {
         'regua_titulo': f'{titulo_mes} {y}',
+        'regua_ano': y,
         'regua_url_mes_anterior': url_query_acerto_caixa(filtros, mes_ant_ini, mes_ant_fim),
         'regua_url_mes_seguinte': url_query_acerto_caixa(filtros, mes_seg_ini, mes_seg_fim),
+        'regua_url_ano_anterior': url_query_acerto_caixa(
+            filtros, date(ano_ant, 1, 1), _ultimo_dia_mes(date(ano_ant, 12, 1))
+        ),
+        'regua_url_ano_seguinte': url_query_acerto_caixa(
+            filtros, date(ano_seg, 1, 1), _ultimo_dia_mes(date(ano_seg, 12, 1))
+        ),
+        'regua_botoes_meses': _botoes_meses_ano(filtros, data_inicio, data_fim, y),
+        'regua_botoes_anos': _botoes_anos(filtros, data_inicio, data_fim, y),
         'regua_dias': dias,
     }
 
@@ -1018,6 +1104,44 @@ def montar_resumo_viabilidade_acerto(linhas: list[dict]) -> list[dict]:
     )
 
 
+def montar_resumo_viabilidade_por_mes_acerto(
+    linhas: list[dict], ano: int
+) -> list[dict]:
+    """Janeiro a dezembro do ano: viabilidade (qt · valor pago) em cada mês."""
+    por_mes: dict[int, list[dict]] = {m: [] for m in range(1, 13)}
+    for linha in linhas:
+        iso = (linha.get('data_iso') or '').strip()
+        if len(iso) < 7:
+            continue
+        try:
+            y = int(iso[:4])
+            m = int(iso[5:7])
+        except (TypeError, ValueError):
+            continue
+        if y != ano or m not in por_mes:
+            continue
+        por_mes[m].append(linha)
+
+    blocos: list[dict] = []
+    for mes in range(1, 13):
+        sub = por_mes[mes]
+        viabs = montar_resumo_viabilidade_acerto(sub) if sub else []
+        total_qt = sum(v['quantidade'] for v in viabs)
+        total_valor = sum((v['valor'] for v in viabs), Decimal('0'))
+        blocos.append(
+            {
+                'mes': mes,
+                'label': MESES_REGUA_PT[mes],
+                'label_curto': MESES_BOTAO_CURTO[mes],
+                'tem_dados': bool(sub),
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+                'viabilidades': viabs,
+            }
+        )
+    return blocos
+
+
 def montar_blocos_impressao_acerto_caixa(
     linhas: list[dict],
     resumo_por_caixa: list[dict],
@@ -1375,6 +1499,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_viabilidade = montar_resumo_viabilidade_acerto(linhas_grade)
     total_viab_qt = sum(r['quantidade'] for r in resumo_viabilidade)
     total_viab_valor = sum((r['valor'] for r in resumo_viabilidade), Decimal('0'))
+    regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
+    resumo_viabilidade_por_mes = montar_resumo_viabilidade_por_mes_acerto(
+        linhas_grade, regua_ctx['regua_ano']
+    )
 
     return {
         'linhas': linhas_grade,
@@ -1393,7 +1521,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'filtros': filtros_dict,
         'filtros_resumo': montar_resumo_filtros_acerto(filtros_dict, di, df),
-        **montar_regua_dias_acerto(filtros_dict, di, df),
+        **regua_ctx,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
@@ -1405,4 +1533,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade': resumo_viabilidade,
         'resumo_viabilidade_total_qt': total_viab_qt,
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
+        'resumo_viabilidade_por_mes': resumo_viabilidade_por_mes,
+        'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
     }

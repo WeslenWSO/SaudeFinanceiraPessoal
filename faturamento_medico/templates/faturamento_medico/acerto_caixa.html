@@ -176,6 +176,88 @@
     font-weight: 600;
 }
 .acerto-regua-dia.weekend { background: #f1f3f5; }
+.acerto-regua-anos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.55rem;
+}
+.acerto-regua-anos-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-right: 0.15rem;
+}
+.acerto-regua-ano {
+    flex: 0 0 auto;
+    min-width: 3rem;
+    padding: 0.32rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    color: #495057;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+}
+.acerto-regua-ano:hover { background: #e7f1ff; color: #0a58ca; border-color: #b6d4fe; }
+.acerto-regua-ano.active {
+    background: #198754;
+    color: #fff;
+    border-color: #198754;
+    box-shadow: 0 1px 3px rgba(25, 135, 84, 0.35);
+}
+.acerto-regua-ano.parcial {
+    background: #d1e7dd;
+    border-color: #a3cfbb;
+    color: #0f5132;
+}
+.acerto-regua-meses {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px dashed #dee2e6;
+}
+.acerto-regua-meses-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-right: 0.15rem;
+}
+.acerto-regua-mes {
+    flex: 1 1 2.4rem;
+    min-width: 2.4rem;
+    max-width: 3.25rem;
+    padding: 0.28rem 0.2rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    color: #495057;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    line-height: 1.2;
+}
+.acerto-regua-mes:hover { background: #e7f1ff; color: #0a58ca; border-color: #b6d4fe; }
+.acerto-regua-mes.active {
+    background: #0d6efd;
+    color: #fff;
+    border-color: #0d6efd;
+    box-shadow: 0 1px 3px rgba(13, 110, 253, 0.35);
+}
+.acerto-regua-mes.parcial {
+    background: #e7f1ff;
+    border-color: #9ec5fe;
+    color: #084298;
+}
 .acerto-regua-dia.in-range:not(.active) {
     background: #e7f1ff;
     border-color: #b6d4fe;
@@ -187,6 +269,211 @@
 }
 .acerto-regua-dia.active .dow { color: rgba(255,255,255,0.85); }
 .acerto-regua-dia:hover:not(.active) { background: #eef2f7; }
+
+/* Modal resumo — ~90% da tela, visual atualizado */
+#modalResumoAcerto .modal-dialog.modal-resumo-acerto-dialog {
+    width: 90vw;
+    max-width: 90vw;
+    height: 90vh;
+    max-height: 90vh;
+    margin: 5vh auto;
+}
+#modalResumoAcerto .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+    overflow: hidden;
+    background: #f1f5f9;
+}
+#modalResumoAcerto .modal-header {
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 55%, #3b82f6 100%);
+    color: #fff;
+    border: none;
+    padding: 1rem 1.35rem;
+}
+#modalResumoAcerto .modal-header .modal-title {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+#modalResumoAcerto .modal-header .acerto-modal-subtitulo {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.8rem;
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
+}
+#modalResumoAcerto .modal-header .btn-close {
+    filter: brightness(0) invert(1);
+    opacity: 0.85;
+}
+#modalResumoAcerto .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1.15rem 1.35rem;
+}
+#modalResumoAcerto .modal-footer {
+    flex-shrink: 0;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    padding: 0.75rem 1.35rem;
+}
+.acerto-modal-panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+    height: 100%;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.acerto-modal-panel-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.acerto-modal-panel-title i { color: #2563eb; }
+.acerto-modal-table {
+    font-size: 0.82rem;
+    margin-bottom: 0;
+}
+.acerto-modal-table thead th {
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+.acerto-modal-table tbody td {
+    border-color: #f1f5f9;
+    vertical-align: middle;
+}
+.acerto-modal-table tbody tr:hover td {
+    background: #f8fafc;
+}
+.acerto-modal-table .row-total td {
+    background: #eff6ff;
+    border-top: 2px solid #bfdbfe;
+    font-weight: 700;
+}
+.acerto-modal-table .row-total-valor td:last-child {
+    color: #1d4ed8;
+}
+.acerto-modal-pagamento td:last-child {
+    font-variant-numeric: tabular-nums;
+}
+.acerto-modal-chart-wrap {
+    min-height: 260px;
+    max-height: min(42vh, 380px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.acerto-modal-scroll-tabela {
+    max-height: min(38vh, 420px);
+    overflow-y: auto;
+    border-radius: 0.5rem;
+    border: 1px solid #f1f5f9;
+}
+.acerto-modal-kpi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #e2e8f0;
+}
+.acerto-modal-kpi-item {
+    flex: 1 1 8rem;
+    background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%);
+    border: 1px solid #dbeafe;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+}
+.acerto-modal-kpi-item .label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 600;
+}
+.acerto-modal-kpi-item .valor {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e40af;
+    font-variant-numeric: tabular-nums;
+}
+.acerto-modal-alerta {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.78rem;
+    color: #92400e;
+    margin-top: 0.65rem;
+}
+.acerto-modal-viab-meses {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+}
+@media (min-width: 992px) {
+    .acerto-modal-viab-meses { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1200px) {
+    .acerto-modal-viab-meses { grid-template-columns: repeat(4, 1fr); }
+}
+.acerto-modal-viab-mes {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+    overflow: hidden;
+    min-height: 4.5rem;
+}
+.acerto-modal-viab-mes.empty { opacity: 0.55; background: #f8fafc; }
+.acerto-modal-viab-mes-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #334155;
+    background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-bottom: 1px solid #e2e8f0;
+}
+.acerto-modal-viab-mes-head .totais {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #1e40af;
+    font-variant-numeric: tabular-nums;
+}
+.acerto-modal-viab-mes table {
+    width: 100%;
+    font-size: 0.68rem;
+    margin: 0;
+}
+.acerto-modal-viab-mes table td, .acerto-modal-viab-mes table th {
+    padding: 0.15rem 0.4rem;
+    border: none;
+}
+.acerto-modal-viab-mes table tbody tr:nth-child(even) { background: #f8fafc; }
+.acerto-modal-viab-mes .sem-dados {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -243,9 +530,25 @@
                 <div class="filtro-retratil-painel mt-2" id="painelFiltrosAcerto">
                     <form method="get" id="formFiltrosAcerto">
                         <div class="acerto-regua-dias mb-3">
+                            <div class="acerto-regua-anos" role="navigation" aria-label="Anos">
+                                <span class="acerto-regua-anos-label">Ano</span>
+                                {% for ba in regua_botoes_anos %}
+                                <a class="acerto-regua-ano{% if ba.ativo %} active{% elif ba.parcial %} parcial{% endif %}"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ ba.url_query }}"
+                                   title="Período = {{ ba.label }} inteiro">{{ ba.label }}</a>
+                                {% endfor %}
+                            </div>
+                            <div class="acerto-regua-meses" role="navigation" aria-label="Meses do ano">
+                                <span class="acerto-regua-meses-label">{{ regua_ano }}</span>
+                                {% for bm in regua_botoes_meses %}
+                                <a class="acerto-regua-mes{% if bm.ativo %} active{% elif bm.parcial %} parcial{% endif %}"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ bm.url_query }}"
+                                   title="{{ bm.label }} {{ regua_ano }} (mês inteiro)">{{ bm.label }}</a>
+                                {% endfor %}
+                            </div>
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-1">
                                 <span class="small fw-semibold">{{ regua_titulo }}</span>
-                                <span class="text-muted small">Clique no dia (filtra só aquele dia) · extremos mudam o mês</span>
+                                <span class="text-muted small">Mês acima · dia abaixo · extremos mudam o mês</span>
                             </div>
                             <div class="acerto-regua-dias-scroll" role="navigation" aria-label="Régua de dias">
                                 <a class="acerto-regua-nav"
@@ -846,131 +1149,192 @@
     </div>
 </div>
 <div class="modal fade" id="modalResumoAcerto" tabindex="-1" aria-labelledby="modalResumoAcertoTitulo" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-resumo-acerto-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header py-2">
+            <div class="modal-header">
                 <div>
-                    <h5 class="modal-title" id="modalResumoAcertoTitulo">Resumo — Acerto de Caixa</h5>
-                    <p class="small text-muted mb-0">{{ periodo_fmt }} · {{ filtros_resumo }} · {{ quantidade_linhas }} linha(s)</p>
+                    <h5 class="modal-title" id="modalResumoAcertoTitulo">
+                        <i class="fas fa-chart-pie me-2 opacity-75"></i>Resumo — Acerto de Caixa
+                    </h5>
+                    <p class="acerto-modal-subtitulo mb-0">
+                        {{ periodo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
+                    </p>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-3">
-                    <div class="col-md-5">
-                        <h6 class="fw-semibold">Formas de pagamento</h6>
-                        <table class="table table-sm table-borderless mb-2">
-                            {% for row in resumo_pagamento %}
-                            <tr>
-                                <td>{{ row.rotulo }}</td>
-                                <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
-                            </tr>
-                            {% endfor %}
-                            {% if resumo_aguardando_faturamento %}
-                            <tr class="border-top">
-                                <td class="fw-semibold pt-2">Aguardando faturamento</td>
-                                <td class="text-end fw-semibold pt-2">R$ {{ total_aguardando_faturamento_fmt }}</td>
-                            </tr>
-                            {% for row in resumo_aguardando_faturamento %}
-                            <tr>
-                                <td class="ps-3 small text-muted">{{ row.convenio }}</td>
-                                <td class="text-end small">R$ {{ row.total_fmt }}</td>
-                            </tr>
-                            {% endfor %}
-                            {% endif %}
-                            <tr class="border-top">
-                                <td class="fw-bold pt-2">Total geral</td>
-                                <td class="text-end fw-bold pt-2">R$ {{ total_resumo_geral_fmt }}</td>
-                            </tr>
-                            <tr>
-                                <td class="small text-muted">Conferência (Valor pago grade)</td>
-                                <td class="text-end small fw-semibold">R$ {{ total_valor_pago_grade_fmt }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="col-md-7">
-                        <div style="max-height: 220px;">
-                            <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico por modalidade"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-3 mt-1">
-                    <div class="col-lg-6">
-                        <h6 class="fw-semibold">Modalidade — qt · valor pago</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered resumo-ris mb-0">
-                                <thead>
-                                    <tr class="small text-center">
-                                        <th>Modalidade</th>
-                                        <th>Qt</th>
-                                        <th>Valor</th>
-                                    </tr>
-                                </thead>
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-5">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-wallet"></i> Formas de pagamento
+                            </div>
+                            <table class="table table-sm acerto-modal-table acerto-modal-pagamento mb-0">
                                 <tbody>
-                                    {% for item in resumo_modalidades %}
+                                    {% for row in resumo_pagamento %}
                                     <tr>
-                                        <td class="small">{{ item.label }}</td>
-                                        <td class="text-center">{{ item.quantidade }}</td>
-                                        <td class="text-end">R$ {{ item.valor_fmt }}</td>
+                                        <td>{{ row.rotulo }}</td>
+                                        <td class="text-end fw-semibold">R$ {{ row.total_fmt }}</td>
                                     </tr>
                                     {% endfor %}
+                                    {% if resumo_aguardando_faturamento %}
                                     <tr>
-                                        <td class="fw-bold">Total</td>
-                                        <td class="text-center fw-bold">{{ resumo_quantidade_total }}</td>
-                                        <td class="text-end fw-bold">R$ {{ resumo_valor_total_fmt }}</td>
+                                        <td class="fw-semibold pt-2">Aguardando faturamento</td>
+                                        <td class="text-end fw-semibold pt-2">R$ {{ total_aguardando_faturamento_fmt }}</td>
                                     </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        {% if modalidades_fora_resumo %}
-                        <p class="small text-warning mb-0 mt-2">
-                            Detalhe fora do padrão:
-                            {% for item in modalidades_fora_resumo %}
-                            {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
-                            {% endfor %}
-                        </p>
-                        {% endif %}
-                    </div>
-                    <div class="col-lg-6">
-                        <h6 class="fw-semibold">Viabilidade (convênio) — qt · valor pago</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered resumo-ris mb-0">
-                                <thead>
-                                    <tr class="small text-center">
-                                        <th>Viabilidade</th>
-                                        <th>Qt</th>
-                                        <th>Valor</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in resumo_viabilidade %}
+                                    {% for row in resumo_aguardando_faturamento %}
                                     <tr>
-                                        <td class="small">{{ row.viabilidade }}</td>
-                                        <td class="text-center">{{ row.quantidade }}</td>
-                                        <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                        <td class="ps-3 text-muted small">{{ row.convenio }}</td>
+                                        <td class="text-end small">R$ {{ row.total_fmt }}</td>
                                     </tr>
-                                    {% empty %}
-                                    <tr><td colspan="3" class="text-muted text-center">Sem dados.</td></tr>
                                     {% endfor %}
-                                    {% if resumo_viabilidade %}
-                                    <tr>
-                                        <td class="fw-bold">Total</td>
-                                        <td class="text-center fw-bold">{{ resumo_viabilidade_total_qt }}</td>
-                                        <td class="text-end fw-bold">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
-                                    </tr>
                                     {% endif %}
                                 </tbody>
                             </table>
+                            <div class="acerto-modal-kpi">
+                                <div class="acerto-modal-kpi-item">
+                                    <div class="label">Total geral</div>
+                                    <div class="valor">R$ {{ total_resumo_geral_fmt }}</div>
+                                </div>
+                                <div class="acerto-modal-kpi-item">
+                                    <div class="label">Valor pago (grade)</div>
+                                    <div class="valor">R$ {{ total_valor_pago_grade_fmt }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="acerto-modal-panel h-100">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-chart-pie"></i> Por modalidade (R$)
+                            </div>
+                            <div class="acerto-modal-chart-wrap">
+                                <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico por modalidade"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm acerto-modal-table mb-0">
+                                    <thead>
+                                        <tr class="text-center">
+                                            <th class="text-start">Modalidade</th>
+                                            <th>Qt</th>
+                                            <th>Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in resumo_modalidades %}
+                                        <tr>
+                                            <td>{{ item.label }}</td>
+                                            <td class="text-center">{{ item.quantidade }}</td>
+                                            <td class="text-end">R$ {{ item.valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="row-total row-total-valor">
+                                            <td>Total</td>
+                                            <td class="text-center">{{ resumo_quantidade_total }}</td>
+                                            <td class="text-end">R$ {{ resumo_valor_total_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if modalidades_fora_resumo %}
+                            <div class="acerto-modal-alerta">
+                                <strong>Fora do padrão:</strong>
+                                {% for item in modalidades_fora_resumo %}
+                                {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-hospital"></i> Viabilidade (convênio) — qt · valor pago
+                            </div>
+                            <div class="acerto-modal-scroll-tabela">
+                                <table class="table table-sm acerto-modal-table mb-0">
+                                    <thead class="sticky-top">
+                                        <tr class="text-center">
+                                            <th class="text-start">Viabilidade</th>
+                                            <th>Qt</th>
+                                            <th>Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in resumo_viabilidade %}
+                                        <tr>
+                                            <td>{{ row.viabilidade }}</td>
+                                            <td class="text-center">{{ row.quantidade }}</td>
+                                            <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr><td colspan="3" class="text-muted text-center py-3">Sem dados.</td></tr>
+                                        {% endfor %}
+                                        {% if resumo_viabilidade %}
+                                        <tr class="row-total row-total-valor">
+                                            <td>Total</td>
+                                            <td class="text-center">{{ resumo_viabilidade_total_qt }}</td>
+                                            <td class="text-end">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="acerto-modal-panel mt-3">
+                    <div class="acerto-modal-panel-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Viabilidade por mês — {{ resumo_viabilidade_por_mes_ano }}
+                        <span class="text-muted fw-normal small">(qt · valor pago, conforme filtro)</span>
+                    </div>
+                    <div class="acerto-modal-viab-meses">
+                        {% for bloco in resumo_viabilidade_por_mes %}
+                        <div class="acerto-modal-viab-mes{% if not bloco.tem_dados %} empty{% endif %}">
+                            <div class="acerto-modal-viab-mes-head">
+                                <span>{{ bloco.label }}</span>
+                                {% if bloco.tem_dados %}
+                                <span class="totais">{{ bloco.total_qt }} · R$ {{ bloco.total_valor_fmt }}</span>
+                                {% else %}
+                                <span class="totais text-muted">0 · R$ 0,00</span>
+                                {% endif %}
+                            </div>
+                            {% if bloco.viabilidades %}
+                            <table>
+                                <tbody>
+                                    {% for row in bloco.viabilidades %}
+                                    <tr>
+                                        <td>{{ row.viabilidade }}</td>
+                                        <td class="text-center">{{ row.quantidade }}</td>
+                                        <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <div class="sem-dados">Sem movimento no período</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer py-2">
+            <div class="modal-footer">
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
-                   class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
-                    <i class="fas fa-print"></i> Imprimir
+                   class="btn btn-primary btn-sm px-3" target="_blank" rel="noopener">
+                    <i class="fas fa-print me-1"></i> Imprimir
                 </a>
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>

@@ -13,6 +13,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
+    montar_resumo_viabilidade_por_mes_acerto,
     recomputar_resumos_acerto_caixa_de_linhas,
     url_query_acerto_caixa,
 )
@@ -128,6 +129,14 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         qs = url_query_acerto_caixa(filtros, date(2026, 11, 15), date(2026, 11, 15))
         self.assertIn('data_inicio=2026-11-15', qs)
         self.assertIn('caixa=1', qs)
+        self.assertEqual(len(ctx['regua_botoes_meses']), 12)
+        nov = ctx['regua_botoes_meses'][10]
+        self.assertTrue(nov['ativo'])
+        self.assertIn('data_inicio=2026-11-01', nov['url_query'])
+        self.assertIn('data_fim=2026-11-30', nov['url_query'])
+        self.assertEqual(len(ctx['regua_botoes_anos']), 9)
+        ativo_2026 = next(b for b in ctx['regua_botoes_anos'] if b['ano'] == 2026)
+        self.assertTrue(ativo_2026['ativo'])
 
     def test_resumo_bate_soma_valor_pago_linhas(self):
         linhas = [
@@ -165,3 +174,33 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         cassi = next(r for r in rows if r['viabilidade'] == 'CASSI')
         self.assertEqual(cassi['quantidade'], 2)
         self.assertEqual(cassi['valor'], Decimal('150'))
+
+    def test_viabilidade_por_mes_janeiro_dezembro(self):
+        linhas = [
+            {
+                'data_iso': '2026-01-15',
+                'convenio': 'CASSI',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'data_iso': '2026-02-10',
+                'convenio': 'GEAP',
+                'valor_pago': Decimal('50'),
+                'aguardando_faturamento': False,
+            },
+            {
+                'data_iso': '2026-02-20',
+                'convenio': 'GEAP',
+                'valor_pago': Decimal('30'),
+                'aguardando_faturamento': False,
+            },
+        ]
+        blocos = montar_resumo_viabilidade_por_mes_acerto(linhas, 2026)
+        self.assertEqual(len(blocos), 12)
+        self.assertEqual(blocos[0]['label'], 'Janeiro')
+        self.assertTrue(blocos[0]['tem_dados'])
+        self.assertEqual(blocos[0]['total_qt'], 1)
+        self.assertEqual(blocos[1]['total_qt'], 2)
+        self.assertFalse(blocos[2]['tem_dados'])
+        self.assertEqual(blocos[11]['label'], 'Dezembro')
