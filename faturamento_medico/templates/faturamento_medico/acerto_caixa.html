@@ -373,11 +373,17 @@
     font-variant-numeric: tabular-nums;
 }
 .acerto-modal-chart-wrap {
-    min-height: 260px;
-    max-height: min(42vh, 380px);
+    min-height: 220px;
+    max-height: min(36vh, 320px);
     display: flex;
     align-items: center;
     justify-content: center;
+}
+.acerto-modal-charts-grid .acerto-modal-panel {
+    height: 100%;
+}
+.acerto-modal-charts-grid .acerto-modal-chart-wrap {
+    min-height: 200px;
 }
 .acerto-modal-scroll-tabela {
     max-height: min(38vh, 420px);
@@ -1331,17 +1337,67 @@
                             </div>
                         </div>
                     </div>
-                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-7{% endif %}">
-                        <div class="acerto-modal-panel h-100">
+                    {% if not resumo_matriz_anual %}
+                    <div class="col-lg-7">
+                        <div class="row g-2 acerto-modal-charts-grid h-100">
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-pie"></i> Modalidade (pizza)
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico pizza por modalidade"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-column"></i> Modalidade (torre)
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoTorreModalidadeModal" aria-label="Gráfico torre por modalidade"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="acerto-modal-panel h-100">
+                                    <div class="acerto-modal-panel-title">
+                                        <i class="fas fa-chart-column"></i> Forma de pagamento
+                                    </div>
+                                    <div class="acerto-modal-chart-wrap">
+                                        <canvas id="acertoGraficoPagamentoModal" aria-label="Gráfico por forma de pagamento"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if resumo_matriz_anual %}
+                <div class="row g-3 mb-3 acerto-modal-charts-grid">
+                    <div class="col-md-6">
+                        <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
-                                <i class="fas fa-chart-pie"></i> Por modalidade (R$)
+                                <i class="fas fa-chart-column"></i> Total por mês — valor pago (grade)
                             </div>
                             <div class="acerto-modal-chart-wrap">
-                                <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico por modalidade"></canvas>
+                                <canvas id="acertoGraficoTorreMesesModalidadeModal" aria-label="Torre mensal modalidade"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-chart-column"></i> Total por mês — formas de pagamento
+                            </div>
+                            <div class="acerto-modal-chart-wrap">
+                                <canvas id="acertoGraficoTorreMesesPagamentoModal" aria-label="Torre mensal pagamento"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 <div class="row g-3">
                     <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-6{% endif %}">
                         <div class="acerto-modal-panel">

@@ -1235,13 +1235,17 @@ def montar_resumo_modalidades_matriz_mes(linhas: list[dict], ano: int) -> dict:
             }
         )
 
-    totais_mes = [
-        {
-            'qt': ctx['resumo_quantidade_total'],
-            'valor_fmt': ctx['resumo_valor_total_fmt'],
-        }
-        for ctx in ctx_por_mes
-    ]
+    totais_mes = []
+    for mes in range(1, 13):
+        sub = _filtrar_linhas_mes_ano(linhas, ano, mes)
+        valor_mes = sum((_valor_contabil_linha_acerto(l) for l in sub), Decimal('0'))
+        totais_mes.append(
+            {
+                'qt': len(sub),
+                'valor': valor_mes,
+                'valor_fmt': _moeda_br(valor_mes),
+            }
+        )
     return {
         'modalidades_matriz_linhas': linhas_matriz,
         'modalidades_matriz_totais_mes': totais_mes,
@@ -1316,9 +1320,11 @@ def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
     for i in range(12):
         pag_t = sum(pag_por_mes[i].values(), Decimal('0'))
         ag_t = sum(aguard_por_mes[i].values(), Decimal('0'))
+        total_mes = pag_t + ag_t
         totais_mes.append(
             {
-                'valor_fmt': _moeda_br(pag_t + ag_t),
+                'valor': total_mes,
+                'valor_fmt': _moeda_br(total_mes),
                 'pagamento_fmt': _moeda_br(pag_t),
                 'aguardando_fmt': _moeda_br(ag_t),
             }
@@ -1331,6 +1337,50 @@ def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
         ),
         'pagamento_matriz_totais_mes': totais_mes,
     }
+
+
+def montar_graficos_resumo_acerto_caixa(
+    resumo_pagamento_lista: list[dict],
+    total_aguardando: Decimal,
+    *,
+    grafico_modalidade_labels: list,
+    grafico_modalidade_valores: list,
+    matriz_anual: bool = False,
+    meses_colunas: list[dict] | None = None,
+    modalidades_totais_mes: list[dict] | None = None,
+    pagamento_totais_mes: list[dict] | None = None,
+) -> dict:
+    pag_labels = [r['rotulo'] for r in resumo_pagamento_lista]
+    pag_valores = [float(r['total']) for r in resumo_pagamento_lista]
+    if total_aguardando > 0:
+        pag_labels.append('Aguardando faturamento')
+        pag_valores.append(float(total_aguardando))
+
+    ctx: dict = {
+        'grafico_pagamento_labels': pag_labels,
+        'grafico_pagamento_valores': pag_valores,
+        'grafico_torre_modalidade_labels': list(grafico_modalidade_labels),
+        'grafico_torre_modalidade_valores': list(grafico_modalidade_valores),
+        'grafico_torre_usar_meses': False,
+        'grafico_torre_meses_labels': [],
+        'grafico_torre_meses_modalidade_valores': [],
+        'grafico_torre_meses_pagamento_valores': [],
+    }
+    if (
+        matriz_anual
+        and meses_colunas
+        and modalidades_totais_mes
+        and pagamento_totais_mes
+    ):
+        ctx['grafico_torre_usar_meses'] = True
+        ctx['grafico_torre_meses_labels'] = [c['label_curto'] for c in meses_colunas]
+        ctx['grafico_torre_meses_modalidade_valores'] = [
+            float(t.get('valor') or 0) for t in modalidades_totais_mes
+        ]
+        ctx['grafico_torre_meses_pagamento_valores'] = [
+            float(t.get('valor') or 0) for t in pagamento_totais_mes
+        ]
+    return ctx
 
 
 def montar_contexto_matriz_anual_acerto(linhas: list[dict], di: date, df: date) -> dict:
@@ -1708,6 +1758,16 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         linhas_grade, regua_ctx['regua_ano']
     )
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
+    graficos_resumo_ctx = montar_graficos_resumo_acerto_caixa(
+        resumo_pagamento_lista,
+        total_aguardando,
+        grafico_modalidade_labels=resumo_modalidades_ctx.get('grafico_modalidade_labels') or [],
+        grafico_modalidade_valores=resumo_modalidades_ctx.get('grafico_modalidade_valores') or [],
+        matriz_anual=bool(matriz_anual_ctx.get('resumo_matriz_anual')),
+        meses_colunas=matriz_anual_ctx.get('resumo_meses_colunas'),
+        modalidades_totais_mes=matriz_anual_ctx.get('modalidades_matriz_totais_mes'),
+        pagamento_totais_mes=matriz_anual_ctx.get('pagamento_matriz_totais_mes'),
+    )
 
     return {
         'linhas': linhas_grade,
@@ -1741,4 +1801,5 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade_por_mes': resumo_viabilidade_por_mes,
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
         **matriz_anual_ctx,
+        **graficos_resumo_ctx,
     }
