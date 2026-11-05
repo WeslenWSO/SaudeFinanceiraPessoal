@@ -6223,6 +6223,7 @@ def acerto_caixa(request):
         contexto.setdefault('periodo_resumo_fmt', contexto.get('periodo_fmt', ''))
         contexto.setdefault('dias_resumo', [])
         contexto.setdefault('modo_resumo_ano_leve', False)
+        contexto.setdefault('acerto_botao_ano_habilitado', False)
         contexto['empresa'] = empresa
         contexto['redirect_qs'] = request.GET.urlencode()
         return render(request, 'faturamento_medico/acerto_caixa.html', contexto)

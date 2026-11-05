@@ -48,6 +48,9 @@ STATUS_CANCELADOS = (
     'Delecao',
 )
 
+# Botão «Ano» na tela: reativar quando o resumo anual estiver estável em produção.
+ACERTO_BOTAO_ANO_HABILITADO = False
+
 MODALIDADES_RESUMO_ACERTO = (
     ('US', 'QUANTIDADE DE ULTRASSONOGRAFIA'),
     ('CT', 'QUANTIDADE DE TOMOGRAFIA'),
@@ -323,7 +326,11 @@ def pode_abrir_resumo_acerto_direto(request, data_inicio: date, data_fim: date) 
     visao = (request.GET.get('visao_resumo') or '').strip().lower()
     if visao == 'mes' and periodo_eh_mes_inteiro(data_inicio, data_fim):
         return True
-    if visao == 'ano' and periodo_eh_ano_inteiro(data_inicio, data_fim):
+    if (
+        ACERTO_BOTAO_ANO_HABILITADO
+        and visao == 'ano'
+        and periodo_eh_ano_inteiro(data_inicio, data_fim)
+    ):
         return True
     if data_inicio == data_fim:
         return True
@@ -2553,6 +2560,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'periodo_resumo_fmt': periodo_resumo_fmt,
         'dias_resumo': dias_resumo,
         'resumo_pode_abrir_direto': resumo_pode_abrir_direto,
+        'acerto_botao_ano_habilitado': ACERTO_BOTAO_ANO_HABILITADO,
         'modo_resumo_ano_leve': modo_resumo_ano_leve,
         'nome_caixa_acerto': nome_caixa_acerto,
         'formas_pagamento_acerto': list(

@@ -276,6 +276,12 @@
     box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.35);
 }
 .acerto-regua-dia.picked-resumo .dow { color: rgba(255, 255, 255, 0.9); }
+.btn-acerto-ano-desativado.btn-danger:disabled,
+.btn-acerto-ano-desativado.btn-danger.disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 .acerto-regua-modo-resumo {
     outline: 2px solid #198754;
     outline-offset: 2px;
@@ -637,11 +643,21 @@
                    title="Mês inteiro ({{ regua_botao_mes_titulo }}) + resumo do período">
                     <i class="fas fa-calendar-day"></i> Mês
                 </a>
+                {% if acerto_botao_ano_habilitado %}
                 <a href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_botao_ano }}&visao_resumo=ano"
                    class="btn btn-sm {% if regua_botao_ano_ativo %}btn-success{% else %}btn-outline-success{% endif %}"
                    title="Ano {{ regua_botao_ano_titulo }} inteiro + resumo anual">
                     <i class="fas fa-calendar"></i> Ano
                 </a>
+                {% else %}
+                <button type="button"
+                        class="btn btn-sm btn-danger btn-acerto-ano-desativado"
+                        disabled
+                        aria-disabled="true"
+                        title="Resumo anual temporariamente indisponível">
+                    <i class="fas fa-calendar"></i> Ano
+                </button>
+                {% endif %}
                 <span class="text-muted d-none d-md-inline">|</span>
                 <button type="button"
                         class="btn btn-outline-success btn-sm"
@@ -1351,12 +1367,23 @@
                             data-visao="mes">
                         <i class="fas fa-calendar-day me-1"></i> Mês / período
                     </button>
+                    {% if acerto_botao_ano_habilitado %}
                     <button type="button"
                             class="btn btn-outline-primary js-resumo-visao-tab"
                             data-visao="ano"
                             {% if not resumo_matriz_anual %}disabled title="Selecione o ano inteiro (botão Ano no topo)"{% endif %}>
                         <i class="fas fa-calendar me-1"></i> Ano {{ regua_ano }}
                     </button>
+                    {% else %}
+                    <button type="button"
+                            class="btn btn-danger btn-acerto-ano-desativado js-resumo-visao-tab"
+                            data-visao="ano"
+                            disabled
+                            aria-disabled="true"
+                            title="Resumo anual temporariamente indisponível">
+                        <i class="fas fa-calendar me-1"></i> Ano {{ regua_ano }}
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-lg-5 resumo-visao-mes">
@@ -2589,7 +2616,10 @@
     }
 
     var modalEl = document.getElementById('modalResumoAcerto');
-    var defaultVisaoResumo = {% if regua_botao_ano_ativo %}'ano'{% else %}'mes'{% endif %};
+    var acertoBotaoAnoHabilitado = {{ acerto_botao_ano_habilitado|yesno:"true,false" }};
+    var defaultVisaoResumo = (
+        acertoBotaoAnoHabilitado && {% if regua_botao_ano_ativo %}true{% else %}false{% endif %}
+    ) ? 'ano' : 'mes';
     document.querySelectorAll('.js-resumo-visao-tab').forEach(function(btn) {
         btn.addEventListener('click', function() {
             if (btn.disabled) return;
@@ -2700,8 +2730,14 @@
 
     function abrirResumoSePedidoNaUrl() {
         var qs = new URLSearchParams(window.location.search);
+        if (!acertoBotaoAnoHabilitado && qs.get('visao_resumo') === 'ano') {
+            qs.delete('visao_resumo');
+            var limpa = qs.toString();
+            window.history.replaceState({}, '', window.location.pathname + (limpa ? ('?' + limpa) : ''));
+        }
         var abrir = qs.get('visao_resumo') || qs.get('abrir_resumo');
         if (!abrir || !modalEl) return;
+        if (!acertoBotaoAnoHabilitado && abrir === 'ano') return;
         function tentarAbrir() {
             abrirModalResumo();
             if (qs.get('abrir_resumo')) {
