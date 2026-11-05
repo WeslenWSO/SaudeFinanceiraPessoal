@@ -1024,9 +1024,10 @@
 
             <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
             {% if modo_resumo_ano_leve %}
-            <div class="alert alert-warning py-2 small mb-2">
-                Resumo anual rápido: formas de pagamento usam rateio manual da grade (NF omitida nesta carga).
-                Para conferência item a item com NF, filtre por <strong>Mês</strong> ou um dia na régua.
+            <div class="alert alert-info py-2 small mb-2">
+                Resumo anual: a grade detalhada e os vínculos de NF na tabela foram omitidos para agilizar.
+                Formas de pagamento e totais usam as mesmas regras da visão por mês (NF + rateio manual).
+                Para conferência linha a linha, use <strong>Mês</strong> ou um dia na régua.
             </div>
             {% elif grade_oculta_resumo_ano %}
             <div class="alert alert-info py-2 small mb-2">

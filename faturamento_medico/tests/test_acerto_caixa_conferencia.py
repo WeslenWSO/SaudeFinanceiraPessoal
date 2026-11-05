@@ -355,6 +355,45 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(pix['meses'][0]['qt'], 1)
         self.assertEqual(pix['meses'][1]['qt'], 1)
 
+    def test_matriz_anual_novembro_usa_pagamentos_acerto_nao_forma_vazia(self):
+        """Coluna do mês deve seguir pagamentos_acerto (NF), não cair em Sem NF por forma '-'."""
+        linhas = [
+            {
+                'data_iso': '2026-11-03',
+                'faturamento_id': 10,
+                'convenio': 'CASSI',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+                'forma_pgto': '-',
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('100')}],
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+            {
+                'data_iso': '2026-11-20',
+                'faturamento_id': 11,
+                'convenio': 'GEAP',
+                'valor_pago': Decimal('200'),
+                'aguardando_faturamento': False,
+                'forma_pgto': '-',
+                'pagamentos_acerto': [],
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+        ]
+        ctx = montar_contexto_matriz_anual_acerto(
+            linhas, date(2026, 1, 1), date(2026, 12, 31)
+        )
+        nov = 10
+        pix = next(r for r in ctx['pagamento_matriz_formas'] if r['rotulo'] == 'PIX')
+        self.assertEqual(pix['meses'][nov]['qt'], 1)
+        sem_nf = next(
+            r
+            for r in ctx['pagamento_matriz_formas']
+            if r['rotulo'] == 'Sem NF / forma não informada'
+        )
+        self.assertEqual(sem_nf['meses'][nov]['qt'], 1)
+
     def test_graficos_pagamento_inclui_aguardando(self):
         g = montar_graficos_resumo_acerto_caixa(
             [{'rotulo': 'PIX', 'total': Decimal('100')}],

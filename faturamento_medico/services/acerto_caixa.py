@@ -2157,13 +2157,10 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         qs = qs.filter(marcado_acerto_caixa=True)
 
     qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
-    if modo_resumo_ano_leve:
+    try:
+        notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+    except Exception:
         notas_por_data = {}
-    else:
-        try:
-            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
-        except Exception:
-            notas_por_data = {}
     fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
     fats_bloqueio: dict[int, bool] = {}
     try:
@@ -2181,21 +2178,17 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         if hora_fim_min is not None and (mins is None or mins > hora_fim_min):
             continue
 
-        if modo_resumo_ano_leve:
+        try:
+            notas = resolver_notas_linha(
+                notas_por_data,
+                empresa_id,
+                fat.nome or '',
+                fat.data,
+                fat.nota_fiscal,
+            )
+        except Exception:
             notas = []
-            nota = None
-        else:
-            try:
-                notas = resolver_notas_linha(
-                    notas_por_data,
-                    empresa_id,
-                    fat.nome or '',
-                    fat.data,
-                    fat.nota_fiscal,
-                )
-            except Exception:
-                notas = []
-            nota = _primeira_nota(notas)
+        nota = _primeira_nota(notas)
         from faturamento_medico.services.pagamentos_acerto_caixa import (
             pagamentos_efetivos_faturamento,
             pagamentos_manuais_faturamento,
@@ -2289,8 +2282,8 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 'caixa_acerto': caixa_valor,
                 'mostrar_acerto_celula': mostrar_acerto,
                 'mostrar_nf_celula': mostrar_nf,
-                'notas_vinculadas': notas,
-                'qtd_notas': qtd_notas,
+                'notas_vinculadas': [] if modo_resumo_ano_leve else notas,
+                'qtd_notas': 0 if modo_resumo_ano_leve else qtd_notas,
                 'notas_json': notas_json,
                 'data_fmt': fat.data.strftime('%d/%m/%Y') if fat.data else '-',
                 'paciente': fat.nome or '-',
