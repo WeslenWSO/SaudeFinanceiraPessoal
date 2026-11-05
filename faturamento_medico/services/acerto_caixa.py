@@ -588,6 +588,31 @@ def recomputar_resumos_acerto_caixa_de_linhas(
     return resumo_pagamento, resumo_aguardando, resumo_caixas
 
 
+def _contagem_formas_pagamento_mes(linhas: list[dict]) -> dict[str, int]:
+    """Quantidade de faturamentos (NFs) por forma de pagamento no mês."""
+    por_fat: dict[int, list[dict]] = defaultdict(list)
+    for linha in linhas:
+        if linha.get('aguardando_faturamento'):
+            continue
+        por_fat[linha['faturamento_id']].append(linha)
+    contagem: dict[str, int] = defaultdict(int)
+    for fat_linhas in por_fat.values():
+        total_vp = sum(_valor_contabil_linha_acerto(l) for l in fat_linhas)
+        if total_vp <= 0:
+            continue
+        first = fat_linhas[0]
+        pags = first.get('pagamentos_acerto') or []
+        if pags:
+            distrib = _distribuir_valor_formas_pagamento(total_vp, pags)
+            for chave, val in distrib:
+                if val > 0:
+                    contagem[chave] += 1
+        else:
+            chave = _agrupar_forma_pagamento(first.get('forma_pgto') or '-')
+            contagem[chave] += 1
+    return dict(contagem)
+
+
 def _montar_listas_resumo_acerto(
     resumo_pagamento: dict[str, Decimal],
     resumo_aguardando_faturamento: dict[str, Decimal],
@@ -1142,6 +1167,185 @@ def montar_resumo_viabilidade_por_mes_acerto(
     return blocos
 
 
+def periodo_eh_ano_inteiro(data_inicio: date, data_fim: date) -> bool:
+    if data_inicio.year != data_fim.year:
+        return False
+    ano = data_inicio.year
+    return data_inicio == date(ano, 1, 1) and data_fim == _ultimo_dia_mes(date(ano, 12, 1))
+
+
+def _filtrar_linhas_mes_ano(linhas: list[dict], ano: int, mes: int) -> list[dict]:
+    prefixo = f'{ano}-{mes:02d}'
+    return [
+        linha
+        for linha in linhas
+        if (linha.get('data_iso') or '').strip().startswith(prefixo)
+    ]
+
+
+def montar_colunas_meses_resumo() -> list[dict]:
+    return [
+        {
+            'mes': mes,
+            'label_curto': MESES_BOTAO_CURTO[mes],
+            'label': MESES_REGUA_PT[mes],
+        }
+        for mes in range(1, 13)
+    ]
+
+
+def montar_resumo_modalidades_matriz_mes(linhas: list[dict], ano: int) -> dict:
+    """Linhas = modalidades; colunas = Jan–Dez (qt · valor pago)."""
+    ctx_por_mes = [
+        montar_resumo_modalidades_acerto(_filtrar_linhas_mes_ano(linhas, ano, mes))
+        for mes in range(1, 13)
+    ]
+    codigos_ordem: list[tuple[str, str]] = list(MODALIDADES_RESUMO_ACERTO)
+    if any(ctx['resumo_outros_quantidade'] for ctx in ctx_por_mes):
+        codigos_ordem.append(('OUTROS', 'QUANTIDADE OUTRAS MODALIDADES'))
+
+    linhas_matriz: list[dict] = []
+    for codigo, label in codigos_ordem:
+        meses_cel: list[dict] = []
+        total_qt = 0
+        total_valor = Decimal('0')
+        for ctx in ctx_por_mes:
+            item = next(
+                (m for m in ctx['resumo_modalidades'] if m['codigo'] == codigo),
+                None,
+            )
+            if item:
+                qt = item['quantidade']
+                val = item['valor']
+                vf = item['valor_fmt']
+            else:
+                qt = 0
+                val = Decimal('0')
+                vf = _moeda_br(Decimal('0'))
+            meses_cel.append({'qt': qt, 'valor_fmt': vf})
+            total_qt += qt
+            total_valor += val
+        linhas_matriz.append(
+            {
+                'codigo': codigo,
+                'label': label,
+                'meses': meses_cel,
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+            }
+        )
+
+    totais_mes = [
+        {
+            'qt': ctx['resumo_quantidade_total'],
+            'valor_fmt': ctx['resumo_valor_total_fmt'],
+        }
+        for ctx in ctx_por_mes
+    ]
+    return {
+        'modalidades_matriz_linhas': linhas_matriz,
+        'modalidades_matriz_totais_mes': totais_mes,
+    }
+
+
+def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
+    """Formas de pagamento e aguardando faturamento por mês (qt · valor)."""
+    pag_por_mes: list[dict[str, Decimal]] = []
+    aguard_por_mes: list[dict[str, Decimal]] = []
+    pag_qt_por_mes: list[dict[str, int]] = []
+    aguard_qt_por_mes: list[dict[str, int]] = []
+
+    for mes in range(1, 13):
+        sub = _filtrar_linhas_mes_ano(linhas, ano, mes)
+        pag, aguard, _ = recomputar_resumos_acerto_caixa_de_linhas(sub)
+        pag_por_mes.append(dict(pag))
+        aguard_por_mes.append(dict(aguard))
+        pag_qt_por_mes.append(_contagem_formas_pagamento_mes(sub))
+        aguard_qt: dict[str, int] = defaultdict(int)
+        for linha in sub:
+            if not linha.get('aguardando_faturamento'):
+                continue
+            conv = (linha.get('convenio') or '-').strip() or '-'
+            aguard_qt[conv] += 1
+        aguard_qt_por_mes.append(dict(aguard_qt))
+
+    pag_keys = sorted(
+        {k for d in pag_por_mes for k in d},
+        key=lambda k: -sum(d.get(k, Decimal('0')) for d in pag_por_mes),
+    )
+    aguard_keys = sorted(
+        {k for d in aguard_por_mes for k in d},
+        key=lambda k: (
+            -sum(d.get(k, Decimal('0')) for d in aguard_por_mes),
+            k.lower(),
+        ),
+    )
+
+    def _celulas_mes(
+        keys: list[str],
+        valores: list[dict[str, Decimal]],
+        contagens: list[dict[str, int]],
+    ) -> list[dict]:
+        out: list[dict] = []
+        for chave in keys:
+            meses_cel: list[dict] = []
+            total_qt = 0
+            total_valor = Decimal('0')
+            for i in range(12):
+                val = valores[i].get(chave, Decimal('0'))
+                qt = contagens[i].get(chave, 0)
+                meses_cel.append(
+                    {
+                        'qt': qt,
+                        'valor_fmt': _moeda_br(val) if val else _moeda_br(Decimal('0')),
+                    }
+                )
+                total_qt += qt
+                total_valor += val
+            out.append(
+                {
+                    'rotulo': chave,
+                    'meses': meses_cel,
+                    'total_qt': total_qt,
+                    'total_valor_fmt': _moeda_br(total_valor),
+                }
+            )
+        return out
+
+    totais_mes: list[dict] = []
+    for i in range(12):
+        pag_t = sum(pag_por_mes[i].values(), Decimal('0'))
+        ag_t = sum(aguard_por_mes[i].values(), Decimal('0'))
+        totais_mes.append(
+            {
+                'valor_fmt': _moeda_br(pag_t + ag_t),
+                'pagamento_fmt': _moeda_br(pag_t),
+                'aguardando_fmt': _moeda_br(ag_t),
+            }
+        )
+
+    return {
+        'pagamento_matriz_formas': _celulas_mes(pag_keys, pag_por_mes, pag_qt_por_mes),
+        'pagamento_matriz_aguardando': _celulas_mes(
+            aguard_keys, aguard_por_mes, aguard_qt_por_mes
+        ),
+        'pagamento_matriz_totais_mes': totais_mes,
+    }
+
+
+def montar_contexto_matriz_anual_acerto(linhas: list[dict], di: date, df: date) -> dict:
+    if not periodo_eh_ano_inteiro(di, df):
+        return {'resumo_matriz_anual': False}
+    ano = di.year
+    return {
+        'resumo_matriz_anual': True,
+        'resumo_matriz_ano': ano,
+        'resumo_meses_colunas': montar_colunas_meses_resumo(),
+        **montar_resumo_modalidades_matriz_mes(linhas, ano),
+        **montar_resumo_pagamento_matriz_mes(linhas, ano),
+    }
+
+
 def montar_blocos_impressao_acerto_caixa(
     linhas: list[dict],
     resumo_por_caixa: list[dict],
@@ -1503,6 +1707,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_viabilidade_por_mes = montar_resumo_viabilidade_por_mes_acerto(
         linhas_grade, regua_ctx['regua_ano']
     )
+    matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
 
     return {
         'linhas': linhas_grade,
@@ -1535,4 +1740,5 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
         'resumo_viabilidade_por_mes': resumo_viabilidade_por_mes,
         'resumo_viabilidade_por_mes_ano': regua_ctx['regua_ano'],
+        **matriz_anual_ctx,
     }

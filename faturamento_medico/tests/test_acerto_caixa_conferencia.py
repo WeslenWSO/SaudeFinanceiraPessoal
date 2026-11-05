@@ -14,6 +14,8 @@ from faturamento_medico.services.acerto_caixa import (
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
     montar_resumo_viabilidade_por_mes_acerto,
+    montar_contexto_matriz_anual_acerto,
+    periodo_eh_ano_inteiro,
     recomputar_resumos_acerto_caixa_de_linhas,
     url_query_acerto_caixa,
 )
@@ -135,7 +137,12 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertIn('data_inicio=2026-11-01', nov['url_query'])
         self.assertIn('data_fim=2026-11-30', nov['url_query'])
         self.assertEqual(len(ctx['regua_botoes_anos']), 9)
-        ativo_2026 = next(b for b in ctx['regua_botoes_anos'] if b['ano'] == 2026)
+        btn_2026 = next(b for b in ctx['regua_botoes_anos'] if b['ano'] == 2026)
+        self.assertTrue(btn_2026['parcial'])
+        ctx_ano = montar_regua_dias_acerto(
+            filtros, date(2026, 1, 1), date(2026, 12, 31)
+        )
+        ativo_2026 = next(b for b in ctx_ano['regua_botoes_anos'] if b['ano'] == 2026)
         self.assertTrue(ativo_2026['ativo'])
 
     def test_resumo_bate_soma_valor_pago_linhas(self):
@@ -204,3 +211,51 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(blocos[1]['total_qt'], 2)
         self.assertFalse(blocos[2]['tem_dados'])
         self.assertEqual(blocos[11]['label'], 'Dezembro')
+
+    def test_matriz_anual_modalidade_e_pagamento_por_mes(self):
+        self.assertTrue(
+            periodo_eh_ano_inteiro(date(2026, 1, 1), date(2026, 12, 31))
+        )
+        self.assertFalse(
+            periodo_eh_ano_inteiro(date(2026, 11, 1), date(2026, 11, 30))
+        )
+        linhas = [
+            {
+                'data_iso': '2026-01-10',
+                'faturamento_id': 1,
+                'convenio': 'CASSI',
+                'modalidade': 'US',
+                'codigo_servico': 'US',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('100')}],
+                'forma_pgto': 'PIX',
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+            {
+                'data_iso': '2026-02-10',
+                'faturamento_id': 2,
+                'convenio': 'GEAP',
+                'modalidade': 'MR',
+                'codigo_servico': 'MR',
+                'valor_pago': Decimal('200'),
+                'aguardando_faturamento': False,
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('200')}],
+                'forma_pgto': 'PIX',
+                'caixa_acerto': '',
+                'caixa_exibicao': 'Cx',
+            },
+        ]
+        ctx = montar_contexto_matriz_anual_acerto(
+            linhas, date(2026, 1, 1), date(2026, 12, 31)
+        )
+        self.assertTrue(ctx['resumo_matriz_anual'])
+        us = next(
+            r for r in ctx['modalidades_matriz_linhas'] if r['codigo'] == 'US'
+        )
+        self.assertEqual(us['meses'][0]['qt'], 1)
+        self.assertEqual(us['meses'][1]['qt'], 0)
+        pix = next(r for r in ctx['pagamento_matriz_formas'] if r['rotulo'] == 'PIX')
+        self.assertEqual(pix['meses'][0]['qt'], 1)
+        self.assertEqual(pix['meses'][1]['qt'], 1)

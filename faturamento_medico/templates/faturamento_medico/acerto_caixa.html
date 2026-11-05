@@ -474,6 +474,69 @@
     font-size: 0.68rem;
     color: #94a3b8;
 }
+.acerto-matriz-anual-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+}
+.acerto-matriz-anual {
+    width: max-content;
+    min-width: 100%;
+    font-size: 0.65rem;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.acerto-matriz-anual th,
+.acerto-matriz-anual td {
+    padding: 0.2rem 0.35rem;
+    border: 1px solid #e2e8f0;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.acerto-matriz-anual thead th {
+    background: #f1f5f9;
+    font-weight: 700;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.acerto-matriz-anual .col-fixa {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: #fff;
+    min-width: 9rem;
+    max-width: 14rem;
+    white-space: normal;
+    text-align: left;
+    font-weight: 600;
+}
+.acerto-matriz-anual thead .col-fixa { z-index: 4; background: #e2e8f0; }
+.acerto-matriz-anual .subcol { min-width: 2.1rem; text-align: center; }
+.acerto-matriz-anual .subcol-val { min-width: 3.5rem; text-align: right; }
+.acerto-matriz-anual tr.row-total td { background: #eff6ff; font-weight: 700; }
+.acerto-matriz-anual tr.row-secao td {
+    background: #f8fafc;
+    font-weight: 700;
+    font-size: 0.68rem;
+    color: #475569;
+}
+.acerto-matriz-anual-badge {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #1e40af;
+    background: #dbeafe;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    margin-left: 0.35rem;
+}
 </style>
 <div class="container-fluid">
     <div class="card shadow-sm">
@@ -1164,11 +1227,75 @@
             </div>
             <div class="modal-body">
                 <div class="row g-3 mb-3">
-                    <div class="col-lg-5">
+                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-5{% endif %}">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-wallet"></i> Formas de pagamento
+                                {% if resumo_matriz_anual %}
+                                <span class="acerto-matriz-anual-badge">Ano {{ resumo_matriz_ano }} · colunas por mês</span>
+                                {% endif %}
                             </div>
+                            {% if resumo_matriz_anual %}
+                            <div class="acerto-matriz-anual-wrap mb-2">
+                                <table class="acerto-matriz-anual mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-fixa" rowspan="2">Forma / convênio</th>
+                                            {% for col in resumo_meses_colunas %}
+                                            <th colspan="2">{{ col.label_curto }}</th>
+                                            {% endfor %}
+                                            <th colspan="2">Total ano</th>
+                                        </tr>
+                                        <tr>
+                                            {% for col in resumo_meses_colunas %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                            {% endfor %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in pagamento_matriz_formas %}
+                                        <tr>
+                                            <td class="col-fixa">{{ row.rotulo }}</td>
+                                            {% for cel in row.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ row.total_qt }}</td>
+                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% if pagamento_matriz_aguardando %}
+                                        <tr class="row-secao">
+                                            <td class="col-fixa" colspan="{{ resumo_meses_colunas|length|add:resumo_meses_colunas|length|add:3 }}">Aguardando faturamento</td>
+                                        </tr>
+                                        {% for row in pagamento_matriz_aguardando %}
+                                        <tr>
+                                            <td class="col-fixa ps-2">{{ row.rotulo }}</td>
+                                            {% for cel in row.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ row.total_qt }}</td>
+                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                        <tr class="row-total">
+                                            <td class="col-fixa">Total geral</td>
+                                            {% for tot in pagamento_matriz_totais_mes %}
+                                            <td class="subcol">—</td>
+                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">—</td>
+                                            <td class="subcol-val">{{ total_resumo_geral_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
                             <table class="table table-sm acerto-modal-table acerto-modal-pagamento mb-0">
                                 <tbody>
                                     {% for row in resumo_pagamento %}
@@ -1191,6 +1318,7 @@
                                     {% endif %}
                                 </tbody>
                             </table>
+                            {% endif %}
                             <div class="acerto-modal-kpi">
                                 <div class="acerto-modal-kpi-item">
                                     <div class="label">Total geral</div>
@@ -1203,7 +1331,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-7">
+                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-7{% endif %}">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-chart-pie"></i> Por modalidade (R$)
@@ -1215,11 +1343,59 @@
                     </div>
                 </div>
                 <div class="row g-3">
-                    <div class="col-lg-6">
+                    <div class="{% if resumo_matriz_anual %}col-12{% else %}col-lg-6{% endif %}">
                         <div class="acerto-modal-panel">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — qt · valor pago
+                                {% if resumo_matriz_anual %}
+                                <span class="acerto-matriz-anual-badge">Ano {{ resumo_matriz_ano }}</span>
+                                {% endif %}
                             </div>
+                            {% if resumo_matriz_anual %}
+                            <div class="acerto-matriz-anual-wrap">
+                                <table class="acerto-matriz-anual mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-fixa" rowspan="2">Modalidade</th>
+                                            {% for col in resumo_meses_colunas %}
+                                            <th colspan="2">{{ col.label_curto }}</th>
+                                            {% endfor %}
+                                            <th colspan="2">Total ano</th>
+                                        </tr>
+                                        <tr>
+                                            {% for col in resumo_meses_colunas %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                            {% endfor %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in modalidades_matriz_linhas %}
+                                        <tr>
+                                            <td class="col-fixa">{{ item.label }}</td>
+                                            {% for cel in item.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ item.total_qt }}</td>
+                                            <td class="subcol-val">{{ item.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="row-total">
+                                            <td class="col-fixa">Total</td>
+                                            {% for tot in modalidades_matriz_totais_mes %}
+                                            <td class="subcol">{{ tot.qt }}</td>
+                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ resumo_quantidade_total }}</td>
+                                            <td class="subcol-val">{{ resumo_valor_total_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
                             <div class="table-responsive">
                                 <table class="table table-sm acerto-modal-table mb-0">
                                     <thead>
@@ -1245,6 +1421,7 @@
                                     </tbody>
                                 </table>
                             </div>
+                            {% endif %}
                             {% if modalidades_fora_resumo %}
                             <div class="acerto-modal-alerta">
                                 <strong>Fora do padrão:</strong>
