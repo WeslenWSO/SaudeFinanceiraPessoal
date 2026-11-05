@@ -543,6 +543,19 @@
 .acerto-matriz-anual .subcol-val { min-width: 3.5rem; text-align: right; }
 .acerto-matriz-anual tr.row-total td { background: #eff6ff; font-weight: 700; }
 .acerto-matriz-anual th.dia-fim-semana { color: #64748b; font-weight: 600; }
+.acerto-matriz-por-dia th.dia-zebra-a,
+.acerto-matriz-por-dia td.dia-zebra-a {
+    background: #dbeafe;
+}
+.acerto-matriz-por-dia th.dia-zebra-b,
+.acerto-matriz-por-dia td.dia-zebra-b {
+    background: #ffffff;
+}
+.acerto-matriz-por-dia thead th.dia-zebra-a { background: #bfdbfe; }
+.acerto-matriz-por-dia thead th.dia-zebra-b { background: #f8fafc; }
+.acerto-matriz-por-dia tr.row-total td.dia-zebra-a { background: #93c5fd; }
+.acerto-matriz-por-dia tr.row-total td.dia-zebra-b { background: #eff6ff; }
+.acerto-matriz-por-dia tr.row-secao td { background: #f1f5f9; }
 .acerto-matriz-anual tr.row-secao td {
     background: #f8fafc;
     font-weight: 700;
@@ -1390,8 +1403,8 @@
                                         <tr>
                                             <td class="col-fixa">{{ row.rotulo }}</td>
                                             {% for cel in row.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ row.total_qt }}</td>
                                             <td class="subcol-val">{{ row.total_valor_fmt }}</td>
@@ -1405,8 +1418,8 @@
                                         <tr>
                                             <td class="col-fixa ps-2">{{ row.rotulo }}</td>
                                             {% for cel in row.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ row.total_qt }}</td>
                                             <td class="subcol-val">{{ row.total_valor_fmt }}</td>
@@ -1528,20 +1541,20 @@
                                 <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
                             </div>
                             <div class="acerto-matriz-anual-wrap">
-                                <table class="acerto-matriz-anual mb-0">
+                                <table class="acerto-matriz-anual acerto-matriz-por-dia mb-0">
                                     <thead>
                                         <tr>
                                             <th class="col-fixa" rowspan="2">Modalidade</th>
                                             {% for col in resumo_dias_colunas %}
-                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                            <th colspan="2" class="dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}{% if col.fim_semana %} dia-fim-semana{% endif %}"
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">Qt</th>
+                                            <th class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">R$</th>
                                             {% endfor %}
                                             <th class="subcol">Qt</th>
                                             <th class="subcol-val">R$</th>
@@ -1552,8 +1565,8 @@
                                         <tr>
                                             <td class="col-fixa">{{ item.label }}</td>
                                             {% for cel in item.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ item.total_qt }}</td>
                                             <td class="subcol-val">{{ item.total_valor_fmt }}</td>
@@ -1562,8 +1575,8 @@
                                         <tr class="row-total">
                                             <td class="col-fixa">Total</td>
                                             {% for tot in modalidades_matriz_dia_totais %}
-                                            <td class="subcol">{{ tot.qt }}</td>
-                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ resumo_quantidade_total }}</td>
                                             <td class="subcol-val">{{ resumo_valor_total_fmt }}</td>
@@ -1580,20 +1593,20 @@
                                 <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
                             </div>
                             <div class="acerto-matriz-anual-wrap">
-                                <table class="acerto-matriz-anual mb-0">
+                                <table class="acerto-matriz-anual acerto-matriz-por-dia mb-0">
                                     <thead>
                                         <tr>
                                             <th class="col-fixa" rowspan="2">Viabilidade</th>
                                             {% for col in resumo_dias_colunas %}
-                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                            <th colspan="2" class="dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}{% if col.fim_semana %} dia-fim-semana{% endif %}"
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">Qt</th>
+                                            <th class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">R$</th>
                                             {% endfor %}
                                             <th class="subcol">Qt</th>
                                             <th class="subcol-val">R$</th>
@@ -1604,8 +1617,8 @@
                                         <tr>
                                             <td class="col-fixa">{{ row.viabilidade|truncatechars:36 }}</td>
                                             {% for cel in row.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ row.total_qt }}</td>
                                             <td class="subcol-val">{{ row.total_valor_fmt }}</td>
@@ -1614,8 +1627,8 @@
                                         <tr class="row-total">
                                             <td class="col-fixa">Total</td>
                                             {% for tot in viabilidade_matriz_dia_totais %}
-                                            <td class="subcol">{{ tot.qt }}</td>
-                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ resumo_viabilidade_total_qt }}</td>
                                             <td class="subcol-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
@@ -1632,20 +1645,20 @@
                                 <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
                             </div>
                             <div class="acerto-matriz-anual-wrap mb-2">
-                                <table class="acerto-matriz-anual mb-0">
+                                <table class="acerto-matriz-anual acerto-matriz-por-dia mb-0">
                                     <thead>
                                         <tr>
                                             <th class="col-fixa" rowspan="2">Forma / convênio</th>
                                             {% for col in resumo_dias_colunas %}
-                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                            <th colspan="2" class="dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}{% if col.fim_semana %} dia-fim-semana{% endif %}"
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">Qt</th>
+                                            <th class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">R$</th>
                                             {% endfor %}
                                             <th class="subcol">Qt</th>
                                             <th class="subcol-val">R$</th>
@@ -1656,8 +1669,8 @@
                                         <tr>
                                             <td class="col-fixa">{{ row.rotulo }}</td>
                                             {% for cel in row.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ row.total_qt }}</td>
                                             <td class="subcol-val">{{ row.total_valor_fmt }}</td>
@@ -1671,8 +1684,8 @@
                                         <tr>
                                             <td class="col-fixa ps-2">{{ row.rotulo }}</td>
                                             {% for cel in row.meses %}
-                                            <td class="subcol">{{ cel.qt }}</td>
-                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">{{ row.total_qt }}</td>
                                             <td class="subcol-val">{{ row.total_valor_fmt }}</td>
@@ -1682,8 +1695,8 @@
                                         <tr class="row-total">
                                             <td class="col-fixa">Total geral</td>
                                             {% for tot in pagamento_matriz_dia_totais %}
-                                            <td class="subcol">—</td>
-                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">—</td>
+                                            <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
                                             <td class="subcol">—</td>
                                             <td class="subcol-val">{{ total_resumo_geral_fmt }}</td>
