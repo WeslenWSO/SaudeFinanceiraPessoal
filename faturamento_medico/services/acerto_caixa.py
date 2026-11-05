@@ -1973,7 +1973,8 @@ def montar_blocos_impressao_acerto_caixa(
     return blocos
 
 
-def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
+def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
+    """Carrega linhas da grade conforme filtros GET (tela + drill-down AJAX)."""
     hoje = date.today()
     di_padrao, df_padrao = _periodo_padrao(hoje)
     di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
@@ -2233,6 +2234,47 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         _carregar_mapa_apelidos_solicitante(empresa_id),
     )
 
+    return {
+        'di': di,
+        'df': df,
+        'linhas': linhas,
+        'linhas_grade': linhas_grade,
+        'filtros_dict': filtros_dict,
+        'status_disponiveis': status_disponiveis,
+        'checkin_disponiveis': checkin_disponiveis,
+        'convenios_disponiveis': convenios_disponiveis,
+        'fechamentos_caixa': fechamentos_caixa,
+        'pode_fechar_caixa': pode_fechar_caixa,
+    }
+
+
+def montar_detalhe_solicitante_acerto_por_nome(
+    linhas_grade: list[dict], nome: str
+) -> dict | None:
+    """Um médico solicitante: modalidade, viabilidade e pagamento (drill-down)."""
+    chave = (nome or '').strip()
+    if not chave:
+        return None
+    sub = [l for l in linhas_grade if _chave_medico_solicitante_linha(l) == chave]
+    if not sub:
+        return None
+    return montar_detalhe_medico_solicitante_acerto(sub).get(chave)
+
+
+def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
+    base = montar_linhas_grade_acerto_caixa(request, empresa_id)
+    di = base['di']
+    df = base['df']
+    linhas = base['linhas']
+    linhas_grade = base['linhas_grade']
+    filtros_dict = base['filtros_dict']
+    status_disponiveis = base['status_disponiveis']
+    checkin_disponiveis = base['checkin_disponiveis']
+    convenios_disponiveis = base['convenios_disponiveis']
+    fechamentos_caixa = base['fechamentos_caixa']
+    pode_fechar_caixa = base['pode_fechar_caixa']
+    caixas_sel = list(filtros_dict.get('caixa') or [])
+
     if caixas_sel:
         nome_caixa_acerto = ', '.join(rotulo_caixa_acerto(c, empresa_id) for c in caixas_sel)
     else:
@@ -2290,7 +2332,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     resumo_solicitante = montar_resumo_solicitante_acerto(linhas_grade)
     total_sol_qt = sum(r['quantidade'] for r in resumo_solicitante)
     total_sol_valor = sum((r['valor'] for r in resumo_solicitante), Decimal('0'))
-    resumo_solicitante_detalhes = montar_detalhe_medico_solicitante_acerto(linhas_grade)
+    # Drill-down carregado via AJAX (evita HTML pesado / timeout no Render).
+    resumo_solicitante_detalhes: dict = {}
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
     matriz_mes_dia_ctx = montar_contexto_matriz_mensal_por_dia(linhas_grade, di, df)

@@ -2345,7 +2345,6 @@
 {{ grafico_convenio_valores|json_script:"acerto-graf-conv-valores" }}
 {{ grafico_solicitante_labels|json_script:"acerto-graf-sol-labels" }}
 {{ grafico_solicitante_valores|json_script:"acerto-graf-sol-valores" }}
-{{ resumo_solicitante_detalhes|json_script:"acerto-solicitante-detalhes" }}
 {{ grafico_torre_usar_meses|json_script:"acerto-graf-torre-usar-meses" }}
 {{ grafico_torre_meses_labels|json_script:"acerto-graf-torre-meses-labels" }}
 {{ grafico_torre_meses_modalidade_valores|json_script:"acerto-graf-torre-meses-mod-valores" }}
@@ -2606,7 +2605,8 @@
     }
     abrirResumoSePedidoNaUrl();
 
-    var detalhesSolicitante = parseJsonScript('acerto-solicitante-detalhes', {});
+    var acertoDetalheSolUrl = '{% url "faturamento_medico:acerto_caixa_detalhe_solicitante" %}';
+    var acertoDetalheSolQs = '{{ redirect_qs|escapejs }}';
     var modalDetalheSol = document.getElementById('modalDetalheSolicitanteAcerto');
     var tbodyDetMod = document.querySelector('.js-detalhe-sol-modalidade');
     var tbodyDetViab = document.querySelector('.js-detalhe-sol-viabilidade');
@@ -2619,13 +2619,7 @@
         return d.innerHTML;
     }
 
-    function abrirDetalheSolicitante(nome) {
-        if (!nome || !modalDetalheSol) return;
-        var bloco = detalhesSolicitante[nome];
-        if (!bloco) {
-            alert('Sem detalhes para este solicitante no período filtrado.');
-            return;
-        }
+    function preencherDetalheSolicitante(bloco, nome) {
         if (tituloDetNome) tituloDetNome.textContent = nome;
         if (tbodyDetMod) {
             var htmlM = '';
@@ -2667,15 +2661,39 @@
             }
             tbodyDetPag.innerHTML = htmlP || '<tr><td colspan="2" class="text-muted text-center py-3">Sem dados.</td></tr>';
         }
-        function showModal() {
-            if (!window.bootstrap || !window.bootstrap.Modal) return;
-            bootstrap.Modal.getOrCreateInstance(modalDetalheSol).show();
-        }
-        if (window.bootstrap && window.bootstrap.Modal) {
-            showModal();
-        } else {
-            window.addEventListener('load', showModal, { once: true });
-        }
+    }
+
+    function showModalDetalheSolicitante() {
+        if (!window.bootstrap || !window.bootstrap.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(modalDetalheSol).show();
+    }
+
+    function abrirDetalheSolicitante(nome) {
+        if (!nome || !modalDetalheSol) return;
+        if (tituloDetNome) tituloDetNome.textContent = nome;
+        var loadingRow = '<tr><td colspan="3" class="text-muted text-center py-3">Carregando…</td></tr>';
+        if (tbodyDetMod) tbodyDetMod.innerHTML = loadingRow;
+        if (tbodyDetViab) tbodyDetViab.innerHTML = loadingRow;
+        if (tbodyDetPag) tbodyDetPag.innerHTML = '<tr><td colspan="2" class="text-muted text-center py-3">Carregando…</td></tr>';
+        showModalDetalheSolicitante();
+        var qs = acertoDetalheSolQs ? (acertoDetalheSolQs + '&') : '';
+        qs += 'solicitante=' + encodeURIComponent(nome);
+        fetch(acertoDetalheSolUrl + '?' + qs, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(resp) {
+            return resp.json().then(function(data) {
+                return { ok: resp.ok, data: data };
+            });
+        }).then(function(result) {
+            if (!result.ok) {
+                alert((result.data && result.data.error) || 'Não foi possível carregar os detalhes.');
+                return;
+            }
+            preencherDetalheSolicitante(result.data, nome);
+        }).catch(function() {
+            alert('Erro de rede ao carregar os detalhes do solicitante.');
+        });
     }
 
     document.querySelectorAll('.js-acerto-solicitante-row').forEach(function(tr) {

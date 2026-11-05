@@ -15,6 +15,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_resumo_viabilidade_acerto,
     aplicar_rotulo_solicitante_resumo_linhas,
     montar_detalhe_medico_solicitante_acerto,
+    montar_detalhe_solicitante_acerto_por_nome,
     montar_resumo_solicitante_acerto,
     montar_resumo_viabilidade_matriz_mes,
     montar_resumo_viabilidade_por_mes_acerto,
@@ -440,6 +441,24 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         rotulos = [p['rotulo'] for p in det['Dr. A']['pagamento']]
         self.assertIn('PIX', rotulos)
         self.assertIn('Dinheiro', rotulos)
+
+    def test_detalhe_solicitante_por_nome(self):
+        linhas = [
+            {
+                'faturamento_id': 1,
+                'medico_solicitante': 'Dr. A',
+                'convenio': 'FUSEX',
+                'modalidade': 'US',
+                'valor_pago': Decimal('100'),
+                'aguardando_faturamento': False,
+                'forma_pgto': 'PIX',
+                'pagamentos_acerto': [],
+            },
+        ]
+        aplicar_rotulo_solicitante_resumo_linhas(linhas, {})
+        bloco = montar_detalhe_solicitante_acerto_por_nome(linhas, 'Dr. A')
+        self.assertIsNotNone(bloco)
+        self.assertGreaterEqual(len(bloco['modalidade']), 1)
 
     def test_grafico_convenio_torre(self):
         viab = [

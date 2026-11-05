@@ -70,6 +70,11 @@ urlpatterns = [
     path('exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('conferencia/', views.conferencia_faturamento, name='conferencia'),
     path('acerto-caixa/', views.acerto_caixa, name='acerto_caixa'),
+    path(
+        'acerto-caixa/detalhe-solicitante/',
+        views.acerto_caixa_detalhe_solicitante,
+        name='acerto_caixa_detalhe_solicitante',
+    ),
     path('acerto-caixa/imprimir/', views.imprimir_acerto_caixa, name='imprimir_acerto_caixa'),
     path(
         'acerto-caixa/salvar-faturamento/',

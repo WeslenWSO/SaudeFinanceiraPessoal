@@ -6191,7 +6191,12 @@ def _tratar_falha_acerto_caixa(request, exc, *, empresa_id, logger):
             'Confira os logs do servidor ou execute python manage.py migrate no Render.'
         )
     messages.error(request, msg)
-    return redirect('faturamento_medico:ftlistar')
+    try:
+        return redirect('faturamento_medico:ftlistar')
+    except Exception:
+        from django.http import HttpResponse
+
+        return HttpResponse(msg, status=503, content_type='text/plain; charset=utf-8')
 
 
 @login_required
@@ -6220,6 +6225,46 @@ def acerto_caixa(request):
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
     except Exception as exc:
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
+
+
+@login_required
+def acerto_caixa_detalhe_solicitante(request):
+    """AJAX: drill-down do médico solicitante (modalidade, viabilidade, pagamento)."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
+    nome = (request.GET.get('solicitante') or '').strip()
+    if not nome:
+        return JsonResponse({'error': 'Informe o solicitante.'}, status=400)
+    try:
+        from faturamento_medico.services.acerto_caixa import (
+            montar_detalhe_solicitante_acerto_por_nome,
+            montar_linhas_grade_acerto_caixa,
+        )
+
+        base = montar_linhas_grade_acerto_caixa(request, empresa_id)
+        bloco = montar_detalhe_solicitante_acerto_por_nome(
+            base['linhas_grade'],
+            nome,
+        )
+        if not bloco:
+            return JsonResponse(
+                {'error': 'Sem detalhes para este solicitante no período filtrado.'},
+                status=404,
+            )
+        return JsonResponse(bloco)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            'acerto_caixa_detalhe_solicitante empresa=%s solicitante=%r',
+            empresa_id,
+            nome,
+        )
+        return JsonResponse(
+            {'error': 'Não foi possível carregar os detalhes. Tente novamente.'},
+            status=500,
+        )
 
 
 @login_required
