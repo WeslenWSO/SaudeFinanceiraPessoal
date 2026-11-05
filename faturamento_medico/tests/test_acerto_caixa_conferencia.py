@@ -223,27 +223,36 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         linhas = [
             {
                 'data_iso': '2026-11-03',
+                'faturamento_id': 1,
                 'convenio': 'CASSI',
                 'modalidade': 'US',
                 'codigo_servico': 'US',
                 'valor_pago': Decimal('100'),
                 'aguardando_faturamento': False,
+                'forma_pgto': 'PIX',
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('100')}],
             },
             {
                 'data_iso': '2026-11-03',
+                'faturamento_id': 2,
                 'convenio': 'GEAP',
                 'modalidade': 'MR',
                 'codigo_servico': 'MR',
                 'valor_pago': Decimal('200'),
                 'aguardando_faturamento': False,
+                'forma_pgto': 'PIX',
+                'pagamentos_acerto': [{'rotulo': 'PIX', 'valor': Decimal('200')}],
             },
             {
                 'data_iso': '2026-11-05',
+                'faturamento_id': 3,
                 'convenio': 'CASSI',
                 'modalidade': 'US',
                 'codigo_servico': 'US',
                 'valor_pago': Decimal('50'),
                 'aguardando_faturamento': False,
+                'forma_pgto': 'DINHEIRO',
+                'pagamentos_acerto': [],
             },
         ]
         ctx = montar_contexto_matriz_mensal_por_dia(
@@ -264,6 +273,10 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(cassi['meses'][4]['qt'], 1)
         self.assertEqual(ctx['modalidades_matriz_dia_totais'][2]['qt'], 2)
         self.assertEqual(ctx['modalidades_matriz_dia_totais'][4]['qt'], 1)
+        pix = next(
+            r for r in ctx['pagamento_matriz_dia_formas'] if r['rotulo'] == 'PIX'
+        )
+        self.assertEqual(pix['meses'][2]['qt'], 1)
 
     def test_matriz_mes_por_dia_nao_aplica_fora_mes_inteiro(self):
         ctx = montar_contexto_matriz_mensal_por_dia(

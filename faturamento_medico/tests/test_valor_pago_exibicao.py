@@ -5,6 +5,7 @@ from django.test import SimpleTestCase
 
 from faturamento_medico.services.valor_pago_exibicao import (
     sincronizar_valor_pago_apos_preco,
+    valor_agregacao_analises,
     valor_pago_para_exibicao,
 )
 
@@ -58,3 +59,13 @@ class ValorPagoExibicaoTest(SimpleTestCase):
                 valor_pago=Decimal('856.10'),
             )
             self.assertEqual(item.valor_pago, Decimal('856.10'))
+
+    def test_agregacao_analises_usa_liquido_quando_ris_menor_que_tabela(self):
+        item = _item(total=Decimal('570'), valor_pago=Decimal('220'))
+        fat = MagicMock(status_agendamento='Concluído')
+        self.assertEqual(valor_agregacao_analises(item, fat), Decimal('570'))
+
+    def test_agregacao_analises_aguardando_sem_pago_usa_total(self):
+        item = _item(total=Decimal('150'), valor_pago=None)
+        fat = MagicMock(status_agendamento='Aguardando faturamento')
+        self.assertEqual(valor_agregacao_analises(item, fat), Decimal('150'))

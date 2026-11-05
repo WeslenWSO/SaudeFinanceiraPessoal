@@ -1078,7 +1078,7 @@ def montar_resumo_modalidades_acerto(
     detalhe_fora: dict[str, dict] = {}
 
     for linha in linhas:
-        val_item = _valor_pago_resumo_linha(linha)
+        val_item = _valor_contabil_linha_acerto(linha)
         valor_total += val_item
 
         codigo_mod = _codigo_modalidade_para_resumo_acerto(linha)
@@ -1663,29 +1663,122 @@ def montar_contexto_matriz_mensal_por_dia(
         'matriz_mes_colspan_secao': len(colunas) * 2 + 3,
         **montar_resumo_modalidades_matriz_dia(linhas, colunas),
         **montar_resumo_viabilidade_matriz_dia(linhas, colunas),
+        **montar_resumo_pagamento_matriz_dia(linhas, colunas),
     }
 
 
-def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
-    """Formas de pagamento e aguardando faturamento por mês (qt · valor)."""
-    pag_por_mes: list[dict[str, Decimal]] = []
-    aguard_por_mes: list[dict[str, Decimal]] = []
-    pag_qt_por_mes: list[dict[str, int]] = []
-    aguard_qt_por_mes: list[dict[str, int]] = []
+def _matriz_pagamento_linhas_celulas(
+    keys: list[str],
+    valores_por_col: list[dict[str, Decimal]],
+    contagens_por_col: list[dict[str, int]],
+) -> list[dict]:
+    n = len(valores_por_col)
+    out: list[dict] = []
+    for chave in keys:
+        celulas: list[dict] = []
+        total_qt = 0
+        total_valor = Decimal('0')
+        for i in range(n):
+            val = valores_por_col[i].get(chave, Decimal('0'))
+            qt = contagens_por_col[i].get(chave, 0)
+            celulas.append(
+                {
+                    'qt': qt,
+                    'valor_fmt': _moeda_br(val) if val else _moeda_br(Decimal('0')),
+                }
+            )
+            total_qt += qt
+            total_valor += val
+        out.append(
+            {
+                'rotulo': chave,
+                'meses': celulas,
+                'total_qt': total_qt,
+                'total_valor_fmt': _moeda_br(total_valor),
+            }
+        )
+    return out
 
-    for mes in range(1, 13):
-        sub = _filtrar_linhas_mes_ano(linhas, ano, mes)
+
+def _agregados_pagamento_por_subconjuntos(
+    subconjuntos: list[list[dict]],
+) -> tuple[
+    list[dict[str, Decimal]],
+    list[dict[str, Decimal]],
+    list[dict[str, int]],
+    list[dict[str, int]],
+]:
+    pag_por: list[dict[str, Decimal]] = []
+    aguard_por: list[dict[str, Decimal]] = []
+    pag_qt_por: list[dict[str, int]] = []
+    aguard_qt_por: list[dict[str, int]] = []
+    for sub in subconjuntos:
         pag, aguard, _ = recomputar_resumos_acerto_caixa_de_linhas(sub)
-        pag_por_mes.append(dict(pag))
-        aguard_por_mes.append(dict(aguard))
-        pag_qt_por_mes.append(_contagem_formas_pagamento_mes(sub))
+        pag_por.append(dict(pag))
+        aguard_por.append(dict(aguard))
+        pag_qt_por.append(_contagem_formas_pagamento_mes(sub))
         aguard_qt: dict[str, int] = defaultdict(int)
         for linha in sub:
             if not linha.get('aguardando_faturamento'):
                 continue
             conv = (linha.get('convenio') or '-').strip() or '-'
             aguard_qt[conv] += 1
-        aguard_qt_por_mes.append(dict(aguard_qt))
+        aguard_qt_por.append(dict(aguard_qt))
+    return pag_por, aguard_por, pag_qt_por, aguard_qt_por
+
+
+def montar_resumo_pagamento_matriz_dia(
+    linhas: list[dict], colunas_dias: list[dict]
+) -> dict:
+    """Formas de pagamento e aguardando faturamento por dia (qt · valor)."""
+    subs = [_filtrar_linhas_dia(linhas, col['iso']) for col in colunas_dias]
+    pag_por_dia, aguard_por_dia, pag_qt_por_dia, aguard_qt_por_dia = (
+        _agregados_pagamento_por_subconjuntos(subs)
+    )
+
+    pag_keys = sorted(
+        {k for d in pag_por_dia for k in d},
+        key=lambda k: -sum(d.get(k, Decimal('0')) for d in pag_por_dia),
+    )
+    aguard_keys = sorted(
+        {k for d in aguard_por_dia for k in d},
+        key=lambda k: (
+            -sum(d.get(k, Decimal('0')) for d in aguard_por_dia),
+            k.lower(),
+        ),
+    )
+
+    totais_dia: list[dict] = []
+    for i in range(len(colunas_dias)):
+        pag_t = sum(pag_por_dia[i].values(), Decimal('0'))
+        ag_t = sum(aguard_por_dia[i].values(), Decimal('0'))
+        total_dia = pag_t + ag_t
+        totais_dia.append(
+            {
+                'valor': total_dia,
+                'valor_fmt': _moeda_br(total_dia),
+                'pagamento_fmt': _moeda_br(pag_t),
+                'aguardando_fmt': _moeda_br(ag_t),
+            }
+        )
+
+    return {
+        'pagamento_matriz_dia_formas': _matriz_pagamento_linhas_celulas(
+            pag_keys, pag_por_dia, pag_qt_por_dia
+        ),
+        'pagamento_matriz_dia_aguardando': _matriz_pagamento_linhas_celulas(
+            aguard_keys, aguard_por_dia, aguard_qt_por_dia
+        ),
+        'pagamento_matriz_dia_totais': totais_dia,
+    }
+
+
+def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
+    """Formas de pagamento e aguardando faturamento por mês (qt · valor)."""
+    subs_mes = [_filtrar_linhas_mes_ano(linhas, ano, mes) for mes in range(1, 13)]
+    pag_por_mes, aguard_por_mes, pag_qt_por_mes, aguard_qt_por_mes = (
+        _agregados_pagamento_por_subconjuntos(subs_mes)
+    )
 
     pag_keys = sorted(
         {k for d in pag_por_mes for k in d},
@@ -1698,37 +1791,6 @@ def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
             k.lower(),
         ),
     )
-
-    def _celulas_mes(
-        keys: list[str],
-        valores: list[dict[str, Decimal]],
-        contagens: list[dict[str, int]],
-    ) -> list[dict]:
-        out: list[dict] = []
-        for chave in keys:
-            meses_cel: list[dict] = []
-            total_qt = 0
-            total_valor = Decimal('0')
-            for i in range(12):
-                val = valores[i].get(chave, Decimal('0'))
-                qt = contagens[i].get(chave, 0)
-                meses_cel.append(
-                    {
-                        'qt': qt,
-                        'valor_fmt': _moeda_br(val) if val else _moeda_br(Decimal('0')),
-                    }
-                )
-                total_qt += qt
-                total_valor += val
-            out.append(
-                {
-                    'rotulo': chave,
-                    'meses': meses_cel,
-                    'total_qt': total_qt,
-                    'total_valor_fmt': _moeda_br(total_valor),
-                }
-            )
-        return out
 
     totais_mes: list[dict] = []
     for i in range(12):
@@ -1745,8 +1807,10 @@ def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
         )
 
     return {
-        'pagamento_matriz_formas': _celulas_mes(pag_keys, pag_por_mes, pag_qt_por_mes),
-        'pagamento_matriz_aguardando': _celulas_mes(
+        'pagamento_matriz_formas': _matriz_pagamento_linhas_celulas(
+            pag_keys, pag_por_mes, pag_qt_por_mes
+        ),
+        'pagamento_matriz_aguardando': _matriz_pagamento_linhas_celulas(
             aguard_keys, aguard_por_mes, aguard_qt_por_mes
         ),
         'pagamento_matriz_totais_mes': totais_mes,

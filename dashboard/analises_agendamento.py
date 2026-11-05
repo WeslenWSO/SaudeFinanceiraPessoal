@@ -68,6 +68,7 @@ def kwargs_ranking_faturamento_analises(empresa_id: int) -> dict:
 
 LEGENDA_FILTRO_ANALISES = (
     'Faturamento: status de agendamento (RIS) — Aguardando faturamento e Concluído. '
+    'Valores: mesma regra da coluna Valor pago (acerto de caixa). '
     'Confirmado: pendência PACS (tela Conferência).'
 )
 

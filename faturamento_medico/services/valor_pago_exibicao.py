@@ -58,13 +58,42 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
 
 
 def valor_agregacao_analises(item: ItemServico | None, faturamento) -> Decimal:
-    """Relatórios de faturamento: valor_pago; se vazio ou zerado, campo valor do item."""
-    alvo = item if item is not None else faturamento
-    vp = _decimal_campo(getattr(alvo, 'valor_pago', None))
-    if vp is not None and vp != 0:
-        return vp
-    val = _decimal_campo(getattr(alvo, 'valor', None))
-    acrescimo = _decimal_campo(getattr(alvo, 'valor_acrescimo', None)) or Decimal('0')
+    """
+    Relatórios (Análises / dashboard): mesma base do acerto de caixa — coluna Valor pago.
+    Usa valor_pago_para_exibicao (tabela, acréscimo, desconto); aguardando faturamento
+    com valor vazio usa total/valor do item.
+    """
+    try:
+        from dashboard.analises_agendamento import eh_aguardando_faturamento_agendamento
+    except ImportError:
+        def eh_aguardando_faturamento_agendamento(_status):  # type: ignore[misc]
+            return False
+
+    aguardando = eh_aguardando_faturamento_agendamento(
+        getattr(faturamento, 'status_agendamento', None)
+    )
+
+    if item is not None:
+        vp = valor_pago_para_exibicao(item)
+        if vp is not None and vp > 0:
+            return vp
+        if aguardando:
+            bruto = item.total if item.total is not None else item.valor
+            try:
+                return Decimal(str(bruto or 0))
+            except Exception:
+                return Decimal('0')
+        return vp if vp is not None else Decimal('0')
+
+    vp_fat = _decimal_campo(getattr(faturamento, 'valor_pago', None))
+    if vp_fat is not None and vp_fat != 0:
+        return vp_fat
+    if aguardando:
+        tot = _decimal_campo(getattr(faturamento, 'total', None))
+        if tot is not None and tot > 0:
+            return tot
+    val = _decimal_campo(getattr(faturamento, 'valor', None))
+    acrescimo = _decimal_campo(getattr(faturamento, 'valor_acrescimo', None)) or Decimal('0')
     if val is not None:
         return val + acrescimo
     return Decimal('0')

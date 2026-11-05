@@ -1626,6 +1626,76 @@
                         </div>
                     </div>
                 </div>
+                <div class="row g-3 mb-2 resumo-visao-mes">
+                    <div class="col-12">
+                        <div class="acerto-modal-panel">
+                            <div class="acerto-modal-panel-title">
+                                <i class="fas fa-wallet"></i> Formas de pagamento — por dia
+                                <span class="acerto-matriz-anual-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span>
+                            </div>
+                            <div class="acerto-matriz-anual-wrap mb-2">
+                                <table class="acerto-matriz-anual mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-fixa" rowspan="2">Forma / convênio</th>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th colspan="2" class="{% if col.fim_semana %}dia-fim-semana{% endif %}"
+                                                title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
+                                            {% endfor %}
+                                            <th colspan="2">Total</th>
+                                        </tr>
+                                        <tr>
+                                            {% for col in resumo_dias_colunas %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                            {% endfor %}
+                                            <th class="subcol">Qt</th>
+                                            <th class="subcol-val">R$</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in pagamento_matriz_dia_formas %}
+                                        <tr>
+                                            <td class="col-fixa">{{ row.rotulo }}</td>
+                                            {% for cel in row.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ row.total_qt }}</td>
+                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% if pagamento_matriz_dia_aguardando %}
+                                        <tr class="row-secao">
+                                            <td class="col-fixa" colspan="{{ matriz_mes_colspan_secao|default:27 }}">Aguardando faturamento</td>
+                                        </tr>
+                                        {% for row in pagamento_matriz_dia_aguardando %}
+                                        <tr>
+                                            <td class="col-fixa ps-2">{{ row.rotulo }}</td>
+                                            {% for cel in row.meses %}
+                                            <td class="subcol">{{ cel.qt }}</td>
+                                            <td class="subcol-val">{{ cel.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">{{ row.total_qt }}</td>
+                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                        <tr class="row-total">
+                                            <td class="col-fixa">Total geral</td>
+                                            {% for tot in pagamento_matriz_dia_totais %}
+                                            <td class="subcol">—</td>
+                                            <td class="subcol-val">{{ tot.valor_fmt }}</td>
+                                            {% endfor %}
+                                            <td class="subcol">—</td>
+                                            <td class="subcol-val">{{ total_resumo_geral_fmt }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
                 <div class="row g-3 resumo-visao-mes">
                     <div class="col-lg-6">
