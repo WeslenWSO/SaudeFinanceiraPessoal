@@ -1510,28 +1510,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="row g-3 mb-3 acerto-modal-charts-grid">
-                    <div class="col-md-6">
-                        <div class="acerto-modal-panel">
-                            <div class="acerto-modal-panel-title">
-                                <i class="fas fa-chart-column"></i> Total por mês — valor pago (grade)
-                            </div>
-                            <div class="acerto-modal-chart-wrap">
-                                <canvas id="acertoGraficoTorreMesesModalidadeModal" aria-label="Torre mensal modalidade"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="acerto-modal-panel">
-                            <div class="acerto-modal-panel-title">
-                                <i class="fas fa-chart-column"></i> Total por mês — formas de pagamento
-                            </div>
-                            <div class="acerto-modal-chart-wrap">
-                                <canvas id="acertoGraficoTorreMesesPagamentoModal" aria-label="Torre mensal pagamento"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div class="row g-3 mb-3">
                     <div class="col-12">
                         <div class="acerto-modal-panel">
@@ -2578,21 +2556,7 @@
     function montarChartsModal() {
         if (typeof Chart === 'undefined') return;
         destruirChartsModal();
-        if (visaoResumoAtiva() === 'ano' && torreUsarMeses) {
-            var c1 = criarGraficoTorre(
-                document.getElementById('acertoGraficoTorreMesesModalidadeModal'),
-                mesesLabels,
-                mesesModValores,
-                ['#2563eb']
-            );
-            var c2 = criarGraficoTorre(
-                document.getElementById('acertoGraficoTorreMesesPagamentoModal'),
-                mesesLabels,
-                mesesPagValores,
-                ['#0d9488']
-            );
-            if (c1) chartsModal.push(c1);
-            if (c2) chartsModal.push(c2);
+        if (visaoResumoAtiva() === 'ano') {
             return;
         }
         var conv = criarGraficoTorre(
