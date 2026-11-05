@@ -15,6 +15,7 @@ from faturamento_medico.services.acerto_caixa import (
     montar_resumo_viabilidade_acerto,
     montar_resumo_viabilidade_por_mes_acerto,
     montar_contexto_matriz_anual_acerto,
+    montar_graficos_resumo_acerto_caixa,
     periodo_eh_ano_inteiro,
     recomputar_resumos_acerto_caixa_de_linhas,
     url_query_acerto_caixa,
@@ -259,3 +260,14 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         pix = next(r for r in ctx['pagamento_matriz_formas'] if r['rotulo'] == 'PIX')
         self.assertEqual(pix['meses'][0]['qt'], 1)
         self.assertEqual(pix['meses'][1]['qt'], 1)
+
+    def test_graficos_pagamento_inclui_aguardando(self):
+        g = montar_graficos_resumo_acerto_caixa(
+            [{'rotulo': 'PIX', 'total': Decimal('100')}],
+            Decimal('50'),
+            grafico_modalidade_labels=['US'],
+            grafico_modalidade_valores=[100.0],
+        )
+        self.assertIn('PIX', g['grafico_pagamento_labels'])
+        self.assertIn('Aguardando faturamento', g['grafico_pagamento_labels'])
+        self.assertEqual(len(g['grafico_pagamento_valores']), 2)

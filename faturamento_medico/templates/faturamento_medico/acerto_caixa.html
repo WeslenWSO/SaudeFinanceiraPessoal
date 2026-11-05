@@ -1970,38 +1970,67 @@
 </script>
 {{ grafico_modalidade_labels|json_script:"acerto-graf-mod-labels" }}
 {{ grafico_modalidade_valores|json_script:"acerto-graf-mod-valores" }}
+{{ grafico_torre_modalidade_labels|json_script:"acerto-graf-torre-mod-labels" }}
+{{ grafico_torre_modalidade_valores|json_script:"acerto-graf-torre-mod-valores" }}
+{{ grafico_pagamento_labels|json_script:"acerto-graf-pag-labels" }}
+{{ grafico_pagamento_valores|json_script:"acerto-graf-pag-valores" }}
+{{ grafico_torre_usar_meses|json_script:"acerto-graf-torre-usar-meses" }}
+{{ grafico_torre_meses_labels|json_script:"acerto-graf-torre-meses-labels" }}
+{{ grafico_torre_meses_modalidade_valores|json_script:"acerto-graf-torre-meses-mod-valores" }}
+{{ grafico_torre_meses_pagamento_valores|json_script:"acerto-graf-torre-meses-pag-valores" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function initAcertoResumoModalidadeChart() {
     if (typeof Chart === 'undefined') return;
-    var elLabels = document.getElementById('acerto-graf-mod-labels');
-    var elValores = document.getElementById('acerto-graf-mod-valores');
-    if (!elLabels || !elValores) return;
-    var labelsRaw = JSON.parse(elLabels.textContent || '[]');
-    var valoresRaw = JSON.parse(elValores.textContent || '[]');
-    var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669'];
-    var chartModalInst = null;
+
+    function parseJsonScript(id, fallback) {
+        var el = document.getElementById(id);
+        if (!el) return fallback;
+        try { return JSON.parse(el.textContent || ''); } catch (e) { return fallback; }
+    }
+
+    var labelsRaw = parseJsonScript('acerto-graf-mod-labels', []);
+    var valoresRaw = parseJsonScript('acerto-graf-mod-valores', []);
+    var torreModLabels = parseJsonScript('acerto-graf-torre-mod-labels', []);
+    var torreModValores = parseJsonScript('acerto-graf-torre-mod-valores', []);
+    var pagLabels = parseJsonScript('acerto-graf-pag-labels', []);
+    var pagValores = parseJsonScript('acerto-graf-pag-valores', []);
+    var torreUsarMeses = parseJsonScript('acerto-graf-torre-usar-meses', false);
+    var mesesLabels = parseJsonScript('acerto-graf-torre-meses-labels', []);
+    var mesesModValores = parseJsonScript('acerto-graf-torre-meses-mod-valores', []);
+    var mesesPagValores = parseJsonScript('acerto-graf-torre-meses-pag-valores', []);
+
+    var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669', '#ea580c'];
+    var coresPag = ['#2563eb', '#0d9488', '#7c3aed', '#ca8a04', '#64748b', '#db2777', '#059669'];
+    var chartsModal = [];
 
     function fmtMoeda(v) {
         return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    function criarGraficoModalidade(canvas) {
-        if (!canvas) return null;
-        var labels = [];
-        var valores = [];
-        var cores = [];
-        labelsRaw.forEach(function(label, i) {
-            if ((valoresRaw[i] || 0) > 0) {
-                labels.push(label);
-                valores.push(valoresRaw[i]);
-                cores.push(coresAll[i % coresAll.length]);
+    function filtrarPositivos(labels, valores) {
+        var outL = [];
+        var outV = [];
+        (labels || []).forEach(function(label, i) {
+            var v = valores[i] || 0;
+            if (v > 0) {
+                outL.push(label);
+                outV.push(v);
             }
         });
+        return { labels: outL, valores: outV };
+    }
+
+    function criarGraficoModalidade(canvas) {
+        if (!canvas) return null;
+        var par = filtrarPositivos(labelsRaw, valoresRaw);
+        var labels = par.labels;
+        var valores = par.valores;
+        var cores = labels.map(function(_, i) { return coresAll[i % coresAll.length]; });
         if (!labels.length) {
-            labels.push('Sem dados');
-            valores.push(1);
-            cores.push('#e5e7eb');
+            labels = ['Sem dados'];
+            valores = [1];
+            cores = ['#e5e7eb'];
         }
         return new Chart(canvas.getContext('2d'), {
             type: 'pie',
@@ -2019,7 +2048,7 @@
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
                             label: function(ctx) {
@@ -2035,18 +2064,111 @@
         });
     }
 
+    function criarGraficoTorre(canvas, labels, valores, coresBase) {
+        if (!canvas) return null;
+        var par = filtrarPositivos(labels, valores);
+        var lbs = par.labels;
+        var vals = par.valores;
+        var cores = lbs.map(function(_, i) { return (coresBase || coresAll)[i % (coresBase || coresAll).length]; });
+        if (!lbs.length) {
+            lbs = ['Sem dados'];
+            vals = [0];
+            cores = ['#e5e7eb'];
+        }
+        return new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: lbs,
+                datasets: [{
+                    label: 'Valor (R$)',
+                    data: vals,
+                    backgroundColor: cores.map(function(c) { return c + 'cc'; }),
+                    borderColor: cores,
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return fmtMoeda(ctx.parsed.y != null ? ctx.parsed.y : ctx.parsed.x);
+                            }
+                        }
+                    },
+                },
+                scales: {
+                    x: {
+                        ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 0 },
+                        grid: { display: false },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: { size: 9 },
+                            callback: function(v) {
+                                if (v >= 1000) return 'R$ ' + (v / 1000).toLocaleString('pt-BR') + 'k';
+                                return fmtMoeda(v);
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    function destruirChartsModal() {
+        chartsModal.forEach(function(c) {
+            if (c) c.destroy();
+        });
+        chartsModal = [];
+    }
+
+    function montarChartsModal() {
+        destruirChartsModal();
+        if (torreUsarMeses) {
+            var c1 = criarGraficoTorre(
+                document.getElementById('acertoGraficoTorreMesesModalidadeModal'),
+                mesesLabels,
+                mesesModValores,
+                ['#2563eb']
+            );
+            var c2 = criarGraficoTorre(
+                document.getElementById('acertoGraficoTorreMesesPagamentoModal'),
+                mesesLabels,
+                mesesPagValores,
+                ['#0d9488']
+            );
+            if (c1) chartsModal.push(c1);
+            if (c2) chartsModal.push(c2);
+            return;
+        }
+        var pie = criarGraficoModalidade(document.getElementById('acertoGraficoModalidadeModal'));
+        var torre = criarGraficoTorre(
+            document.getElementById('acertoGraficoTorreModalidadeModal'),
+            torreModLabels,
+            torreModValores
+        );
+        var pag = criarGraficoTorre(
+            document.getElementById('acertoGraficoPagamentoModal'),
+            pagLabels,
+            pagValores,
+            coresPag
+        );
+        if (pie) chartsModal.push(pie);
+        if (torre) chartsModal.push(torre);
+        if (pag) chartsModal.push(pag);
+    }
+
     criarGraficoModalidade(document.getElementById('acertoGraficoModalidade'));
 
     var modalEl = document.getElementById('modalResumoAcerto');
     if (modalEl) {
-        modalEl.addEventListener('shown.bs.modal', function() {
-            var canvasModal = document.getElementById('acertoGraficoModalidadeModal');
-            if (chartModalInst) {
-                chartModalInst.destroy();
-                chartModalInst = null;
-            }
-            chartModalInst = criarGraficoModalidade(canvasModal);
-        });
+        modalEl.addEventListener('shown.bs.modal', montarChartsModal);
     }
 })();
 </script>
