@@ -233,6 +233,66 @@
             color: #555;
             margin-top: 8px;
         }
+        .secao-resumo-modal h1 { font-size: 14px; margin-bottom: 6px; }
+        .secao-resumo-modal h2 {
+            font-size: 10px;
+            text-transform: uppercase;
+            margin: 0 0 6px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 3px;
+        }
+        .resumo-impressao-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .resumo-impressao-bloco {
+            flex: 1 1 280px;
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+        .resumo-impressao-duas-colunas {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .resumo-impressao-duas-colunas .resumo-impressao-bloco { flex: 1 1 45%; }
+        .resumo-tabela { width: 100%; border-collapse: collapse; font-size: 8px; }
+        .resumo-tabela td, .resumo-tabela th {
+            border: 1px solid #ddd;
+            padding: 2px 4px;
+        }
+        .resumo-tabela .num { text-align: right; white-space: nowrap; }
+        .resumo-tabela .sub { padding-left: 10px; }
+        .resumo-tabela .secao-linha td { font-weight: bold; background: #f5f5f5; }
+        .resumo-tabela .total-linha td { font-weight: bold; background: #eef2ff; }
+        .kpi-linha { font-size: 8px; margin: 8px 0 0; }
+        .graficos-linha { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-around; }
+        .chart-box { flex: 1 1 140px; max-width: 220px; text-align: center; }
+        .chart-titulo { font-size: 7px; margin: 0 0 4px; font-weight: bold; }
+        .matriz-impressao-wrap { overflow-x: auto; }
+        .matriz-impressao {
+            border-collapse: collapse;
+            font-size: 6.5px;
+            width: max-content;
+            min-width: 100%;
+        }
+        .matriz-impressao th, .matriz-impressao td {
+            border: 1px solid #ccc;
+            padding: 1px 3px;
+            text-align: center;
+        }
+        .matriz-impressao .col-fixa {
+            text-align: left;
+            min-width: 72px;
+            max-width: 120px;
+            font-weight: 600;
+        }
+        .matriz-impressao .num { text-align: right; }
+        .nota-fora { font-size: 7px; margin-top: 6px; }
+        .page-break-before { page-break-before: always; margin-top: 12px; }
         @media print {
             body { margin: 0; }
             .no-print { display: none !important; }
@@ -262,6 +322,10 @@
     <p class="empresa-detalhe">CNPJ {{ empresa.cnpj }}</p>
     {% endif %}
     {% endif %}
+
+    {% if modo_resumo %}
+    {% include 'faturamento_medico/imprimir_resumo_acerto_conteudo.html' %}
+    {% else %}
 
     {% if filtros_resumo %}
     <p class="periodo">Filtros: {{ filtros_resumo }}</p>
@@ -527,5 +591,6 @@
         });
     })();
     </script>
+    {% endif %}
 </body>
 </html>

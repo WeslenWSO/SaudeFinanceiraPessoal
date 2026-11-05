@@ -1,0 +1,378 @@
+{# Impressão espelhando o modal Resumo (mesmo contexto montar_contexto_acerto_caixa). #}
+<section class="secao-resumo-modal">
+    <h1>Resumo — Acerto de Caixa</h1>
+    <p class="periodo">
+        Período: {{ periodo_fmt }} · {{ filtros_resumo }} · <strong>{{ quantidade_linhas }}</strong> linha(s)
+    </p>
+
+    <div class="resumo-impressao-grid">
+        <div class="resumo-impressao-bloco">
+            <h2>Formas de pagamento</h2>
+            {% if resumo_matriz_anual %}
+            <div class="matriz-impressao-wrap">
+                <table class="matriz-impressao">
+                    <thead>
+                        <tr>
+                            <th class="col-fixa" rowspan="2">Forma / convênio</th>
+                            {% for col in resumo_meses_colunas %}
+                            <th colspan="2">{{ col.label_curto }}</th>
+                            {% endfor %}
+                            <th colspan="2">Total</th>
+                        </tr>
+                        <tr>
+                            {% for col in resumo_meses_colunas %}
+                            <th>Qt</th><th>R$</th>
+                            {% endfor %}
+                            <th>Qt</th><th>R$</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in pagamento_matriz_formas %}
+                        <tr>
+                            <td class="col-fixa">{{ row.rotulo }}</td>
+                            {% for cel in row.meses %}
+                            <td class="num">{{ cel.qt }}</td>
+                            <td class="num">{{ cel.valor_fmt }}</td>
+                            {% endfor %}
+                            <td class="num">{{ row.total_qt }}</td>
+                            <td class="num">{{ row.total_valor_fmt }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if pagamento_matriz_aguardando %}
+                        <tr class="secao-linha"><td class="col-fixa" colspan="99">Aguardando faturamento</td></tr>
+                        {% for row in pagamento_matriz_aguardando %}
+                        <tr>
+                            <td class="col-fixa">{{ row.rotulo }}</td>
+                            {% for cel in row.meses %}
+                            <td class="num">{{ cel.qt }}</td>
+                            <td class="num">{{ cel.valor_fmt }}</td>
+                            {% endfor %}
+                            <td class="num">{{ row.total_qt }}</td>
+                            <td class="num">{{ row.total_valor_fmt }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <table class="resumo-tabela">
+                <tbody>
+                    {% for row in resumo_pagamento %}
+                    <tr>
+                        <td>{{ row.rotulo }}</td>
+                        <td class="num">R$ {{ row.total_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if resumo_aguardando_faturamento %}
+                    <tr class="secao-linha">
+                        <td>Aguardando faturamento</td>
+                        <td class="num">R$ {{ total_aguardando_faturamento_fmt }}</td>
+                    </tr>
+                    {% for row in resumo_aguardando_faturamento %}
+                    <tr>
+                        <td class="sub">{{ row.convenio }}</td>
+                        <td class="num">R$ {{ row.total_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+            {% endif %}
+            <p class="kpi-linha">
+                <strong>Total geral:</strong> R$ {{ total_resumo_geral_fmt }}
+                · <strong>Valor pago (grade):</strong> R$ {{ total_valor_pago_grade_fmt }}
+            </p>
+        </div>
+
+        <div class="resumo-impressao-bloco resumo-impressao-graficos">
+            <h2>Gráficos</h2>
+            {% if resumo_matriz_anual %}
+            <div class="graficos-linha">
+                <div class="chart-box">
+                    <p class="chart-titulo">Total por mês (grade)</p>
+                    <canvas id="acertoImpressaoTorreMesesMod" height="200"></canvas>
+                </div>
+                <div class="chart-box">
+                    <p class="chart-titulo">Total por mês (pagamento)</p>
+                    <canvas id="acertoImpressaoTorreMesesPag" height="200"></canvas>
+                </div>
+            </div>
+            {% else %}
+            <div class="graficos-linha">
+                <div class="chart-box">
+                    <p class="chart-titulo">Modalidade (pizza)</p>
+                    <canvas id="acertoImpressaoGraficoModalidade" height="180"></canvas>
+                </div>
+                <div class="chart-box">
+                    <p class="chart-titulo">Modalidade (torre)</p>
+                    <canvas id="acertoImpressaoTorreModalidade" height="180"></canvas>
+                </div>
+                <div class="chart-box">
+                    <p class="chart-titulo">Forma de pagamento</p>
+                    <canvas id="acertoImpressaoGraficoPagamento" height="180"></canvas>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="resumo-impressao-duas-colunas">
+        <div class="resumo-impressao-bloco">
+            <h2>Modalidade — qt · valor pago</h2>
+            {% if resumo_matriz_anual %}
+            <div class="matriz-impressao-wrap">
+                <table class="matriz-impressao">
+                    <thead>
+                        <tr>
+                            <th class="col-fixa" rowspan="2">Modalidade</th>
+                            {% for col in resumo_meses_colunas %}
+                            <th colspan="2">{{ col.label_curto }}</th>
+                            {% endfor %}
+                            <th colspan="2">Total</th>
+                        </tr>
+                        <tr>
+                            {% for col in resumo_meses_colunas %}
+                            <th>Qt</th><th>R$</th>
+                            {% endfor %}
+                            <th>Qt</th><th>R$</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in modalidades_matriz_linhas %}
+                        <tr>
+                            <td class="col-fixa">{{ item.label }}</td>
+                            {% for cel in item.meses %}
+                            <td class="num">{{ cel.qt }}</td>
+                            <td class="num">{{ cel.valor_fmt }}</td>
+                            {% endfor %}
+                            <td class="num">{{ item.total_qt }}</td>
+                            <td class="num">{{ item.total_valor_fmt }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="total-linha">
+                            <td class="col-fixa">Total</td>
+                            {% for tot in modalidades_matriz_totais_mes %}
+                            <td class="num">{{ tot.qt }}</td>
+                            <td class="num">{{ tot.valor_fmt }}</td>
+                            {% endfor %}
+                            <td class="num">{{ resumo_quantidade_total }}</td>
+                            <td class="num">{{ resumo_valor_total_fmt }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <table class="resumo-tabela resumo-tabela-3col">
+                <thead>
+                    <tr><th>Modalidade</th><th>Qt</th><th>Valor</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in resumo_modalidades %}
+                    <tr>
+                        <td>{{ item.label }}</td>
+                        <td class="num">{{ item.quantidade }}</td>
+                        <td class="num">R$ {{ item.valor_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-linha">
+                        <td>Total</td>
+                        <td class="num">{{ resumo_quantidade_total }}</td>
+                        <td class="num">R$ {{ resumo_valor_total_fmt }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+            {% if modalidades_fora_resumo %}
+            <p class="nota-fora"><strong>Fora do padrão:</strong>
+                {% for item in modalidades_fora_resumo %}
+                {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+                {% endfor %}
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="resumo-impressao-bloco">
+            <h2>Viabilidade (convênio) — qt · valor pago</h2>
+            <table class="resumo-tabela resumo-tabela-3col">
+                <thead>
+                    <tr><th>Viabilidade</th><th>Qt</th><th>Valor</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in resumo_viabilidade %}
+                    <tr>
+                        <td>{{ row.viabilidade }}</td>
+                        <td class="num">{{ row.quantidade }}</td>
+                        <td class="num">R$ {{ row.valor_fmt }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center">Sem dados.</td></tr>
+                    {% endfor %}
+                    {% if resumo_viabilidade %}
+                    <tr class="total-linha">
+                        <td>Total</td>
+                        <td class="num">{{ resumo_viabilidade_total_qt }}</td>
+                        <td class="num">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="resumo-impressao-bloco page-break-before">
+        <h2>Viabilidade por mês — {{ resumo_viabilidade_por_mes_ano }}</h2>
+        <div class="matriz-impressao-wrap">
+            <table class="matriz-impressao">
+                <thead>
+                    <tr>
+                        <th class="col-fixa" rowspan="2">Viabilidade</th>
+                        {% for col in viabilidade_matriz_colunas %}
+                        <th colspan="2">{{ col.label_curto }}</th>
+                        {% endfor %}
+                        <th colspan="2">Total</th>
+                    </tr>
+                    <tr>
+                        {% for col in viabilidade_matriz_colunas %}
+                        <th>Qt</th><th>R$</th>
+                        {% endfor %}
+                        <th>Qt</th><th>R$</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in viabilidade_matriz_linhas %}
+                    <tr>
+                        <td class="col-fixa">{{ row.viabilidade }}</td>
+                        {% for cel in row.meses %}
+                        <td class="num">{{ cel.qt }}</td>
+                        <td class="num">{{ cel.valor_fmt }}</td>
+                        {% endfor %}
+                        <td class="num">{{ row.total_qt }}</td>
+                        <td class="num">{{ row.total_valor_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if viabilidade_matriz_linhas %}
+                    <tr class="total-linha">
+                        <td class="col-fixa">Total</td>
+                        {% for tot in viabilidade_matriz_totais_mes %}
+                        <td class="num">{{ tot.qt }}</td>
+                        <td class="num">{{ tot.valor_fmt }}</td>
+                        {% endfor %}
+                        <td class="num">{{ resumo_viabilidade_total_qt }}</td>
+                        <td class="num">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{{ grafico_modalidade_labels|json_script:"acerto-impressao-graf-mod-labels" }}
+{{ grafico_modalidade_valores|json_script:"acerto-impressao-graf-mod-valores" }}
+{{ grafico_torre_modalidade_labels|json_script:"acerto-impressao-torre-mod-labels" }}
+{{ grafico_torre_modalidade_valores|json_script:"acerto-impressao-torre-mod-valores" }}
+{{ grafico_pagamento_labels|json_script:"acerto-impressao-pag-labels" }}
+{{ grafico_pagamento_valores|json_script:"acerto-impressao-pag-valores" }}
+{{ grafico_torre_usar_meses|json_script:"acerto-impressao-torre-usar-meses" }}
+{{ grafico_torre_meses_labels|json_script:"acerto-impressao-torre-meses-labels" }}
+{{ grafico_torre_meses_modalidade_valores|json_script:"acerto-impressao-torre-meses-mod" }}
+{{ grafico_torre_meses_pagamento_valores|json_script:"acerto-impressao-torre-meses-pag" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+    if (typeof Chart === 'undefined') return;
+    function parseJson(id, fb) {
+        var el = document.getElementById(id);
+        if (!el) return fb;
+        try { return JSON.parse(el.textContent || ''); } catch (e) { return fb; }
+    }
+    function fmtMoeda(v) {
+        return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    function filtrarPositivos(labels, valores) {
+        var outL = [], outV = [];
+        (labels || []).forEach(function (label, i) {
+            var v = valores[i] || 0;
+            if (v > 0) { outL.push(label); outV.push(v); }
+        });
+        return { labels: outL, valores: outV };
+    }
+    var coresAll = ['#0d9488', '#2563eb', '#db2777', '#ca8a04', '#7c3aed', '#64748b', '#059669'];
+    var coresPag = ['#2563eb', '#0d9488', '#7c3aed', '#ca8a04', '#64748b'];
+    var torreUsarMeses = parseJson('acerto-impressao-torre-usar-meses', false);
+
+    function criarPie(canvas, labels, valores) {
+        if (!canvas) return;
+        var par = filtrarPositivos(labels, valores);
+        var lbs = par.labels.length ? par.labels : ['Sem dados'];
+        var vals = par.valores.length ? par.valores : [1];
+        var cores = lbs.map(function (_, i) { return coresAll[i % coresAll.length]; });
+        if (!par.labels.length) cores = ['#e5e7eb'];
+        new Chart(canvas.getContext('2d'), {
+            type: 'pie',
+            data: { labels: lbs, datasets: [{ data: vals, backgroundColor: cores, borderWidth: 1 }] },
+            options: { animation: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 8 } } } } },
+        });
+    }
+    function criarBarra(canvas, labels, valores, cor) {
+        if (!canvas) return;
+        var par = filtrarPositivos(labels, valores);
+        var lbs = par.labels.length ? par.labels : ['—'];
+        var vals = par.valores.length ? par.valores : [0];
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: lbs,
+                datasets: [{
+                    data: vals,
+                    backgroundColor: (cor || '#2563eb') + 'bb',
+                    borderColor: cor || '#2563eb',
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                animation: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { font: { size: 7 }, maxRotation: 45 } },
+                    y: { beginAtZero: true, ticks: { font: { size: 7 } } },
+                },
+            },
+        });
+    }
+
+    if (torreUsarMeses) {
+        criarBarra(
+            document.getElementById('acertoImpressaoTorreMesesMod'),
+            parseJson('acerto-impressao-torre-meses-labels', []),
+            parseJson('acerto-impressao-torre-meses-mod', []),
+            '#2563eb'
+        );
+        criarBarra(
+            document.getElementById('acertoImpressaoTorreMesesPag'),
+            parseJson('acerto-impressao-torre-meses-labels', []),
+            parseJson('acerto-impressao-torre-meses-pag', []),
+            '#0d9488'
+        );
+    } else {
+        criarPie(
+            document.getElementById('acertoImpressaoGraficoModalidade'),
+            parseJson('acerto-impressao-graf-mod-labels', []),
+            parseJson('acerto-impressao-graf-mod-valores', [])
+        );
+        criarBarra(
+            document.getElementById('acertoImpressaoTorreModalidade'),
+            parseJson('acerto-impressao-torre-mod-labels', []),
+            parseJson('acerto-impressao-torre-mod-valores', [])
+        );
+        criarBarra(
+            document.getElementById('acertoImpressaoGraficoPagamento'),
+            parseJson('acerto-impressao-pag-labels', []),
+            parseJson('acerto-impressao-pag-valores', []),
+            '#0d9488'
+        );
+    }
+
+})();
+</script>

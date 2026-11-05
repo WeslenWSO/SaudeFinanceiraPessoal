@@ -1596,7 +1596,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
+                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo"
                    class="btn btn-primary btn-sm px-3" target="_blank" rel="noopener">
                     <i class="fas fa-print me-1"></i> Imprimir
                 </a>

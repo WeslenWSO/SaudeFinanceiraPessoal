@@ -6363,7 +6363,10 @@ def imprimir_acerto_caixa(request):
         empresa = Empresa.objects.filter(pk=empresa_id).first()
         contexto = montar_contexto_acerto_caixa(request, empresa_id)
         contexto['empresa'] = empresa
-        contexto['redirect_qs'] = request.GET.urlencode()
+        qs_voltar = request.GET.copy()
+        qs_voltar.pop('modo', None)
+        contexto['redirect_qs'] = qs_voltar.urlencode()
+        contexto['modo_resumo'] = request.GET.get('modo') == 'resumo'
         return render(request, 'faturamento_medico/imprimir_acerto_caixa.html', contexto)
     except Exception as exc:
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
