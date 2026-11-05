@@ -329,6 +329,17 @@
 #modalDetalheSolicitanteAcerto {
     z-index: 1065;
 }
+#modalDetalheSolicitanteAcerto.show {
+    z-index: 1085;
+}
+#modalDetalheSolicitanteAcerto.show ~ .modal-backdrop {
+    z-index: 1080;
+}
+@media (max-width: 1199px) {
+    .acerto-detalhe-solicitante-panels .acerto-modal-panel {
+        margin-bottom: 0.25rem;
+    }
+}
 #modalDetalheSolicitanteAcerto .modal-dialog.modal-detalhe-solicitante-dialog {
     width: 70vw;
     max-width: 70vw;
@@ -1828,7 +1839,7 @@
                                         {% for row in resumo_solicitante %}
                                         <tr class="js-acerto-solicitante-row acerto-solicitante-row-drill"
                                             data-solicitante="{{ row.solicitante }}"
-                                            title="Duplo clique para viabilidade e formas de pagamento">
+                                            title="Duplo clique: modalidade, viabilidade e formas de pagamento">
                                             <td>{{ row.solicitante|truncatechars:48 }}</td>
                                             <td class="text-center">{{ row.quantidade }}</td>
                                             <td class="text-end">R$ {{ row.valor_fmt }}</td>
@@ -1874,13 +1885,13 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-3">
-                    <div class="col-lg-4">
+                <div class="row g-3 acerto-detalhe-solicitante-panels">
+                    <div class="col-12 col-xl-4">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-list-ol"></i> Modalidade — qt · valor
                             </div>
-                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 18rem;">
                                 <table class="table table-sm acerto-modal-table mb-0">
                                     <thead class="sticky-top">
                                         <tr class="text-center">
@@ -1894,12 +1905,12 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-4">
+                    <div class="col-12 col-xl-4">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-handshake"></i> Viabilidade — qt · valor
                             </div>
-                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 18rem;">
                                 <table class="table table-sm acerto-modal-table mb-0">
                                     <thead class="sticky-top">
                                         <tr class="text-center">
@@ -1913,12 +1924,12 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-4">
+                    <div class="col-12 col-xl-4">
                         <div class="acerto-modal-panel h-100">
                             <div class="acerto-modal-panel-title">
                                 <i class="fas fa-wallet"></i> Forma de pagamento · valor
                             </div>
-                            <div class="acerto-modal-scroll-tabela" style="max-height: 22rem;">
+                            <div class="acerto-modal-scroll-tabela" style="max-height: 18rem;">
                                 <table class="table table-sm acerto-modal-table mb-0">
                                     <thead class="sticky-top">
                                         <tr>
@@ -2665,7 +2676,18 @@
 
     function showModalDetalheSolicitante() {
         if (!window.bootstrap || !window.bootstrap.Modal) return;
-        bootstrap.Modal.getOrCreateInstance(modalDetalheSol).show();
+        var inst = bootstrap.Modal.getOrCreateInstance(modalDetalheSol);
+        modalDetalheSol.addEventListener('shown.bs.modal', function ajustarZIndexDetalheSol() {
+            var abertos = document.querySelectorAll('.modal.show').length;
+            if (abertos > 1) {
+                modalDetalheSol.style.zIndex = String(1050 + abertos * 10 + 5);
+                var backs = document.querySelectorAll('.modal-backdrop');
+                if (backs.length) {
+                    backs[backs.length - 1].style.zIndex = String(1050 + abertos * 10);
+                }
+            }
+        }, { once: true });
+        inst.show();
     }
 
     function abrirDetalheSolicitante(nome) {

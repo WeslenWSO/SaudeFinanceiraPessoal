@@ -1263,15 +1263,40 @@ def montar_detalhe_medico_solicitante_acerto(linhas: list[dict]) -> dict[str, di
     detalhes: dict[str, dict] = {}
     for nome, sub in por_sol.items():
         mod_ctx = montar_resumo_modalidades_acerto(sub)
-        modalidades = [
-            {
-                'modalidade': r['label'],
-                'quantidade': r['quantidade'],
-                'valor_fmt': r['valor_fmt'],
-            }
-            for r in mod_ctx.get('resumo_modalidades') or []
-            if (r.get('quantidade') or 0) > 0 or (r.get('valor') or Decimal('0')) > 0
-        ]
+        modalidades: list[dict] = []
+        vistos: set[str] = set()
+        for r in mod_ctx.get('resumo_modalidades') or []:
+            if (r.get('quantidade') or 0) <= 0 and (r.get('valor') or Decimal('0')) <= 0:
+                continue
+            chave = (r.get('codigo') or r.get('label') or '').strip()
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            rotulo = MODALIDADES_LABEL_CURTO_ACERTO.get(chave, r.get('label') or chave)
+            modalidades.append(
+                {
+                    'modalidade': rotulo,
+                    'quantidade': r['quantidade'],
+                    'valor_fmt': r['valor_fmt'],
+                }
+            )
+        for item in mod_ctx.get('modalidades_fora_resumo') or []:
+            chave = (item.get('codigo') or '').strip()
+            if not chave or chave in vistos:
+                continue
+            if (item.get('quantidade') or 0) <= 0 and (item.get('valor') or Decimal('0')) <= 0:
+                continue
+            vistos.add(chave)
+            modalidades.append(
+                {
+                    'modalidade': chave,
+                    'quantidade': item['quantidade'],
+                    'valor_fmt': item.get('valor_fmt') or _moeda_br(item.get('valor') or 0),
+                }
+            )
+        modalidades.sort(
+            key=lambda x: (-int(x.get('quantidade') or 0), (x.get('modalidade') or '').lower())
+        )
         viab = montar_resumo_viabilidade_acerto(sub)
         resumo_pag, resumo_aguard, _ = recomputar_resumos_acerto_caixa_de_linhas(sub)
         pagamentos: list[dict] = [
