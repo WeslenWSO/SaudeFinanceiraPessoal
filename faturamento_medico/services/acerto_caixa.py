@@ -1428,12 +1428,20 @@ def montar_resumo_pagamento_matriz_mes(linhas: list[dict], ano: int) -> dict:
     }
 
 
+def _rotulo_curto_grafico(texto: str, max_len: int = 22) -> str:
+    t = (texto or '').strip() or '—'
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + '…'
+
+
 def montar_graficos_resumo_acerto_caixa(
     resumo_pagamento_lista: list[dict],
     total_aguardando: Decimal,
     *,
     grafico_modalidade_labels: list,
     grafico_modalidade_valores: list,
+    resumo_viabilidade: list[dict] | None = None,
     matriz_anual: bool = False,
     meses_colunas: list[dict] | None = None,
     modalidades_totais_mes: list[dict] | None = None,
@@ -1445,9 +1453,20 @@ def montar_graficos_resumo_acerto_caixa(
         pag_labels.append('Aguardando faturamento')
         pag_valores.append(float(total_aguardando))
 
+    conv_labels: list[str] = []
+    conv_valores: list[float] = []
+    for row in resumo_viabilidade or []:
+        val = row.get('valor') or Decimal('0')
+        if val <= 0 and not (row.get('quantidade') or 0):
+            continue
+        conv_labels.append(_rotulo_curto_grafico(row.get('viabilidade') or ''))
+        conv_valores.append(float(val))
+
     ctx: dict = {
         'grafico_pagamento_labels': pag_labels,
         'grafico_pagamento_valores': pag_valores,
+        'grafico_convenio_labels': conv_labels,
+        'grafico_convenio_valores': conv_valores,
         'grafico_torre_modalidade_labels': list(grafico_modalidade_labels),
         'grafico_torre_modalidade_valores': list(grafico_modalidade_valores),
         'grafico_torre_usar_meses': False,
@@ -1849,6 +1868,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         total_aguardando,
         grafico_modalidade_labels=resumo_modalidades_ctx.get('grafico_modalidade_labels') or [],
         grafico_modalidade_valores=resumo_modalidades_ctx.get('grafico_modalidade_valores') or [],
+        resumo_viabilidade=resumo_viabilidade,
         matriz_anual=bool(matriz_anual_ctx.get('resumo_matriz_anual')),
         meses_colunas=matriz_anual_ctx.get('resumo_meses_colunas'),
         modalidades_totais_mes=matriz_anual_ctx.get('modalidades_matriz_totais_mes'),

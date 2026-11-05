@@ -273,3 +273,18 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertIn('PIX', g['grafico_pagamento_labels'])
         self.assertIn('Aguardando faturamento', g['grafico_pagamento_labels'])
         self.assertEqual(len(g['grafico_pagamento_valores']), 2)
+
+    def test_grafico_convenio_torre(self):
+        viab = [
+            {'viabilidade': 'FUSEX', 'quantidade': 2, 'valor': Decimal('100')},
+            {'viabilidade': 'PARTICULAR', 'quantidade': 1, 'valor': Decimal('50')},
+        ]
+        g = montar_graficos_resumo_acerto_caixa(
+            [],
+            Decimal('0'),
+            grafico_modalidade_labels=[],
+            grafico_modalidade_valores=[],
+            resumo_viabilidade=viab,
+        )
+        self.assertEqual(g['grafico_convenio_labels'][0], 'FUSEX')
+        self.assertEqual(g['grafico_convenio_valores'][0], 100.0)

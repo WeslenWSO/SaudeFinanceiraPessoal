@@ -101,8 +101,8 @@
             {% else %}
             <div class="graficos-linha">
                 <div class="chart-box">
-                    <p class="chart-titulo">Modalidade (pizza)</p>
-                    <canvas id="acertoImpressaoGraficoModalidade" height="180"></canvas>
+                    <p class="chart-titulo">Convênio (torre)</p>
+                    <canvas id="acertoImpressaoGraficoConvenio" height="180"></canvas>
                 </div>
                 <div class="chart-box">
                     <p class="chart-titulo">Modalidade (torre)</p>
@@ -225,6 +225,8 @@
 {{ grafico_modalidade_valores|json_script:"acerto-impressao-graf-mod-valores" }}
 {{ grafico_torre_modalidade_labels|json_script:"acerto-impressao-torre-mod-labels" }}
 {{ grafico_torre_modalidade_valores|json_script:"acerto-impressao-torre-mod-valores" }}
+{{ grafico_convenio_labels|json_script:"acerto-impressao-conv-labels" }}
+{{ grafico_convenio_valores|json_script:"acerto-impressao-conv-valores" }}
 {{ grafico_pagamento_labels|json_script:"acerto-impressao-pag-labels" }}
 {{ grafico_pagamento_valores|json_script:"acerto-impressao-pag-valores" }}
 {{ grafico_torre_usar_meses|json_script:"acerto-impressao-torre-usar-meses" }}
@@ -309,10 +311,11 @@
             '#0d9488'
         );
     } else {
-        criarPie(
-            document.getElementById('acertoImpressaoGraficoModalidade'),
-            parseJson('acerto-impressao-graf-mod-labels', []),
-            parseJson('acerto-impressao-graf-mod-valores', [])
+        criarBarra(
+            document.getElementById('acertoImpressaoGraficoConvenio'),
+            parseJson('acerto-impressao-conv-labels', []),
+            parseJson('acerto-impressao-conv-valores', []),
+            '#0d9488'
         );
         criarBarra(
             document.getElementById('acertoImpressaoTorreModalidade'),

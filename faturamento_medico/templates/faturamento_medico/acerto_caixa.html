@@ -1301,10 +1301,10 @@
                             <div class="col-md-4">
                                 <div class="acerto-modal-panel h-100">
                                     <div class="acerto-modal-panel-title">
-                                        <i class="fas fa-chart-pie"></i> Modalidade (pizza)
+                                        <i class="fas fa-chart-column"></i> Convênio (torre)
                                     </div>
                                     <div class="acerto-modal-chart-wrap">
-                                        <canvas id="acertoGraficoModalidadeModal" aria-label="Gráfico pizza por modalidade"></canvas>
+                                        <canvas id="acertoGraficoConvenioModal" aria-label="Gráfico torre por convênio"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -1984,6 +1984,8 @@
 {{ grafico_torre_modalidade_valores|json_script:"acerto-graf-torre-mod-valores" }}
 {{ grafico_pagamento_labels|json_script:"acerto-graf-pag-labels" }}
 {{ grafico_pagamento_valores|json_script:"acerto-graf-pag-valores" }}
+{{ grafico_convenio_labels|json_script:"acerto-graf-conv-labels" }}
+{{ grafico_convenio_valores|json_script:"acerto-graf-conv-valores" }}
 {{ grafico_torre_usar_meses|json_script:"acerto-graf-torre-usar-meses" }}
 {{ grafico_torre_meses_labels|json_script:"acerto-graf-torre-meses-labels" }}
 {{ grafico_torre_meses_modalidade_valores|json_script:"acerto-graf-torre-meses-mod-valores" }}
@@ -2005,6 +2007,8 @@
     var torreModValores = parseJsonScript('acerto-graf-torre-mod-valores', []);
     var pagLabels = parseJsonScript('acerto-graf-pag-labels', []);
     var pagValores = parseJsonScript('acerto-graf-pag-valores', []);
+    var convLabels = parseJsonScript('acerto-graf-conv-labels', []);
+    var convValores = parseJsonScript('acerto-graf-conv-valores', []);
     var torreUsarMeses = parseJsonScript('acerto-graf-torre-usar-meses', false);
     var mesesLabels = parseJsonScript('acerto-graf-torre-meses-labels', []);
     var mesesModValores = parseJsonScript('acerto-graf-torre-meses-mod-valores', []);
@@ -2178,7 +2182,12 @@
             if (c2) chartsModal.push(c2);
             return;
         }
-        var pie = criarGraficoModalidade(document.getElementById('acertoGraficoModalidadeModal'));
+        var conv = criarGraficoTorre(
+            document.getElementById('acertoGraficoConvenioModal'),
+            convLabels,
+            convValores,
+            ['#0d9488', '#2563eb', '#7c3aed', '#ca8a04', '#64748b']
+        );
         var torre = criarGraficoTorre(
             document.getElementById('acertoGraficoTorreModalidadeModal'),
             torreModLabels,
@@ -2190,7 +2199,7 @@
             pagValores,
             coresPag
         );
-        if (pie) chartsModal.push(pie);
+        if (conv) chartsModal.push(conv);
         if (torre) chartsModal.push(torre);
         if (pag) chartsModal.push(pag);
     }
