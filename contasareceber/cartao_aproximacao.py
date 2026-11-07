@@ -221,17 +221,35 @@ def build_suggestions(empresa_id: int, conta_ids: list[int]) -> dict[str, Any]:
     }
 
 
+def _numero_nf_para_recebivel(conta: ContaAReceber) -> str:
+    nf = getattr(conta, 'nota', None)
+    if nf and (getattr(nf, 'numero_nota', None) or '').strip():
+        return str(nf.numero_nota).strip()[:50]
+    return (conta.doc or '').strip()[:50]
+
+
+def _razao_cliente_para_recebivel(conta: ContaAReceber) -> str:
+    cliente = (conta.cliente or '').strip()
+    if cliente:
+        return cliente[:200]
+    nf = getattr(conta, 'nota', None)
+    if nf and (getattr(nf, 'cliente', None) or '').strip():
+        return str(nf.cliente).strip()[:200]
+    return ''
+
+
 def _vincular_relatorio_na_conta(
     conta: ContaAReceber,
     relatorio: RelatorioRecebiveisMaquinaCartao,
 ) -> None:
     """Associa o lançamento do recebível ao título (sem alterar totais da conta ainda)."""
-    doc = (conta.doc or '')[:50] if conta.doc else ''
-    razao = (conta.cliente or '')[:200] if conta.cliente else ''
-    relatorio.nota_fiscal = doc
-    relatorio.razao = razao
+    relatorio.nota_fiscal = _numero_nf_para_recebivel(conta)
+    relatorio.razao = _razao_cliente_para_recebivel(conta)
     relatorio.conta_a_receber = conta
-    relatorio.conciliado = False
+    if conta.status == 'pago':
+        relatorio.conciliado = True
+    else:
+        relatorio.conciliado = False
     relatorio.save(
         update_fields=[
             'nota_fiscal',
@@ -240,6 +258,72 @@ def _vincular_relatorio_na_conta(
             'conciliado',
         ]
     )
+
+
+def conta_eh_cartao_para_maquininha(conta: ContaAReceber) -> bool:
+    return tipo_cartao_conta(conta) in ('credito', 'debito')
+
+
+def vincular_maquininha_contas_pagas(
+    empresa_id: int,
+    conta_ids: list[int] | None = None,
+    *,
+    apenas_preencher_recebivel: bool = False,
+) -> dict[str, int]:
+    """
+    Para títulos pagos com AUT: casa recebível da maquininha (Stone: sufixo da AUT)
+    e grava NF, cliente e FK no relatório.
+    """
+    stats = {'titulos': 0, 'recebiveis': 0, 'sem_auth': 0, 'sem_recebivel': 0}
+    qs = ContaAReceber.objects.filter(empresa_id=empresa_id, status='pago').select_related(
+        'nota', 'forma_pagamento', 'nota__forma_pagamento'
+    )
+    if conta_ids:
+        qs = qs.filter(pk__in=conta_ids)
+
+    for conta in qs:
+        if not conta_eh_cartao_para_maquininha(conta):
+            continue
+        auth = autorizacao_para_conciliacao(conta)
+        if not auth:
+            stats['sem_auth'] += 1
+            continue
+        stats['titulos'] += 1
+        ja_no_titulo = list(
+            RelatorioRecebiveisMaquinaCartao.objects.filter(
+                empresa_id=empresa_id,
+                conta_a_receber_id=conta.pk,
+            )
+        )
+        if ja_no_titulo and apenas_preencher_recebivel:
+            for rel in ja_no_titulo:
+                _vincular_relatorio_na_conta(conta, rel)
+                stats['recebiveis'] += 1
+            continue
+        candidatos = buscar_relatorios_por_autorizacao(
+            empresa_id, auth, conciliado=False
+        )
+        if not candidatos.exists():
+            candidatos = buscar_relatorios_por_autorizacao(
+                empresa_id, auth, conciliado=None
+            )
+        novos = [
+            r
+            for r in candidatos
+            if not r.conta_a_receber_id or r.conta_a_receber_id == conta.pk
+        ]
+        if not novos:
+            stats['sem_recebivel'] += 1
+            continue
+        if not (conta.autorizacao or '').strip() and auth:
+            conta.autorizacao = auth[:100]
+            conta.save(update_fields=['autorizacao', 'data_atualizacao'])
+        for rel in novos:
+            _vincular_relatorio_na_conta(conta, rel)
+            stats['recebiveis'] += 1
+        if not apenas_preencher_recebivel and novos:
+            _atualizar_conta_totais_cartao(conta, novos)
+    return stats
 
 
 def _autorizacao_de_recebiveis_para_conta(
@@ -480,8 +564,10 @@ def buscar_relatorios_por_autorizacao(
         return RelatorioRecebiveisMaquinaCartao.objects.none()
 
     qs = RelatorioRecebiveisMaquinaCartao.objects.filter(empresa_id=empresa_id)
-    if conciliado is not None:
-        qs = qs.filter(conciliado=conciliado)
+    if conciliado is True:
+        qs = qs.filter(conciliado=True)
+    elif conciliado is False:
+        qs = qs.filter(conciliado=False)
 
     # Match exato primeiro
     exatos = list(qs.filter(numero_autorizacao=auth))

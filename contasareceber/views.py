@@ -1123,6 +1123,26 @@ def buscar_forma_autorizacao_nf_lote(request):
                 f'{stats["sem_dados"]} nota(s) sem forma de pagamento ou autorização reconhecida na discriminação.',
             )
 
+    from .cartao_aproximacao import vincular_maquininha_contas_pagas
+
+    pago_ids = list(
+        ContaAReceber.objects.filter(
+            pk__in=contas_ids,
+            empresa_id=empresa_id,
+            status='pago',
+        ).values_list('pk', flat=True)
+    )
+    if pago_ids:
+        maq = vincular_maquininha_contas_pagas(
+            empresa_id, pago_ids, apenas_preencher_recebivel=True
+        )
+        if maq['recebiveis']:
+            messages.info(
+                request,
+                f'{maq["recebiveis"]} lançamento(s) da maquininha receberam NF e cliente '
+                f'(AUT em {maq["titulos"]} título(s) pago(s)).',
+            )
+
     return _redirect_car_com_return(request, return_path)
 
 
@@ -3447,6 +3467,10 @@ def conciliar_cartao_por_autorizacao(request):
             candidatos = buscar_relatorios_por_autorizacao(
                 empresa_id, autorizacao, conciliado=False
             )
+            if not candidatos.exists():
+                candidatos = buscar_relatorios_por_autorizacao(
+                    empresa_id, autorizacao, conciliado=None
+                )
             novos = []
             for rel in candidatos:
                 if rel.pk in ids_vinculados:
@@ -3469,14 +3493,17 @@ def conciliar_cartao_por_autorizacao(request):
                     conta_a_receber=conta,
                 )
             )
-            if todos:
+            if conta.status == 'pago':
+                for rel in todos:
+                    _vincular_relatorio_na_conta(conta, rel)
+            elif todos:
                 _atualizar_conta_totais_cartao(conta, todos)
 
         if conciliadas > 0:
             messages.success(
                 request,
-                f'{conciliadas} lançamento(s) do relatório de recebíveis incluído(s) na baixa '
-                f'(parcelas acumuladas por autorização).',
+                f'{conciliadas} lançamento(s) do relatório de recebíveis vinculado(s) por autorização '
+                f'(NF e cliente gravados nos recebíveis; títulos pagos mantêm valores já baixados).',
             )
         else:
             msg = 'Nenhum recebível novo encontrado para incluir na baixa das contas selecionadas.'
