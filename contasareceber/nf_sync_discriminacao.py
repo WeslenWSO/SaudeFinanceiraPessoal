@@ -82,15 +82,53 @@ def sincronizar_forma_e_autorizacao_nota(nota) -> dict:
     return out
 
 
+def tentar_vincular_nota_conta_por_documento(conta, *, empresa_id: int) -> bool:
+    """Liga o título à NFSe quando doc = número da nota (muito comum em títulos pagos)."""
+    from contasareceber.models import ContaAReceber
+
+    if not isinstance(conta, ContaAReceber):
+        return False
+    if conta.nota_id:
+        return True
+    doc = (conta.doc or '').strip()
+    if not doc:
+        return False
+    from notasfiscais.models import NotaFiscalServico
+
+    qs = NotaFiscalServico.objects.filter(
+        empresa_id=empresa_id,
+        data_cancelamento__isnull=True,
+    )
+    nf = qs.filter(numero_nota=doc).first()
+    if not nf and doc.isdigit():
+        nf = qs.filter(numero_nota__regex=rf'{doc}$').first()
+    if not nf:
+        return False
+    conta.nota_id = nf.pk
+    conta.save(update_fields=['nota_id'])
+    return True
+
+
 def sincronizar_forma_e_autorizacao_notas_das_contas(conta_ids, *, empresa_id: int) -> dict:
     """Processa cada NF distinta vinculada às contas selecionadas."""
     from contasareceber.models import ContaAReceber
 
-    contas = (
-        ContaAReceber.objects.filter(pk__in=conta_ids, empresa_id=empresa_id)
-        .exclude(nota_id__isnull=True)
-        .select_related('nota')
+    contas = list(
+        ContaAReceber.objects.filter(pk__in=conta_ids, empresa_id=empresa_id).select_related('nota')
     )
+    vinculadas_doc = 0
+    for conta in contas:
+        if not conta.nota_id and tentar_vincular_nota_conta_por_documento(
+            conta, empresa_id=empresa_id
+        ):
+            vinculadas_doc += 1
+            conta.refresh_from_db(fields=['nota_id'])
+            if conta.nota_id:
+                try:
+                    conta.nota.refresh_from_db()
+                except Exception:
+                    pass
+
     notas_vistas: set[int] = set()
     stats = {
         'notas_processadas': 0,
@@ -100,13 +138,16 @@ def sincronizar_forma_e_autorizacao_notas_das_contas(conta_ids, *, empresa_id: i
         'sem_nota': 0,
         'sem_discriminacao': 0,
         'sem_dados': 0,
+        'vinculadas_por_doc': vinculadas_doc,
     }
 
     selecionadas = len(conta_ids)
-    com_nota = contas.count()
+    com_nota = sum(1 for c in contas if c.nota_id)
     stats['sem_nota'] = max(0, selecionadas - com_nota)
 
     for conta in contas:
+        if not conta.nota_id:
+            continue
         nf = conta.nota
         if not nf or nf.pk in notas_vistas:
             continue

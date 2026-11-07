@@ -2,18 +2,23 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title">Notas fiscais encontradas</h5>
+                <h5 class="modal-title">Escolher nota(s) fiscal(is)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body py-2">
+                <p class="small text-muted mb-2" id="modalNotasMultiplasSubtitulo"></p>
+                <p class="small mb-2">Marque <strong>1 ou 2</strong> notas e clique em <strong>Usar selecionadas</strong>,
+                    ou use <strong>Usar só esta</strong> em uma linha.</p>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th style="width:2.5rem"></th>
                                 <th>Nota</th>
                                 <th>Cliente</th>
                                 <th class="text-end">Valor</th>
                                 <th>Forma pagamento</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody id="modalNotasMultiplasBody"></tbody>
@@ -21,6 +26,7 @@
                 </div>
             </div>
             <div class="modal-footer py-2">
+                <button type="button" class="btn btn-primary btn-sm" id="btnUsarNotasSelecionadas">Usar selecionadas</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
@@ -73,6 +79,9 @@
     var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     csrfToken = csrfToken ? csrfToken.value : '';
     var vinculoAtual = { faturamentoId: null, paciente: '', data: '', celula: null };
+    var multiAtual = { faturamentoId: null, paciente: '', data: '', celula: null, notas: [] };
+    var modalSubtitulo = document.getElementById('modalNotasMultiplasSubtitulo');
+    var btnUsarNotasSel = document.getElementById('btnUsarNotasSelecionadas');
 
     function escapeHtml(texto) {
         return String(texto || '')
@@ -239,16 +248,119 @@
         atualizarColunasPagamentoNota(faturamentoId, nota, extras);
     }
 
-    function abrirModalMultiplas(notas) {
+    function renderCelulaNFMulti(celula, notas) {
+        if (!celula || !notas || !notas.length) return;
+        if (notas.length === 1) {
+            renderCelulaNF(celula, notas[0]);
+            return;
+        }
+        var faturamentoId = multiAtual.faturamentoId || celula.getAttribute('data-faturamento-id') || '';
+        var paciente = multiAtual.paciente || celula.getAttribute('data-paciente') || '';
+        var dataIso = multiAtual.data || celula.getAttribute('data-data') || '';
+        var links = notas.map(function(nota) {
+            return '<a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a>';
+        }).join(' <span class="text-muted">+</span> ');
+        var notasJson = '';
+        try { notasJson = escapeHtml(JSON.stringify(notas)); } catch (e) { notasJson = ''; }
+        celula.innerHTML =
+            '<div>' + links +
+            ' <span class="badge bg-secondary">Manual</span>' +
+            '<div class="mt-1">' +
+            '<button type="button" class="btn btn-link btn-sm p-0 js-ver-notas-multi"' +
+            ' data-notas="' + notasJson + '"' +
+            ' data-faturamento-id="' + escapeHtml(faturamentoId) + '"' +
+            ' data-paciente="' + escapeHtml(paciente) + '"' +
+            ' data-data="' + escapeHtml(dataIso) + '">' +
+            notas.length + ' notas — alterar</button></div>' +
+            botoesAcaoNF(faturamentoId, paciente, dataIso) +
+            '</div>';
+    }
+
+    function aplicarVinculoNotas(faturamentoId, notaIds, celula) {
+        if (!faturamentoId || !notaIds.length) return;
+        var body = new URLSearchParams({ faturamento_id: String(faturamentoId) });
+        notaIds.forEach(function(id) { body.append('nota_id', String(id)); });
+        return fetch(vincularUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: body.toString()
+        })
+            .then(function(resp) { return resp.json(); })
+            .then(function(res) {
+                if (!res.ok) {
+                    alert(res.error || 'Não foi possível vincular a(s) NF.');
+                    return;
+                }
+                var notas = res.notas && res.notas.length ? res.notas : (res.nota ? [res.nota] : []);
+                var alvo = celula || multiAtual.celula;
+                if (alvo) {
+                    if (notas.length > 1) {
+                        renderCelulaNFMulti(alvo, notas);
+                    } else if (notas.length === 1) {
+                        renderCelulaNF(alvo, notas[0]);
+                    }
+                }
+                document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + faturamentoId + '"]').forEach(function(cel) {
+                    if (notas.length > 1) {
+                        renderCelulaNFMulti(cel, notas);
+                    } else if (notas.length === 1) {
+                        renderCelulaNF(cel, notas[0]);
+                    }
+                });
+                var notaPag = res.nota_resumo || (notas.length === 1 ? notas[0] : null);
+                if (notaPag) {
+                    atualizarColunasPagamentoNota(faturamentoId, notaPag, res);
+                } else if (notas.length > 1) {
+                    var total = 0;
+                    notas.forEach(function(n) {
+                        var v = n.valor_liquido != null ? Number(n.valor_liquido) : Number(n.valor_bruto);
+                        if (!isNaN(v)) total += v;
+                    });
+                    atualizarColunasPagamentoNota(faturamentoId, {
+                        valor_fmt: res.valor_nf_total,
+                        valor_liquido: total,
+                        discriminacao: notas.map(function(n) { return n.discriminacao || ''; }).join(' | ')
+                    }, res);
+                }
+                if (modalMulti && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalMulti).hide();
+                }
+            })
+            .catch(function() {
+                alert('Erro ao vincular a(s) NF.');
+            });
+    }
+
+    function abrirModalMultiplas(notas, ctx) {
         if (!tbodyMulti) return;
+        ctx = ctx || {};
+        multiAtual.faturamentoId = ctx.faturamentoId || null;
+        multiAtual.paciente = ctx.paciente || '';
+        multiAtual.data = ctx.data || '';
+        multiAtual.celula = ctx.celula || null;
+        multiAtual.notas = notas || [];
+        if (modalSubtitulo) {
+            modalSubtitulo.textContent = ctx.paciente
+                ? ('Paciente: ' + ctx.paciente + (ctx.data ? (' · Exame: ' + ctx.data) : ''))
+                : '';
+        }
         tbodyMulti.innerHTML = '';
-        notas.forEach(function(nota) {
+        multiAtual.notas.forEach(function(nota, idx) {
             var tr = document.createElement('tr');
+            var pk = nota.pk != null ? String(nota.pk) : '';
             tr.innerHTML =
+                '<td><input type="checkbox" class="form-check-input js-nota-multi-pick" value="' + escapeHtml(pk) + '"' +
+                (idx < 2 ? ' checked' : '') + '></td>' +
                 '<td><a href="' + escapeHtml(nota.url) + '" target="_blank" rel="noopener">NF ' + escapeHtml(nota.numero) + '</a><div class="text-muted small">' + escapeHtml(nota.data_emissao_fmt) + '</div></td>' +
                 '<td>' + escapeHtml(nota.nome_exibicao_vinculo || nota.cliente || nota.paciente_nota) + '</td>' +
                 '<td class="text-end">R$ ' + escapeHtml(nota.valor_fmt) + '</td>' +
-                '<td>' + escapeHtml(nota.forma_pagamento) + '</td>';
+                '<td>' + escapeHtml(nota.forma_pagamento) + '</td>' +
+                '<td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm py-0 js-usar-nota-unica"' +
+                ' data-nota-id="' + escapeHtml(pk) + '">Usar só esta</button></td>';
             tbodyMulti.appendChild(tr);
         });
         if (modalMulti && window.bootstrap) {
@@ -265,10 +377,56 @@
             } catch (err) {
                 notas = [];
             }
-            abrirModalMultiplas(notas);
+            abrirModalMultiplas(notas, {
+                faturamentoId: btnMulti.getAttribute('data-faturamento-id'),
+                paciente: btnMulti.getAttribute('data-paciente') || '',
+                data: btnMulti.getAttribute('data-data') || '',
+                celula: btnMulti.closest('.fm-celula-nf')
+            });
+            return;
+        }
+        var btnUma = e.target.closest('.js-usar-nota-unica');
+        if (btnUma) {
+            var nid = btnUma.getAttribute('data-nota-id');
+            if (multiAtual.faturamentoId && nid) {
+                aplicarVinculoNotas(multiAtual.faturamentoId, [nid], multiAtual.celula);
+            }
             return;
         }
     });
+
+    if (btnUsarNotasSel) {
+        btnUsarNotasSel.addEventListener('click', function() {
+            if (!multiAtual.faturamentoId) {
+                alert('Esta visualização não permite vincular (abra pelo botão da grade).');
+                return;
+            }
+            var ids = [];
+            document.querySelectorAll('.js-nota-multi-pick:checked').forEach(function(cb) {
+                if (cb.value) ids.push(cb.value);
+            });
+            if (!ids.length) {
+                alert('Marque ao menos uma nota.');
+                return;
+            }
+            if (ids.length > 2) {
+                alert('Selecione no máximo 2 notas por atendimento.');
+                return;
+            }
+            aplicarVinculoNotas(multiAtual.faturamentoId, ids, multiAtual.celula);
+        });
+    }
+
+    if (tbodyMulti) {
+        tbodyMulti.addEventListener('change', function(e) {
+            if (!e.target.classList.contains('js-nota-multi-pick')) return;
+            var marcados = document.querySelectorAll('.js-nota-multi-pick:checked');
+            if (marcados.length > 2) {
+                e.target.checked = false;
+                alert('No máximo 2 notas por atendimento.');
+            }
+        });
+    }
 
     function carregarCandidatasVinculo() {
         if (!vinculoAtual.faturamentoId || !vincularListaEl) return;
@@ -318,10 +476,23 @@
                                     alert(res.error || 'Não foi possível vincular a NF.');
                                     return;
                                 }
+                                var notasRes = res.notas && res.notas.length ? res.notas : (res.nota ? [res.nota] : []);
                                 if (vinculoAtual.celula) {
-                                    renderCelulaNF(vinculoAtual.celula, res.nota);
+                                    if (notasRes.length > 1) {
+                                        renderCelulaNFMulti(vinculoAtual.celula, notasRes);
+                                    } else if (notasRes.length === 1) {
+                                        renderCelulaNF(vinculoAtual.celula, notasRes[0]);
+                                    }
                                 }
-                                atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, res.nota, res);
+                                if (notasRes.length === 1) {
+                                    atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, notasRes[0], res);
+                                } else if (notasRes.length > 1) {
+                                    document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + vinculoAtual.faturamentoId + '"]').forEach(function(cel) {
+                                        renderCelulaNFMulti(cel, notasRes);
+                                    });
+                                    var notaPag = res.nota_resumo || notasRes[0];
+                                    atualizarColunasPagamentoNota(vinculoAtual.faturamentoId, notaPag, res);
+                                }
                                 if (modalVincular && window.bootstrap) {
                                     bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
                                 }

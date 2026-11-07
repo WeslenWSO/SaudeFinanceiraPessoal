@@ -424,6 +424,48 @@ def valor_nf_rateio_acerto_caixa(empresa_id: int | None, faturamento) -> tuple[D
     return valor_total_notas_serializadas(notas), notas
 
 
+def parse_numeros_notas_salvas(raw: str | None) -> list[str]:
+    """Números de NF gravados no faturamento (um ou vários, separados por vírgula)."""
+    if not raw:
+        return []
+    partes = re.split(r'[,;|]+', str(raw).strip())
+    vistos: set[str] = set()
+    out: list[str] = []
+    for parte in partes:
+        num = parte.strip()
+        if not num or num in vistos:
+            continue
+        vistos.add(num)
+        out.append(num)
+    return out
+
+
+def buscar_notas_manuais_salvas(
+    empresa_id: int | None,
+    numeros_raw: str | None,
+) -> list[NotaFiscalServico]:
+    numeros = parse_numeros_notas_salvas(numeros_raw)
+    if not numeros or not empresa_id:
+        return []
+    vistos_pk: set[int] = set()
+    out: list[NotaFiscalServico] = []
+    for num in numeros:
+        nota = buscar_nota_manual_salva(empresa_id, num)
+        if nota and nota.pk not in vistos_pk:
+            vistos_pk.add(nota.pk)
+            out.append(nota)
+    return out
+
+
+def gravar_numeros_notas_faturamento(numeros: list[str]) -> str:
+    limpos = []
+    for num in numeros:
+        s = (num or '').strip()
+        if s and s not in limpos:
+            limpos.append(s)
+    return ','.join(limpos)[:50]
+
+
 def buscar_nota_manual_salva(
     empresa_id: int | None,
     numero_nota: str | None,
@@ -451,9 +493,9 @@ def resolver_notas_linha(
     numero_nota_salvo: str | None = None,
 ) -> list[dict]:
     """Vínculo manual salvo tem prioridade; senão busca automática por paciente na NF."""
-    nota_manual = buscar_nota_manual_salva(empresa_id, numero_nota_salvo)
-    if nota_manual:
-        return [serializar_nota_linha(nota_manual, manual=True)]
+    notas_manuais = buscar_notas_manuais_salvas(empresa_id, numero_nota_salvo)
+    if notas_manuais:
+        return [serializar_nota_linha(n, manual=True) for n in notas_manuais]
     notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
     if notas:
         return [serializar_nota_linha(n, manual=False) for n in notas]

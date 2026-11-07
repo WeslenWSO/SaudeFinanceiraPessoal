@@ -1001,6 +1001,11 @@ def buscar_forma_autorizacao_nf_lote(request):
         if stats['notas_atualizadas']:
             partes.insert(1, f'{stats["notas_atualizadas"]} nota(s) ajustada(s) na origem')
         messages.success(request, 'Dados da NF aplicados: ' + '; '.join(partes) + '.')
+        if stats.get('vinculadas_por_doc'):
+            messages.info(
+                request,
+                f'{stats["vinculadas_por_doc"]} título(s) ligados à NF pelo número do documento.',
+            )
         if stats['sem_nota']:
             messages.info(
                 request,

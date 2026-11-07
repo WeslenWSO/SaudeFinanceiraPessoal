@@ -122,18 +122,23 @@
                                 </thead>
                                 <tbody>
                                     {% for conta in contas %}
-                                    <tr>
+                                    <tr class="{% if not conta.nota_id %}table-warning{% endif %}">
                                         <td>
-                                            {% if conta.nota_id %}
-                                            <input type="checkbox" name="contas_ids" value="{{ conta.pk }}" class="conta-nf-sync-cb">
-                                            {% else %}
-                                            <span class="text-muted" title="Sem NF vinculada">—</span>
-                                            {% endif %}
+                                            <input type="checkbox"
+                                                   name="contas_ids"
+                                                   value="{{ conta.pk }}"
+                                                   class="conta-nf-sync-cb"
+                                                   title="{% if not conta.nota_id %}Será tentado vínculo pelo nº em NF/DOC{% else %}NF vinculada{% endif %}">
                                         </td>
                                         <td>{{ conta.cliente }}</td>
                                         <td>{{ conta.data_vencimento|date:"d/m/Y" }}</td>
                                         <td>
-                                            {% if conta.nota %}{{ conta.nota.numero_nota }}{% else %}{{ conta.doc|default:"—" }}{% endif %}
+                                            {% if conta.nota %}
+                                                {{ conta.nota.numero_nota }}
+                                            {% else %}
+                                                {{ conta.doc|default:"—" }}
+                                                {% if conta.doc %}<span class="badge bg-secondary ms-1" title="NF não ligada no título — processamento tenta ligar pelo número">Doc</span>{% endif %}
+                                            {% endif %}
                                         </td>
                                         <td>{{ conta.get_autorizacao_exibicao|default:"—" }}</td>
                                         <td>{{ conta.get_cobranca_exibicao|default:"—" }}</td>

@@ -4736,50 +4736,108 @@ def buscar_notas_vinculo_solicitante(request):
 
 @require_POST
 def vincular_nota_solicitante_faturamento(request):
-    """AJAX: salva vínculo manual NFSe → faturamento (campo nota_fiscal)."""
+    """AJAX: salva vínculo manual NFSe → faturamento (campo nota_fiscal, uma ou várias)."""
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         return JsonResponse({'error': 'Empresa não selecionada.'}, status=400)
     try:
         faturamento_id = int(request.POST.get('faturamento_id') or 0)
-        nota_id = int(request.POST.get('nota_id') or 0)
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Parâmetros inválidos.'}, status=400)
-    if not faturamento_id or not nota_id:
-        return JsonResponse({'error': 'Informe faturamento e nota.'}, status=400)
+    if not faturamento_id:
+        return JsonResponse({'error': 'Informe o faturamento.'}, status=400)
+
+    nota_ids: list[int] = []
+    for raw in request.POST.getlist('nota_id'):
+        try:
+            nid = int(raw)
+            if nid > 0:
+                nota_ids.append(nid)
+        except (TypeError, ValueError):
+            continue
+    if not nota_ids:
+        try:
+            nid = int(request.POST.get('nota_id') or 0)
+            if nid:
+                nota_ids = [nid]
+        except (TypeError, ValueError):
+            pass
+    if not nota_ids:
+        return JsonResponse({'error': 'Informe ao menos uma nota.'}, status=400)
+    nota_ids = list(dict.fromkeys(nota_ids))
+
+    from decimal import Decimal
 
     from notasfiscais.models import NotaFiscalServico
-    from faturamento_medico.services.vincular_nota_solicitante import serializar_nota_linha
+    from faturamento_medico.services.vincular_nota_solicitante import (
+        gravar_numeros_notas_faturamento,
+        notas_linha_para_json,
+        serializar_nota_linha,
+    )
 
     faturamento = get_object_or_404(FaturamentoMedico, pk=faturamento_id, empresa_id=empresa_id)
-    nota = get_object_or_404(
-        NotaFiscalServico,
-        pk=nota_id,
-        empresa_id=empresa_id,
-        data_cancelamento__isnull=True,
+    notas = list(
+        NotaFiscalServico.objects.filter(
+            pk__in=nota_ids,
+            empresa_id=empresa_id,
+            data_cancelamento__isnull=True,
+        )
     )
+    if len(notas) != len(nota_ids):
+        return JsonResponse({'error': 'Uma ou mais notas não foram encontradas.'}, status=404)
+    ordem = {nid: i for i, nid in enumerate(nota_ids)}
+    notas.sort(key=lambda n: ordem.get(n.pk, 999))
+
     from faturamento_medico.models import rotulo_caixa_acerto
     from faturamento_medico.services.pagamentos_acerto_caixa import (
         aplicar_caixa_acerto_ao_vincular_nota,
         aplicar_pagamentos_acerto_ao_vincular_nota,
+        aplicar_pagamentos_acerto_vincular_varias_notas,
         serializar_pagamentos_json,
         texto_forma_pgto,
     )
 
-    faturamento.nota_fiscal = nota.numero_nota
+    numeros = [(n.numero_nota or '').strip() or str(n.pk) for n in notas]
+    faturamento.nota_fiscal = gravar_numeros_notas_faturamento(numeros)
     faturamento.save(update_fields=['nota_fiscal'])
-    pagamentos = aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota)
-    caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, nota)
+    if len(notas) == 1:
+        pagamentos = aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, notas[0])
+        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, notas[0])
+    else:
+        pagamentos = aplicar_pagamentos_acerto_vincular_varias_notas(faturamento, notas)
+        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, notas[0])
     forma_pgto = texto_forma_pgto(pagamentos)
-    return JsonResponse({
+    serializadas = [serializar_nota_linha(n, manual=True) for n in notas]
+    total_nf = Decimal('0')
+    for n in notas:
+        v = n.valor_liquido if n.valor_liquido is not None else n.valor_bruto
+        if v is not None:
+            total_nf += Decimal(str(v))
+    payload = {
         'ok': True,
-        'nota': serializar_nota_linha(nota, manual=True),
+        'nota': serializadas[0],
+        'notas': serializadas,
+        'qtd_notas': len(serializadas),
+        'notas_json': notas_linha_para_json(serializadas) if len(serializadas) > 1 else '',
         'forma_pgto_acerto': forma_pgto,
         'pagamentos_acerto_json': serializar_pagamentos_json(pagamentos),
         'caixa_acerto': caixa_val,
         'caixa_acerto_rotulo': rotulo_caixa_acerto(caixa_val, empresa_id) if caixa_val else '',
         'marcado_acerto_caixa': bool(faturamento.marcado_acerto_caixa),
-    })
+        'valor_nf_total': str(total_nf),
+    }
+    if len(serializadas) > 1:
+        payload['nota_resumo'] = {
+            'numero': ' + '.join(str(s.get('numero') or '') for s in serializadas),
+            'valor_fmt': f'{total_nf:.2f}'.replace('.', ','),
+            'valor_liquido': float(total_nf),
+            'discriminacao': ' | '.join(
+                (s.get('discriminacao') or '').strip()
+                for s in serializadas
+                if (s.get('discriminacao') or '').strip()
+            ),
+        }
+    return JsonResponse(payload)
 
 
 @require_POST

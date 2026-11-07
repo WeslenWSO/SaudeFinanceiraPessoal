@@ -48,8 +48,11 @@
         {% else %}
         <button type="button"
                 class="btn btn-link btn-sm p-0 js-ver-notas-multi"
-                data-notas="{{ linha.notas_json|escape }}">
-            {{ linha.qtd_notas }} notas — ver detalhes
+                data-notas="{{ linha.notas_json|escape }}"
+                data-faturamento-id="{{ linha.faturamento.id }}"
+                data-paciente="{{ linha.paciente }}"
+                data-data="{{ linha.data_iso }}">
+            {{ linha.qtd_notas }} notas — escolher
         </button>
         {% endif %}
     {% endif %}

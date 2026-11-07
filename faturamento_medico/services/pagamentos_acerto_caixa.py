@@ -140,10 +140,10 @@ def aplicar_caixa_acerto_ao_vincular_nota(faturamento, nota) -> str:
     return caixa
 
 
-def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[str, Any]]:
+def montar_pagamentos_json_vinculo_nota(nota) -> tuple[list[dict], bool, list[str]]:
     """
-    Preenche pagamentos_acerto_json a partir da discriminação da NF (regra de forma de pagamento).
-    Se a discriminação estiver incoerente com o valor, usa só forma já cadastrada na nota.
+    Monta lista {cobranca_id, valor} para pagamentos_acerto_json sem gravar no faturamento.
+    Retorna também se a NF precisa save (forma_pagamento) e quais campos.
     """
     from notasfiscais.discriminacao_nfse import discriminacao_valor_coerente
     from notasfiscais.utils import (
@@ -154,9 +154,7 @@ def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[s
 
     valor_ref = _dec(nota.valor_liquido) or _dec(nota.valor_bruto)
     if valor_ref is None or valor_ref <= 0:
-        faturamento.pagamentos_acerto_json = []
-        faturamento.save(update_fields=['pagamentos_acerto_json'])
-        return []
+        return [], False, []
 
     cobrancas = list(Cobranca.objects.all())
     pagamentos_json: list[dict] = []
@@ -206,11 +204,41 @@ def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[s
     if not pagamentos_json and nota.forma_pagamento_id:
         pagamentos_json.append({'cobranca_id': nota.forma_pagamento_id, 'valor': str(valor_ref)})
 
+    return pagamentos_json, atualizar_nota, update_nf_fields
+
+
+def aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, nota) -> list[dict[str, Any]]:
+    """Preenche pagamentos_acerto_json a partir de uma NF."""
+    pagamentos_json, atualizar_nota, update_nf_fields = montar_pagamentos_json_vinculo_nota(nota)
     faturamento.pagamentos_acerto_json = pagamentos_json
     faturamento.save(update_fields=['pagamentos_acerto_json'])
     if atualizar_nota and update_nf_fields:
         nota.save(update_fields=update_nf_fields)
+    return pagamentos_manuais_faturamento(faturamento)
 
+
+def aplicar_pagamentos_acerto_vincular_varias_notas(
+    faturamento, notas: list
+) -> list[dict[str, Any]]:
+    """Soma rateios de pagamento ao vincular 2+ NFSe na mesma linha."""
+    from collections import defaultdict
+    from decimal import Decimal
+
+    merged: dict[int, Decimal] = defaultdict(Decimal)
+    for nota in notas:
+        pagamentos_json, atualizar_nota, update_nf_fields = montar_pagamentos_json_vinculo_nota(nota)
+        if atualizar_nota and update_nf_fields:
+            nota.save(update_fields=update_nf_fields)
+        for item in pagamentos_json:
+            cid = int(item.get('cobranca_id'))
+            val = _dec(item.get('valor')) or Decimal('0')
+            if val > 0:
+                merged[cid] += val
+    pagamentos_json = [
+        {'cobranca_id': cid, 'valor': str(val)} for cid, val in merged.items() if val > 0
+    ]
+    faturamento.pagamentos_acerto_json = pagamentos_json
+    faturamento.save(update_fields=['pagamentos_acerto_json'])
     return pagamentos_manuais_faturamento(faturamento)
 
 
