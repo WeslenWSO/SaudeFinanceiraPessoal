@@ -230,9 +230,9 @@ def _car_sort_key(conta, sort_col):
         doc = conta.doc or (conta.nota.numero_nota if conta.nota else '') or ''
         return str(doc).lower()
     if sort_col == 'autorizacao':
-        return (conta.autorizacao or '').lower()
+        return (conta.get_autorizacao_exibicao() or '').lower()
     if sort_col == 'cobranca':
-        return (conta.forma_pagamento.descricao if conta.forma_pagamento else '').lower()
+        return (conta.get_cobranca_exibicao() or '').lower()
     if sort_col == 'data_vencimento':
         return conta.data_vencimento or date.min
     if sort_col == 'valor':
@@ -268,6 +268,101 @@ def extrair_filtros_categorizar_baixados(request):
         'data_fim': (request.GET.get('data_fim') or '').strip(),
         'per_page': (request.GET.get('per_page') or '50').strip(),
     }
+
+
+def extrair_filtros_nf_sync_car(request):
+    """Filtros da tela de sync autorização/cobrança (período de vencimento)."""
+    status_list = [
+        s.strip()
+        for s in request.GET.getlist('status')
+        if s and str(s).strip()
+    ]
+    valid = {c[0] for c in ContaAReceber.STATUS_CHOICES}
+    status_list = [s for s in status_list if s in valid]
+    return {
+        'search': (request.GET.get('search') or '').strip(),
+        'vencimento_inicio': (request.GET.get('vencimento_inicio') or '').strip(),
+        'vencimento_fim': (request.GET.get('vencimento_fim') or '').strip(),
+        'status_list': status_list,
+        'per_page': (request.GET.get('per_page') or '50').strip(),
+    }
+
+
+@login_required
+def nf_sync_autorizacao_cobranca_vencimento(request):
+    """
+    Contas já pagas/cartão (ou todas) por vencimento: selecionar e gravar cobrança + AUT da NF.
+    """
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    filtros = extrair_filtros_nf_sync_car(request)
+    per_page = filtros['per_page']
+    try:
+        per_page = int(per_page)
+        if per_page not in [25, 50, 100, 150, 500, 900]:
+            per_page = 50
+    except ValueError:
+        per_page = 50
+
+    hoje = timezone.now().date()
+    venc_ini = filtros['vencimento_inicio'] or hoje.replace(day=1).strftime('%Y-%m-%d')
+    venc_fim = filtros['vencimento_fim'] or hoje.strftime('%Y-%m-%d')
+    if venc_ini > venc_fim:
+        venc_ini, venc_fim = venc_fim, venc_ini
+
+    contas = (
+        ContaAReceber.objects.filter(empresa_id=empresa_id)
+        .filter(data_vencimento__gte=venc_ini, data_vencimento__lte=venc_fim)
+        .exclude(nota_id__isnull=True)
+        .select_related(
+            'forma_pagamento',
+            'nota',
+            'nota__forma_pagamento',
+        )
+        .order_by('data_vencimento', 'cliente', 'id')
+    )
+
+    status_list = filtros['status_list']
+    if status_list:
+        contas = contas.filter(status__in=status_list)
+
+    if filtros['search']:
+        contas = contas.filter(
+            Q(nota__numero_nota__icontains=filtros['search'], nota__isnull=False)
+            | Q(cliente__icontains=filtros['search'])
+            | Q(cnpj_cpf__icontains=filtros['search'])
+            | Q(doc__icontains=filtros['search'])
+            | Q(autorizacao__icontains=filtros['search'])
+        )
+
+    paginator = Paginator(contas, per_page)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    q_nav = request.GET.copy()
+    if 'page' in q_nav:
+        del q_nav['page']
+    filtros_query_sem_page = q_nav.urlencode()
+    return_path = request.get_full_path()
+
+    context = {
+        'contas': page_obj,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'filtros_query_sem_page': filtros_query_sem_page,
+        'return_path': return_path,
+        'filtros': {
+            'search': filtros['search'],
+            'vencimento_inicio': venc_ini,
+            'vencimento_fim': venc_fim,
+            'status_list': status_list,
+            'per_page': str(per_page),
+        },
+        'status_choices': ContaAReceber.STATUS_CHOICES,
+        'total_com_nf': paginator.count,
+    }
+    return render(request, 'contasareceber/nf_sync_vencimento.html', context)
 
 
 def categorizar_recebidos_baixados(request):
@@ -509,7 +604,14 @@ def listar_contas_a_receber(request):
 
     contas = (
         ContaAReceber.objects.filter(empresa_id=empresa_id)
-        .select_related('nota', 'nota__socio', 'socio', 'categoria', 'forma_pagamento')
+        .select_related(
+            'nota',
+            'nota__socio',
+            'nota__forma_pagamento',
+            'socio',
+            'categoria',
+            'forma_pagamento',
+        )
         .order_by('-data_vencimento')
     )
 

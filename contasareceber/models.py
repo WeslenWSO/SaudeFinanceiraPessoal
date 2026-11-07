@@ -156,6 +156,62 @@ class ContaAReceber(models.Model):
             return True
         return self.get_valor_liquido_restante() <= Decimal('0.02')
 
+    def get_autorizacao_exibicao(self) -> str:
+        """Autorização gravada no CAR ou, se vazio, lida da NF (mesma regra de sync)."""
+        auth = (self.autorizacao or '').strip()
+        if auth:
+            return auth
+        if self.nota_id:
+            from contasareceber.socio_sync import _autorizacao_da_nota
+
+            da_nf = (_autorizacao_da_nota(self.nota) or '').strip()
+            if da_nf:
+                return da_nf
+        return ''
+
+    def get_cobranca_exibicao(self) -> str:
+        """Cobrança no CAR ou forma de pagamento da NF vinculada."""
+        if self.forma_pagamento_id and self.forma_pagamento:
+            return (self.forma_pagamento.descricao or '').strip()
+        nf = self.nota
+        if nf and nf.forma_pagamento_id and nf.forma_pagamento:
+            return (nf.forma_pagamento.descricao or '').strip()
+        return ''
+
+    def exibe_autorizacao_da_nf(self) -> bool:
+        return not (self.autorizacao or '').strip() and bool(self.get_autorizacao_exibicao())
+
+    def exibe_cobranca_da_nf(self) -> bool:
+        return not self.forma_pagamento_id and bool(self.get_cobranca_exibicao())
+
+    def get_autorizacao_exibicao(self) -> str:
+        """Autorização gravada no CAR ou, se vazio, lida da NF (mesma regra de sync)."""
+        auth = (self.autorizacao or '').strip()
+        if auth:
+            return auth
+        if self.nota_id:
+            from contasareceber.socio_sync import _autorizacao_da_nota
+
+            da_nf = (_autorizacao_da_nota(self.nota) or '').strip()
+            if da_nf:
+                return da_nf
+        return ''
+
+    def get_cobranca_exibicao(self) -> str:
+        """Cobrança no CAR ou forma de pagamento da NF vinculada."""
+        if self.forma_pagamento_id and self.forma_pagamento:
+            return (self.forma_pagamento.descricao or '').strip()
+        nf = self.nota
+        if nf and nf.forma_pagamento_id and nf.forma_pagamento:
+            return (nf.forma_pagamento.descricao or '').strip()
+        return ''
+
+    def exibe_autorizacao_da_nf(self) -> bool:
+        return not (self.autorizacao or '').strip() and bool(self.get_autorizacao_exibicao())
+
+    def exibe_cobranca_da_nf(self) -> bool:
+        return not self.forma_pagamento_id and bool(self.get_cobranca_exibicao())
+
     def is_vencida(self):
         """Verifica se a conta está vencida"""
         if self.data_recebimento or self.status == 'pago':

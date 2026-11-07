@@ -115,6 +115,9 @@
                             <a href="{% url 'contasareceber:categorizar_baixados' %}" class="btn btn-outline-primary" title="Categorizar lançamentos já recebidos">
                                 <i class="fas fa-tags"></i> Categorizar baixados
                             </a>
+                            <a href="{% url 'contasareceber:nf_sync_vencimento' %}" class="btn btn-outline-danger" title="Títulos pagos por vencimento: gravar AUT e cobrança da NF">
+                                <i class="fas fa-fingerprint"></i> AUT / Cobrança (vencimento)
+                            </a>
                         </div>
                     </div>
                     {% if conta_azul_integracao %}
@@ -347,6 +350,7 @@
                     <!-- Form para seleção múltipla -->
                     <form method="post" id="contas-form" action="{% url 'contasareceber:lancar_selecionados' %}">
                         {% csrf_token %}
+                        <input type="hidden" name="return_path" id="contas-form-return-path" value="{{ request.get_full_path }}">
                         <div class="toolbar">
                             <div class="toolbar-left">
                                 <button type="button" class="btn btn-info btn-sm" id="conciliar-btn">
@@ -364,14 +368,14 @@
                                 <button type="button" class="btn btn-primary btn-sm" id="escolher-categoria-btn">
                                     <i class="fas fa-tags"></i> Escolher Categoria
                                 </button>
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="buscar-forma-nf-btn" title="Lê cobrança e autorização (AUT) na discriminação da NF vinculada e atualiza as colunas">
-                                    <i class="fas fa-file-invoice"></i> Buscar da NF (cobrança / AUT)
-                                </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="alterar-socio-btn" title="Define o sócio na nota fiscal vinculada">
                                     <i class="fas fa-user-edit"></i> Alterar Sócio
                                 </button>
                                 <button type="button" class="btn btn-danger btn-sm" id="excluir-selecionados-btn" title="Exclui as contas pendentes selecionadas">
                                     <i class="fas fa-trash"></i> Excluir Selecionados
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="buscar-forma-nf-btn" title="Lê cobrança e autorização na discriminação da NF (mesmas regras da importação) e grava nas colunas">
+                                    <i class="fas fa-fingerprint"></i> Autorização / Cobrança (NF)
                                 </button>
                             </div>
                             <small class="text-muted">Selecione contas para aplicar ações em lote</small>
@@ -433,13 +437,23 @@
                                             {{ conta.doc|default:"-" }}
                                             {% endif %}
                                         </td>
-                                        <td>{{ conta.autorizacao|default:"-" }}</td>
                                         <td>
-                                            {% if conta.forma_pagamento %}
-                                                {{ conta.forma_pagamento.descricao }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% with auth=conta.get_autorizacao_exibicao %}
+                                                {% if auth %}
+                                                    {{ auth }}{% if conta.exibe_autorizacao_da_nf %} <span class="text-muted" title="Ainda na NF — use «Autorização / Cobrança (NF)» para gravar">*</span>{% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            {% with cob=conta.get_cobranca_exibicao %}
+                                                {% if cob %}
+                                                    {{ cob }}{% if conta.exibe_cobranca_da_nf %} <span class="text-muted" title="Ainda na NF — use «Autorização / Cobrança (NF)» para gravar">*</span>{% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
                                         </td>
                                         <td>{{ conta.data_vencimento|date:"d/m/Y" }}</td>
                                         <td>R$ {{ conta.valor_a_receber|moeda_br }}</td>

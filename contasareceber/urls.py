@@ -6,6 +6,11 @@ app_name = 'contasareceber'
 urlpatterns = [
     path('', views.listar_contas_a_receber, name='crlistar'),
     path('categorizar-baixados/', views.categorizar_recebidos_baixados, name='categorizar_baixados'),
+    path(
+        'nf-sync-vencimento/',
+        views.nf_sync_autorizacao_cobranca_vencimento,
+        name='nf_sync_vencimento',
+    ),
     path('criar/', views.criar_conta_a_receber, name='criar'),
     path('autocomplete-cliente/', views.autocomplete_cliente, name='autocomplete_cliente'),
     path('buscar-lancamentos-extrato/', views.buscar_lancamentos_extrato, name='buscar_lancamentos_extrato'),
