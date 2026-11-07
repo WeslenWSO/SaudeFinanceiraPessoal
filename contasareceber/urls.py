@@ -31,6 +31,11 @@ urlpatterns = [
     path('buscar_categorias/', views.buscar_categorias, name='buscar_categorias'),
     path('aplicar_categoria/', views.aplicar_categoria, name='aplicar_categoria'),
     path('alterar-socio-lote/', views.alterar_socio_lote, name='alterar_socio_lote'),
+    path(
+        'buscar-forma-autorizacao-nf/',
+        views.buscar_forma_autorizacao_nf_lote,
+        name='buscar_forma_autorizacao_nf',
+    ),
     path('excluir-selecionados/', views.excluir_contas_selecionadas, name='excluir_selecionados'),
     path(
         'integrar-conta-azul/',

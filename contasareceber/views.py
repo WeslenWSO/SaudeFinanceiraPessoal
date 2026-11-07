@@ -834,6 +834,63 @@ def alterar_socio_lote(request):
     return _redirect_car_com_return(request, return_path)
 
 
+@login_required
+@require_POST
+def buscar_forma_autorizacao_nf_lote(request):
+    """Preenche cobrança e autorização nas contas a partir da discriminação da NF vinculada."""
+    from contasareceber.nf_sync_discriminacao import sincronizar_forma_e_autorizacao_notas_das_contas
+
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    contas_ids_raw = request.POST.getlist('contas_ids') or request.POST.getlist('contas')
+    return_path = (request.POST.get('return_path') or '').strip()
+
+    contas_ids: list[int] = []
+    for raw in contas_ids_raw:
+        if str(raw).isdigit():
+            contas_ids.append(int(raw))
+
+    if not contas_ids:
+        messages.error(request, 'Nenhuma conta selecionada.')
+        return _redirect_car_com_return(request, return_path)
+
+    stats = sincronizar_forma_e_autorizacao_notas_das_contas(contas_ids, empresa_id=empresa_id)
+
+    if stats['notas_processadas'] == 0:
+        messages.warning(
+            request,
+            'Nenhuma conta selecionada possui nota fiscal vinculada.',
+        )
+    else:
+        partes = [
+            f'{stats["notas_processadas"]} nota(s) analisada(s)',
+            f'{stats["car_forma"]} conta(s) com cobrança atualizada',
+            f'{stats["car_aut"]} conta(s) com autorização atualizada',
+        ]
+        if stats['notas_atualizadas']:
+            partes.insert(1, f'{stats["notas_atualizadas"]} nota(s) ajustada(s) na origem')
+        messages.success(request, 'Dados da NF aplicados: ' + '; '.join(partes) + '.')
+        if stats['sem_nota']:
+            messages.info(
+                request,
+                f'{stats["sem_nota"]} conta(s) sem NF vinculada foram ignoradas.',
+            )
+        if stats['sem_discriminacao']:
+            messages.warning(
+                request,
+                f'{stats["sem_discriminacao"]} nota(s) sem discriminação — não foi possível extrair dados.',
+            )
+        if stats['sem_dados']:
+            messages.info(
+                request,
+                f'{stats["sem_dados"]} nota(s) sem forma de pagamento ou autorização reconhecida na discriminação.',
+            )
+
+    return _redirect_car_com_return(request, return_path)
+
+
 def _redirect_car_com_return(request, return_path):
     if return_path.startswith('/contasareceber'):
         return redirect(return_path)

@@ -364,6 +364,9 @@
                                 <button type="button" class="btn btn-primary btn-sm" id="escolher-categoria-btn">
                                     <i class="fas fa-tags"></i> Escolher Categoria
                                 </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="buscar-forma-nf-btn" title="Lê cobrança e autorização (AUT) na discriminação da NF vinculada e atualiza as colunas">
+                                    <i class="fas fa-file-invoice"></i> Buscar da NF (cobrança / AUT)
+                                </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="alterar-socio-btn" title="Define o sócio na nota fiscal vinculada">
                                     <i class="fas fa-user-edit"></i> Alterar Sócio
                                 </button>
@@ -1314,6 +1317,34 @@ document.addEventListener('DOMContentLoaded', function() {
         // Mostrar modal com informações das contas
         mostrarModalEscolherCategoria(checkedBoxes);
     });
+
+    const buscarFormaNfBtn = document.getElementById('buscar-forma-nf-btn');
+    if (buscarFormaNfBtn) {
+        buscarFormaNfBtn.addEventListener('click', function() {
+            const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Selecione pelo menos uma conta para buscar cobrança e autorização na NF.');
+                return;
+            }
+            const n = checkedBoxes.length;
+            const msg = 'Buscar na nota fiscal vinculada a forma de pagamento (cobrança) e a autorização (AUT), conforme a discriminação?\n\n'
+                + (n === 1 ? '1 conta selecionada.' : n + ' contas selecionadas.')
+                + '\n\nContas sem NF vinculada serão ignoradas.';
+            if (!window.confirm(msg)) {
+                return;
+            }
+            contasForm.querySelectorAll('input[name="contas_ids"]').forEach(function(el) { el.remove(); });
+            Array.from(checkedBoxes).forEach(function(cb) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'contas_ids';
+                input.value = cb.value;
+                contasForm.appendChild(input);
+            });
+            contasForm.action = '{% url "contasareceber:buscar_forma_autorizacao_nf" %}';
+            contasForm.submit();
+        });
+    }
 
     const alterarSocioBtn = document.getElementById('alterar-socio-btn');
     if (alterarSocioBtn) {
