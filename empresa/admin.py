@@ -4,10 +4,34 @@ from .models import Empresa, UsuarioEmpresa
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
     list_display = [
-        'razao', 'nome_fantasia', 'cnpj', 'codigo_externo', 'status', 'regime_tributario', 'anexo_i', 'anexo_ii', 'anexo_iii', 'anexo_iv', 'anexo_v', 'tem_fator_r', 'tipo_apuracao', 'data_criacao'
+        'razao',
+        'nome_fantasia',
+        'cnpj',
+        'codigo_externo',
+        'status',
+        'integracao_conta_azul',
+        'regime_tributario',
+        'anexo_i',
+        'anexo_ii',
+        'anexo_iii',
+        'anexo_iv',
+        'anexo_v',
+        'tem_fator_r',
+        'tipo_apuracao',
+        'data_criacao',
     ]
     list_filter = [
-        'status', 'regime_tributario', 'anexo_i', 'anexo_ii', 'anexo_iii', 'anexo_iv', 'anexo_v', 'tem_fator_r', 'tipo_apuracao', 'data_criacao'
+        'status',
+        'integracao_conta_azul',
+        'regime_tributario',
+        'anexo_i',
+        'anexo_ii',
+        'anexo_iii',
+        'anexo_iv',
+        'anexo_v',
+        'tem_fator_r',
+        'tipo_apuracao',
+        'data_criacao',
     ]
     search_fields = [
         'razao', 'nome_fantasia', 'cnpj', 'codigo_externo'
@@ -20,6 +44,12 @@ class EmpresaAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Informações Básicas', {
             'fields': ('razao', 'nome_fantasia', 'cnpj', 'codigo_externo', 'status')
+        }),
+        ('Integração Conta Azul', {
+            'fields': ('integracao_conta_azul',),
+            'description': (
+                'Marcado: contas a receber vêm da API Conta Azul; o sistema não cria CAR local ao gravar NFSe.'
+            ),
         }),
         ('Configurações Fiscais', {
             'fields': ('regime_tributario', 'anexo_i', 'anexo_ii', 'anexo_iii', 'anexo_iv', 'anexo_v', 'tem_fator_r', 'tipo_apuracao', 'usa_base_calculo_reduzido', 'utiliza_iss_fixo')

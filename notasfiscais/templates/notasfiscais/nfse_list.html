@@ -358,10 +358,15 @@
                 <button type="button" class="btn btn-muted btn-sm" id="btnAplicarCobranca" disabled title="Aplicar cobrança (forma de pagamento) nas notas selecionadas"><i class="fas fa-money-check-alt"></i> Aplicar Cobrança</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnAplicarRegraImposto" {% if periodo_fechado %}onclick="alert('Período fechado - vá para Apuração de Impostos e reabra o período para alterar regras.');" title="Período fechado"{% else %}onclick="document.getElementById('modalRegraImposto').showModal();" title="Aplicar regra de imposto"{% endif %}><i class="fas fa-calculator"></i> Aplicar Regra Imposto</button>
                 <button type="button" class="btn btn-muted btn-sm" id="btnSegmentar" disabled><i class="fas fa-cut"></i> Segmentar NFSe</button>
-                {% if bloquear_gerar_car_conta_azul %}
-                <span class="d-inline-block" tabindex="0" title="Conta Azul conectada — use a sincronização CA em vez de gerar CAR aqui.">
-                  <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled style="pointer-events: none;"><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
+                {% if bloquear_gerar_car_conta_azul or empresa_integracao_conta_azul %}
+                <span class="btn btn-outline-secondary btn-sm disabled opacity-75" style="pointer-events: none; cursor: not-allowed;" title="Integração Conta Azul: use «Sincronizar dados» — não gere CAR pela NFSe.">
+                    <i class="fas fa-ban me-1"></i> CAR via Conta Azul
                 </span>
+                {% if conta_azul_sync_url %}
+                <a href="{{ conta_azul_sync_url }}" class="btn btn-outline-primary btn-sm" title="Importar receitas do Conta Azul">
+                    <i class="fas fa-cloud-download-alt"></i> Sync CA
+                </a>
+                {% endif %}
                 {% else %}
                 <button type="button" class="btn btn-muted btn-sm" id="btnGerarContasReceber" disabled><i class="fas fa-plus-circle"></i> Gerar Contas a Receber</button>
                 {% endif %}
@@ -1068,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnExtrair = document.getElementById('btnExtrairDiscriminacao');
     const btnAplicarRegra = document.getElementById('btnAplicarRegraImposto');
     const btnSegmentar = document.getElementById('btnSegmentar');
+    const NFSE_BLOQUEAR_GERAR_CAR = {% if bloquear_gerar_car_conta_azul or empresa_integracao_conta_azul %}true{% else %}false{% endif %};
     const btnGerarContas = document.getElementById('btnGerarContasReceber');
     const btnExcluirNfse = document.getElementById('btnExcluirNfse');
     const btnAISegmentacao = document.getElementById('btnAISegmentacao');
@@ -1082,9 +1088,13 @@ document.addEventListener('DOMContentLoaded', function() {
         btnExtrair.disabled = selectedIds.length === 0;
         btnAplicarRegra.disabled = selectedIds.length === 0;
         btnSegmentar.disabled = selectedIds.length !== 1;  // Só habilita se exatamente 1 selecionado
-        {% if not bloquear_gerar_car_conta_azul %}
-        btnGerarContas.disabled = selectedIds.length === 0;
-        {% endif %}
+        if (btnGerarContas) {
+            if (NFSE_BLOQUEAR_GERAR_CAR) {
+                btnGerarContas.disabled = true;
+            } else {
+                btnGerarContas.disabled = selectedIds.length === 0;
+            }
+        }
         if (btnExcluirNfse) btnExcluirNfse.disabled = selectedIds.length === 0;
         btnAISegmentacao.disabled = selectedIds.length === 0;
         const btnAlterarSocio = document.getElementById('btnAlterarSocio');
@@ -1581,11 +1591,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Função para gerar contas a receber das notas selecionadas
-    btnGerarContas.addEventListener('click', function() {
-        {% if bloquear_gerar_car_conta_azul %}
-        mostrarMensagem('Conta Azul conectada: use a sincronização CA. Geração de CAR pela NFSe está desativada.', 'warning');
-        return;
-        {% endif %}
+    if (btnGerarContas) btnGerarContas.addEventListener('click', function() {
+        if (NFSE_BLOQUEAR_GERAR_CAR) {
+            mostrarMensagem(
+                'Integração Conta Azul ativa nesta empresa: contas a receber vêm da sincronização CA, não pelo botão da NFSe.',
+                'warning'
+            );
+            return;
+        }
         if (selectedIds.length === 0) {
             mostrarMensagem('Selecione pelo menos uma NFSe para gerar contas a receber.', 'warning');
             return;

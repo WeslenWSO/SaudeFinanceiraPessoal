@@ -30,6 +30,7 @@ class EmpresaForm(forms.ModelForm):
             "nome_fantasia",
             "codigo_externo",
             "status",
+            "integracao_conta_azul",
             "regime_tributario",
             "anexo_i",
             "anexo_ii",
@@ -87,6 +88,10 @@ class EmpresaForm(forms.ModelForm):
             }),
             'utiliza_iss_fixo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
+            }),
+            'integracao_conta_azul': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_integracao_conta_azul',
             }),
         }
 

@@ -535,16 +535,15 @@ class NFSeListView(LoginRequiredMixin, ListView):
         conta_azul_sync_url = ''
         empresa_integracao_conta_azul = False
         if empresa_id:
+            from dashboard.conta_azul.config import empresa_tem_integracao_conta_azul_id
+
+            empresa_integracao_conta_azul = empresa_tem_integracao_conta_azul_id(empresa_id)
             try:
-                from dashboard.conta_azul.config import (
-                    empresa_tem_integracao_conta_azul_id,
-                    obter_ou_criar_config,
-                )
+                from dashboard.conta_azul.config import obter_ou_criar_config
 
                 emp_ca = Empresa.objects.get(pk=empresa_id)
                 cfg_ca = obter_ou_criar_config(emp_ca)
                 conta_azul_nfse = cfg_ca.tem_refresh_token()
-                empresa_integracao_conta_azul = empresa_tem_integracao_conta_azul_id(empresa_id)
                 conta_azul_sync_url = reverse('empresa:conta_azul_sincronizar', kwargs={'pk': empresa_id})
             except Exception:
                 pass

@@ -38,6 +38,10 @@
               Integração CA (empresa):
               {% if empresa.integracao_conta_azul %}<span class="badge bg-primary">Ativa</span>
               {% else %}<span class="badge bg-secondary">Inativa</span>{% endif %}
+              <span class="small text-muted d-block mt-1">
+                Marque em <a href="{% url 'empresa:empresa_edit' empresa.pk %}">cadastro da empresa</a>
+                para não gerar contas a receber pela NFSe (somente pela sincronização CA).
+              </span>
             </li>
             <li class="mb-2">
               Access token:

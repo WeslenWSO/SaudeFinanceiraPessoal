@@ -9,12 +9,12 @@ def cotacao_context(request):
             empresa = Empresa.objects.get(id=request.session['empresa_id'])
         except (Empresa.DoesNotExist, DatabaseError):
             pass
+    integracao_ca = bool(empresa and getattr(empresa, 'integracao_conta_azul', False))
     return {
         'cotacao': "5.20",
         'empresa_atual': empresa,
-        'empresa_integracao_conta_azul': bool(
-            empresa and getattr(empresa, 'integracao_conta_azul', False)
-        ),
+        'empresa_integracao_conta_azul': integracao_ca,
+        'bloquear_gerar_car_conta_azul': integracao_ca,
     }
 
 

@@ -102,6 +102,30 @@
                             {% endif %}
                         </div>
 
+                        <div class="mb-3 border rounded p-3 bg-light">
+                            <div class="form-check">
+                                {{ form.integracao_conta_azul }}
+                                <label class="form-check-label small mb-1" for="{{ form.integracao_conta_azul.id_for_label }}">
+                                    {{ form.integracao_conta_azul.label }}
+                                </label>
+                            </div>
+                            {% if form.integracao_conta_azul.help_text %}
+                                <p class="small text-muted mb-0 mt-2">{{ form.integracao_conta_azul.help_text }}</p>
+                            {% endif %}
+                            <p class="small text-muted mb-0 mt-1">
+                                Com esta opção <strong>marcada</strong>, o sistema <strong>não gera</strong> contas a receber ao salvar NFSe
+                                (títulos vêm da sincronização Conta Azul). Configure OAuth em
+                                {% if form.instance.pk %}
+                                <a href="{% url 'empresa:conta_azul_config' form.instance.pk %}">Configuração Conta Azul</a>.
+                                {% else %}
+                                <strong>Configuração Conta Azul</strong> após salvar a empresa.
+                                {% endif %}
+                            </p>
+                            {% if form.integracao_conta_azul.errors %}
+                                <div class="text-danger small">{{ form.integracao_conta_azul.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
                         <div class="mb-3">
                             <div class="form-check">
                                 {{ form.usa_base_calculo_reduzido }}
