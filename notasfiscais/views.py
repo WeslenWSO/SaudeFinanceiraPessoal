@@ -2043,17 +2043,26 @@ def importar_nfse_conta_azul(request):
         if raw_num.isdigit():
             numero_nfse = int(raw_num)
 
+        varredura_profunda = (request.POST.get('ca_busca_profunda') or '').strip() in (
+            '1',
+            'on',
+            'true',
+        )
         try:
+            # Nesta tela só NFS-e (vendas em lote estouram timeout no Render).
             resultado = sincronizar_conta_azul(
                 empresa,
                 nfse_prestador=True,
-                vendas=True,
+                vendas=False,
                 data_de=di,
                 data_ate=df,
                 numero_nfse=numero_nfse,
+                nfse_varredura_profunda=varredura_profunda,
             )
             nivel, texto = _mensagem_import_nfse_ca(resultado)
-            getattr(messages, nivel, messages.info)(request, texto)
+            if nivel not in ('success', 'warning', 'error', 'info'):
+                nivel = 'info'
+            getattr(messages, nivel, messages.info)(request, str(texto or 'Importação concluída.'))
             _aplicar_filtro_periodo_nfse_na_sessao(request, di, df)
         except ContaAzulAPIError as exc:
             messages.error(request, f'Conta Azul: {exc}')

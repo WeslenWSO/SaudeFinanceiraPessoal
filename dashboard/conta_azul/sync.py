@@ -1551,6 +1551,7 @@ def sincronizar_conta_azul(
     data_de: date | None = None,
     data_ate: date | None = None,
     numero_nfse: int | None = None,
+    nfse_varredura_profunda: bool = False,
     dry_run: bool = False,
     receitas_por_recebimento: bool = True,
     receitas_somente_recebidos: bool = True,
@@ -1615,6 +1616,7 @@ def sincronizar_conta_azul(
                     data_ate=data_ate,
                     dry_run=dry_run,
                     numero_nfse=numero_nfse,
+                    varredura_profunda=nfse_varredura_profunda,
                 )
             if vendas and not dry_run:
                 try:
@@ -1687,7 +1689,17 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
                 f'(verifique se está emitida no CA; competência pode estar fora do período).'
             )
         if stats.get('busca_ampliada_interrompida'):
-            ok[-1] += ' (varredura ampla interrompida — tente um intervalo de datas manual).'
+            motivo = stats.get('busca_motivo')
+            if motivo == 'tempo':
+                ok[-1] += (
+                    ' (tempo limite na busca pelo número — marque «Busca profunda» '
+                    'ou ajuste as datas de competência no formulário).'
+                )
+            else:
+                ok[-1] += (
+                    ' (busca pelo número interrompida — marque «Busca profunda» ou '
+                    'informe datas mais próximas da competência no CA).'
+                )
         if stats.get('detalhes_erro'):
             ok[-1] += f', {stats["detalhes_erro"]} vendas sem detalhe API'
         if chave == 'nfse_venda_cache' and stats.get('atualizadas') is not None:

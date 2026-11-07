@@ -113,10 +113,14 @@
                                value="{{ ca_numero_nfse_default }}" style="max-width: 7rem;"
                                title="Opcional: filtra na API CA e, se não achar no período, varre competências próximas">
                     </div>
-                    <div class="col-auto">
+                    <div class="col-auto d-flex flex-column gap-1">
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-cloud-download-alt"></i> Importar do Conta Azul
                         </button>
+                        <label class="form-check form-check-inline small mb-0" title="Até ~2 anos de competência (pode levar mais; só use se a busca rápida não achar)">
+                            <input class="form-check-input" type="checkbox" name="ca_busca_profunda" value="1">
+                            Busca profunda (nº NFS-e)
+                        </label>
                     </div>
                     <div class="col-12">
                         <p class="small text-muted mb-0 nfse-ca-campo-intervalo">Busca por <strong>competência</strong> no Conta Azul (pode diferir da data de emissão e do filtro da lista). Intervalo até <strong>31 dias</strong>. Com <strong>Nº NFS-e</strong>, a API filtra pelo número; se não vier no período, o sistema varre ±200 dias em torno das datas informadas. Confira o <strong>ano</strong> (ex.: 2025 vs 2026).</p>

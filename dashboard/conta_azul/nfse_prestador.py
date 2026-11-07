@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -224,12 +225,24 @@ def _janelas_competencia_15_dias(data_de: date, data_ate: date):
         cur = fim + timedelta(days=1)
 
 
-def _janelas_varredura_numero_global(*, dias_retro: int = 900, dias_frente: int = 45):
-    """Varre competências nos últimos ~2,5 anos — cobre ano errado no formulário."""
+MAX_JANELAS_VARREDURA_WEB = 24
+TEMPO_MAX_VARREDURA_WEB_S = 28.0
+
+
+def _janelas_varredura_numero_global(
+    *,
+    dias_retro: int = 450,
+    dias_frente: int = 30,
+    recentes_primeiro: bool = True,
+):
+    """Janelas de 15 dias; por padrão das mais recentes para as antigas (achar NF logo)."""
     hoje = date.today()
     inicio = hoje - timedelta(days=dias_retro)
     fim = hoje + timedelta(days=dias_frente)
-    yield from _janelas_competencia_15_dias(inicio, fim)
+    janelas = list(_janelas_competencia_15_dias(inicio, fim))
+    if recentes_primeiro:
+        janelas = list(reversed(janelas))
+    yield from janelas
 
 
 def _nf_numero_existe_local(empresa, numero: int) -> bool:
@@ -249,6 +262,7 @@ def importar_nfse_prestador_conta_azul(
     data_ate: date,
     dry_run: bool = False,
     numero_nfse: int | None = None,
+    varredura_profunda: bool = False,
 ) -> dict[str, Any]:
     stats: dict[str, Any] = {
         'criados': 0,
@@ -417,8 +431,20 @@ def importar_nfse_prestador_conta_azul(
         _processar_itens(itens)
 
     if numero_nfse is not None and not dry_run and not _nf_numero_existe_local(empresa, numero_nfse):
+        retro = 900 if varredura_profunda else 450
+        limite_janelas = 120 if varredura_profunda else MAX_JANELAS_VARREDURA_WEB
+        tempo_limite = 180.0 if varredura_profunda else TEMPO_MAX_VARREDURA_WEB_S
+        t0 = time.monotonic()
         stats['busca_numero_ampla'] = 0
-        for cur, fim in _janelas_varredura_numero_global():
+        for cur, fim in _janelas_varredura_numero_global(dias_retro=retro):
+            if time.monotonic() - t0 > tempo_limite:
+                stats['busca_ampliada_interrompida'] = True
+                stats['busca_motivo'] = 'tempo'
+                break
+            if stats['busca_numero_ampla'] >= limite_janelas:
+                stats['busca_ampliada_interrompida'] = True
+                stats['busca_motivo'] = 'limite_janelas'
+                break
             try:
                 itens = client.buscar_notas_fiscais_servico(
                     data_de=cur,
@@ -431,9 +457,6 @@ def importar_nfse_prestador_conta_azul(
             _processar_itens(itens)
             stats['busca_numero_ampla'] += 1
             if _nf_numero_existe_local(empresa, numero_nfse):
-                break
-            if stats['busca_numero_ampla'] >= 72:
-                stats['busca_ampliada_interrompida'] = True
                 break
 
     if numero_nfse is not None and not _nf_numero_existe_local(empresa, numero_nfse):
