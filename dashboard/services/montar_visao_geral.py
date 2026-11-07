@@ -84,30 +84,32 @@ def _sum_receitas_competencia(empresa, ini: date, fim: date) -> Decimal:
     )['t'] or Decimal('0')
 
 
-def _sum_receitas_competencia_nao_recebidas(empresa, ini: date, fim: date) -> Decimal:
-    """Emissão no período (competência) com título ainda não baixado como pago."""
-    return (
-        _qs_receitas_competencia(empresa, ini, fim)
-        .filter(status__in=['pendente', 'vencido', 'cartao'])
-        .aggregate(t=Coalesce(Sum('valor_a_receber'), Decimal('0')))['t']
-        or Decimal('0')
+def _recebido_no_mes_competencia_q(ini: date, fim: date) -> Q:
+    """Baixa no mesmo mês do gráfico (emissão/competência do título)."""
+    return Q(
+        status='pago',
+        data_recebimento__gte=ini,
+        data_recebimento__lte=fim,
     )
+
+
+def _sum_receitas_competencia_nao_recebidas(empresa, ini: date, fim: date) -> Decimal:
+    """
+    Emissão no mês (competência) ainda em aberto ou recebida em outro mês
+    (inclui cartão/pendente e «pago» com data_recebimento fora do mês de emissão).
+    """
+    qs = _qs_receitas_competencia(empresa, ini, fim).exclude(
+        _recebido_no_mes_competencia_q(ini, fim)
+    )
+    return qs.aggregate(t=Coalesce(Sum('valor_a_receber'), Decimal('0')))['t'] or Decimal('0')
 
 
 def _sum_receitas_competencia_recebidas(empresa, ini: date, fim: date) -> Decimal:
-    """Emissão no período (competência) já recebida (status pago)."""
-    agg = (
-        _qs_receitas_competencia(empresa, ini, fim)
-        .filter(status='pago')
-        .aggregate(
-            rec=Coalesce(Sum('valor_recebido'), Decimal('0')),
-            doc=Coalesce(Sum('valor_a_receber'), Decimal('0')),
-        )
+    """Emissão no mês e recebimento (baixa) no mesmo mês."""
+    qs = _qs_receitas_competencia(empresa, ini, fim).filter(
+        _recebido_no_mes_competencia_q(ini, fim)
     )
-    rec = agg['rec'] or Decimal('0')
-    if rec > 0:
-        return rec
-    return agg['doc'] or Decimal('0')
+    return qs.aggregate(t=Coalesce(Sum('valor_a_receber'), Decimal('0')))['t'] or Decimal('0')
 
 
 def _sum_despesas_caixa(empresa, ini: date, fim: date) -> Decimal:
@@ -337,8 +339,8 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
     sufixo = SUFIXO_REGIME[regime]
     leg_rec = f'Receitas Totais ({sufixo})'
     leg_desp = f'Custos/Despesas Totais ({sufixo})'
-    leg_rec_aberto = 'Emissão ainda não recebida (competência)'
-    leg_rec_recebidas = 'Recebidos (emissão / competência)'
+    leg_rec_aberto = 'Em aberto ou recebido em outro mês (emissão no mês)'
+    leg_rec_recebidas = 'Recebidos no mesmo mês da emissão'
 
     return {
         'regime': regime,
@@ -389,8 +391,8 @@ def visao_financeira_vazia(regime: str = REGIME_PADRAO) -> dict:
     return {
         'regime': regime,
         'legenda_receitas': f'Receitas Totais ({sufixo})',
-        'legenda_receitas_nao_recebidas': 'Emissão ainda não recebida (competência)',
-        'legenda_receitas_recebidas': 'Recebidos (emissão / competência)',
+        'legenda_receitas_nao_recebidas': 'Em aberto ou recebido em outro mês (emissão no mês)',
+        'legenda_receitas_recebidas': 'Recebidos no mesmo mês da emissão',
         'legenda_despesas': f'Custos/Despesas Totais ({sufixo})',
         'total_receitas_periodo': 0,
         'total_despesas_periodo': 0,

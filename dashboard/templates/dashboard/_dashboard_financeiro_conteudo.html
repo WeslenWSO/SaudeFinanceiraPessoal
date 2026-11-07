@@ -5,9 +5,9 @@
     · Base: <strong>{{ visao.legenda_receitas|lower }}</strong>
     {% if regime == 'competencia' %}
     — <em>Contas a Receber</em> por <strong>data de emissão</strong> (NFS-e vinculada, senão emissão do título, senão vencimento) e <em>Contas a Pagar</em> por emissão/vencimento, valor do documento.
-    Gráfico mensal (competência): <span class="text-primary">azul</span> = emissão <strong>não recebida</strong>;
-    <span class="text-success">verde</span> = <strong>recebidos</strong> (pago, mesma data de emissão);
-    <span style="color:#20c997">verde-claro</span> = receitas totais da emissão no mês.
+    Gráfico mensal (competência): <span class="text-primary">azul</span> = emitido no mês e <strong>em aberto</strong> ou recebido em <strong>outro mês</strong>;
+    <span class="text-success">verde escuro</span> = emitido e <strong>recebido no mesmo mês</strong>;
+    <span style="color:#20c997">verde-claro</span> = <strong>total</strong> do contas a receber na data de emissão (competência).
     {% elif regime == 'caixa' %}
     — somente valores <strong>recebidos</strong> (CAR) e <strong>pagos</strong> (CAP) na data de baixa.
     {% endif %}

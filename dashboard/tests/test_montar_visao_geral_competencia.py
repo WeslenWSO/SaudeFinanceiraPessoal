@@ -4,7 +4,11 @@ from decimal import Decimal
 from django.test import TestCase
 
 from contasareceber.models import ContaAReceber
-from dashboard.services.montar_visao_geral import _sum_receitas_competencia
+from dashboard.services.montar_visao_geral import (
+    _sum_receitas_competencia,
+    _sum_receitas_competencia_nao_recebidas,
+    _sum_receitas_competencia_recebidas,
+)
 from empresa.models import Empresa
 from notasfiscais.models import NotaFiscalServico
 
@@ -52,3 +56,34 @@ class ReceitasCompetenciaEmissaoTests(TestCase):
             self.empresa, date(2026, 10, 1), date(2026, 10, 31)
         )
         self.assertEqual(out, Decimal('500.00'))
+
+    def test_grafico_competencia_separa_recebimento_no_mes(self):
+        out = date(2026, 10, 1)
+        fim = date(2026, 10, 31)
+        ContaAReceber.objects.create(
+            empresa=self.empresa,
+            cliente='No mês',
+            data_emissao=date(2026, 10, 10),
+            data_vencimento=date(2026, 10, 25),
+            data_recebimento=date(2026, 10, 28),
+            valor_a_receber=Decimal('300.00'),
+            valor_recebido=Decimal('300.00'),
+            status='pago',
+        )
+        ContaAReceber.objects.create(
+            empresa=self.empresa,
+            cliente='Futuro',
+            data_emissao=date(2026, 10, 15),
+            data_vencimento=date(2026, 10, 30),
+            data_recebimento=date(2026, 11, 5),
+            valor_a_receber=Decimal('700.00'),
+            valor_recebido=Decimal('700.00'),
+            status='pago',
+        )
+        total = _sum_receitas_competencia(self.empresa, out, fim)
+        verde = _sum_receitas_competencia_recebidas(self.empresa, out, fim)
+        azul = _sum_receitas_competencia_nao_recebidas(self.empresa, out, fim)
+        self.assertEqual(total, Decimal('1000.00'))
+        self.assertEqual(verde, Decimal('300.00'))
+        self.assertEqual(azul, Decimal('700.00'))
+        self.assertEqual(verde + azul, total)
