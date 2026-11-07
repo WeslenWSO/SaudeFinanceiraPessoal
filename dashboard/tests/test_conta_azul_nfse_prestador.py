@@ -38,9 +38,18 @@ class ContaAzulNfsePrestadorTest(SimpleTestCase):
         self.assertEqual(campos['valor_liquido'], Decimal('1500.5'))
         self.assertIsNone(campos['data_cancelamento'])
 
-    def test_ignora_pendente(self):
-        item = {'numero_nfse': 1, 'status': 'PENDENTE'}
-        self.assertIsNone(_campos_de_item_ca(item, empresa=object()))
+    def test_importa_pendente(self):
+        item = {
+            'numero_nfse': 1,
+            'status': 'PENDENTE',
+            'valor_total_nfse': 10,
+            'nome_cliente': 'X',
+            'data_competencia': '2024-01-10',
+        }
+        campos = _campos_de_item_ca(item, empresa=object())
+        self.assertIsNotNone(campos)
+        assert campos is not None
+        self.assertEqual(campos['numero_nota'], '1')
 
     def test_campos_cancelada_zeram_valores(self):
         item = {

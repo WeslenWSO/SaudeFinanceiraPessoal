@@ -572,6 +572,7 @@ class NFSeListView(LoginRequiredMixin, ListView):
             'ca_periodo_dia_default': ca_periodo_dia_default,
             'ca_data_de_default': ca_data_de_default,
             'ca_data_ate_default': ca_data_ate_default,
+            'ca_numero_nfse_default': search.strip() if (search or '').strip().isdigit() else '',
             'search': search,
             'valor_filter': valor_filter,
             'status_filter': status_filter,
@@ -2037,6 +2038,11 @@ def importar_nfse_conta_azul(request):
         from dashboard.conta_azul.client import ContaAzulAPIError
         from dashboard.conta_azul.sync import sincronizar_conta_azul
 
+        numero_nfse = None
+        raw_num = (request.POST.get('ca_numero_nfse') or '').strip()
+        if raw_num.isdigit():
+            numero_nfse = int(raw_num)
+
         try:
             resultado = sincronizar_conta_azul(
                 empresa,
@@ -2044,6 +2050,7 @@ def importar_nfse_conta_azul(request):
                 vendas=True,
                 data_de=di,
                 data_ate=df,
+                numero_nfse=numero_nfse,
             )
             nivel, texto = _mensagem_import_nfse_ca(resultado)
             getattr(messages, nivel, messages.info)(request, texto)

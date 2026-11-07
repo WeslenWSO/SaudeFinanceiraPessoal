@@ -1550,6 +1550,7 @@ def sincronizar_conta_azul(
     vendas: bool = False,
     data_de: date | None = None,
     data_ate: date | None = None,
+    numero_nfse: int | None = None,
     dry_run: bool = False,
     receitas_por_recebimento: bool = True,
     receitas_somente_recebidos: bool = True,
@@ -1613,6 +1614,7 @@ def sincronizar_conta_azul(
                     data_de=data_de,
                     data_ate=data_ate,
                     dry_run=dry_run,
+                    numero_nfse=numero_nfse,
                 )
             if vendas and not dry_run:
                 try:
@@ -1679,6 +1681,11 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["canceladas_aplicadas"]} canceladas (regra CA)'
         if stats.get('car_vinculados'):
             ok[-1] += f', {stats["car_vinculados"]} título(s) CAR vinculados pelo doc'
+        if stats.get('numero_nao_encontrado'):
+            ok[-1] += (
+                f' — NFS-e nº {stats["numero_nao_encontrado"]} não retornou no CA '
+                f'(confira ano e competência no ERP; a API usa data de competência, não só emissão).'
+            )
         if stats.get('detalhes_erro'):
             ok[-1] += f', {stats["detalhes_erro"]} vendas sem detalhe API'
         if chave == 'nfse_venda_cache' and stats.get('atualizadas') is not None:

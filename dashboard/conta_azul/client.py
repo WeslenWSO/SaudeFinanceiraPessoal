@@ -242,12 +242,17 @@ class ContaAzulClient:
         *,
         data_de: date,
         data_ate: date,
+        numero_nfse_inicial: int | None = None,
+        numero_nfse_final: int | None = None,
         **filtros,
     ) -> list:
         """Uma janela de competência (máx. 15 dias), com paginação CA."""
         params = dict(filtros)
         params['data_competencia_de'] = data_de.isoformat()
         params['data_competencia_ate'] = data_ate.isoformat()
+        if numero_nfse_inicial is not None and numero_nfse_final is not None:
+            params['numero_nfse_inicial'] = int(numero_nfse_inicial)
+            params['numero_nfse_final'] = int(numero_nfse_final)
         params.setdefault('pagina', 1)
         params.setdefault('tamanho_pagina', 100)
         todos: list = []

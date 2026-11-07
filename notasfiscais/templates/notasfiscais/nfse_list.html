@@ -107,12 +107,19 @@
                                value="{{ ca_data_ate_default }}">
                     </div>
                     <div class="col-auto">
+                        <label class="form-label small mb-0" for="nfse_ca_numero_nfse">Nº NFS-e</label>
+                        <input type="number" min="1" step="1" class="form-control form-control-sm" name="ca_numero_nfse"
+                               id="nfse_ca_numero_nfse" placeholder="ex. 6661"
+                               value="{{ ca_numero_nfse_default }}" style="max-width: 7rem;"
+                               title="Opcional: filtra na API CA e, se não achar no período, varre competências próximas">
+                    </div>
+                    <div class="col-auto">
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-cloud-download-alt"></i> Importar do Conta Azul
                         </button>
                     </div>
                     <div class="col-12">
-                        <p class="small text-muted mb-0 nfse-ca-campo-intervalo">Busca por <strong>competência</strong> no Conta Azul — intervalo de até <strong>31 dias</strong>. Após importar, os filtros da lista ajustam para o mesmo período.</p>
+                        <p class="small text-muted mb-0 nfse-ca-campo-intervalo">Busca por <strong>competência</strong> no Conta Azul (pode diferir da data de emissão e do filtro da lista). Intervalo até <strong>31 dias</strong>. Com <strong>Nº NFS-e</strong>, a API filtra pelo número; se não vier no período, o sistema varre ±200 dias em torno das datas informadas. Confira o <strong>ano</strong> (ex.: 2025 vs 2026).</p>
                     </div>
                 </div>
             </form>

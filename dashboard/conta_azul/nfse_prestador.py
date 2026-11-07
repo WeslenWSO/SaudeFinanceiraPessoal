@@ -18,14 +18,8 @@ from notasfiscais.models import NotaFiscalServico
 CA_NFSE_ID_PREFIX = 'Conta Azul NFS-e ID:'
 SERIE_PADRAO = '1'
 
-STATUS_IMPORTAR = frozenset(
-    {
-        'EMITIDA',
-        'CORRIGIDA_SUCESSO',
-        'CANCELADA',
-        'CANCELAMENTO_MANUAL',
-    }
-)
+# API CA devolve vários status; só não importamos lista explicitamente vazia de “lixo”.
+STATUS_IGNORAR = frozenset()
 
 STATUS_CA_CANCELADO = frozenset({'CANCELADA', 'CANCELAMENTO_MANUAL'})
 
@@ -74,6 +68,18 @@ def aplicar_regras_nfse_cancelada_ca(
 
 def _marcador_ca_id(ca_id: str) -> str:
     return f'{CA_NFSE_ID_PREFIX} {ca_id.strip()}'
+
+
+def _numero_nfse_de_item(item: dict) -> int | None:
+    for key in ('numero_nfse', 'numeroNfse', 'numero'):
+        raw = item.get(key)
+        if raw is None or raw == '':
+            continue
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 def _parse_data_item(item: dict) -> date | None:
@@ -151,15 +157,15 @@ def _localizar_nfse(empresa, ca_id: str, numero_nota: str, serie: str) -> NotaFi
 
 def _campos_de_item_ca(item: dict, *, empresa) -> dict[str, Any] | None:
     ca_id = str(item.get('id') or '').strip()
-    numero = item.get('numero_nfse')
-    if numero is None:
+    numero_int = _numero_nfse_de_item(item)
+    if numero_int is None:
         return None
-    numero_nota = str(numero).strip()
+    numero_nota = str(numero_int).strip()
     if not numero_nota:
         return None
 
     status = str(item.get('status') or '').strip().upper()
-    if status and status not in STATUS_IMPORTAR:
+    if status and status in STATUS_IGNORAR:
         return None
 
     data_emissao = _parse_data_item(item) or date.today()
@@ -210,6 +216,21 @@ def _campos_de_item_ca(item: dict, *, empresa) -> dict[str, Any] | None:
     return campos
 
 
+def _janelas_competencia_15_dias(data_de: date, data_ate: date):
+    cur = data_de
+    while cur <= data_ate:
+        fim = min(cur + timedelta(days=14), data_ate)
+        yield cur, fim
+        cur = fim + timedelta(days=1)
+
+
+def _janelas_varredura_numero(centro: date, *, raio_dias: int = 200):
+    """Varre competências em torno da data informada (competência pode ≠ emissão)."""
+    inicio = centro - timedelta(days=raio_dias)
+    fim = centro + timedelta(days=raio_dias)
+    yield from _janelas_competencia_15_dias(inicio, fim)
+
+
 def importar_nfse_prestador_conta_azul(
     empresa,
     client: ContaAzulClient,
@@ -217,6 +238,7 @@ def importar_nfse_prestador_conta_azul(
     data_de: date,
     data_ate: date,
     dry_run: bool = False,
+    numero_nfse: int | None = None,
 ) -> dict[str, Any]:
     stats: dict[str, Any] = {
         'criados': 0,
@@ -231,13 +253,17 @@ def importar_nfse_prestador_conta_azul(
     vistos: set[str] = set()
     cache_vendas: dict[str, dict] = {}
     cache_cobranca: dict = {}
-    cur = data_de
-    while cur <= data_ate:
-        fim = min(cur + timedelta(days=14), data_ate)
-        try:
-            itens = client.buscar_notas_fiscais_servico(data_de=cur, data_ate=fim)
-        except ContaAzulAPIError as exc:
-            return {**stats, 'erro': f'{cur.isoformat()} a {fim.isoformat()}: {exc}'}
+
+    def _busca_kw() -> dict[str, int]:
+        if numero_nfse is None:
+            return {}
+        return {
+            'numero_nfse_inicial': int(numero_nfse),
+            'numero_nfse_final': int(numero_nfse),
+        }
+
+    def _processar_itens(itens: list) -> None:
+        nonlocal stats
         for item in itens:
             if not isinstance(item, dict):
                 stats['erros'] += 1
@@ -250,7 +276,7 @@ def importar_nfse_prestador_conta_azul(
 
             campos = _campos_de_item_ca(item, empresa=empresa)
             if campos is None:
-                if item.get('numero_nfse') is None:
+                if _numero_nfse_de_item(item) is None:
                     stats['ignorados_sem_numero'] += 1
                 else:
                     stats['ignorados_status'] += 1
@@ -367,6 +393,36 @@ def importar_nfse_prestador_conta_azul(
                     exc,
                 )
                 stats['erros'] += 1
-        cur = fim + timedelta(days=1)
+
+    kw = _busca_kw()
+    for cur, fim in _janelas_competencia_15_dias(data_de, data_ate):
+        try:
+            itens = client.buscar_notas_fiscais_servico(data_de=cur, data_ate=fim, **kw)
+        except ContaAzulAPIError as exc:
+            return {**stats, 'erro': f'{cur.isoformat()} a {fim.isoformat()}: {exc}'}
+        _processar_itens(itens)
+
+    achou = stats['criados'] + stats['atualizados'] > 0
+    if numero_nfse is not None and not achou and not dry_run:
+        centro = data_de + timedelta(days=max(0, (data_ate - data_de).days // 2))
+        stats['busca_numero_ampla'] = 0
+        for cur, fim in _janelas_varredura_numero(centro):
+            try:
+                itens = client.buscar_notas_fiscais_servico(
+                    data_de=cur,
+                    data_ate=fim,
+                    numero_nfse_inicial=numero_nfse,
+                    numero_nfse_final=numero_nfse,
+                )
+            except ContaAzulAPIError:
+                continue
+            antes = stats['criados'] + stats['atualizados']
+            _processar_itens(itens)
+            stats['busca_numero_ampla'] += 1
+            if stats['criados'] + stats['atualizados'] > antes:
+                break
+
+    if numero_nfse is not None and stats['criados'] + stats['atualizados'] == 0:
+        stats['numero_nao_encontrado'] = numero_nfse
 
     return stats
