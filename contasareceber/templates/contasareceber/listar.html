@@ -1339,8 +1339,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
             if (checkedBoxes.length === 0) {
                 const params = new URLSearchParams();
+                const emiIni = document.getElementById('data_inicio');
+                const emiFim = document.getElementById('data_fim');
                 const vIni = document.getElementById('vencimento_inicio');
                 const vFim = document.getElementById('vencimento_fim');
+                if (emiIni && emiIni.value) params.set('emissao_inicio', emiIni.value);
+                if (emiFim && emiFim.value) params.set('emissao_fim', emiFim.value);
                 if (vIni && vIni.value) params.set('vencimento_inicio', vIni.value);
                 if (vFim && vFim.value) params.set('vencimento_fim', vFim.value);
                 const qs = params.toString();

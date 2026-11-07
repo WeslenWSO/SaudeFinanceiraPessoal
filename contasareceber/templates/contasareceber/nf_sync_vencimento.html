@@ -36,14 +36,25 @@
                                                value="{{ filtros.search }}">
                                     </div>
                                     <div>
+                                        <label for="emissao_inicio">Emissão de</label>
+                                        <input type="date" id="emissao_inicio" name="emissao_inicio"
+                                               value="{{ filtros.emissao_inicio|default:'' }}"
+                                               title="Mesma ideia da lista geral (últimos 12 meses ao abrir a tela)">
+                                    </div>
+                                    <div>
+                                        <label for="emissao_fim">Emissão até</label>
+                                        <input type="date" id="emissao_fim" name="emissao_fim"
+                                               value="{{ filtros.emissao_fim|default:'' }}">
+                                    </div>
+                                    <div>
                                         <label for="vencimento_inicio">Vencimento de</label>
                                         <input type="date" id="vencimento_inicio" name="vencimento_inicio"
-                                               value="{{ filtros.vencimento_inicio }}" required>
+                                               value="{{ filtros.vencimento_inicio|default:'' }}">
                                     </div>
                                     <div>
                                         <label for="vencimento_fim">Vencimento até</label>
                                         <input type="date" id="vencimento_fim" name="vencimento_fim"
-                                               value="{{ filtros.vencimento_fim }}" required>
+                                               value="{{ filtros.vencimento_fim|default:'' }}">
                                     </div>
                                     <div class="filtro-status-multi">
                                         <span class="form-label d-block">Status</span>
@@ -78,7 +89,10 @@
                         </details>
                     </section>
 
-                    <p class="small text-muted mb-2">{{ total_com_nf }} título(s) com NF no período.</p>
+                    <p class="small text-muted mb-2">
+                        {{ total_listados }} título(s) no filtro · {{ total_com_nf }} com NF vinculada
+                        (só estes podem ser processados).
+                    </p>
 
                     <form method="post" id="form-nf-sync-vencimento" action="{% url 'contasareceber:buscar_forma_autorizacao_nf' %}">
                         {% csrf_token %}
@@ -110,7 +124,11 @@
                                     {% for conta in contas %}
                                     <tr>
                                         <td>
+                                            {% if conta.nota_id %}
                                             <input type="checkbox" name="contas_ids" value="{{ conta.pk }}" class="conta-nf-sync-cb">
+                                            {% else %}
+                                            <span class="text-muted" title="Sem NF vinculada">—</span>
+                                            {% endif %}
                                         </td>
                                         <td>{{ conta.cliente }}</td>
                                         <td>{{ conta.data_vencimento|date:"d/m/Y" }}</td>
@@ -129,7 +147,8 @@
                                     {% empty %}
                                     <tr>
                                         <td colspan="8" class="text-center text-muted py-4">
-                                            Nenhum título com NF no intervalo de vencimento informado.
+                                            Nenhum título com os filtros informados. Tente ampliar <strong>emissão</strong>
+                                            (como na lista geral) ou deixe o vencimento em branco.
                                         </td>
                                     </tr>
                                     {% endfor %}

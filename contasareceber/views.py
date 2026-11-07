@@ -271,7 +271,7 @@ def extrair_filtros_categorizar_baixados(request):
 
 
 def extrair_filtros_nf_sync_car(request):
-    """Filtros da tela de sync autorização/cobrança (período de vencimento)."""
+    """Filtros da tela de sync autorização/cobrança (vencimento e/ou emissão)."""
     status_list = [
         s.strip()
         for s in request.GET.getlist('status')
@@ -281,10 +281,13 @@ def extrair_filtros_nf_sync_car(request):
     status_list = [s for s in status_list if s in valid]
     return {
         'search': (request.GET.get('search') or '').strip(),
+        'emissao_inicio': (request.GET.get('emissao_inicio') or '').strip(),
+        'emissao_fim': (request.GET.get('emissao_fim') or '').strip(),
         'vencimento_inicio': (request.GET.get('vencimento_inicio') or '').strip(),
         'vencimento_fim': (request.GET.get('vencimento_fim') or '').strip(),
         'status_list': status_list,
         'per_page': (request.GET.get('per_page') or '50').strip(),
+        'tem_get': bool(request.GET),
     }
 
 
@@ -307,25 +310,44 @@ def nf_sync_autorizacao_cobranca_vencimento(request):
         per_page = 50
 
     hoje = timezone.now().date()
-    venc_ini = filtros['vencimento_inicio'] or hoje.replace(day=1).strftime('%Y-%m-%d')
-    venc_fim = filtros['vencimento_fim'] or hoje.strftime('%Y-%m-%d')
-    if venc_ini > venc_fim:
-        venc_ini, venc_fim = venc_fim, venc_ini
+    emi_ini = filtros['emissao_inicio']
+    emi_fim = filtros['emissao_fim']
+    venc_ini = filtros['vencimento_inicio']
+    venc_fim = filtros['vencimento_fim']
 
-    contas = (
-        ContaAReceber.objects.filter(empresa_id=empresa_id)
-        .filter(data_vencimento__gte=venc_ini, data_vencimento__lte=venc_fim)
-        .exclude(nota_id__isnull=True)
-        .select_related(
-            'forma_pagamento',
-            'nota',
-            'nota__forma_pagamento',
-        )
-        .order_by('data_vencimento', 'cliente', 'id')
+    if not filtros['tem_get']:
+        emi_ini = emi_ini or (hoje - timedelta(days=365)).strftime('%Y-%m-%d')
+        emi_fim = emi_fim or hoje.strftime('%Y-%m-%d')
+
+    contas = ContaAReceber.objects.filter(empresa_id=empresa_id).select_related(
+        'forma_pagamento',
+        'nota',
+        'nota__forma_pagamento',
     )
 
+    if emi_ini and emi_fim:
+        if emi_ini > emi_fim:
+            emi_ini, emi_fim = emi_fim, emi_ini
+        contas = contas.filter(data_emissao__gte=emi_ini, data_emissao__lte=emi_fim)
+    elif emi_ini:
+        contas = contas.filter(data_emissao__gte=emi_ini)
+    elif emi_fim:
+        contas = contas.filter(data_emissao__lte=emi_fim)
+
+    if venc_ini and venc_fim:
+        if venc_ini > venc_fim:
+            venc_ini, venc_fim = venc_fim, venc_ini
+        contas = contas.filter(data_vencimento__gte=venc_ini, data_vencimento__lte=venc_fim)
+    elif venc_ini:
+        contas = contas.filter(data_vencimento__gte=venc_ini)
+    elif venc_fim:
+        contas = contas.filter(data_vencimento__lte=venc_fim)
+
+    contas = contas.order_by('-data_emissao', 'data_vencimento', 'cliente', 'id')
+
     status_list = filtros['status_list']
-    if status_list:
+    n_status_valid = len(ContaAReceber.STATUS_CHOICES)
+    if status_list and len(status_list) < n_status_valid:
         contas = contas.filter(status__in=status_list)
 
     if filtros['search']:
@@ -337,7 +359,9 @@ def nf_sync_autorizacao_cobranca_vencimento(request):
             | Q(autorizacao__icontains=filtros['search'])
         )
 
-    paginator = Paginator(contas, per_page)
+    qs_list = list(contas)
+    total_com_nf = sum(1 for c in qs_list if c.nota_id)
+    paginator = Paginator(qs_list, per_page)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     q_nav = request.GET.copy()
@@ -354,13 +378,16 @@ def nf_sync_autorizacao_cobranca_vencimento(request):
         'return_path': return_path,
         'filtros': {
             'search': filtros['search'],
+            'emissao_inicio': emi_ini,
+            'emissao_fim': emi_fim,
             'vencimento_inicio': venc_ini,
             'vencimento_fim': venc_fim,
             'status_list': status_list,
             'per_page': str(per_page),
         },
         'status_choices': ContaAReceber.STATUS_CHOICES,
-        'total_com_nf': paginator.count,
+        'total_listados': len(qs_list),
+        'total_com_nf': total_com_nf,
     }
     return render(request, 'contasareceber/nf_sync_vencimento.html', context)
 
