@@ -392,6 +392,107 @@ def nf_sync_autorizacao_cobranca_vencimento(request):
     return render(request, 'contasareceber/nf_sync_vencimento.html', context)
 
 
+@login_required
+def conciliar_cartao_baixados(request):
+    """
+    Títulos já baixados (status Pago) com cobrança cartão crédito/débito:
+    selecionar e vincular ao relatório da maquininha (AUT ou aproximação).
+    """
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    from .cartao_baixados import (
+        extrair_filtros_conciliar_cartao_baixados,
+        filtrar_por_tipo_cartao,
+        queryset_cartao_pago_base,
+    )
+
+    filtros = extrair_filtros_conciliar_cartao_baixados(request)
+    per_page = filtros['per_page']
+    try:
+        per_page = int(per_page)
+        if per_page not in [25, 50, 100, 150, 500]:
+            per_page = 50
+    except ValueError:
+        per_page = 50
+
+    hoje = timezone.now().date()
+    receb_ini = filtros['receb_inicio']
+    receb_fim = filtros['receb_fim']
+    venc_ini = filtros['venc_inicio']
+    venc_fim = filtros['venc_fim']
+
+    if not filtros['tem_get']:
+        receb_ini = receb_ini or (hoje - timedelta(days=90)).strftime('%Y-%m-%d')
+        receb_fim = receb_fim or hoje.strftime('%Y-%m-%d')
+
+    contas = queryset_cartao_pago_base(empresa_id)
+
+    if receb_ini and receb_fim:
+        if receb_ini > receb_fim:
+            receb_ini, receb_fim = receb_fim, receb_ini
+        contas = contas.filter(data_recebimento__gte=receb_ini, data_recebimento__lte=receb_fim)
+    elif receb_ini:
+        contas = contas.filter(data_recebimento__gte=receb_ini)
+    elif receb_fim:
+        contas = contas.filter(data_recebimento__lte=receb_fim)
+
+    if venc_ini and venc_fim:
+        if venc_ini > venc_fim:
+            venc_ini, venc_fim = venc_fim, venc_ini
+        contas = contas.filter(data_vencimento__gte=venc_ini, data_vencimento__lte=venc_fim)
+    elif venc_ini:
+        contas = contas.filter(data_vencimento__gte=venc_ini)
+    elif venc_fim:
+        contas = contas.filter(data_vencimento__lte=venc_fim)
+
+    if filtros['search']:
+        contas = contas.filter(
+            Q(nota__numero_nota__icontains=filtros['search'], nota__isnull=False)
+            | Q(cliente__icontains=filtros['search'])
+            | Q(cnpj_cpf__icontains=filtros['search'])
+            | Q(doc__icontains=filtros['search'])
+            | Q(autorizacao__icontains=filtros['search'])
+        )
+
+    qs_list = list(contas.order_by('-data_recebimento', '-data_vencimento', 'cliente', 'id'))
+    qs_list = filtrar_por_tipo_cartao(qs_list, filtros['tipo_cartao'])
+    if filtros['sem_maquininha']:
+        qs_list = [c for c in qs_list if getattr(c, 'n_recebiveis_maquina', 0) == 0]
+
+    total_sem_maquina = sum(1 for c in qs_list if getattr(c, 'n_recebiveis_maquina', 0) == 0)
+    paginator = Paginator(qs_list, per_page)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    q_nav = request.GET.copy()
+    if 'page' in q_nav:
+        del q_nav['page']
+    filtros_query_sem_page = q_nav.urlencode()
+    return_path = request.get_full_path()
+
+    context = {
+        'contas': page_obj,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'filtros_query_sem_page': filtros_query_sem_page,
+        'return_path': return_path,
+        'filtros': {
+            'search': filtros['search'],
+            'receb_inicio': receb_ini,
+            'receb_fim': receb_fim,
+            'venc_inicio': venc_ini,
+            'venc_fim': venc_fim,
+            'tipo_cartao': filtros['tipo_cartao'],
+            'sem_maquininha': filtros['sem_maquininha'],
+            'per_page': str(per_page),
+        },
+        'total_listados': len(qs_list),
+        'total_sem_maquina': total_sem_maquina,
+    }
+    return render(request, 'contasareceber/conciliar_cartao_baixados.html', context)
+
+
 def categorizar_recebidos_baixados(request):
     """Lista contas já baixadas (pago/cartão) para aplicar categoria em lote, com filtros por cobrança e data de recebimento."""
     empresa_id = request.session.get('empresa_id')
@@ -3304,6 +3405,9 @@ def conciliar_cartao_por_autorizacao(request):
         contas_ids = request.POST.getlist('contas')
         if not contas_ids:
             messages.error(request, 'Selecione pelo menos uma conta a receber.')
+            return_path = (request.POST.get('return_path') or '').strip()
+            if return_path.startswith('/') and '://' not in return_path[:12]:
+                return redirect(return_path)
             return redirect('contasareceber:crlistar')
 
         contas = ContaAReceber.objects.filter(
@@ -3381,6 +3485,9 @@ def conciliar_cartao_por_autorizacao(request):
                     f' {sem_auth} título(s) sem autorização (grave pela NF ou importe o relatório da maquininha).'
                 )
             messages.warning(request, msg)
+        return_path = (request.POST.get('return_path') or '').strip()
+        if return_path.startswith('/') and '://' not in return_path[:12]:
+            return redirect(return_path)
         filtros = extrair_filtros_contas_receber(request)
         return redirect(construir_url_crlistar_com_filtros(filtros))
 

@@ -38,9 +38,7 @@ def tipo_cartao_conta(conta: ContaAReceber) -> str | None:
     A partir da cobrança do título (ex.: CARTAO CREDITO / CARTAO DEBITO).
     Retorna 'credito', 'debito' ou None se não for cartão tipado assim.
     """
-    desc = _ascii_fold_upper(
-        conta.forma_pagamento.descricao if conta.forma_pagamento else ''
-    )
+    desc = _ascii_fold_upper(conta.get_cobranca_exibicao())
     if 'DEBIT' in desc or 'DEBITO' in desc:
         return 'debito'
     if 'CREDIT' in desc or 'CREDITO' in desc:
@@ -86,8 +84,8 @@ def _serialize_conta(c: ContaAReceber) -> dict[str, Any]:
         'valor_a_receber': str(c.valor_a_receber),
         'data_vencimento': c.data_vencimento.isoformat() if c.data_vencimento else None,
         'data_emissao': c.data_emissao.isoformat() if c.data_emissao else None,
-        'autorizacao': c.autorizacao or '',
-        'forma_pagamento': c.forma_pagamento.descricao if c.forma_pagamento else '',
+        'autorizacao': autorizacao_para_conciliacao(c),
+        'forma_pagamento': c.get_cobranca_exibicao(),
         'tipo_cartao': tc or '',
     }
 
@@ -126,8 +124,8 @@ def build_suggestions(empresa_id: int, conta_ids: list[int]) -> dict[str, Any]:
         ContaAReceber.objects.filter(
             id__in=conta_ids,
             empresa_id=empresa_id,
-            status='pendente',
-        ).select_related('forma_pagamento')
+            status__in=['pendente', 'cartao', 'pago'],
+        ).select_related('forma_pagamento', 'nota', 'nota__forma_pagamento')
     )
 
     if not contas:
@@ -136,7 +134,7 @@ def build_suggestions(empresa_id: int, conta_ids: list[int]) -> dict[str, Any]:
             'titulos_sem_sugestao': [],
             'recebiveis_sem_sugestao': [],
             'pool_recebiveis': [],
-            'erro': 'Nenhuma conta pendente encontrada para os IDs informados.',
+            'erro': 'Nenhum título encontrado para os IDs informados (pendente, cartão ou pago).',
         }
 
     ref_dates = []
@@ -355,10 +353,10 @@ def aplicar_grupos(empresa_id: int, grupos: list[dict[str, Any]]) -> tuple[int, 
                 conta = ContaAReceber.objects.select_for_update().get(
                     id=cid,
                     empresa_id=empresa_id,
-                    status__in=['pendente', 'cartao'],
+                    status__in=['pendente', 'cartao', 'pago'],
                 )
             except ContaAReceber.DoesNotExist:
-                erros.append(f'Título {cid} não está pendente/cartão ou não existe.')
+                erros.append(f'Título {cid} não está pendente/cartão/pago ou não existe.')
                 continue
 
             rel_list: list[RelatorioRecebiveisMaquinaCartao] = []

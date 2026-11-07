@@ -118,6 +118,9 @@
                             <a href="{% url 'contasareceber:nf_sync_vencimento' %}" class="btn btn-outline-danger" title="Títulos pagos por vencimento: gravar AUT e cobrança da NF">
                                 <i class="fas fa-fingerprint"></i> AUT / Cobrança (vencimento)
                             </a>
+                            <a href="{% url 'contasareceber:conciliar_cartao_baixados' %}" class="btn btn-outline-success" title="Títulos Pago com cartão débito/crédito: vincular à maquininha">
+                                <i class="fas fa-credit-card"></i> Cartão baixado (maquininha)
+                            </a>
                         </div>
                     </div>
                     {% if conta_azul_integracao %}
