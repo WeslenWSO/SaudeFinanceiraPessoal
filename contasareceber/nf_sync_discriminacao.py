@@ -184,6 +184,33 @@ def vincular_contas_receber_a_nota_por_doc(nota) -> int:
     return len(pks)
 
 
+def reprocessar_aut_nf_empresa_periodo(
+    empresa_id: int,
+    *,
+    data_de=None,
+    data_ate=None,
+) -> dict:
+    """Re-lê discriminação de cada NF no período e replica AUT/cobrança nos CAR."""
+    from notasfiscais.models import NotaFiscalServico
+
+    qs = NotaFiscalServico.objects.filter(
+        empresa_id=empresa_id,
+        data_cancelamento__isnull=True,
+    )
+    if data_de and data_ate:
+        qs = qs.filter(data_emissao__gte=data_de, data_emissao__lte=data_ate)
+
+    stats = {'notas_processadas': 0, 'notas_atualizadas': 0, 'car_aut': 0, 'car_forma': 0}
+    for nf in qs.iterator(chunk_size=200):
+        stats['notas_processadas'] += 1
+        res = sincronizar_forma_e_autorizacao_nota(nf)
+        if res.get('mudou_nf'):
+            stats['notas_atualizadas'] += 1
+        stats['car_aut'] += int(res.get('car_aut') or 0)
+        stats['car_forma'] += int(res.get('car_forma') or 0)
+    return stats
+
+
 def alinhar_autorizacao_car_com_nf_empresa(
     empresa_id: int,
     *,
@@ -218,6 +245,10 @@ def alinhar_autorizacao_car_com_nf_empresa(
         if tentar_vincular_nota_conta_por_documento(conta, empresa_id=empresa_id):
             vinculadas_doc += 1
 
+    reprocess = reprocessar_aut_nf_empresa_periodo(
+        empresa_id, data_de=data_de, data_ate=data_ate
+    )
+
     for conta in qs.filter(nota_id__isnull=False).select_related('nota').iterator(chunk_size=300):
         nf = conta.nota
         if not nf or nf.pk in notas_vistas:
@@ -227,7 +258,7 @@ def alinhar_autorizacao_car_com_nf_empresa(
         propagar_autorizacao_nota_para_contas_receber(nf, apenas_vazias=True)
 
     sync = sincronizar_autorizacao_car_da_nota(empresa_id=empresa_id)
-    return {'vinculadas_doc': vinculadas_doc, **sync}
+    return {'vinculadas_doc': vinculadas_doc, 'reprocess_nf': reprocess, **sync}
 
 
 def sincronizar_forma_e_autorizacao_notas_das_contas(conta_ids, *, empresa_id: int) -> dict:

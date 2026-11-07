@@ -154,6 +154,13 @@ def atualizar_nfse_com_vendas_importadas(
         if upd:
             nota.save(update_fields=upd)
             stats['atualizadas'] += 1
+            from contasareceber.nf_sync_discriminacao import (
+                sincronizar_forma_e_autorizacao_nota,
+                vincular_contas_receber_a_nota_por_doc,
+            )
+
+            sincronizar_forma_e_autorizacao_nota(nota)
+            vincular_contas_receber_a_nota_por_doc(nota)
         else:
             stats['ignoradas'] += 1
     return stats

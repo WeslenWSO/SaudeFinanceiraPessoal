@@ -20,10 +20,24 @@ class Command(BaseCommand):
             action='store_true',
             help='Mostra quantos registros seriam atualizados, sem gravar.',
         )
+        parser.add_argument(
+            '--reprocessar-nf',
+            action='store_true',
+            help='Relê discriminação das NFS-e antes de propagar para o CAR.',
+        )
 
     def handle(self, *args, **options):
+        empresa_id = options.get('empresa_id')
+        if options.get('reprocessar_nf') and empresa_id and not options.get('dry_run'):
+            from contasareceber.nf_sync_discriminacao import reprocessar_aut_nf_empresa_periodo
+
+            rep = reprocessar_aut_nf_empresa_periodo(empresa_id)
+            self.stdout.write(
+                f'NFs reprocessadas: {rep["notas_processadas"]}, '
+                f'CAR com AUT: {rep["car_aut"]}.'
+            )
         stats = sincronizar_autorizacao_car_da_nota(
-            empresa_id=options.get('empresa_id'),
+            empresa_id=empresa_id,
             dry_run=options.get('dry_run'),
         )
         modo = 'Seriam atualizados' if options.get('dry_run') else 'Atualizados'

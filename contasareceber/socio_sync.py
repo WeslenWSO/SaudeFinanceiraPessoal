@@ -52,10 +52,29 @@ def _autorizacao_da_nota(nota):
     nsu = (getattr(nota, 'nsu', None) or '').strip()
     if nsu:
         return nsu
-    if getattr(nota, 'discriminacao', None):
+    disc = (getattr(nota, 'discriminacao', None) or '').strip()
+    if disc:
         from notasfiscais.utils import extrair_autorizacao
-        return extrair_autorizacao(nota.discriminacao)
-    return None
+
+        auth = extrair_autorizacao(disc)
+        if auth:
+            return auth
+    venda_nsu = ''
+    try:
+        from notasfiscais.discriminacao_nfse import extrair_id_venda_conta_azul
+        from dashboard.models import VendaContaAzul
+
+        id_v = extrair_id_venda_conta_azul(getattr(nota, 'observacoes', None))
+        if id_v and getattr(nota, 'empresa_id', None):
+            v = VendaContaAzul.objects.filter(
+                empresa_id=nota.empresa_id,
+                conta_azul_id=id_v,
+            ).first()
+            if v:
+                venda_nsu = (v.nsu or '').strip()
+    except Exception:
+        venda_nsu = ''
+    return venda_nsu or None
 
 
 def propagar_autorizacao_nota_para_contas_receber(nota, *, apenas_vazias=True):

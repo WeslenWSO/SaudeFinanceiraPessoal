@@ -7,7 +7,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import DateField, F, Q, Sum
 from django.db.models.functions import Coalesce
 
 from contasapagar.models import ContasaPagar
@@ -50,6 +50,25 @@ def _iter_meses(data_inicio: date, data_fim: date):
             mes += 1
 
 
+def _qs_receitas_competencia(empresa, ini: date, fim: date):
+    """
+    Competência = data de emissão: prioriza NFS-e vinculada, depois emissão do título, depois vencimento.
+    """
+    return (
+        ContaAReceber.objects.filter(empresa=empresa)
+        .exclude(status='cancelado')
+        .annotate(
+            data_ref=Coalesce(
+                F('nota__data_emissao'),
+                F('data_emissao'),
+                F('data_vencimento'),
+                output_field=DateField(),
+            )
+        )
+        .filter(data_ref__gte=ini, data_ref__lte=fim)
+    )
+
+
 def _sum_receitas_caixa(empresa, ini: date, fim: date) -> Decimal:
     return ContaAReceber.objects.filter(
         empresa=empresa,
@@ -60,13 +79,35 @@ def _sum_receitas_caixa(empresa, ini: date, fim: date) -> Decimal:
 
 
 def _sum_receitas_competencia(empresa, ini: date, fim: date) -> Decimal:
-    return ContaAReceber.objects.filter(
-        empresa=empresa,
-        data_emissao__gte=ini,
-        data_emissao__lte=fim,
-    ).exclude(status='cancelado').aggregate(
+    return _qs_receitas_competencia(empresa, ini, fim).aggregate(
         t=Coalesce(Sum('valor_a_receber'), Decimal('0')),
     )['t'] or Decimal('0')
+
+
+def _sum_receitas_competencia_nao_recebidas(empresa, ini: date, fim: date) -> Decimal:
+    """Emissão no período (competência) com título ainda não baixado como pago."""
+    return (
+        _qs_receitas_competencia(empresa, ini, fim)
+        .filter(status__in=['pendente', 'vencido', 'cartao'])
+        .aggregate(t=Coalesce(Sum('valor_a_receber'), Decimal('0')))['t']
+        or Decimal('0')
+    )
+
+
+def _sum_receitas_competencia_recebidas(empresa, ini: date, fim: date) -> Decimal:
+    """Emissão no período (competência) já recebida (status pago)."""
+    agg = (
+        _qs_receitas_competencia(empresa, ini, fim)
+        .filter(status='pago')
+        .aggregate(
+            rec=Coalesce(Sum('valor_recebido'), Decimal('0')),
+            doc=Coalesce(Sum('valor_a_receber'), Decimal('0')),
+        )
+    )
+    rec = agg['rec'] or Decimal('0')
+    if rec > 0:
+        return rec
+    return agg['doc'] or Decimal('0')
 
 
 def _sum_despesas_caixa(empresa, ini: date, fim: date) -> Decimal:
@@ -113,13 +154,8 @@ def _receitas_por_categoria(empresa, ini: date, fim: date, regime: str, limite: 
         return [{'nome': r['categoria__nome'] or '—', 'total': r['total'] or Decimal('0')} for r in qs]
 
     qs = (
-        ContaAReceber.objects.filter(
-            empresa=empresa,
-            data_emissao__gte=ini,
-            data_emissao__lte=fim,
-            categoria__isnull=False,
-        )
-        .exclude(status='cancelado')
+        _qs_receitas_competencia(empresa, ini, fim)
+        .filter(categoria__isnull=False)
         .values('categoria__nome')
         .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
         .order_by('-total')[:limite]
@@ -187,12 +223,7 @@ def _receitas_por_forma_pagamento(empresa, ini: date, fim: date, regime: str, li
         ]
     if regime == 'competencia':
         qs = (
-            ContaAReceber.objects.filter(
-                empresa=empresa,
-                data_emissao__gte=ini,
-                data_emissao__lte=fim,
-            )
-            .exclude(status='cancelado')
+            _qs_receitas_competencia(empresa, ini, fim)
             .values('forma_pagamento_id', 'forma_pagamento__descricao')
             .annotate(total=Coalesce(Sum('valor_a_receber'), Decimal('0')))
             .order_by('-total')[:limite]
@@ -282,10 +313,19 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
 
     labels = []
     receitas_mes = []
+    receitas_nao_recebidas_mes: list[float] = []
+    receitas_recebidas_mes: list[float] = []
     despesas_mes = []
     for ano, mes, ini, fim in _iter_meses(data_inicio, data_fim):
         labels.append(f'{MESES_CURTO[mes - 1]} {ano}')
         receitas_mes.append(float(sum_rec_fn(empresa, ini, fim)))
+        if regime == 'competencia':
+            receitas_nao_recebidas_mes.append(
+                float(_sum_receitas_competencia_nao_recebidas(empresa, ini, fim))
+            )
+            receitas_recebidas_mes.append(
+                float(_sum_receitas_competencia_recebidas(empresa, ini, fim))
+            )
         despesas_mes.append(float(sum_desp_fn(empresa, ini, fim)))
 
     entradas = _receitas_por_categoria(empresa, data_inicio, data_fim, regime)
@@ -297,10 +337,14 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
     sufixo = SUFIXO_REGIME[regime]
     leg_rec = f'Receitas Totais ({sufixo})'
     leg_desp = f'Custos/Despesas Totais ({sufixo})'
+    leg_rec_aberto = 'Emissão ainda não recebida (competência)'
+    leg_rec_recebidas = 'Recebidos (emissão / competência)'
 
     return {
         'regime': regime,
         'legenda_receitas': leg_rec,
+        'legenda_receitas_nao_recebidas': leg_rec_aberto,
+        'legenda_receitas_recebidas': leg_rec_recebidas,
         'legenda_despesas': leg_desp,
         'total_receitas_periodo': sum(receitas_mes),
         'total_despesas_periodo': sum(despesas_mes),
@@ -312,6 +356,12 @@ def montar_visao_geral(empresa, data_inicio: date, data_fim: date, regime: str =
         'despesas_forma_pagamento': despesas_forma,
         'chart_mensal_labels_json': json.dumps(labels, ensure_ascii=False),
         'chart_mensal_receitas_json': json.dumps(receitas_mes),
+        'chart_mensal_receitas_nao_recebidas_json': json.dumps(
+            receitas_nao_recebidas_mes if regime == 'competencia' else []
+        ),
+        'chart_mensal_receitas_recebidas_json': json.dumps(
+            receitas_recebidas_mes if regime == 'competencia' else []
+        ),
         'chart_mensal_despesas_json': json.dumps(despesas_mes),
         'chart_vencer_labels_json': json.dumps(['Receber', 'Pagar'], ensure_ascii=False),
         'chart_vencer_data_json': json.dumps([float(total_receber), float(total_pagar)]),
@@ -339,6 +389,8 @@ def visao_financeira_vazia(regime: str = REGIME_PADRAO) -> dict:
     return {
         'regime': regime,
         'legenda_receitas': f'Receitas Totais ({sufixo})',
+        'legenda_receitas_nao_recebidas': 'Emissão ainda não recebida (competência)',
+        'legenda_receitas_recebidas': 'Recebidos (emissão / competência)',
         'legenda_despesas': f'Custos/Despesas Totais ({sufixo})',
         'total_receitas_periodo': 0,
         'total_despesas_periodo': 0,
@@ -350,6 +402,8 @@ def visao_financeira_vazia(regime: str = REGIME_PADRAO) -> dict:
         'despesas_forma_pagamento': vazio,
         'chart_mensal_labels_json': '[]',
         'chart_mensal_receitas_json': '[]',
+        'chart_mensal_receitas_nao_recebidas_json': '[]',
+        'chart_mensal_receitas_recebidas_json': '[]',
         'chart_mensal_despesas_json': '[]',
         'chart_vencer_labels_json': '["Receber", "Pagar"]',
         'chart_vencer_data_json': '[0, 0]',

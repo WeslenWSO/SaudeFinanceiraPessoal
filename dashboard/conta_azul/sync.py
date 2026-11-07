@@ -1666,6 +1666,14 @@ def sincronizar_conta_azul(
                         'ignoradas': 0,
                         'erro': str(exc),
                     }
+        if not dry_run and data_de and data_ate and (receitas or nfse_prestador or vendas):
+            from contasareceber.nf_sync_discriminacao import alinhar_autorizacao_car_com_nf_empresa
+
+            resultado['car_nf_aut'] = alinhar_autorizacao_car_com_nf_empresa(
+                empresa.pk,
+                data_de=data_de,
+                data_ate=data_ate,
+            )
         cfg = getattr(empresa, 'conta_azul_config', None)
         if cfg and not dry_run:
             cfg.save(update_fields=['atualizado_em'])

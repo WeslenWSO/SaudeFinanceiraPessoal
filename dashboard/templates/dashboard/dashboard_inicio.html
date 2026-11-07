@@ -108,6 +108,29 @@
       data: {
         labels: {{ visao.chart_mensal_labels_json|safe }},
         datasets: [
+          {% if regime == 'competencia' %}
+          {
+            label: '{{ visao.legenda_receitas_nao_recebidas|escapejs }}',
+            data: {{ visao.chart_mensal_receitas_nao_recebidas_json|safe }},
+            backgroundColor: 'rgba(13, 110, 253, 0.82)',
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {
+            label: '{{ visao.legenda_receitas_recebidas|escapejs }}',
+            data: {{ visao.chart_mensal_receitas_recebidas_json|safe }},
+            backgroundColor: 'rgba(25, 135, 84, 0.85)',
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {
+            label: '{{ visao.legenda_receitas|escapejs }}',
+            data: {{ visao.chart_mensal_receitas_json|safe }},
+            backgroundColor: 'rgba(32, 201, 151, 0.75)',
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {% else %}
           {
             label: '{{ visao.legenda_receitas|escapejs }}',
             data: {{ visao.chart_mensal_receitas_json|safe }},
@@ -115,6 +138,7 @@
             borderRadius: 3,
             yAxisID: 'y',
           },
+          {% endif %}
           {
             label: '{{ visao.legenda_despesas|escapejs }}',
             data: {{ visao.chart_mensal_despesas_json|safe }},
