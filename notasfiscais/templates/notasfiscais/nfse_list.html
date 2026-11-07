@@ -267,8 +267,8 @@
                         <label for="conta_receber">Contas a Receber</label>
                         <select id="conta_receber" name="conta_receber">
                             <option value="" {% if not conta_receber_filter %}selected{% endif %}>Todos</option>
-                            <option value="sim" {% if conta_receber_filter == 'sim' %}selected{% endif %}>Gerado (sim)</option>
-                            <option value="nao" {% if conta_receber_filter == 'nao' %}selected{% endif %}>Não gerado</option>
+                            <option value="sim" {% if conta_receber_filter == 'sim' %}selected{% endif %}>Com CAR (vinculado ou CA)</option>
+                            <option value="nao" {% if conta_receber_filter == 'nao' %}selected{% endif %}>Sem CAR</option>
                         </select>
                     </div>
                     <div>
@@ -487,10 +487,15 @@
                             <td data-col="autorizacao">{{ nfse.nsu|default:nfse.extracted_autorizacao|default:"—" }}</td>
                             
                             <td data-col="conta_rec" class="text-center">
-                                {% if nfse.id in notas_com_conta %}
-                                    <i class="fas fa-check-circle text-success" title="Conta a Receber já gerada"></i>
+                                {% if nfse.id in notas_com_conta_fk %}
+                                    <i class="fas fa-check-circle text-success" title="Conta a receber vinculada à NF"></i>
+                                {% elif nfse.id in notas_com_conta_ca %}
+                                    <span class="d-inline-flex align-items-center gap-1" title="Título do Conta Azul localizado pelo nº da nota (doc)">
+                                        <i class="fas fa-check-circle text-primary"></i>
+                                        <span class="badge bg-primary" style="font-size:0.65rem;line-height:1.2">CA</span>
+                                    </span>
                                 {% else %}
-                                    <i class="fas fa-times-circle text-muted" title="Conta a Receber não gerada"></i>
+                                    <i class="fas fa-times-circle text-muted" title="Nenhum título a receber localizado para esta NF"></i>
                                 {% endif %}
                             </td>
                             <td data-col="conciliacao">

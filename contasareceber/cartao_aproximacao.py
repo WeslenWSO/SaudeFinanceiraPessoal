@@ -25,6 +25,14 @@ def _ascii_fold_upper(s: str) -> str:
     return u.upper().replace(' ', '')
 
 
+def autorizacao_para_conciliacao(conta: ContaAReceber) -> str:
+    """Usa AUT gravada no CAR; se vazio, tenta a exibida da NF (título com * na lista)."""
+    auth = (conta.autorizacao or '').strip()
+    if auth:
+        return auth
+    return (conta.get_autorizacao_exibicao() or '').strip()
+
+
 def tipo_cartao_conta(conta: ContaAReceber) -> str | None:
     """
     A partir da cobrança do título (ex.: CARTAO CREDITO / CARTAO DEBITO).
@@ -283,16 +291,17 @@ def _atualizar_conta_totais_cartao(
     data_rec = max(datas) if datas else None
     conta.valor_recebido = total_liq
     conta.tarifas = total_taxa
-    conta.data_recebimento = data_rec
-    # Vinculação maquininha → cartão; «pago» só na conciliação extrato × recebível
-    conta.status = 'cartao'
+    conta.data_recebimento = data_rec or conta.data_recebimento
     update_fields: list[str] = [
         'valor_recebido',
         'tarifas',
-        'status',
         'data_recebimento',
         'data_atualizacao',
     ]
+    # Título já «pago» (ex.: Conta Azul): só vincula recebível; não volta para «cartão»
+    if conta.status != 'pago':
+        conta.status = 'cartao'
+        update_fields.append('status')
     atual_auth = (conta.autorizacao or '').strip()
     if not atual_auth:
         nova = _autorizacao_de_recebiveis_para_conta(todos)

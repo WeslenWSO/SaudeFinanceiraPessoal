@@ -3309,10 +3309,12 @@ def conciliar_cartao_por_autorizacao(request):
         contas = ContaAReceber.objects.filter(
             id__in=contas_ids,
             empresa_id=empresa_id,
-            status__in=['pendente', 'cartao', 'vencido'],
+            status__in=['pendente', 'cartao', 'vencido', 'pago'],
         )
         conciliadas = 0
+        sem_auth = 0
         from .cartao_aproximacao import (
+            autorizacao_para_conciliacao,
             buscar_relatorios_por_autorizacao,
             _atualizar_conta_totais_cartao,
             _vincular_relatorio_na_conta,
@@ -3320,9 +3322,13 @@ def conciliar_cartao_por_autorizacao(request):
         from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
 
         for conta in contas:
-            autorizacao = conta.autorizacao
+            autorizacao = autorizacao_para_conciliacao(conta)
             if not autorizacao:
+                sem_auth += 1
                 continue
+            if not (conta.autorizacao or '').strip() and autorizacao:
+                conta.autorizacao = autorizacao[:100]
+                conta.save(update_fields=['autorizacao', 'data_atualizacao'])
 
             # Já vinculados a este título
             ja_vinculados = list(
@@ -3369,10 +3375,12 @@ def conciliar_cartao_por_autorizacao(request):
                 f'(parcelas acumuladas por autorização).',
             )
         else:
-            messages.warning(
-                request,
-                'Nenhum recebível novo encontrado para incluir na baixa das contas selecionadas.',
-            )
+            msg = 'Nenhum recebível novo encontrado para incluir na baixa das contas selecionadas.'
+            if sem_auth:
+                msg += (
+                    f' {sem_auth} título(s) sem autorização (grave pela NF ou importe o relatório da maquininha).'
+                )
+            messages.warning(request, msg)
         filtros = extrair_filtros_contas_receber(request)
         return redirect(construir_url_crlistar_com_filtros(filtros))
 

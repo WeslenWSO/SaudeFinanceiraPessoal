@@ -200,14 +200,20 @@ def _apply_filtro_conta_receber_nfse(queryset, empresa_id, conta_receber_val):
 
     from contasareceber.models import ContaAReceber
 
-    car_exists = ContaAReceber.objects.filter(
+    car_fk = ContaAReceber.objects.filter(
         empresa_id=empresa_id,
         nota_id=OuterRef('pk'),
     )
+    car_doc_ca = ContaAReceber.objects.filter(
+        empresa_id=empresa_id,
+        nota_id__isnull=True,
+        doc=OuterRef('numero_nota'),
+    )
+    tem_car = Exists(car_fk) | Exists(car_doc_ca)
     if val == 'sim':
-        return queryset.filter(Exists(car_exists))
+        return queryset.filter(tem_car)
     if val == 'nao':
-        return queryset.filter(~Exists(car_exists))
+        return queryset.filter(~tem_car)
     return queryset
 
 
@@ -485,17 +491,24 @@ class NFSeListView(LoginRequiredMixin, ListView):
         data_fim = filters.get('data_fim', '')
         paginate_by = str(filters.get('paginate_by', self.paginate_by))
 
-        # Verificar quais notas já têm contas a receber
         context['notas_com_conta'] = set()
-        notas_ids = [nfse.id for nfse in context.get('notas') or []]
-        if notas_ids and empresa_id:
-            from contasareceber.models import ContaAReceber
+        context['notas_com_conta_fk'] = set()
+        context['notas_com_conta_ca'] = set()
+        context['nfse_status_car'] = {}
+        notas_pagina = list(context.get('notas') or [])
+        if notas_pagina and empresa_id:
+            from contasareceber.car_nfse_listagem import (
+                CAR_NFSE_CA,
+                CAR_NFSE_FK,
+                nota_ids_com_car_resolvido,
+                status_car_nfse_listagem,
+            )
 
-            contas_existentes = ContaAReceber.objects.filter(
-                empresa_id=empresa_id,
-                nota_id__in=notas_ids,
-            ).values_list('nota_id', flat=True)
-            context['notas_com_conta'] = set(contas_existentes)
+            status_car = status_car_nfse_listagem(empresa_id, notas_pagina)
+            context['nfse_status_car'] = status_car
+            context['notas_com_conta_fk'] = {nid for nid, st in status_car.items() if st == CAR_NFSE_FK}
+            context['notas_com_conta_ca'] = {nid for nid, st in status_car.items() if st == CAR_NFSE_CA}
+            context['notas_com_conta'] = nota_ids_com_car_resolvido(status_car)
 
         # Período fechado: comparar com date (ApuracaoPeriodo usa DateField)
         periodo_fechado = False
