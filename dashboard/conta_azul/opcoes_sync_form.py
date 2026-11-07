@@ -57,11 +57,18 @@ def montar_opcoes_sync(
     *,
     data_de: date,
     data_ate: date,
+    receitas_todos_status: bool = False,
 ) -> dict:
+    """
+    receitas_todos_status: importa CAR por vencimento no período (pendente, vencido, pago, etc.).
+    Caso contrário: só recebidos/pagos por data de pagamento (regime de caixa).
+    """
     return {
         **{nome: bool(flags.get(nome)) for nome in SYNC_FLAGS},
         'data_de': data_de,
         'data_ate': data_ate,
+        'receitas_somente_recebidos': not receitas_todos_status,
+        'receitas_por_recebimento': not receitas_todos_status,
     }
 
 

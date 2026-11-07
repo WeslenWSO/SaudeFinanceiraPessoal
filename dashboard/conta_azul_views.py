@@ -446,7 +446,13 @@ def conta_azul_sincronizar(request, pk):
             )
 
         try:
-            opcoes = montar_opcoes_sync(flags, data_de=data_de, data_ate=data_ate)
+            receitas_todos = request.POST.get('receitas_todos_status') == 'on'
+            opcoes = montar_opcoes_sync(
+                flags,
+                data_de=data_de,
+                data_ate=data_ate,
+                receitas_todos_status=receitas_todos,
+            )
             threading.Thread(
                 target=_executar_sync_conta_azul_em_background,
                 args=(empresa.pk, opcoes),
@@ -470,12 +476,15 @@ def conta_azul_sincronizar(request, pk):
             f"?data_de={data_de.isoformat()}&data_ate={data_ate.isoformat()}"
             f"&{query_flags(flags)}"
         )
+        if receitas_todos:
+            q += '&receitas_todos_status=1'
         return redirect(f"{reverse('empresa:conta_azul_sincronizar', kwargs={'pk': pk})}{q}")
 
     aplicar_mensagem_sync_cache(request, empresa.pk)
 
     data_de_g = request.GET.get('data_de')
     data_ate_g = request.GET.get('data_ate')
+    receitas_todos_g = request.GET.get('receitas_todos_status') == '1'
     return render(
         request,
         'empresa/conta_azul_sincronizar.html',
@@ -486,6 +495,7 @@ def conta_azul_sincronizar(request, pk):
             data_ate=data_ate_g,
             hoje=hoje,
             sync_flags=flags_para_template(request),
+            receitas_todos_status=receitas_todos_g,
         ),
     )
 
@@ -498,6 +508,7 @@ def _ctx_conta_azul_sincronizar(
     data_ate=None,
     hoje: date | None = None,
     sync_flags: dict | None = None,
+    receitas_todos_status: bool = False,
 ) -> dict:
     hoje = hoje or date.today()
     padrao_de, padrao_ate = periodo_sync_padrao(hoje)
@@ -516,6 +527,7 @@ def _ctx_conta_azul_sincronizar(
         'data_ate_str': ate_str,
         'max_dias_sync': MAX_DIAS_SYNC_CONTA_AZUL,
         'sync_flags': flags,
+        'receitas_todos_status': receitas_todos_status,
     }
 
 

@@ -35,6 +35,12 @@ class OpcoesSyncFormTests(SimpleTestCase):
         self.assertTrue(op['receitas'])
         self.assertFalse(op['despesas'])
         self.assertEqual(op['data_de'].day, 1)
+        self.assertTrue(op['receitas_somente_recebidos'])
+        op_aberto = montar_opcoes_sync(
+            flags, data_de=date(2026, 10, 1), data_ate=date(2026, 10, 31), receitas_todos_status=True
+        )
+        self.assertFalse(op_aberto['receitas_somente_recebidos'])
+        self.assertFalse(op_aberto['receitas_por_recebimento'])
 
     def test_dica_pos_sync_sem_car_cap(self):
         flags = {

@@ -184,6 +184,52 @@ def vincular_contas_receber_a_nota_por_doc(nota) -> int:
     return len(pks)
 
 
+def alinhar_autorizacao_car_com_nf_empresa(
+    empresa_id: int,
+    *,
+    data_de=None,
+    data_ate=None,
+) -> dict:
+    """
+    Após sync Conta Azul: vincula CAR pelo doc, replica AUT/cobrança da NF e corrige títulos sem AUT.
+    """
+    from django.db.models import Q
+
+    from contasareceber.models import ContaAReceber
+    from contasareceber.socio_sync import (
+        propagar_autorizacao_nota_para_contas_receber,
+        propagar_forma_pagamento_nota_para_contas_receber,
+        sincronizar_autorizacao_car_da_nota,
+    )
+
+    qs = ContaAReceber.objects.filter(empresa_id=empresa_id)
+    if data_de and data_ate:
+        qs = qs.filter(
+            Q(data_vencimento__gte=data_de, data_vencimento__lte=data_ate)
+            | Q(
+                data_recebimento__gte=data_de,
+                data_recebimento__lte=data_ate,
+            )
+        )
+
+    vinculadas_doc = 0
+    notas_vistas: set[int] = set()
+    for conta in qs.filter(nota_id__isnull=True).exclude(doc='').iterator(chunk_size=300):
+        if tentar_vincular_nota_conta_por_documento(conta, empresa_id=empresa_id):
+            vinculadas_doc += 1
+
+    for conta in qs.filter(nota_id__isnull=False).select_related('nota').iterator(chunk_size=300):
+        nf = conta.nota
+        if not nf or nf.pk in notas_vistas:
+            continue
+        notas_vistas.add(nf.pk)
+        propagar_forma_pagamento_nota_para_contas_receber(nf)
+        propagar_autorizacao_nota_para_contas_receber(nf, apenas_vazias=True)
+
+    sync = sincronizar_autorizacao_car_da_nota(empresa_id=empresa_id)
+    return {'vinculadas_doc': vinculadas_doc, **sync}
+
+
 def sincronizar_forma_e_autorizacao_notas_das_contas(conta_ids, *, empresa_id: int) -> dict:
     """Processa cada NF distinta vinculada às contas selecionadas."""
     from contasareceber.models import ContaAReceber

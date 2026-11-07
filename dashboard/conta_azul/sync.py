@@ -1237,8 +1237,24 @@ def importar_receitas(
             for c in ContaAReceber.objects.filter(
                 empresa=empresa,
                 conta_azul_parcela_id__in=ids,
-            )
+            ).select_related('nota')
         }
+        from contasareceber.socio_sync import _autorizacao_da_nota
+
+        for parcela_id, defaults in preparados:
+            obj = existentes.get(parcela_id)
+            if not obj:
+                continue
+            auth_new = (defaults.get('autorizacao') or '').strip()
+            if auth_new:
+                continue
+            auth_old = (obj.autorizacao or '').strip()
+            if auth_old:
+                defaults['autorizacao'] = auth_old[:100]
+            elif obj.nota_id and obj.nota:
+                auth_nf = (_autorizacao_da_nota(obj.nota) or '').strip()
+                if auth_nf:
+                    defaults['autorizacao'] = auth_nf[:100]
         campos_update = (
             'cliente', 'data_vencimento', 'data_emissao', 'valor_a_receber',
             'valor_recebido', 'data_recebimento', 'status', 'doc', 'autorizacao',
@@ -1267,6 +1283,14 @@ def importar_receitas(
                 stats['atualizados'] += len(atualizar)
         except IntegrityError:
             stats['erros'] += len(preparados)
+    if not dry_run and (preparados or itens):
+        from contasareceber.nf_sync_discriminacao import alinhar_autorizacao_car_com_nf_empresa
+
+        stats['car_nf_aut'] = alinhar_autorizacao_car_com_nf_empresa(
+            empresa.pk,
+            data_de=data_de,
+            data_ate=data_ate,
+        )
     if chamadas_detalhe >= limite_detalhe:
         stats['detalhes_limitados'] = chamadas_detalhe
     return stats
