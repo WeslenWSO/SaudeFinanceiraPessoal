@@ -374,7 +374,7 @@
                                 <button type="button" class="btn btn-danger btn-sm" id="excluir-selecionados-btn" title="Exclui as contas pendentes selecionadas">
                                     <i class="fas fa-trash"></i> Excluir Selecionados
                                 </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm" id="buscar-forma-nf-btn" title="Lê cobrança e autorização na discriminação da NF (mesmas regras da importação) e grava nas colunas">
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="buscar-forma-nf-btn" title="Sem seleção: abre tela por vencimento (inclui pagas). Com seleção: processa só as marcadas nesta página.">
                                     <i class="fas fa-fingerprint"></i> Autorização / Cobrança (NF)
                                 </button>
                             </div>
@@ -1333,11 +1333,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const buscarFormaNfBtn = document.getElementById('buscar-forma-nf-btn');
+    const nfSyncVencimentoUrl = '{% url "contasareceber:nf_sync_vencimento" %}';
     if (buscarFormaNfBtn) {
         buscarFormaNfBtn.addEventListener('click', function() {
             const checkedBoxes = document.querySelectorAll('.conta-checkbox:checked');
             if (checkedBoxes.length === 0) {
-                alert('Selecione pelo menos uma conta para buscar cobrança e autorização na NF.');
+                const params = new URLSearchParams();
+                const vIni = document.getElementById('vencimento_inicio');
+                const vFim = document.getElementById('vencimento_fim');
+                if (vIni && vIni.value) params.set('vencimento_inicio', vIni.value);
+                if (vFim && vFim.value) params.set('vencimento_fim', vFim.value);
+                const qs = params.toString();
+                window.location.href = nfSyncVencimentoUrl + (qs ? ('?' + qs) : '');
                 return;
             }
             const n = checkedBoxes.length;
