@@ -1159,6 +1159,17 @@ def importar_receitas(
         itens = client.buscar_receitas(**params)
     except ContaAzulAPIError as exc:
         return {**stats, 'erro': str(exc)}
+
+    if somente_recebidos:
+        itens = sorted(
+            itens,
+            key=lambda it: (
+                0 if _precisa_detalhe_parcela(it) else 1,
+                0 if not _documento_receita_item(it) else 1,
+            ),
+        )
+    limite_detalhe = len(itens) if somente_recebidos else LIMITE_DETALHE_PARCELA_SYNC
+
     cache_parcelas: dict[str, dict] = {}
     cache_cobranca: dict[str, Cobranca] = {}
     cache_categorias: dict[str, Categoria | None] = {}
@@ -1176,7 +1187,7 @@ def importar_receitas(
         item = _aplicar_campos_da_descricao(item)
         if _precisa_detalhe_parcela(item):
             if parcela_id not in cache_parcelas:
-                if chamadas_detalhe < LIMITE_DETALHE_PARCELA_SYNC:
+                if chamadas_detalhe < limite_detalhe:
                     chamadas_detalhe += 1
                     item = _enriquecer_item_receita(client, item, cache_parcelas)
             else:
