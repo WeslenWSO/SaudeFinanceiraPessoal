@@ -90,8 +90,9 @@
                     </section>
 
                     <p class="small text-muted mb-2">
-                        {{ total_listados }} título(s) no filtro · {{ total_com_nf }} com NF vinculada
-                        (só estes podem ser processados).
+                        {{ total_listados }} título(s) no filtro · {{ total_com_nf }} já com NF vinculada.
+                        Linhas amarelas têm só o nº no doc — marque e processe: o sistema tenta ligar à NF e gravar AUT/cobrança.
+                        Se faltar NF local, importe o dia em <strong>Notas Fiscais → Importar do Conta Azul</strong> (competência).
                     </p>
 
                     <form method="post" id="form-nf-sync-vencimento" action="{% url 'contasareceber:buscar_forma_autorizacao_nf' %}">

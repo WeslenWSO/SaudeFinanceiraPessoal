@@ -1591,13 +1591,21 @@ def sincronizar_conta_azul(
                     empresa, client, data_de=data_de, data_ate=data_ate, dry_run=dry_run,
                 )
             if vendas:
-                resultado['vendas'] = importar_vendas_conta_azul(
-                    empresa,
-                    client,
-                    data_de=data_de,
-                    data_ate=data_ate,
-                    dry_run=dry_run,
-                )
+                try:
+                    resultado['vendas'] = importar_vendas_conta_azul(
+                        empresa,
+                        client,
+                        data_de=data_de,
+                        data_ate=data_ate,
+                        dry_run=dry_run,
+                    )
+                except Exception as exc:
+                    resultado['vendas'] = {
+                        'criados': 0,
+                        'atualizados': 0,
+                        'erros': 1,
+                        'erro': f'Vendas CA: {exc}',
+                    }
             if nfse_prestador:
                 resultado['nfse_prestador'] = importar_nfse_prestador_conta_azul(
                     empresa,
@@ -1607,11 +1615,18 @@ def sincronizar_conta_azul(
                     dry_run=dry_run,
                 )
             if vendas and not dry_run:
-                resultado['nfse_venda_cache'] = atualizar_nfse_com_vendas_importadas(
-                    empresa,
-                    data_de=data_de,
-                    data_ate=data_ate,
-                )
+                try:
+                    resultado['nfse_venda_cache'] = atualizar_nfse_com_vendas_importadas(
+                        empresa,
+                        data_de=data_de,
+                        data_ate=data_ate,
+                    )
+                except Exception as exc:
+                    resultado['nfse_venda_cache'] = {
+                        'atualizadas': 0,
+                        'ignoradas': 0,
+                        'erro': str(exc),
+                    }
         cfg = getattr(empresa, 'conta_azul_config', None)
         if cfg and not dry_run:
             cfg.save(update_fields=['atualizado_em'])
@@ -1662,6 +1677,8 @@ def mensagem_resultado_sync(resultado: dict[str, Any]) -> tuple[str, str]:
             ok[-1] += f', {stats["vendas_sincronizadas"]} enriquecidas com venda CA'
         if stats.get('canceladas_aplicadas'):
             ok[-1] += f', {stats["canceladas_aplicadas"]} canceladas (regra CA)'
+        if stats.get('car_vinculados'):
+            ok[-1] += f', {stats["car_vinculados"]} título(s) CAR vinculados pelo doc'
         if stats.get('detalhes_erro'):
             ok[-1] += f', {stats["detalhes_erro"]} vendas sem detalhe API'
         if chave == 'nfse_venda_cache' and stats.get('atualizadas') is not None:

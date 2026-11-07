@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -27,6 +28,8 @@ STATUS_IMPORTAR = frozenset(
 )
 
 STATUS_CA_CANCELADO = frozenset({'CANCELADA', 'CANCELAMENTO_MANUAL'})
+
+logger = logging.getLogger(__name__)
 
 
 def status_ca_cancelado(item: dict) -> bool:
@@ -223,6 +226,7 @@ def importar_nfse_prestador_conta_azul(
         'ignorados_sem_numero': 0,
         'vendas_sincronizadas': 0,
         'canceladas_aplicadas': 0,
+        'car_vinculados': 0,
     }
     vistos: set[str] = set()
     cache_vendas: dict[str, dict] = {}
@@ -281,6 +285,8 @@ def importar_nfse_prestador_conta_azul(
                 campos['serie'],
             )
             try:
+                from contasareceber.nf_sync_discriminacao import vincular_contas_receber_a_nota_por_doc
+
                 cancelamento_ca = status_ca_cancelado(item)
                 if existente:
                     from notasfiscais.discriminacao_nfse import (
@@ -337,6 +343,7 @@ def importar_nfse_prestador_conta_azul(
                             stats['canceladas_aplicadas'] += 1
                     existente.save()
                     stats['atualizados'] += 1
+                    stats['car_vinculados'] += vincular_contas_receber_a_nota_por_doc(existente)
                 else:
                     nf = NotaFiscalServico.objects.create(empresa=empresa, **campos)
                     if cancelamento_ca:
@@ -348,7 +355,17 @@ def importar_nfse_prestador_conta_azul(
                         nf.save()
                         stats['canceladas_aplicadas'] += 1
                     stats['criados'] += 1
+                    stats['car_vinculados'] += vincular_contas_receber_a_nota_por_doc(nf)
             except IntegrityError:
+                stats['erros'] += 1
+            except Exception as exc:
+                logger.exception(
+                    'Falha ao gravar NFS-e CA (empresa=%s numero=%s id=%s): %s',
+                    empresa.pk,
+                    campos.get('numero_nota'),
+                    ca_id,
+                    exc,
+                )
                 stats['erros'] += 1
         cur = fim + timedelta(days=1)
 

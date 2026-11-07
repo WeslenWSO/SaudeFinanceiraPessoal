@@ -2007,50 +2007,55 @@ def _mensagem_import_nfse_ca(resultado: dict) -> tuple[str, str]:
 @require_POST
 def importar_nfse_conta_azul(request):
     """Busca NFS-e de prestador na API Conta Azul (período explícito, máx. 31 dias)."""
-    from dashboard.conta_azul.config import obter_ou_criar_config
-    from dashboard.conta_azul.periodo import parse_periodo_integracao_ca
-
-    empresa_id = request.session.get('empresa_id')
-    if not empresa_id:
-        messages.error(request, 'Selecione uma empresa para continuar.')
-        return redirect('empresa:lista')
-
-    empresa = get_object_or_404(Empresa, pk=empresa_id)
-    config = obter_ou_criar_config(empresa)
-    if not config.tem_refresh_token():
-        messages.error(
-            request,
-            'Conta Azul não conectada. Em Empresa → Configuração Conta Azul, clique em Conectar.',
-        )
-        return redirect('notasfiscais:list')
-
-    di, df, erro_periodo = parse_periodo_integracao_ca(request.POST)
-    if erro_periodo:
-        messages.error(request, erro_periodo)
-        return redirect('notasfiscais:list')
-    assert di is not None and df is not None
-
-    from dashboard.conta_azul.client import ContaAzulAPIError
-    from dashboard.conta_azul.sync import sincronizar_conta_azul
-
+    log = logging.getLogger(__name__)
     try:
-        resultado = sincronizar_conta_azul(
-            empresa,
-            nfse_prestador=True,
-            vendas=True,
-            data_de=di,
-            data_ate=df,
-        )
-        nivel, texto = _mensagem_import_nfse_ca(resultado)
-        getattr(messages, nivel, messages.info)(request, texto)
-        _aplicar_filtro_periodo_nfse_na_sessao(request, di, df)
-    except ContaAzulAPIError as exc:
-        messages.error(request, f'Conta Azul: {exc}')
+        from dashboard.conta_azul.config import obter_ou_criar_config
+        from dashboard.conta_azul.periodo import parse_periodo_integracao_ca
+
+        empresa_id = request.session.get('empresa_id')
+        if not empresa_id:
+            messages.error(request, 'Selecione uma empresa para continuar.')
+            return redirect('empresa:lista')
+
+        empresa = get_object_or_404(Empresa, pk=empresa_id)
+        config = obter_ou_criar_config(empresa)
+        if not config.tem_refresh_token():
+            messages.error(
+                request,
+                'Conta Azul não conectada. Em Empresa → Configuração Conta Azul, clique em Conectar.',
+            )
+            return redirect('notasfiscais:list')
+
+        di, df, erro_periodo = parse_periodo_integracao_ca(request.POST)
+        if erro_periodo:
+            messages.error(request, erro_periodo)
+            return redirect('notasfiscais:list')
+        if di is None or df is None:
+            messages.error(request, 'Período inválido.')
+            return redirect('notasfiscais:list')
+
+        from dashboard.conta_azul.client import ContaAzulAPIError
+        from dashboard.conta_azul.sync import sincronizar_conta_azul
+
+        try:
+            resultado = sincronizar_conta_azul(
+                empresa,
+                nfse_prestador=True,
+                vendas=True,
+                data_de=di,
+                data_ate=df,
+            )
+            nivel, texto = _mensagem_import_nfse_ca(resultado)
+            getattr(messages, nivel, messages.info)(request, texto)
+            _aplicar_filtro_periodo_nfse_na_sessao(request, di, df)
+        except ContaAzulAPIError as exc:
+            messages.error(request, f'Conta Azul: {exc}')
+        except Exception as exc:
+            log.exception('Falha ao importar NFS-e Conta Azul (empresa=%s)', empresa.pk)
+            messages.error(request, f'Erro ao buscar NFS-e: {exc}')
     except Exception as exc:
-        logging.getLogger(__name__).exception(
-            'Falha ao importar NFS-e Conta Azul (empresa=%s)', empresa.pk
-        )
-        messages.error(request, f'Erro ao buscar NFS-e: {exc}')
+        log.exception('Erro inesperado na tela importar NFS-e Conta Azul')
+        messages.error(request, f'Não foi possível concluir a importação: {exc}')
 
     return redirect('notasfiscais:list')
 

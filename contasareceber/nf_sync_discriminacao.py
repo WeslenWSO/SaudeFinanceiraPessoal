@@ -1,6 +1,8 @@
 """Sincroniza cobrança (forma de pagamento) e autorização da NFSe para o CAR."""
 from __future__ import annotations
 
+import re
+
 from cobranca.models import Cobranca
 from notasfiscais.utils import (
     detectar_forma_pagamento_e_vincular,
@@ -82,6 +84,50 @@ def sincronizar_forma_e_autorizacao_nota(nota) -> dict:
     return out
 
 
+def _digitos_nf(valor: str) -> str:
+    d = re.sub(r'\D', '', (valor or '').strip())
+    if not d:
+        return ''
+    return d.lstrip('0') or '0'
+
+
+def _variantes_numero_nf(numero: str) -> list[str]:
+    """Chaves equivalentes entre doc do CAR e número da NF (zeros à esquerda, só dígitos)."""
+    bruto = (numero or '').strip()
+    if not bruto:
+        return []
+    out: list[str] = [bruto]
+    dig = _digitos_nf(bruto)
+    if dig and dig not in out:
+        out.append(dig)
+    if dig and dig.isdigit():
+        for largo in (4, 5, 6, 7, 8, 9, 10):
+            pad = dig.zfill(largo)
+            if pad not in out:
+                out.append(pad)
+    return out
+
+
+def _nf_por_numero_empresa(empresa_id: int, numero: str):
+    from notasfiscais.models import NotaFiscalServico
+
+    qs = NotaFiscalServico.objects.filter(
+        empresa_id=empresa_id,
+        data_cancelamento__isnull=True,
+    )
+    for chave in _variantes_numero_nf(numero):
+        nf = qs.filter(numero_nota=chave).order_by('-pk').first()
+        if nf:
+            return nf
+    dig = _digitos_nf(numero)
+    if not dig:
+        return None
+    for cand in qs.only('pk', 'numero_nota').order_by('-pk')[:800]:
+        if _digitos_nf(cand.numero_nota or '') == dig:
+            return cand
+    return None
+
+
 def tentar_vincular_nota_conta_por_documento(conta, *, empresa_id: int) -> bool:
     """Liga o título à NFSe quando doc = número da nota (muito comum em títulos pagos)."""
     from contasareceber.models import ContaAReceber
@@ -93,20 +139,49 @@ def tentar_vincular_nota_conta_por_documento(conta, *, empresa_id: int) -> bool:
     doc = (conta.doc or '').strip()
     if not doc:
         return False
-    from notasfiscais.models import NotaFiscalServico
-
-    qs = NotaFiscalServico.objects.filter(
-        empresa_id=empresa_id,
-        data_cancelamento__isnull=True,
-    )
-    nf = qs.filter(numero_nota=doc).first()
-    if not nf and doc.isdigit():
-        nf = qs.filter(numero_nota__regex=rf'{doc}$').first()
+    nf = _nf_por_numero_empresa(empresa_id, doc)
     if not nf:
         return False
     conta.nota_id = nf.pk
     conta.save(update_fields=['nota_id'])
     return True
+
+
+def vincular_contas_receber_a_nota_por_doc(nota) -> int:
+    """
+    Títulos vindos da Conta Azul costumam ter doc = nº da NFS-e, sem FK nota_id.
+    Após importar/salvar a NF, liga esses CAR e replica cobrança/AUT.
+    """
+    from contasareceber.models import ContaAReceber
+    from contasareceber.socio_sync import (
+        propagar_autorizacao_nota_para_contas_receber,
+        propagar_forma_pagamento_nota_para_contas_receber,
+    )
+
+    if not nota or not getattr(nota, 'pk', None) or not getattr(nota, 'empresa_id', None):
+        return 0
+    numero = (getattr(nota, 'numero_nota', None) or '').strip()
+    if not numero:
+        return 0
+    chaves = set(_variantes_numero_nf(numero))
+    dig_nf = _digitos_nf(numero)
+    qs = ContaAReceber.objects.filter(
+        empresa_id=nota.empresa_id,
+        nota_id__isnull=True,
+    )
+    pks: list[int] = []
+    for car in qs.filter(doc__in=chaves).only('pk'):
+        pks.append(car.pk)
+    if dig_nf:
+        for car in qs.exclude(pk__in=pks).only('pk', 'doc'):
+            if _digitos_nf(car.doc or '') == dig_nf:
+                pks.append(car.pk)
+    if not pks:
+        return 0
+    ContaAReceber.objects.filter(pk__in=pks).update(nota_id=nota.pk)
+    propagar_forma_pagamento_nota_para_contas_receber(nota)
+    propagar_autorizacao_nota_para_contas_receber(nota, apenas_vazias=False)
+    return len(pks)
 
 
 def sincronizar_forma_e_autorizacao_notas_das_contas(conta_ids, *, empresa_id: int) -> dict:
