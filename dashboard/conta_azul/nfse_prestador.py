@@ -224,11 +224,21 @@ def _janelas_competencia_15_dias(data_de: date, data_ate: date):
         cur = fim + timedelta(days=1)
 
 
-def _janelas_varredura_numero(centro: date, *, raio_dias: int = 200):
-    """Varre competências em torno da data informada (competência pode ≠ emissão)."""
-    inicio = centro - timedelta(days=raio_dias)
-    fim = centro + timedelta(days=raio_dias)
+def _janelas_varredura_numero_global(*, dias_retro: int = 900, dias_frente: int = 45):
+    """Varre competências nos últimos ~2,5 anos — cobre ano errado no formulário."""
+    hoje = date.today()
+    inicio = hoje - timedelta(days=dias_retro)
+    fim = hoje + timedelta(days=dias_frente)
     yield from _janelas_competencia_15_dias(inicio, fim)
+
+
+def _nf_numero_existe_local(empresa, numero: int) -> bool:
+    from contasareceber.nf_sync_discriminacao import _variantes_numero_nf
+
+    chaves = _variantes_numero_nf(str(numero))
+    if not chaves:
+        return False
+    return NotaFiscalServico.objects.filter(empresa=empresa, numero_nota__in=chaves).exists()
 
 
 def importar_nfse_prestador_conta_azul(
@@ -268,6 +278,10 @@ def importar_nfse_prestador_conta_azul(
             if not isinstance(item, dict):
                 stats['erros'] += 1
                 continue
+            if numero_nfse is not None:
+                n_item = _numero_nfse_de_item(item)
+                if n_item is not None and n_item != numero_nfse:
+                    continue
             ca_id = str(item.get('id') or '').strip()
             if ca_id:
                 if ca_id in vistos:
@@ -402,11 +416,9 @@ def importar_nfse_prestador_conta_azul(
             return {**stats, 'erro': f'{cur.isoformat()} a {fim.isoformat()}: {exc}'}
         _processar_itens(itens)
 
-    achou = stats['criados'] + stats['atualizados'] > 0
-    if numero_nfse is not None and not achou and not dry_run:
-        centro = data_de + timedelta(days=max(0, (data_ate - data_de).days // 2))
+    if numero_nfse is not None and not dry_run and not _nf_numero_existe_local(empresa, numero_nfse):
         stats['busca_numero_ampla'] = 0
-        for cur, fim in _janelas_varredura_numero(centro):
+        for cur, fim in _janelas_varredura_numero_global():
             try:
                 itens = client.buscar_notas_fiscais_servico(
                     data_de=cur,
@@ -416,13 +428,15 @@ def importar_nfse_prestador_conta_azul(
                 )
             except ContaAzulAPIError:
                 continue
-            antes = stats['criados'] + stats['atualizados']
             _processar_itens(itens)
             stats['busca_numero_ampla'] += 1
-            if stats['criados'] + stats['atualizados'] > antes:
+            if _nf_numero_existe_local(empresa, numero_nfse):
+                break
+            if stats['busca_numero_ampla'] >= 72:
+                stats['busca_ampliada_interrompida'] = True
                 break
 
-    if numero_nfse is not None and stats['criados'] + stats['atualizados'] == 0:
+    if numero_nfse is not None and not _nf_numero_existe_local(empresa, numero_nfse):
         stats['numero_nao_encontrado'] = numero_nfse
 
     return stats
