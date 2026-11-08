@@ -7,11 +7,12 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
-from django.db.models import Prefetch, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
+from django.db.models.functions import Coalesce
 
 from categoria.models import Categoria
 from contasapagar.models import ContasaPagar
-from contasareceber.models import ContaAReceber
+from contasareceber.models import BaixaContaAReceber, ContaAReceber
 from emprestimos.models import Emprestimo, ParcelaEmprestimo
 from notasfiscais.models import NotaFiscalServico
 from planejamento_orcamentario.models import LancamentoOrcamento
@@ -97,34 +98,53 @@ def _mapa_planejado_por_categoria(empresa, ano) -> dict[int, list[Decimal]]:
 
 
 def _mapa_receitas_por_categoria_mes(empresa, ano) -> dict[tuple[int, int], Decimal]:
-    """Receitas já recebidas (regime de caixa), importadas do Conta Azul."""
+    """
+    Regime de caixa: valores recebidos no mês da baixa.
+    Prioriza BaixaContaAReceber; títulos sem baixa local usam data_recebimento do CAR.
+    """
     mapa: dict[tuple[int, int], Decimal] = defaultdict(lambda: Decimal('0'))
-    base = ContaAReceber.objects.filter(
-        empresa=empresa,
-        conta_azul_parcela_id__gt='',
-        categoria_id__isnull=False,
-        status='pago',
-        data_recebimento__isnull=False,
-    )
-    for row in base.filter(
-        data_recebimento__year=ano,
-    ).values('categoria_id', 'data_recebimento__month').annotate(
-        total=Sum('valor_recebido'),
+
+    for row in (
+        BaixaContaAReceber.objects.filter(
+            empresa=empresa,
+            data_recebimento__year=ano,
+            conta_a_receber__categoria_id__isnull=False,
+        )
+        .values('conta_a_receber__categoria_id', 'data_recebimento__month')
+        .annotate(total=Sum('valor_recebido'))
+    ):
+        cid = row['conta_a_receber__categoria_id']
+        mes = row['data_recebimento__month']
+        mapa[(cid, mes)] += row['total'] or Decimal('0')
+
+    valor_car = Coalesce(F('valor_recebido'), F('valor_a_receber'))
+    for row in (
+        ContaAReceber.objects.filter(
+            empresa=empresa,
+            categoria_id__isnull=False,
+            status__in=['pago', 'cartao'],
+            data_recebimento__isnull=False,
+            data_recebimento__year=ano,
+        )
+        .exclude(status='cancelado')
+        .annotate(n_baixas=Count('baixas'))
+        .filter(n_baixas=0)
+        .values('categoria_id', 'data_recebimento__month')
+        .annotate(total=Sum(valor_car))
     ):
         mapa[(row['categoria_id'], row['data_recebimento__month'])] += row['total'] or Decimal('0')
     return mapa
 
 
 def _mapa_despesas_por_categoria_mes(empresa, ano, tipo: str) -> dict[tuple[int, int], Decimal]:
-    """Despesas / investimento / DL já pagos (regime de caixa), importados do Conta Azul."""
+    """Regime de caixa: valores pagos no mês (dtPag), por categoria."""
     mapa: dict[tuple[int, int], Decimal] = defaultdict(lambda: Decimal('0'))
     base = ContasaPagar.objects.filter(
-        empresa=empresa,
-        conta_azul_parcela_id__gt='',
+        _cap_empresa_q(empresa),
         categoria__tipo=tipo,
         status='pago',
         dtPag__isnull=False,
-    )
+    ).exclude(status='cancelado')
     for row in base.filter(
         dtPag__year=ano,
         valorPago__gt=0,

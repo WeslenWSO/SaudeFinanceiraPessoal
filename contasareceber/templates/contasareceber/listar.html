@@ -356,10 +356,12 @@
                         <input type="hidden" name="return_path" id="contas-form-return-path" value="{{ request.get_full_path }}">
                         <div class="toolbar">
                             <div class="toolbar-left">
-                                <button type="button" class="btn btn-info btn-sm" id="conciliar-btn">
+                                <button type="button" class="btn btn-info btn-sm" id="conciliar-btn"
+                                        title="Concilia com lançamento do extrato bancário; em cartão também grava NF/cliente na maquininha pela AUT">
                                     <i class="fas fa-sync-alt"></i> Conciliar Selecionadas
                                 </button>
-                                <button type="button" class="btn btn-success btn-sm" id="conciliar-cartao-btn">
+                                <button type="button" class="btn btn-success btn-sm" id="conciliar-cartao-btn"
+                                        title="Só vincula ao relatório Stone/Cielo pela autorização (NF + cliente), sem extrato">
                                     <i class="fas fa-credit-card"></i> Conciliar Cartão
                                 </button>
                                 <button type="button" class="btn btn-outline-success btn-sm" id="conciliar-cartao-aprox-btn" title="Data ±2 dias e valor aproximado (recebíveis não conciliados)">

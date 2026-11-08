@@ -264,6 +264,94 @@ def conta_eh_cartao_para_maquininha(conta: ContaAReceber) -> bool:
     return tipo_cartao_conta(conta) in ('credito', 'debito')
 
 
+def filtrar_recebiveis_por_valor_conta(
+    conta: ContaAReceber,
+    candidatos: list[RelatorioRecebiveisMaquinaCartao],
+) -> list[RelatorioRecebiveisMaquinaCartao]:
+    """Quando vários recebíveis casam o sufixo da AUT (Stone), filtra pelo valor e tipo débito/crédito."""
+    if not candidatos:
+        return []
+    if len(candidatos) == 1:
+        return candidatos
+    vt = Decimal(conta.valor_a_receber or 0)
+    tipo = tipo_cartao_conta(conta)
+    pool = [r for r in candidatos if rel_forma_bate_tipo(r.forma_pagamento, tipo)]
+    if not pool:
+        pool = list(candidatos)
+
+    def diff_valor(r: RelatorioRecebiveisMaquinaCartao) -> Decimal:
+        vb = Decimal(r.valor_bruto or 0)
+        vl = Decimal(r.valor_liquido or 0)
+        return min(abs(vt - vb), abs(vt - vl))
+
+    lim = max(TOLERANCE_MIN, (max(vt, Decimal('0.01')) * TOLERANCE_PCT).quantize(Decimal('0.01')))
+    compativeis = [r for r in pool if diff_valor(r) <= lim]
+    if compativeis:
+        return compativeis
+    pool.sort(key=diff_valor)
+    return [pool[0]]
+
+
+def vincular_recebivel_maquininha_para_conta(
+    empresa_id: int,
+    conta: ContaAReceber,
+    *,
+    apenas_preencher_recebivel: bool = False,
+) -> int:
+    """
+    Casa recebível(s) da maquininha pela AUT e grava NF + cliente no relatório.
+    Retorna quantidade de recebíveis atualizados/vinculados.
+    """
+    if not conta_eh_cartao_para_maquininha(conta):
+        return 0
+    auth = autorizacao_para_conciliacao(conta)
+    if not auth:
+        return 0
+
+    vinculados = 0
+    ja = list(
+        RelatorioRecebiveisMaquinaCartao.objects.filter(
+            empresa_id=empresa_id,
+            conta_a_receber_id=conta.pk,
+        )
+    )
+    ja_ids = {r.pk for r in ja}
+    for rel in ja:
+        _vincular_relatorio_na_conta(conta, rel)
+        vinculados += 1
+
+    candidatos = list(
+        buscar_relatorios_por_autorizacao(empresa_id, auth, conciliado=False)
+    )
+    if not candidatos:
+        candidatos = list(
+            buscar_relatorios_por_autorizacao(empresa_id, auth, conciliado=None)
+        )
+    candidatos = [
+        r
+        for r in candidatos
+        if r.pk not in ja_ids
+        and (not r.conta_a_receber_id or r.conta_a_receber_id == conta.pk)
+    ]
+    escolhidos = filtrar_recebiveis_por_valor_conta(conta, candidatos)
+    if not escolhidos and not ja:
+        return 0
+
+    if escolhidos and not (conta.autorizacao or '').strip():
+        conta.autorizacao = auth[:100]
+        conta.save(update_fields=['autorizacao', 'data_atualizacao'])
+
+    novos: list[RelatorioRecebiveisMaquinaCartao] = []
+    for rel in escolhidos:
+        _vincular_relatorio_na_conta(conta, rel)
+        novos.append(rel)
+        vinculados += 1
+
+    if not apenas_preencher_recebivel and novos and conta.status != 'pago':
+        _atualizar_conta_totais_cartao(conta, novos + ja)
+    return vinculados
+
+
 def vincular_maquininha_contas_pagas(
     empresa_id: int,
     conta_ids: list[int] | None = None,
@@ -289,40 +377,15 @@ def vincular_maquininha_contas_pagas(
             stats['sem_auth'] += 1
             continue
         stats['titulos'] += 1
-        ja_no_titulo = list(
-            RelatorioRecebiveisMaquinaCartao.objects.filter(
-                empresa_id=empresa_id,
-                conta_a_receber_id=conta.pk,
-            )
+        n = vincular_recebivel_maquininha_para_conta(
+            empresa_id,
+            conta,
+            apenas_preencher_recebivel=apenas_preencher_recebivel,
         )
-        if ja_no_titulo and apenas_preencher_recebivel:
-            for rel in ja_no_titulo:
-                _vincular_relatorio_na_conta(conta, rel)
-                stats['recebiveis'] += 1
-            continue
-        candidatos = buscar_relatorios_por_autorizacao(
-            empresa_id, auth, conciliado=False
-        )
-        if not candidatos.exists():
-            candidatos = buscar_relatorios_por_autorizacao(
-                empresa_id, auth, conciliado=None
-            )
-        novos = [
-            r
-            for r in candidatos
-            if not r.conta_a_receber_id or r.conta_a_receber_id == conta.pk
-        ]
-        if not novos:
+        if n:
+            stats['recebiveis'] += n
+        else:
             stats['sem_recebivel'] += 1
-            continue
-        if not (conta.autorizacao or '').strip() and auth:
-            conta.autorizacao = auth[:100]
-            conta.save(update_fields=['autorizacao', 'data_atualizacao'])
-        for rel in novos:
-            _vincular_relatorio_na_conta(conta, rel)
-            stats['recebiveis'] += 1
-        if not apenas_preencher_recebivel and novos:
-            _atualizar_conta_totais_cartao(conta, novos)
     return stats
 
 

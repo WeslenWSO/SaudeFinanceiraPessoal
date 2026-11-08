@@ -10,7 +10,8 @@
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div class="me-auto">
                         <h3 class="card-title mb-0">Fluxo de Caixa</h3>
-                        <small class="text-muted text-break">{{ empresa.razao|default:"" }} · {{ ano }}</small>
+                        <small class="text-muted text-break d-block">{{ empresa.razao|default:"" }} · {{ ano }}</small>
+                        <small class="text-muted">Realizado no mês: <strong>recebido</strong> (data da baixa / recebimento) e <strong>pago</strong> (data do pagamento) — regime de caixa.</small>
                     </div>
                     <div class="fluxo-toolbar fluxo-hide-xs-text">
                         <div class="btn-group btn-group-sm" role="group">
@@ -49,7 +50,7 @@
                 <div class="card-body border-bottom">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
-                        <small class="text-muted d-none d-md-inline">Totais mensais da planilha (Conta Azul)</small>
+                        <small class="text-muted d-none d-md-inline">Receitas e despesas por mês de recebimento/pagamento</small>
                     </div>
                     <div class="fluxo-chart-box">
                         <canvas id="graficoFluxoPlanilha" aria-label="Gráfico do fluxo de caixa"></canvas>

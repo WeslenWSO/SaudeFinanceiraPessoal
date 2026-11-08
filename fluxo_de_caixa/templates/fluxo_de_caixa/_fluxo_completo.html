@@ -2,7 +2,7 @@
     {% if grafico_torre.tem_dados %}
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <strong><i class="fas fa-chart-bar text-primary"></i> Gráfico — {{ ano }}</strong>
-        <small class="text-muted d-none d-md-inline">Receita, Despesas e Resultados · barras sólidas = Real · claras = Plan.</small>
+        <small class="text-muted d-none d-md-inline">Real = caixa no mês (recebido/pago) · Plan = orçamento · Faturamento NFS-e = competência (emissão)</small>
     </div>
     <div class="fluxo-chart-box">
         <canvas id="graficoTorreFluxo" aria-label="Gráfico de torre do fluxo de caixa"></canvas>

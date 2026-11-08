@@ -1807,9 +1807,14 @@ def conciliar_contas_a_receber(request):
         ).select_related('nota')
         conciliadas = 0
         erros_conciliacao = []
+        maq_vinculos = 0
+        from .cartao_aproximacao import vincular_recebivel_maquininha_para_conta
 
         for conta in contas:
             try:
+                maq_vinculos += vincular_recebivel_maquininha_para_conta(
+                    empresa_id, conta, apenas_preencher_recebivel=conta.status == 'pago'
+                )
                 if _conciliar_uma_conta(request, conta, empresa_id):
                     conciliadas += 1
             except Exception as e:
@@ -1829,6 +1834,11 @@ def conciliar_contas_a_receber(request):
             messages.success(request, f'{conciliadas} conta(s) conciliada(s) automaticamente.')
         elif not erros_conciliacao:
             messages.info(request, 'Nenhuma conta foi conciliada (nenhuma correspondência encontrada).')
+        if maq_vinculos:
+            messages.info(
+                request,
+                f'{maq_vinculos} lançamento(s) da maquininha receberam NF e cliente pela autorização.',
+            )
 
         filtros = extrair_filtros_contas_receber(request)
         return redirect(construir_url_crlistar_com_filtros(filtros))
@@ -1848,6 +1858,12 @@ def conciliar_contas_a_receber(request):
 
 def _conciliar_uma_conta(request, conta, empresa_id):
     """Processa conciliação de uma conta a receber. Retorna True se conciliou, False se sem correspondência. Levanta exceção em caso de erro."""
+    from .cartao_aproximacao import (
+        autorizacao_para_conciliacao,
+        buscar_relatorios_por_autorizacao,
+        filtrar_recebiveis_por_valor_conta,
+        _vincular_relatorio_na_conta,
+    )
     if settings.DEBUG:
         print(f"DEBUG CONCILIAR: Processando conta {conta.id} - Cliente: {conta.cliente}, CNPJ_CPF: {conta.cnpj_cpf}")
     # Regra 1: Pegar CPF/CNPJ, data de vencimento e valor
@@ -2106,10 +2122,12 @@ def _conciliar_uma_conta(request, conta, empresa_id):
         maquina = None
         bandeira = None
         from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
-        from .cartao_aproximacao import buscar_relatorios_por_autorizacao
-        relatorio_cartao = buscar_relatorios_por_autorizacao(
-            empresa_id, conta.autorizacao, conciliado=None
-        ).first()
+        auth_maquina = autorizacao_para_conciliacao(conta)
+        relatorio_cartao = None
+        if auth_maquina:
+            cand = list(buscar_relatorios_por_autorizacao(empresa_id, auth_maquina, conciliado=None))
+            esc = filtrar_recebiveis_por_valor_conta(conta, cand)
+            relatorio_cartao = esc[0] if esc else None
         if relatorio_cartao:
             maquina = relatorio_cartao.maquinha
             bandeira = relatorio_cartao.bandeira
@@ -2240,17 +2258,16 @@ def _conciliar_uma_conta(request, conta, empresa_id):
 
         # Criar ExtratoMovimento com dados do relatório de recebíveis
         from relatoriorecebiveis.models import RelatorioRecebiveisMaquinaCartao
-        from .cartao_aproximacao import buscar_relatorios_por_autorizacao
 
         relatorio = None
-        if conta.autorizacao:
-            relatorio = buscar_relatorios_por_autorizacao(
-                empresa_id, conta.autorizacao, conciliado=None
-            ).first()
+        auth_maquina = autorizacao_para_conciliacao(conta)
+        if auth_maquina:
+            cand = list(buscar_relatorios_por_autorizacao(empresa_id, auth_maquina, conciliado=None))
+            esc = filtrar_recebiveis_por_valor_conta(conta, cand)
+            relatorio = esc[0] if esc else None
 
         if relatorio:
-            relatorio.conta_a_receber = conta
-            relatorio.save()
+            _vincular_relatorio_na_conta(conta, relatorio)
 
         # Construir descrição conforme especificação (evitar None para não quebrar em produção)
         if relatorio:
@@ -3440,6 +3457,7 @@ def conciliar_cartao_por_autorizacao(request):
         from .cartao_aproximacao import (
             autorizacao_para_conciliacao,
             buscar_relatorios_por_autorizacao,
+            filtrar_recebiveis_por_valor_conta,
             _atualizar_conta_totais_cartao,
             _vincular_relatorio_na_conta,
         )
@@ -3471,13 +3489,14 @@ def conciliar_cartao_por_autorizacao(request):
                 candidatos = buscar_relatorios_por_autorizacao(
                     empresa_id, autorizacao, conciliado=None
                 )
-            novos = []
+            candidatos_lista = []
             for rel in candidatos:
                 if rel.pk in ids_vinculados:
                     continue
                 if rel.conta_a_receber_id and rel.conta_a_receber_id != conta.pk:
                     continue
-                novos.append(rel)
+                candidatos_lista.append(rel)
+            novos = filtrar_recebiveis_por_valor_conta(conta, candidatos_lista)
 
             if not novos and not ja_vinculados:
                 continue
