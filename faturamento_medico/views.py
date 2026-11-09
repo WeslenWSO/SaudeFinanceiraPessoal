@@ -940,6 +940,19 @@ def _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias=None):
     return grafia_para_apelido, apelido_info, qtd_auto
 
 
+def _preparar_apelidos_solicitante_periodo_ou_vazio(empresa_id, raws, frequencias=None):
+    """Igual ao GET do relatório: não quebra export/impressão se a tabela de apelidos não existir."""
+    try:
+        return _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias)
+    except Exception as exc:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        if not isinstance(exc, (ProgrammingError, OperationalError)):
+            raise
+        logger.warning('Apelidos solicitante indisponíveis (coleta/export): %s', exc)
+        return {}, {}, 0
+
+
 def _sugerir_grupos_apelido(raws, grafia_para_apelido, frequencias=None) -> list[dict]:
     """Sugere agrupamentos automáticos para grafias ainda sem apelido."""
     nao_cadastrados = sorted({
@@ -3321,7 +3334,7 @@ def _coletar_cards_map_exames_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo_ou_vazio(
         empresa_id,
         freq_solicitante.keys(),
         freq_solicitante,
@@ -3976,6 +3989,16 @@ def _valor_desconto_linha(linha):
     return Decimal('0')
 
 
+_ILLEGAL_CHARACTERS_EXCEL_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]')
+
+
+def _valor_celula_excel(valor):
+    """Remove caracteres de controle proibidos no XML do Excel (openpyxl)."""
+    if isinstance(valor, str):
+        return _ILLEGAL_CHARACTERS_EXCEL_RE.sub('', valor)
+    return valor
+
+
 def _excel_texto_nf_linha(linha):
     qtd = linha.get('qtd_notas') or 0
     if qtd == 0:
@@ -4046,7 +4069,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo_ou_vazio(
         empresa_id,
         freq_solicitante.keys(),
         freq_solicitante,
@@ -4074,7 +4097,16 @@ def _coletar_grid_linhas_exames_solicitante(request):
         notas_linha_para_json,
         resolver_notas_linha,
     )
-    notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+    try:
+        notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+    except Exception:
+        logger.exception(
+            'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
+            empresa_id,
+            di,
+            df,
+        )
+        notas_por_data = {}
 
     for faturamento in qs:
         raw_solicitante = (faturamento.medico_solicitante or '').strip()
@@ -4097,13 +4129,20 @@ def _coletar_grid_linhas_exames_solicitante(request):
                 faturamento, item, ids_internos=ids_lotes_int
             )
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
-            notas_vinculadas = resolver_notas_linha(
-                notas_por_data,
-                empresa_id,
-                faturamento.nome or '',
-                faturamento.data,
-                faturamento.nota_fiscal,
-            )
+            try:
+                notas_vinculadas = resolver_notas_linha(
+                    notas_por_data,
+                    empresa_id,
+                    faturamento.nome or '',
+                    faturamento.data,
+                    faturamento.nota_fiscal,
+                )
+            except Exception:
+                logger.exception(
+                    'resolver_notas_linha falhou faturamento_id=%s (export)',
+                    faturamento.pk,
+                )
+                notas_vinculadas = []
             valor_desconto_item = (
                 item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
             )
@@ -4192,7 +4231,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
 
     if empresa:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
-        cell = ws.cell(row=row, column=1, value=empresa.razao)
+        cell = ws.cell(row=row, column=1, value=_valor_celula_excel(empresa.razao))
         cell.font = banner_font
         cell.fill = banner_fill
         cell.alignment = center
@@ -4237,6 +4276,8 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             linha['convenio'],
         ]
         for col_idx, valor in enumerate(valores, start=1):
+            if isinstance(valor, str):
+                valor = _valor_celula_excel(valor)
             cell = ws.cell(row=row, column=col_idx, value=valor)
             cell.border = borda
             if col_idx in (7, 8):
@@ -4285,19 +4326,55 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
 
 def exportar_lancamentos_solicitante_excel(request):
     """Exporta a tabela de lançamentos (lista de exames) para Excel."""
-    coleta = _coletar_grid_linhas_exames_solicitante(request)
+    if not request.session.get('empresa_id'):
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    try:
+        coleta = _coletar_grid_linhas_exames_solicitante(request)
+    except Exception:
+        logger.exception(
+            'exportar_lancamentos_solicitante_excel coleta empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        return HttpResponse(
+            'Não foi possível montar a lista para o Excel. '
+            'Reduza o período ou aplique filtros (solicitante, médico, convênio) e tente de novo.',
+            status=500,
+        )
+
     if not coleta.get('empresa_id'):
         return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    max_linhas_excel = 25000
+    qtd_linhas = len(coleta.get('grid_linhas') or [])
+    if qtd_linhas > max_linhas_excel:
+        return HttpResponse(
+            f'Há {qtd_linhas:,} lançamento(s) no período — limite do Excel: {max_linhas_excel:,}. '
+            'Filtre solicitante/médico/convênio ou reduza as datas.'.replace(',', '.'),
+            status=400,
+        )
 
     try:
         empresa = Empresa.objects.get(id=coleta['empresa_id'])
     except Empresa.DoesNotExist:
         empresa = None
 
-    wb = _montar_workbook_lancamentos_solicitante(empresa, coleta)
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
+    try:
+        wb = _montar_workbook_lancamentos_solicitante(empresa, coleta)
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+    except Exception:
+        logger.exception(
+            'exportar_lancamentos_solicitante_excel arquivo empresa=%s linhas=%s',
+            coleta.get('empresa_id'),
+            qtd_linhas,
+        )
+        return HttpResponse(
+            'Não foi possível gerar o arquivo Excel. '
+            'Se o relatório na tela carrega, tente de novo; caso contrário, reduza o período.',
+            status=500,
+        )
 
     di = coleta['di'].strftime('%Y%m%d')
     df = coleta['df'].strftime('%Y%m%d')
