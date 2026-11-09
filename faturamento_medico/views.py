@@ -61,6 +61,18 @@ from .utils import processar_arquivos_com_gemini, processar_arquivos_com_ocr
 
 logger = logging.getLogger(__name__)
 
+_LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT = 3500
+_LIMITE_LINHAS_COLETA_EXCEL = 26000
+
+
+class LancamentosExportLimiteExcedido(Exception):
+    """Período/filtros geram mais linhas do que o Excel suporta neste servidor."""
+
+    def __init__(self, qtd_linhas: int, limite: int):
+        self.qtd_linhas = qtd_linhas
+        self.limite = limite
+        super().__init__(f'{qtd_linhas} linhas (limite {limite})')
+
 
 def _moeda_br(valor):
     """Formata valor no padrão brasileiro com milhar: 2.100,00"""
@@ -940,16 +952,27 @@ def _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias=None):
     return grafia_para_apelido, apelido_info, qtd_auto
 
 
-def _preparar_apelidos_solicitante_periodo_ou_vazio(empresa_id, raws, frequencias=None):
-    """Igual ao GET do relatório: não quebra export/impressão se a tabela de apelidos não existir."""
+def _preparar_apelidos_solicitante_periodo_ou_vazio(
+    empresa_id,
+    raws,
+    frequencias=None,
+    request=None,
+):
+    """Não quebra relatório/export se apelidos falharem (migração, concorrência, etc.)."""
     try:
         return _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias)
     except Exception as exc:
-        from django.db.utils import OperationalError, ProgrammingError
+        from django.db import DatabaseError
 
-        if not isinstance(exc, (ProgrammingError, OperationalError)):
+        if not isinstance(exc, DatabaseError):
             raise
         logger.warning('Apelidos solicitante indisponíveis (coleta/export): %s', exc)
+        if request is not None:
+            from SaudeFinanceira.db_schema import capturar_erro_schema
+
+            msg = capturar_erro_schema(exc, contexto='apelidos do solicitante')
+            if msg:
+                messages.warning(request, msg)
         return {}, {}, 0
 
 
@@ -3351,7 +3374,7 @@ def _coletar_cards_map_exames_solicitante(request):
     qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
-    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+    qs = qs.order_by('-data', 'nome')
 
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
     periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
@@ -3360,7 +3383,9 @@ def _coletar_cards_map_exames_solicitante(request):
     )
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
-    for faturamento in qs:
+    from django.db.models import prefetch_related_objects
+
+    def _acumular_faturamento_card(faturamento):
         raw_solicitante = (faturamento.medico_solicitante or '').strip()
         solicitante_apelido = _canonico_solicitante(
             faturamento.medico_solicitante,
@@ -3388,13 +3413,27 @@ def _coletar_cards_map_exames_solicitante(request):
                 _modalidade_faturamento_item(faturamento),
                 faturamento.total or 0,
             )
-            continue
+            return
         for item in itens:
             valor_item = item.total if item.total is not None else (item.valor or 0)
             _acumular_card(
                 _modalidade_faturamento_item(faturamento, item),
                 valor_item,
             )
+
+    lote_cards: list = []
+    for faturamento in qs.iterator(chunk_size=250):
+        lote_cards.append(faturamento)
+        if len(lote_cards) < 250:
+            continue
+        prefetch_related_objects(lote_cards, 'itens_servico')
+        for fat in lote_cards:
+            _acumular_faturamento_card(fat)
+        lote_cards = []
+    if lote_cards:
+        prefetch_related_objects(lote_cards, 'itens_servico')
+        for fat in lote_cards:
+            _acumular_faturamento_card(fat)
 
     meses_periodo = _meses_no_periodo(di, df) if periodo_multimes else [(di.year, di.month)]
     return {
@@ -3942,16 +3981,40 @@ def imprimir_resumo_mes_solicitante(request):
     return render(request, 'faturamento_medico/imprimir_resumo_mes_solicitante.html', context)
 
 
+@login_required
 def exportar_resumo_mes_solicitante_excel(request):
     """Exporta o resumo mês/solicitante (pivot) para Excel — uma aba por solicitante."""
-    context, coleta = _montar_contexto_resumo_mes_solicitante(request)
+    if not request.session.get('empresa_id'):
+        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+
+    try:
+        context, coleta = _montar_contexto_resumo_mes_solicitante(request)
+    except Exception:
+        logger.exception(
+            'exportar_resumo_mes_solicitante_excel coleta empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        return HttpResponse(
+            'Não foi possível montar o resumo para Excel. Reduza o período ou aplique filtros.',
+            status=500,
+        )
     if context is None:
         return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
 
-    wb = _montar_workbook_resumo_mes_solicitante(context)
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
+    try:
+        wb = _montar_workbook_resumo_mes_solicitante(context)
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+    except Exception:
+        logger.exception(
+            'exportar_resumo_mes_solicitante_excel arquivo empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        return HttpResponse(
+            'Não foi possível gerar o arquivo Excel do resumo. Tente com um período menor.',
+            status=500,
+        )
 
     di = coleta['di'].strftime('%Y%m%d')
     df = coleta['df'].strftime('%Y%m%d')
@@ -3997,6 +4060,14 @@ def _valor_celula_excel(valor):
     if isinstance(valor, str):
         return _ILLEGAL_CHARACTERS_EXCEL_RE.sub('', valor)
     return valor
+
+
+def _notas_vinculo_export_rapido(nota_fiscal: str | None) -> list[dict]:
+    """NF só pelo campo do RIS — usado em export grande para evitar timeout."""
+    nf = (nota_fiscal or '').strip()
+    if not nf:
+        return []
+    return [{'numero': nf, 'valor_fmt': '', 'forma_pagamento': '-', 'manual': False, 'discriminacao': ''}]
 
 
 def _excel_texto_nf_linha(linha):
@@ -4086,111 +4157,154 @@ def _coletar_grid_linhas_exames_solicitante(request):
     qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
-    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+    qs = qs.order_by('-data', 'nome')
 
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     grid_linhas = []
     totais_solicitante = defaultdict(int)
+
+    from django.db.models import prefetch_related_objects
 
     from faturamento_medico.services.vincular_nota_solicitante import (
         carregar_notas_por_data,
         notas_linha_para_json,
         resolver_notas_linha,
     )
+
     try:
-        notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+        qtd_faturamentos = qs.count()
     except Exception:
-        logger.exception(
-            'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
-            empresa_id,
-            di,
-            df,
-        )
-        notas_por_data = {}
-
-    for faturamento in qs:
-        raw_solicitante = (faturamento.medico_solicitante or '').strip()
-        solicitante_apelido = _canonico_solicitante(
-            faturamento.medico_solicitante,
-            mapa_solicitante,
-            grafia_para_apelido,
-        )
-        solicitante_linha = (
-            solicitante_apelido
-            or raw_solicitante
-            or SOLICITANTE_NAO_INFORMADO
-        )
-        itens = list(faturamento.itens_servico.all())
-
-        def _registrar_linha(procedimento, modalidade, valor, item=None):
-            if not _modalidade_permitida(_normalizar_codigo_modalidade(modalidade), modalidades_sel):
-                return
-            status_label, _status_css = _status_linha_faturamento(
-                faturamento, item, ids_internos=ids_lotes_int
+        qtd_faturamentos = None
+    vincular_nf_completo = (
+        qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
+    )
+    notas_por_data = {}
+    if vincular_nf_completo:
+        try:
+            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+        except Exception:
+            logger.exception(
+                'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
+                empresa_id,
+                di,
+                df,
             )
-            status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
-            try:
-                notas_vinculadas = resolver_notas_linha(
-                    notas_por_data,
-                    empresa_id,
-                    faturamento.nome or '',
-                    faturamento.data,
-                    faturamento.nota_fiscal,
+            notas_por_data = {}
+
+    def _processar_faturamentos_export(faturamentos: list):
+        for fat in faturamentos:
+            raw_solicitante = (fat.medico_solicitante or '').strip()
+            solicitante_apelido = _canonico_solicitante(
+                fat.medico_solicitante,
+                mapa_solicitante,
+                grafia_para_apelido,
+            )
+            solicitante_linha = (
+                solicitante_apelido
+                or raw_solicitante
+                or SOLICITANTE_NAO_INFORMADO
+            )
+            itens = list(fat.itens_servico.all())
+
+            def _registrar_linha(procedimento, modalidade, valor, item=None, *, _fat=fat):
+                nonlocal grid_linhas
+                if not _modalidade_permitida(_normalizar_codigo_modalidade(modalidade), modalidades_sel):
+                    return
+                if len(grid_linhas) >= _LIMITE_LINHAS_COLETA_EXCEL:
+                    raise LancamentosExportLimiteExcedido(
+                        len(grid_linhas) + 1,
+                        _LIMITE_LINHAS_COLETA_EXCEL,
+                    )
+                status_label, _status_css = _status_linha_faturamento(
+                    _fat, item, ids_internos=ids_lotes_int
                 )
-            except Exception:
-                logger.exception(
-                    'resolver_notas_linha falhou faturamento_id=%s (export)',
-                    faturamento.pk,
+                status_ag_label, status_ag_css = _badge_status_agendamento(_fat.status_agendamento)
+                if vincular_nf_completo and notas_por_data:
+                    try:
+                        notas_vinculadas = resolver_notas_linha(
+                            notas_por_data,
+                            empresa_id,
+                            _fat.nome or '',
+                            _fat.data,
+                            _fat.nota_fiscal,
+                        )
+                    except Exception:
+                        logger.exception(
+                            'resolver_notas_linha falhou faturamento_id=%s (export)',
+                            _fat.pk,
+                        )
+                        notas_vinculadas = []
+                else:
+                    notas_vinculadas = _notas_vinculo_export_rapido(_fat.nota_fiscal)
+                valor_desconto_item = (
+                    item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
                 )
-                notas_vinculadas = []
-            valor_desconto_item = (
-                item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
-            )
-            linha = {
-                'data': faturamento.data,
-                'data_fmt': faturamento.data.strftime('%d/%m/%Y') if faturamento.data else '-',
-                'paciente': faturamento.nome or '-',
-                'procedimento': procedimento,
-                'modalidade': modalidade or '-',
-                'status': status_label,
-                'status_agendamento': status_ag_label,
-                'status_agendamento_css': status_ag_css,
-                'valor': valor,
-                'valor_fmt': _moeda_br(valor),
-                'valor_desconto': valor_desconto_item,
-                'solicitante': solicitante_linha,
-                'medico': _rotulo_medico_faturamento(faturamento),
-                'convenio': faturamento.convenio or '-',
-                'notas_vinculadas': notas_vinculadas,
-                'qtd_notas': len(notas_vinculadas),
-                'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
-            }
-            linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
-            linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
-            grid_linhas.append(linha)
-            totais_solicitante[solicitante_linha] += 1
+                linha = {
+                    'data': _fat.data,
+                    'data_fmt': _fat.data.strftime('%d/%m/%Y') if _fat.data else '-',
+                    'paciente': _fat.nome or '-',
+                    'procedimento': procedimento,
+                    'modalidade': modalidade or '-',
+                    'status': status_label,
+                    'status_agendamento': status_ag_label,
+                    'status_agendamento_css': status_ag_css,
+                    'valor': valor,
+                    'valor_fmt': _moeda_br(valor),
+                    'valor_desconto': valor_desconto_item,
+                    'solicitante': solicitante_linha,
+                    'medico': _rotulo_medico_faturamento(_fat),
+                    'convenio': _fat.convenio or '-',
+                    'notas_vinculadas': notas_vinculadas,
+                    'qtd_notas': len(notas_vinculadas),
+                    'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
+                    'nf_export_simplificado': not vincular_nf_completo,
+                }
+                linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
+                linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
+                grid_linhas.append(linha)
+                totais_solicitante[solicitante_linha] += 1
 
-        if not itens:
-            _registrar_linha(
-                faturamento.servico or '-',
-                _modalidade_faturamento_item(faturamento),
-                faturamento.total or 0,
-            )
+            if not itens:
+                _registrar_linha(
+                    fat.servico or '-',
+                    _modalidade_faturamento_item(fat),
+                    fat.total or 0,
+                )
+                continue
+            for item in itens:
+                valor_item = item.total if item.total is not None else (item.valor or 0)
+                _registrar_linha(
+                    item.servico or '-',
+                    _modalidade_faturamento_item(fat, item),
+                    valor_item,
+                    item,
+                )
+
+    lote_fat: list = []
+    for faturamento in qs.iterator(chunk_size=200):
+        lote_fat.append(faturamento)
+        if len(lote_fat) < 200:
             continue
-        for item in itens:
-            valor_item = item.total if item.total is not None else (item.valor or 0)
-            _registrar_linha(
-                item.servico or '-',
-                _modalidade_faturamento_item(faturamento, item),
-                valor_item,
-                item,
-            )
+        prefetch_related_objects(lote_fat, 'itens_servico')
+        _processar_faturamentos_export(lote_fat)
+        lote_fat = []
+
+    if lote_fat:
+        prefetch_related_objects(lote_fat, 'itens_servico')
+        _processar_faturamentos_export(lote_fat)
 
     grid_linhas.sort(key=lambda linha: (
         -totais_solicitante.get(linha['solicitante'], 0),
         -(linha['data'].toordinal() if linha['data'] else 0),
         linha['paciente'].lower(),
     ))
+
+    aviso_nf = ''
+    if not vincular_nf_completo and grid_linhas:
+        aviso_nf = (
+            'Exportação com vínculo NF simplificado (somente número no RIS) '
+            'para concluir em tempo hábil. Use filtro de solicitante/médico para NF completa.'
+        )
 
     return {
         'empresa_id': empresa_id,
@@ -4199,6 +4313,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
         'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
         'grid_linhas': grid_linhas,
         'valor_total': sum((linha.get('valor') or 0) for linha in grid_linhas),
+        'aviso_nf_export': aviso_nf,
     }
 
 
@@ -4246,7 +4361,13 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     row += 1
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
     ws.cell(row=row, column=1, value=f'Período {coleta["periodo_fmt"]} · {len(coleta["grid_linhas"])} lançamento(s)')
-    row += 2
+    row += 1
+    aviso_nf = (coleta.get('aviso_nf_export') or '').strip()
+    if aviso_nf:
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=num_cols)
+        ws.cell(row=row, column=1, value=_valor_celula_excel(aviso_nf))
+        row += 1
+    row += 1
 
     for col_idx, titulo in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=col_idx, value=titulo)
@@ -4324,6 +4445,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     return wb
 
 
+@login_required
 def exportar_lancamentos_solicitante_excel(request):
     """Exporta a tabela de lançamentos (lista de exames) para Excel."""
     if not request.session.get('empresa_id'):
@@ -4331,6 +4453,14 @@ def exportar_lancamentos_solicitante_excel(request):
 
     try:
         coleta = _coletar_grid_linhas_exames_solicitante(request)
+    except LancamentosExportLimiteExcedido as exc:
+        return HttpResponse(
+            (
+                f'Há mais de {exc.limite:,} lançamento(s) no período. '
+                'Filtre solicitante, médico ou convênio, ou reduza as datas.'
+            ).replace(',', '.'),
+            status=400,
+        )
     except Exception:
         logger.exception(
             'exportar_lancamentos_solicitante_excel coleta empresa=%s',
@@ -4492,24 +4622,12 @@ def _listar_exames_por_solicitante_get(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    try:
-        grafia_para_apelido, apelido_info, qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
-            empresa_id,
-            freq_solicitante.keys(),
-            freq_solicitante,
-        )
-    except Exception as exc:
-        from django.db.utils import OperationalError, ProgrammingError
-
-        if not isinstance(exc, (ProgrammingError, OperationalError)):
-            raise
-        from SaudeFinanceira.db_schema import capturar_erro_schema
-
-        msg = capturar_erro_schema(exc, contexto='apelidos do solicitante')
-        logger.warning('Apelidos solicitante indisponíveis: %s', exc)
-        grafia_para_apelido, apelido_info, qtd_auto_apelido = {}, {}, 0
-        if msg:
-            messages.warning(request, msg)
+    grafia_para_apelido, apelido_info, qtd_auto_apelido = _preparar_apelidos_solicitante_periodo_ou_vazio(
+        empresa_id,
+        freq_solicitante.keys(),
+        freq_solicitante,
+        request=request,
+    )
 
     if qtd_auto_apelido:
         messages.info(

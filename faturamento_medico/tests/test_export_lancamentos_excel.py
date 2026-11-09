@@ -3,6 +3,7 @@ from datetime import date
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase
 from openpyxl import load_workbook
 
@@ -57,9 +58,10 @@ class ExportarLancamentosExcelViewTests(SimpleTestCase):
 
         rf = RequestFactory()
         req = rf.get('/lancamentos/excel/')
+        req.user = AnonymousUser()
         req.session = {}
         resp = exportar_lancamentos_solicitante_excel(req)
-        self.assertEqual(resp.status_code, 403)
+        self.assertIn(resp.status_code, (302, 403))
 
     @patch('faturamento_medico.views._coletar_grid_linhas_exames_solicitante')
     def test_fluxo_minimo_com_mock(self, mock_coleta):
@@ -77,6 +79,9 @@ class ExportarLancamentosExcelViewTests(SimpleTestCase):
 
         rf = RequestFactory()
         req = rf.get('/lancamentos/excel/')
+        user = MagicMock()
+        user.is_authenticated = True
+        req.user = user
         req.session = {'empresa_id': 1}
 
         with patch('faturamento_medico.views.Empresa.objects.get', return_value=empresa):
