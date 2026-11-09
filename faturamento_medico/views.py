@@ -1108,8 +1108,8 @@ def _construir_grupos_solicitante(
     apelido_info: dict[str, dict] | None = None,
 ) -> tuple[dict[str, str], dict[str, dict]]:
     """
-    Agrupa solicitantes priorizando apelidos cadastrados.
-    Grafias sem apelido não entram nos grupos de exibição.
+    Agrupa solicitantes: apelidos cadastrados primeiro; demais grafias do período
+    entram por agrupamento automático (nomes parecidos).
     """
     if grafia_para_apelido is None or apelido_info is None:
         grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
@@ -1127,6 +1127,36 @@ def _construir_grupos_solicitante(
         }
         for grafia in variantes:
             mapeamento[grafia] = apelido
+
+    sem_apelido: list[str] = []
+    for raw in raws:
+        grafia = (raw or '').strip()
+        if not grafia:
+            continue
+        if _lookup_apelido_grafia(grafia, grafia_para_apelido):
+            continue
+        sem_apelido.append(grafia)
+
+    if sem_apelido:
+        mapa_auto, grupos_auto = _construir_grupos_solicitante_auto(sem_apelido, frequencias)
+        for raw, canon in mapa_auto.items():
+            if raw not in mapeamento:
+                mapeamento[raw] = canon
+        for nome, info in grupos_auto.items():
+            if nome == SOLICITANTE_NAO_INFORMADO:
+                continue
+            if nome in grupos:
+                variantes = sorted(set(grupos[nome]['variantes'] + info.get('variantes') or []))
+                grupos[nome]['variantes'] = variantes
+                grupos[nome]['qtd_variantes'] = len([v for v in variantes if v])
+            else:
+                variantes = list(info.get('variantes') or [])
+                grupos[nome] = {
+                    'nome': nome,
+                    'variantes': variantes,
+                    'qtd_variantes': len([v for v in variantes if v]),
+                    'tem_apelido': False,
+                }
 
     mapeamento[''] = SOLICITANTE_NAO_INFORMADO
     if SOLICITANTE_NAO_INFORMADO not in grupos:
@@ -1147,8 +1177,6 @@ def _canonico_solicitante(
     original = (raw or '').strip()
     if not original:
         return SOLICITANTE_NAO_INFORMADO
-    if grafia_para_apelido is not None and _lookup_apelido_grafia(original, grafia_para_apelido) is None:
-        return None
     if original in mapeamento:
         return mapeamento[original]
     chave = original.casefold()
@@ -3320,22 +3348,23 @@ def _coletar_cards_map_exames_solicitante(request):
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     for faturamento in qs:
+        raw_solicitante = (faturamento.medico_solicitante or '').strip()
         solicitante_apelido = _canonico_solicitante(
             faturamento.medico_solicitante,
             mapa_solicitante,
             grafia_para_apelido,
         )
-        if solicitante_apelido is None and not incluir_lista_detalhada:
-            continue
+        solicitante_linha = (
+            solicitante_apelido or raw_solicitante or SOLICITANTE_NAO_INFORMADO
+        )
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
             cod_mod = _normalizar_codigo_modalidade(modalidade)
             if not _modalidade_permitida(cod_mod, modalidades_sel):
                 return
-            if solicitante_apelido is None:
-                return
-            card = cards_map[solicitante_apelido]
+            chave_card = solicitante_apelido or solicitante_linha
+            card = cards_map[chave_card]
             _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
             if periodo_multimes and faturamento.data:
                 chave_mes = (faturamento.data.year, faturamento.data.month)
@@ -4386,11 +4415,25 @@ def _listar_exames_por_solicitante_get(request):
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info, qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
-        empresa_id,
-        freq_solicitante.keys(),
-        freq_solicitante,
-    )
+    try:
+        grafia_para_apelido, apelido_info, qtd_auto_apelido = _preparar_apelidos_solicitante_periodo(
+            empresa_id,
+            freq_solicitante.keys(),
+            freq_solicitante,
+        )
+    except Exception as exc:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        if not isinstance(exc, (ProgrammingError, OperationalError)):
+            raise
+        from SaudeFinanceira.db_schema import capturar_erro_schema
+
+        msg = capturar_erro_schema(exc, contexto='apelidos do solicitante')
+        logger.warning('Apelidos solicitante indisponíveis: %s', exc)
+        grafia_para_apelido, apelido_info, qtd_auto_apelido = {}, {}, 0
+        if msg:
+            messages.warning(request, msg)
+
     if qtd_auto_apelido:
         messages.info(
             request,
@@ -4404,7 +4447,15 @@ def _listar_exames_por_solicitante_get(request):
         grafia_para_apelido=grafia_para_apelido,
         apelido_info=apelido_info,
     )
-    solicitantes_disponiveis = _listar_apelidos_disponiveis(apelido_info)
+    solicitantes_disponiveis = [
+        {
+            'nome': nome,
+            'variantes': info.get('variantes') or [],
+            'qtd_variantes': info.get('qtd_variantes', 0),
+            'tem_apelido': info.get('tem_apelido', False),
+        }
+        for nome, info in sorted(grupos_solicitante.items(), key=lambda x: x[0].lower())
+    ]
     sugestoes_apelido = _sugerir_grupos_apelido(
         freq_solicitante.keys(),
         grafia_para_apelido,
@@ -4488,17 +4539,14 @@ def _listar_exames_por_solicitante_get(request):
             or raw_solicitante
             or SOLICITANTE_NAO_INFORMADO
         )
-        if solicitante_apelido is None and not incluir_lista_detalhada:
-            return
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
             cod_mod = _normalizar_codigo_modalidade(modalidade)
             if not _modalidade_permitida(cod_mod, modalidades_sel):
                 return
-            if solicitante_apelido is None:
-                return
-            card = cards_map[solicitante_apelido]
+            chave_card = solicitante_apelido or solicitante_linha
+            card = cards_map[chave_card]
             _acumular_modalidade_resumo(card, modalidade, valor, codigos_modalidade)
             if periodo_multimes and faturamento.data:
                 chave_mes = (faturamento.data.year, faturamento.data.month)
