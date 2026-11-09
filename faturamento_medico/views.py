@@ -4292,6 +4292,66 @@ def listar_exames_por_solicitante(request):
             return _salvar_apelido_solicitante(request)
         return _salvar_metas_modalidade_solicitante(request)
 
+    try:
+        return _listar_exames_por_solicitante_get(request)
+    except Exception:
+        logger.exception(
+            'listar_exames_por_solicitante empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        messages.error(
+            request,
+            'Não foi possível carregar o relatório (muitos exames ou tempo esgotado). '
+            'Tente filtrar também solicitante/médico, reduzir o período ou use «Por página» menor.',
+        )
+        hoje = date.today()
+        di_padrao, df_padrao = _periodo_filtro_padrao(hoje)
+        di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
+        df = _parse_data_filtro(request.GET.get('data_fim')) or df_padrao
+        if di > df:
+            di, df = df, di
+        return render(
+            request,
+            'faturamento_medico/listar_exames_por_solicitante.html',
+            {
+                'grid_linhas': [],
+                'cards_resumo': [],
+                'incluir_lista_detalhada': False,
+                'total_exames': 0,
+                'valor_total_fmt': _moeda_br(0),
+                'solicitantes_disponiveis': [],
+                'sugestoes_apelido': [],
+                'qtd_grafias_sem_apelido': 0,
+                'medicos_disponiveis': [],
+                'convenios_disponiveis': [],
+                'status_disponiveis': [],
+                'filtros': {
+                    'data_inicio': di.isoformat(),
+                    'data_fim': df.isoformat(),
+                    'solicitante': [],
+                    'medico': [],
+                    'modalidade': _parse_modalidades_filtro(request),
+                    'status_agendamento': [
+                        s.strip()
+                        for s in request.GET.getlist('status_agendamento')
+                        if s and str(s).strip()
+                    ],
+                    'convenio': [],
+                },
+                'modalidades_opcoes': MODALIDADES_SOLICITANTE,
+                'periodo_fmt': f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}',
+                'periodo_multimes': False,
+                'metas_modalidades_opcoes': METAS_MODALIDADES_SOLICITANTE,
+                'redirect_qs': request.GET.urlencode(),
+                'redirect_qs_sem_pagina': request.GET.urlencode(),
+                'pagina_detalhe': None,
+                'paginator_detalhe': None,
+                'per_page_detalhe': 100,
+            },
+        )
+
+
+def _listar_exames_por_solicitante_get(request):
     empresa_id = request.session.get('empresa_id')
     if empresa_id:
         qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
@@ -4362,11 +4422,24 @@ def listar_exames_por_solicitante(request):
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
 
-    qs = qs.order_by('-data', 'nome').prefetch_related('itens_servico')
+    qs = qs.order_by('-data', 'nome')
     codigos_modalidade = [codigo for codigo, _ in MODALIDADES_SOLICITANTE]
     labels_modalidade = dict(MODALIDADES_SOLICITANTE)
     periodo_multimes = _periodo_abrange_mais_de_um_mes(di, df)
-    metas_map = _carregar_metas_solicitante(empresa_id)
+    try:
+        metas_map = _carregar_metas_solicitante(empresa_id)
+    except Exception as exc:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        if not isinstance(exc, (ProgrammingError, OperationalError)):
+            raise
+        from SaudeFinanceira.db_schema import capturar_erro_schema
+
+        msg = capturar_erro_schema(exc, contexto='metas solicitante')
+        logger.warning('Metas solicitante indisponíveis: %s', exc)
+        metas_map = {}
+        if msg:
+            messages.warning(request, msg)
 
     grid_linhas = []
     incluir_lista_detalhada = bool(
@@ -4376,15 +4449,34 @@ def listar_exames_por_solicitante(request):
     cards_map = defaultdict(lambda: _novo_resumo_solicitante(codigos_modalidade, periodo_multimes))
 
     notas_por_data = {}
+    paginator_detalhe = None
+    pagina_detalhe = None
+    per_page_detalhe = 100
     if incluir_lista_detalhada:
+        try:
+            per_page_detalhe = int((request.GET.get('per_page') or '100').strip())
+        except (TypeError, ValueError):
+            per_page_detalhe = 100
+        per_page_detalhe = max(25, min(per_page_detalhe, 500))
+        paginator_detalhe = Paginator(qs, per_page_detalhe)
+        pagina_detalhe = paginator_detalhe.get_page(request.GET.get('page'))
         from faturamento_medico.services.vincular_nota_solicitante import (
             carregar_notas_por_data,
             notas_linha_para_json,
             resolver_notas_linha,
         )
         notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+        if paginator_detalhe.num_pages > 1:
+            messages.info(
+                request,
+                (
+                    f'Lista detalhada: {paginator_detalhe.count:,} exame(s) — '
+                    f'página {pagina_detalhe.number} de {paginator_detalhe.num_pages}. '
+                    'Use «Por página» e as páginas abaixo da tabela.'
+                ).replace(',', '.'),
+            )
 
-    for faturamento in qs:
+    def _processar_faturamento_solicitante(faturamento, *, montar_grid: bool):
         raw_solicitante = (faturamento.medico_solicitante or '').strip()
         solicitante_apelido = _canonico_solicitante(
             faturamento.medico_solicitante,
@@ -4397,7 +4489,7 @@ def listar_exames_por_solicitante(request):
             or SOLICITANTE_NAO_INFORMADO
         )
         if solicitante_apelido is None and not incluir_lista_detalhada:
-            continue
+            return
         itens = list(faturamento.itens_servico.all())
 
         def _acumular_card(modalidade, valor):
@@ -4415,8 +4507,8 @@ def listar_exames_por_solicitante(request):
         def _registrar_linha(procedimento, modalidade, valor, item=None):
             if not _modalidade_permitida(_normalizar_codigo_modalidade(modalidade), modalidades_sel):
                 return
-            _acumular_card(modalidade, valor)
-            if not incluir_lista_detalhada:
+            if not montar_grid:
+                _acumular_card(modalidade, valor)
                 return
             status_label, status_css = _status_linha_faturamento(
                 faturamento, item, ids_internos=ids_lotes_int
@@ -4424,13 +4516,20 @@ def listar_exames_por_solicitante(request):
             status_ag_label, status_ag_css = _badge_status_agendamento(faturamento.status_agendamento)
             notas_vinculadas = []
             if notas_por_data is not None:
-                notas_vinculadas = resolver_notas_linha(
-                    notas_por_data,
-                    empresa_id,
-                    faturamento.nome or '',
-                    faturamento.data,
-                    faturamento.nota_fiscal,
-                )
+                try:
+                    notas_vinculadas = resolver_notas_linha(
+                        notas_por_data,
+                        empresa_id,
+                        faturamento.nome or '',
+                        faturamento.data,
+                        faturamento.nota_fiscal,
+                    )
+                except Exception:
+                    logger.exception(
+                        'resolver_notas_linha falhou faturamento_id=%s',
+                        faturamento.pk,
+                    )
+                    notas_vinculadas = []
             valor_desconto_item = (
                 item.valor_desconto if item is not None and item.valor_desconto else Decimal('0')
             )
@@ -4466,7 +4565,7 @@ def listar_exames_por_solicitante(request):
                 _modalidade_faturamento_item(faturamento),
                 faturamento.total or 0,
             )
-            continue
+            return
         for item in itens:
             valor_item = item.total if item.total is not None else (item.valor or 0)
             _registrar_linha(
@@ -4475,6 +4574,28 @@ def listar_exames_por_solicitante(request):
                 valor_item,
                 item,
             )
+
+    from django.db.models import prefetch_related_objects
+
+    lote_cards: list = []
+    for faturamento in qs.iterator(chunk_size=250):
+        lote_cards.append(faturamento)
+        if len(lote_cards) >= 250:
+            prefetch_related_objects(lote_cards, 'itens_servico')
+            for fat in lote_cards:
+                _processar_faturamento_solicitante(fat, montar_grid=False)
+            lote_cards = []
+    if lote_cards:
+        prefetch_related_objects(lote_cards, 'itens_servico')
+        for fat in lote_cards:
+            _processar_faturamento_solicitante(fat, montar_grid=False)
+
+    if incluir_lista_detalhada and pagina_detalhe is not None:
+        pks = [f.pk for f in pagina_detalhe.object_list]
+        if pks:
+            qs_pagina = qs.filter(pk__in=pks).order_by('-data', 'nome').prefetch_related('itens_servico')
+            for faturamento in qs_pagina:
+                _processar_faturamento_solicitante(faturamento, montar_grid=True)
 
     cards_resumo = []
     meses_periodo = _meses_no_periodo(di, df) if periodo_multimes else [(di.year, di.month)]
@@ -4588,11 +4709,14 @@ def listar_exames_por_solicitante(request):
             -(linha['data'].toordinal() if linha['data'] else 0),
             linha['paciente'].lower(),
         ))
-        valor_total = sum((linha.get('valor') or 0) for linha in grid_linhas)
-        total_exames = len(grid_linhas)
+        valor_total = sum((cards_map[card['nome']]['valor'] for card in cards_resumo), Decimal('0'))
+        total_exames = paginator_detalhe.count if paginator_detalhe is not None else len(grid_linhas)
     else:
         total_exames = sum(card['total'] for card in cards_resumo)
         valor_total = sum(cards_map[card['nome']]['valor'] for card in cards_resumo)
+
+    qs_redirect = request.GET.copy()
+    qs_redirect.pop('page', None)
 
     context = {
         'grid_linhas': grid_linhas,
@@ -4620,6 +4744,10 @@ def listar_exames_por_solicitante(request):
         'periodo_multimes': periodo_multimes,
         'metas_modalidades_opcoes': METAS_MODALIDADES_SOLICITANTE,
         'redirect_qs': request.GET.urlencode(),
+        'redirect_qs_sem_pagina': qs_redirect.urlencode(),
+        'pagina_detalhe': pagina_detalhe,
+        'paginator_detalhe': paginator_detalhe,
+        'per_page_detalhe': per_page_detalhe,
     }
     return render(request, 'faturamento_medico/listar_exames_por_solicitante.html', context)
 

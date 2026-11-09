@@ -212,6 +212,15 @@
                                 <input type="date" name="data_fim" class="form-control"
                                        value="{{ filtros.data_fim }}">
                             </div>
+                            <div class="col-sm-6 col-md-3 col-lg-2">
+                                <label class="form-label small mb-0 text-muted">Por página (lista)</label>
+                                <select name="per_page" class="form-select" title="Quando há lista detalhada de exames">
+                                    <option value="50" {% if per_page_detalhe == 50 %}selected{% endif %}>50</option>
+                                    <option value="100" {% if per_page_detalhe == 100 %}selected{% endif %}>100</option>
+                                    <option value="200" {% if per_page_detalhe == 200 %}selected{% endif %}>200</option>
+                                    <option value="500" {% if per_page_detalhe == 500 %}selected{% endif %}>500</option>
+                                </select>
+                            </div>
                             <div class="col-md-auto ms-md-auto d-flex flex-wrap gap-2">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-filter"></i> Filtrar
@@ -764,6 +773,25 @@
                             </tbody>
                         </table>
                     </div>
+                    {% if paginator_detalhe and paginator_detalhe.num_pages > 1 %}
+                    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3" aria-label="Páginas da lista de exames">
+                        <span class="small text-muted">
+                            {{ paginator_detalhe.count }} exame(s) no total — página {{ pagina_detalhe.number }} de {{ paginator_detalhe.num_pages }}
+                        </span>
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if pagina_detalhe.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if redirect_qs_sem_pagina %}{{ redirect_qs_sem_pagina }}&{% endif %}page={{ pagina_detalhe.previous_page_number }}">Anterior</a>
+                            </li>
+                            {% endif %}
+                            {% if pagina_detalhe.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if redirect_qs_sem_pagina %}{{ redirect_qs_sem_pagina }}&{% endif %}page={{ pagina_detalhe.next_page_number }}">Próxima</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
                     {% elif not incluir_lista_detalhada and total_exames %}
                     <div class="alert alert-light border mb-0">
                         Selecione um ou mais <strong>solicitantes</strong> ou <strong>médicos</strong> acima

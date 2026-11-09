@@ -585,4 +585,6 @@ def buscar_notas_para_vinculo(
 
 
 def notas_linha_para_json(notas: list[dict]) -> str:
-    return json.dumps(notas, ensure_ascii=False)
+    """JSON leve para o modal (sem discriminação completa da NF)."""
+    lite = [{k: v for k, v in n.items() if k != 'discriminacao'} for n in notas]
+    return json.dumps(lite, ensure_ascii=False)
