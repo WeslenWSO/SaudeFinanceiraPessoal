@@ -402,7 +402,7 @@ def carregar_notas_por_data(
     if empresa_id:
         qs = qs.filter(empresa_id=empresa_id)
     por_data: dict[date, list[NotaFiscalServico]] = defaultdict(list)
-    for nota in qs:
+    for nota in qs.iterator(chunk_size=250):
         if nota.data_emissao:
             por_data[nota.data_emissao].append(nota)
     return por_data
@@ -421,6 +421,11 @@ def preparar_indice_vinculo_export(
     return indice
 
 
+def _primeiro_token_nome(nome: str) -> str:
+    partes = [p for p in re.split(r'\s+', (nome or '').strip()) if len(p) > 2]
+    return partes[0].casefold() if partes else ''
+
+
 def buscar_notas_paciente_indice(
     indice: list[tuple[date, NotaFiscalServico, str, str]],
     nome_paciente: str,
@@ -432,10 +437,15 @@ def buscar_notas_paciente_indice(
         return []
     min_d = data_exame - timedelta(days=janela_antes)
     max_d = data_exame + timedelta(days=janela_apos)
+    token = _primeiro_token_nome(nome_paciente)
     matches: list[NotaFiscalServico] = []
     for dia, nota, paciente_nota, cliente in indice:
         if dia < min_d or dia > max_d:
             continue
+        if token:
+            blob = f'{cliente} {paciente_nota}'.casefold()
+            if token not in blob:
+                continue
         if cliente and _similaridade(nome_paciente, cliente) >= SIMILARIDADE_MIN_PACIENTE:
             matches.append(nota)
             continue

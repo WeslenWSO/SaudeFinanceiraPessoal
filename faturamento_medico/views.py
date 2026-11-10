@@ -931,6 +931,21 @@ def _cadastrar_apelidos_automaticos_grafia_unica(
     return criados
 
 
+def _preparar_apelidos_solicitante_export(empresa_id, raws):
+    """Só leitura — exportação não deve gravar apelidos nem alterar o banco."""
+    try:
+        grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
+        grafia_para_apelido, apelido_info = _expandir_apelidos_com_grafias_periodo(
+            grafia_para_apelido,
+            apelido_info,
+            raws,
+        )
+        return grafia_para_apelido, apelido_info, 0
+    except Exception as exc:
+        logger.warning('Apelidos export indisponíveis: %s', exc)
+        return {}, {}, 0
+
+
 def _preparar_apelidos_solicitante_periodo(empresa_id, raws, frequencias=None):
     """Carrega apelidos, cadastra automaticamente grafias únicas e expande o período."""
     grafia_para_apelido, apelido_info = _carregar_mapa_apelidos(empresa_id)
@@ -4143,9 +4158,8 @@ def _excel_discriminacao_linha(linha):
     return ' | '.join(partes) if partes else f'{qtd} notas'
 
 
-def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
-    """Lista detalhada de lançamentos com os filtros da tela Exames por Solicitante."""
-    empresa_id = request.session.get('empresa_id')
+def _qs_filtrada_exames_solicitante(request, empresa_id):
+    """QuerySet de faturamentos com filtros GET (sem agrupar solicitante na tela)."""
     if empresa_id:
         qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
     else:
@@ -4168,36 +4182,92 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
 
     freq_solicitante = defaultdict(int)
-    for raw in qs_periodo.values_list('medico_solicitante', flat=True):
+    for raw in qs_periodo.values_list('medico_solicitante', flat=True).iterator(chunk_size=500):
         nome = (raw or '').strip()
         if nome:
             freq_solicitante[nome] += 1
 
-    grafia_para_apelido, apelido_info, _qtd_auto_apelido = _preparar_apelidos_solicitante_periodo_ou_vazio(
+    grafia_para_apelido, apelido_info, _qtd = _preparar_apelidos_solicitante_export(
         empresa_id,
         freq_solicitante.keys(),
-        freq_solicitante,
-        engolir_erros=para_excel,
     )
-    try:
-        mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
-            freq_solicitante.keys(),
-            freq_solicitante,
-            empresa_id=empresa_id,
-            grafia_para_apelido=grafia_para_apelido,
-            apelido_info=apelido_info,
-        )
-    except Exception:
-        logger.exception('construir_grupos_solicitante falhou (excel=%s)', para_excel)
-        if not para_excel:
-            raise
-        mapa_solicitante, grupos_solicitante = {}, {}
+    mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
+        freq_solicitante.keys(),
+        freq_solicitante,
+        empresa_id=empresa_id,
+        grafia_para_apelido=grafia_para_apelido,
+        apelido_info=apelido_info,
+    )
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
     qs = _filtrar_por_convenios(qs, convenios_sel)
     qs = _filtrar_por_solicitantes(qs, solicitantes_sel, grupos_solicitante)
     qs = _filtrar_por_medicos(qs, medicos_sel)
-    qs = qs.order_by('-data', 'nome')
+    return {
+        'di': di,
+        'df': df,
+        'qs': qs,
+        'solicitantes_sel': solicitantes_sel,
+        'medicos_sel': medicos_sel,
+        'modalidades_sel': modalidades_sel,
+        'convenios_sel': convenios_sel,
+        'grupos_solicitante': grupos_solicitante,
+        'mapa_solicitante': mapa_solicitante,
+        'grafia_para_apelido': grafia_para_apelido,
+    }
+
+
+def _checar_viabilidade_export_lancamentos(request) -> HttpResponse | None:
+    """Responde cedo se o período/filtros provavelmente estouram o tempo do Render."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return None
+    try:
+        ctx = _qs_filtrada_exames_solicitante(request, empresa_id)
+    except Exception:
+        return None
+    di, df = ctx['di'], ctx['df']
+    dias = (df - di).days + 1
+    estreito = bool(ctx['solicitantes_sel'] or ctx['medicos_sel'] or ctx['convenios_sel'])
+    try:
+        qtd_fat = ctx['qs'].count()
+    except Exception:
+        return None
+    if qtd_fat > 9000:
+        return HttpResponse(
+            f'{qtd_fat:,} faturamento(s) no filtro — use solicitante/médico/convênio ou menos dias.'
+            .replace(',', '.'),
+            status=400,
+            content_type='text/plain; charset=utf-8',
+        )
+    if dias > 20 and not estreito and qtd_fat > 1200:
+        return HttpResponse(
+            'Mês inteiro com muitos exames: marque ao menos um solicitante ou médico '
+            '(ou reduza o período) e exporte de novo.',
+            status=400,
+            content_type='text/plain; charset=utf-8',
+        )
+    return None
+
+
+def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
+    """Lista detalhada de lançamentos com os filtros da tela Exames por Solicitante."""
+    from django.db import close_old_connections
+
+    close_old_connections()
+    empresa_id = request.session.get('empresa_id')
+    ctx = _qs_filtrada_exames_solicitante(request, empresa_id)
+    di, df = ctx['di'], ctx['df']
+    qs = ctx['qs'].order_by('-data', 'nome')
+    modalidades_sel = ctx['modalidades_sel']
+    mapa_solicitante = ctx['mapa_solicitante']
+    grafia_para_apelido = ctx['grafia_para_apelido']
+
+    freq_solicitante = defaultdict(int)
+    for raw in qs.values_list('medico_solicitante', flat=True).iterator(chunk_size=500):
+        nome = (raw or '').strip()
+        if nome:
+            freq_solicitante[nome] += 1
 
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
     grid_linhas = []
@@ -4206,7 +4276,6 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
     from django.db.models import prefetch_related_objects
 
     from faturamento_medico.services.vincular_nota_solicitante import (
-        carregar_cache_notas_manuais_export,
         carregar_notas_por_data,
         notas_linha_para_json,
         preparar_indice_vinculo_export,
@@ -4247,12 +4316,6 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
             except Exception:
                 logger.exception('preparar_indice_vinculo_export falhou empresa=%s', empresa_id)
                 indice_vinculo_export = None
-            try:
-                cache_notas_manuais_export = carregar_cache_notas_manuais_export(empresa_id, qs)
-            except Exception:
-                logger.exception('carregar_cache_notas_manuais_export falhou empresa=%s', empresa_id)
-                cache_notas_manuais_export = None
-
     serializar_nf = serializar_nota_linha_excel if para_excel else None
 
     def _processar_faturamentos_export(faturamentos: list):
@@ -4550,6 +4613,10 @@ def _exportar_lancamentos_solicitante_excel_impl(request):
 
         return redirect_to_login(request.get_full_path())
 
+    bloqueio = _checar_viabilidade_export_lancamentos(request)
+    if bloqueio is not None:
+        return bloqueio
+
     if not request.session.get('empresa_id'):
         return HttpResponse(
             'Sessão expirada. Faça login novamente.',
@@ -4636,6 +4703,8 @@ def _exportar_lancamentos_solicitante_excel_impl(request):
 
 def listar_exames_por_solicitante(request):
     """Relatório de exames agrupados por médico solicitante."""
+    from django.db import close_old_connections
+
     if request.method == 'POST':
         acao = (request.POST.get('acao') or '').strip()
         if acao == 'salvar_apelido':
@@ -4699,6 +4768,8 @@ def listar_exames_por_solicitante(request):
                 'per_page_detalhe': 100,
             },
         )
+    finally:
+        close_old_connections()
 
 
 def _listar_exames_por_solicitante_get(request):

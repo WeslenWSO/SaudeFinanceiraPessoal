@@ -41,10 +41,20 @@ class ClearNFSeFiltersOnLeaveMiddleware(MiddlewareMixin):
         path = request.path
         if _should_ignore(path):
             return response
-        last = request.session.get(LAST_PATH_SESSION_KEY)
-        request.session[LAST_PATH_SESSION_KEY] = path
-        if last and _is_nfs_path(last) and not _is_nfs_path(path):
-            request.session.pop(NFS_SESSION_KEY, None)
+        try:
+            last = request.session.get(LAST_PATH_SESSION_KEY)
+            request.session[LAST_PATH_SESSION_KEY] = path
+            if last and _is_nfs_path(last) and not _is_nfs_path(path):
+                request.session.pop(NFS_SESSION_KEY, None)
+        except SessionInterrupted:
+            pass
+        except Exception as exc:
+            from django.db.utils import Error as DjangoDbError
+
+            # InterfaceError/OperationalError não são subclasses de DatabaseError no Django.
+            if isinstance(exc, DjangoDbError):
+                return response
+            raise
         return response
 
 
