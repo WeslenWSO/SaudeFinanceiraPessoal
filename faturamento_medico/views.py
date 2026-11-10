@@ -4082,8 +4082,12 @@ def _excel_texto_nf_linha(linha):
         partes = [f"NF {nota.get('numero', '-')}"]
         if nota.get('valor_fmt'):
             partes.append(f"R$ {nota['valor_fmt']}")
-        if nota.get('forma_pagamento') and nota.get('forma_pagamento') != '-':
-            partes.append(str(nota['forma_pagamento']))
+        forma = (
+            nota.get('forma_pagamento_exibicao')
+            or nota.get('forma_pagamento')
+        )
+        if forma and forma != '-':
+            partes.append(str(forma))
         if nota.get('manual'):
             partes.append('Manual')
         return ' · '.join(partes)
@@ -4174,37 +4178,32 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
 
     from django.db.models import prefetch_related_objects
 
-    if para_excel:
-        vincular_nf_completo = False
-        notas_por_data = {}
-        importar_resolver_nf = False
-    else:
-        from faturamento_medico.services.vincular_nota_solicitante import (
-            carregar_notas_por_data,
-            notas_linha_para_json,
-            resolver_notas_linha,
-        )
+    from faturamento_medico.services.vincular_nota_solicitante import (
+        carregar_notas_por_data,
+        notas_linha_para_json,
+        resolver_notas_linha,
+    )
 
-        importar_resolver_nf = True
+    try:
+        qtd_faturamentos = qs.count()
+    except Exception:
+        qtd_faturamentos = None
+    vincular_nf_completo = (
+        qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
+    )
+    notas_por_data = {}
+    if vincular_nf_completo:
         try:
-            qtd_faturamentos = qs.count()
+            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
         except Exception:
-            qtd_faturamentos = None
-        vincular_nf_completo = (
-            qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
-        )
-        notas_por_data = {}
-        if vincular_nf_completo:
-            try:
-                notas_por_data = carregar_notas_por_data(empresa_id, di, df)
-            except Exception:
-                logger.exception(
-                    'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
-                    empresa_id,
-                    di,
-                    df,
-                )
-                notas_por_data = {}
+            logger.exception(
+                'carregar_notas_por_data falhou empresa=%s periodo=%s..%s periodo_export=%s',
+                empresa_id,
+                di,
+                df,
+                para_excel,
+            )
+            notas_por_data = {}
 
     def _processar_faturamentos_export(faturamentos: list):
         for fat in faturamentos:
@@ -4234,7 +4233,7 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                     _fat, item, ids_internos=ids_lotes_int
                 )
                 status_ag_label, status_ag_css = _badge_status_agendamento(_fat.status_agendamento)
-                if importar_resolver_nf and vincular_nf_completo and notas_por_data:
+                if vincular_nf_completo:
                     try:
                         notas_vinculadas = resolver_notas_linha(
                             notas_por_data,
@@ -4245,8 +4244,9 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                         )
                     except Exception:
                         logger.exception(
-                            'resolver_notas_linha falhou faturamento_id=%s (export)',
+                            'resolver_notas_linha falhou faturamento_id=%s (export excel=%s)',
                             _fat.pk,
+                            para_excel,
                         )
                         notas_vinculadas = []
                 else:
@@ -4276,7 +4276,7 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                         if para_excel
                         else (notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '')
                     ),
-                    'nf_export_simplificado': para_excel or not vincular_nf_completo,
+                    'nf_export_simplificado': not vincular_nf_completo,
                 }
                 linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
                 linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
@@ -4319,12 +4319,7 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
     ))
 
     aviso_nf = ''
-    if para_excel and grid_linhas:
-        aviso_nf = (
-            'Exportação: NF conforme número cadastrado no RIS. '
-            'Na tela do relatório o vínculo com NFS-e permanece completo.'
-        )
-    elif not vincular_nf_completo and grid_linhas:
+    if not vincular_nf_completo and grid_linhas:
         aviso_nf = (
             'Exportação com vínculo NF simplificado (somente número no RIS) '
             'para concluir em tempo hábil. Use filtro de solicitante/médico para NF completa.'
