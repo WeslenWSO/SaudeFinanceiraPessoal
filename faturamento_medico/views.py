@@ -2492,7 +2492,13 @@ def _anexos_grid_faturamento(faturamento):
     }
 
 
-def _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id):
+def _montar_nf_pagamento_grid(
+    faturamento,
+    notas_por_data,
+    empresa_id,
+    *,
+    indice_export=None,
+):
     from .convenio_nf_utils import convenio_mostra_nf_pagamento
     from .services.vincular_nota_solicitante import (
         notas_linha_para_json,
@@ -2514,6 +2520,7 @@ def _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id):
         faturamento.nome or '',
         faturamento.data,
         faturamento.nota_fiscal,
+        indice_export=indice_export,
     )
     return {
         'exibir_nf_pagamento': True,
@@ -2524,13 +2531,93 @@ def _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id):
     }
 
 
-def _nf_pagamento_linha_grid(faturamento, notas_por_data, empresa_id, nf_cache, *, mostrar_celula):
+def _nf_pagamento_linha_grid(
+    faturamento,
+    notas_por_data,
+    empresa_id,
+    nf_cache,
+    *,
+    mostrar_celula,
+    indice_export=None,
+):
     fat_id = faturamento.pk
     if fat_id not in nf_cache:
-        nf_cache[fat_id] = _montar_nf_pagamento_grid(faturamento, notas_por_data, empresa_id)
+        nf_cache[fat_id] = _montar_nf_pagamento_grid(
+            faturamento,
+            notas_por_data,
+            empresa_id,
+            indice_export=indice_export,
+        )
     dados = dict(nf_cache[fat_id])
     dados['mostrar_nf_celula'] = bool(dados.get('exibir_nf_pagamento') and mostrar_celula)
     return dados
+
+
+def _nf_pagamento_linha_grid_placeholder(faturamento, *, mostrar_celula):
+    """Célula NF vazia — vínculo automático só na página exibida (evita timeout na listagem)."""
+    from .convenio_nf_utils import convenio_mostra_nf_pagamento
+
+    data_iso = faturamento.data.isoformat() if faturamento.data else ''
+    exibir = convenio_mostra_nf_pagamento(faturamento.convenio)
+    return {
+        'exibir_nf_pagamento': exibir,
+        'notas_vinculadas': [],
+        'qtd_notas': 0,
+        'notas_json': '',
+        'data_iso': data_iso,
+        'mostrar_nf_celula': bool(exibir and mostrar_celula),
+    }
+
+
+def _enriquecer_nf_grid_pagina_ftlistar(grid_linhas, empresa_id):
+    """Resolve NF/Pagamento só para as linhas da página atual."""
+    if not empresa_id or not grid_linhas:
+        return
+    if not any(linha.get('mostrar_nf_celula') for linha in grid_linhas):
+        return
+
+    from .services.vincular_nota_solicitante import (
+        carregar_notas_por_data,
+        preparar_indice_vinculo_export,
+    )
+
+    datas = []
+    for linha in grid_linhas:
+        fat = linha.get('faturamento')
+        if fat is not None and getattr(fat, 'data', None):
+            datas.append(fat.data)
+    if not datas:
+        return
+    di_nf, df_nf = min(datas), max(datas)
+    try:
+        notas_por_data = carregar_notas_por_data(empresa_id, di_nf, df_nf)
+        indice_export = preparar_indice_vinculo_export(notas_por_data) if notas_por_data else None
+    except Exception:
+        logger.exception(
+            'ftlistar enriquecer_nf falhou empresa=%s %s..%s',
+            empresa_id,
+            di_nf,
+            df_nf,
+        )
+        return
+
+    nf_cache: dict[int, dict] = {}
+    for linha in grid_linhas:
+        if not linha.get('mostrar_nf_celula'):
+            continue
+        fat = linha.get('faturamento')
+        if fat is None:
+            continue
+        linha.update(
+            _nf_pagamento_linha_grid(
+                fat,
+                notas_por_data,
+                empresa_id,
+                nf_cache,
+                mostrar_celula=True,
+                indice_export=indice_export,
+            )
+        )
 
 
 def listar_faturamentos(request):
@@ -2649,24 +2736,6 @@ def listar_faturamentos(request):
     )
     grid_linhas = []
     ids_lotes_int = ids_lotes_internos(empresa_id) if empresa_id else set()
-    nf_cache: dict[int, dict] = {}
-    notas_por_data = {}
-    if empresa_id:
-        from .services.vincular_nota_solicitante import carregar_notas_por_data
-
-        di_nf = _parse_data_filtro(data_inicio)
-        df_nf = _parse_data_filtro(data_fim)
-        if di_nf and df_nf:
-            try:
-                notas_por_data = carregar_notas_por_data(empresa_id, di_nf, df_nf)
-            except Exception:
-                logger.exception(
-                    'ftlistar carregar_notas_por_data falhou empresa=%s %s..%s',
-                    empresa_id,
-                    di_nf,
-                    df_nf,
-                )
-                notas_por_data = {}
 
     # Cache de preços da tabela por empresa/convênio (código e descrição)
     precos_por_codigo = set()
@@ -2745,9 +2814,7 @@ def listar_faturamentos(request):
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
-                **_nf_pagamento_linha_grid(
-                    faturamento, notas_por_data, empresa_id, nf_cache, mostrar_celula=True,
-                ),
+                **_nf_pagamento_linha_grid_placeholder(faturamento, mostrar_celula=True),
             })
             continue
         itens_filtrados = []
@@ -2784,8 +2851,8 @@ def listar_faturamentos(request):
                 **_lote_protocolo_faturamento_grid(faturamento, ids_lotes_int),
                 **_nota_lote_linha_grid(faturamento, ids_lotes_int),
                 **_anexos_grid_faturamento(faturamento),
-                **_nf_pagamento_linha_grid(
-                    faturamento, notas_por_data, empresa_id, nf_cache, mostrar_celula=(idx == 0),
+                **_nf_pagamento_linha_grid_placeholder(
+                    faturamento, mostrar_celula=(idx == 0),
                 ),
             })
 
@@ -2927,6 +2994,14 @@ def listar_faturamentos(request):
     paginator = Paginator(grid_linhas, per_page)
     page_obj = paginator.get_page(request.GET.get('page') or 1)
     grid_linhas = list(page_obj.object_list)
+    _t_nf = time.perf_counter()
+    _enriquecer_nf_grid_pagina_ftlistar(grid_linhas, empresa_id)
+    logger.info(
+        'ftlistar empresa=%s nf_pagina=%s elapsed=%.2fs',
+        empresa_id,
+        len(grid_linhas),
+        time.perf_counter() - _t_nf,
+    )
 
     # Armazenar filtros na sessão (preserva ao voltar de edição / gerar lote / menu)
     _salvar_filtros_listagem_sessao(request, filtros, per_page=per_page)
