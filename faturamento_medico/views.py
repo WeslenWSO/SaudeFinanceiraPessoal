@@ -4136,6 +4136,29 @@ def _excel_texto_nf_linha(linha):
     return f'{qtd} notas'
 
 
+def _excel_texto_nf_sem_valor_linha(linha):
+    """NF e forma de pagamento, sem valor monetário (coluna extra no Excel de lançamentos)."""
+    qtd = linha.get('qtd_notas') or 0
+    if qtd == 0:
+        return 'Sem NF'
+    notas = linha.get('notas_vinculadas') or []
+
+    def _texto_uma_nota(nota):
+        partes = [f"NF {nota.get('numero', '-')}"]
+        forma = nota.get('forma_pagamento')
+        if forma and str(forma).strip() and str(forma).strip() != '-':
+            partes.append(str(forma).strip())
+        if nota.get('manual'):
+            partes.append('Manual')
+        return ' - '.join(partes)
+
+    if qtd == 1 and notas:
+        return _texto_uma_nota(notas[0])
+    if notas:
+        return ' | '.join(_texto_uma_nota(n) for n in notas)
+    return f'{qtd} notas'
+
+
 def _excel_discriminacao_linha(linha):
     qtd = linha.get('qtd_notas') or 0
     if qtd == 0:
@@ -4474,6 +4497,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     headers = [
         'Data', 'Paciente', 'Exame', 'Modalidade', 'Status da agenda',
         'Status conferência', 'Valor', 'Valor desconto', 'NF / Pagamento',
+        'NF e forma de pagamento',
         'Discriminação', 'Solicitante', 'Médico', 'Convênio',
     ]
     num_cols = len(headers)
@@ -4509,7 +4533,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         cell.font = bold
         cell.fill = header_fill
         cell.border = borda
-        cell.alignment = center if col_idx not in (2, 3, 9, 10, 11, 12, 13) else left
+        cell.alignment = center if col_idx not in (2, 3, 9, 10, 11, 12, 13, 14) else left
     row += 1
 
     for linha in coleta['grid_linhas']:
@@ -4534,6 +4558,7 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             valor_num,
             desconto_num,
             _excel_texto_nf_linha(linha),
+            _excel_texto_nf_sem_valor_linha(linha),
             _excel_discriminacao_linha(linha),
             linha.get('solicitante') or '-',
             linha.get('medico') or '-',
@@ -4547,9 +4572,9 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
             if col_idx in (7, 8):
                 cell.number_format = '#,##0.00'
                 cell.alignment = right
-            elif col_idx == 10:
+            elif col_idx == 11:
                 cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-            elif col_idx in (2, 3, 9, 11, 12, 13):
+            elif col_idx in (2, 3, 9, 10, 12, 13, 14):
                 cell.alignment = left
             else:
                 cell.alignment = center
@@ -4576,12 +4601,12 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         desconto_cell.border = borda
         desconto_cell.alignment = right
         ws.cell(row=row, column=6, value=f'{len(coleta["grid_linhas"])} exame(s)').font = bold
-        for col_idx in (2, 3, 4, 5, 6, 9, 10, 11, 12, 13):
+        for col_idx in (2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14):
             c = ws.cell(row=row, column=col_idx)
             c.fill = total_fill
             c.border = borda
 
-    widths = [12, 32, 42, 12, 22, 18, 12, 12, 28, 52, 28, 24, 22]
+    widths = [12, 32, 42, 12, 22, 18, 12, 12, 28, 22, 52, 28, 24, 22]
     for col_idx, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 

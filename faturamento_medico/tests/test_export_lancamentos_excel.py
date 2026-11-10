@@ -8,9 +8,32 @@ from django.test import RequestFactory, SimpleTestCase
 from openpyxl import load_workbook
 
 from faturamento_medico.views import (
+    _excel_texto_nf_sem_valor_linha,
     _montar_workbook_lancamentos_solicitante,
     _valor_celula_excel,
 )
+
+
+class ExcelTextoNfSemValorTests(SimpleTestCase):
+    def test_uma_nota_sem_valor_monetario(self):
+        linha = {
+            'qtd_notas': 1,
+            'notas_vinculadas': [
+                {
+                    'numero': '6043',
+                    'valor_fmt': '440,00',
+                    'forma_pagamento': 'PIX',
+                    'forma_pagamento_exibicao': 'PIX R$ 440,00',
+                },
+            ],
+        }
+        texto = _excel_texto_nf_sem_valor_linha(linha)
+        self.assertEqual(texto, 'NF 6043 - PIX')
+        self.assertNotIn('440', texto)
+        self.assertNotIn('R$', texto)
+
+    def test_sem_nf(self):
+        self.assertEqual(_excel_texto_nf_sem_valor_linha({'qtd_notas': 0}), 'Sem NF')
 
 
 class ValorCelulaExcelTests(SimpleTestCase):
