@@ -957,6 +957,8 @@ def _preparar_apelidos_solicitante_periodo_ou_vazio(
     raws,
     frequencias=None,
     request=None,
+    *,
+    engolir_erros=False,
 ):
     """Não quebra relatório/export se apelidos falharem (migração, concorrência, etc.)."""
     try:
@@ -964,7 +966,7 @@ def _preparar_apelidos_solicitante_periodo_ou_vazio(
     except Exception as exc:
         from django.db import DatabaseError
 
-        if not isinstance(exc, DatabaseError):
+        if not engolir_erros and not isinstance(exc, DatabaseError):
             raise
         logger.warning('Apelidos solicitante indisponíveis (coleta/export): %s', exc)
         if request is not None:
@@ -4110,7 +4112,7 @@ def _excel_discriminacao_linha(linha):
     return ' | '.join(partes) if partes else f'{qtd} notas'
 
 
-def _coletar_grid_linhas_exames_solicitante(request):
+def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
     """Lista detalhada de lançamentos com os filtros da tela Exames por Solicitante."""
     empresa_id = request.session.get('empresa_id')
     if empresa_id:
@@ -4144,14 +4146,21 @@ def _coletar_grid_linhas_exames_solicitante(request):
         empresa_id,
         freq_solicitante.keys(),
         freq_solicitante,
+        engolir_erros=para_excel,
     )
-    mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
-        freq_solicitante.keys(),
-        freq_solicitante,
-        empresa_id=empresa_id,
-        grafia_para_apelido=grafia_para_apelido,
-        apelido_info=apelido_info,
-    )
+    try:
+        mapa_solicitante, grupos_solicitante = _construir_grupos_solicitante(
+            freq_solicitante.keys(),
+            freq_solicitante,
+            empresa_id=empresa_id,
+            grafia_para_apelido=grafia_para_apelido,
+            apelido_info=apelido_info,
+        )
+    except Exception:
+        logger.exception('construir_grupos_solicitante falhou (excel=%s)', para_excel)
+        if not para_excel:
+            raise
+        mapa_solicitante, grupos_solicitante = {}, {}
 
     qs = _filtrar_por_status_agendamento(qs_periodo, status_agendamento_sel)
     qs = _filtrar_por_convenios(qs, convenios_sel)
@@ -4165,31 +4174,37 @@ def _coletar_grid_linhas_exames_solicitante(request):
 
     from django.db.models import prefetch_related_objects
 
-    from faturamento_medico.services.vincular_nota_solicitante import (
-        carregar_notas_por_data,
-        notas_linha_para_json,
-        resolver_notas_linha,
-    )
+    if para_excel:
+        vincular_nf_completo = False
+        notas_por_data = {}
+        importar_resolver_nf = False
+    else:
+        from faturamento_medico.services.vincular_nota_solicitante import (
+            carregar_notas_por_data,
+            notas_linha_para_json,
+            resolver_notas_linha,
+        )
 
-    try:
-        qtd_faturamentos = qs.count()
-    except Exception:
-        qtd_faturamentos = None
-    vincular_nf_completo = (
-        qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
-    )
-    notas_por_data = {}
-    if vincular_nf_completo:
+        importar_resolver_nf = True
         try:
-            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+            qtd_faturamentos = qs.count()
         except Exception:
-            logger.exception(
-                'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
-                empresa_id,
-                di,
-                df,
-            )
-            notas_por_data = {}
+            qtd_faturamentos = None
+        vincular_nf_completo = (
+            qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
+        )
+        notas_por_data = {}
+        if vincular_nf_completo:
+            try:
+                notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+            except Exception:
+                logger.exception(
+                    'carregar_notas_por_data falhou empresa=%s periodo=%s..%s (export)',
+                    empresa_id,
+                    di,
+                    df,
+                )
+                notas_por_data = {}
 
     def _processar_faturamentos_export(faturamentos: list):
         for fat in faturamentos:
@@ -4219,7 +4234,7 @@ def _coletar_grid_linhas_exames_solicitante(request):
                     _fat, item, ids_internos=ids_lotes_int
                 )
                 status_ag_label, status_ag_css = _badge_status_agendamento(_fat.status_agendamento)
-                if vincular_nf_completo and notas_por_data:
+                if importar_resolver_nf and vincular_nf_completo and notas_por_data:
                     try:
                         notas_vinculadas = resolver_notas_linha(
                             notas_por_data,
@@ -4256,8 +4271,12 @@ def _coletar_grid_linhas_exames_solicitante(request):
                     'convenio': _fat.convenio or '-',
                     'notas_vinculadas': notas_vinculadas,
                     'qtd_notas': len(notas_vinculadas),
-                    'notas_json': notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '',
-                    'nf_export_simplificado': not vincular_nf_completo,
+                    'notas_json': (
+                        ''
+                        if para_excel
+                        else (notas_linha_para_json(notas_vinculadas) if len(notas_vinculadas) > 1 else '')
+                    ),
+                    'nf_export_simplificado': para_excel or not vincular_nf_completo,
                 }
                 linha['valor_desconto_efetivo'] = _valor_desconto_linha(linha)
                 linha['valor_desconto_fmt'] = _moeda_br(linha['valor_desconto_efetivo'])
@@ -4295,12 +4314,17 @@ def _coletar_grid_linhas_exames_solicitante(request):
 
     grid_linhas.sort(key=lambda linha: (
         -totais_solicitante.get(linha['solicitante'], 0),
-        -(linha['data'].toordinal() if linha['data'] else 0),
-        linha['paciente'].lower(),
+        -(linha['data'].toordinal() if linha.get('data') else 0),
+        (linha.get('paciente') or '').lower(),
     ))
 
     aviso_nf = ''
-    if not vincular_nf_completo and grid_linhas:
+    if para_excel and grid_linhas:
+        aviso_nf = (
+            'Exportação: NF conforme número cadastrado no RIS. '
+            'Na tela do relatório o vínculo com NFS-e permanece completo.'
+        )
+    elif not vincular_nf_completo and grid_linhas:
         aviso_nf = (
             'Exportação com vínculo NF simplificado (somente número no RIS) '
             'para concluir em tempo hábil. Use filtro de solicitante/médico para NF completa.'
@@ -4381,20 +4405,28 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
         desconto = linha.get('valor_desconto_efetivo')
         if desconto is None:
             desconto = _valor_desconto_linha(linha)
+        try:
+            valor_num = float(linha.get('valor') or 0)
+        except (TypeError, ValueError):
+            valor_num = 0.0
+        try:
+            desconto_num = float(desconto or 0)
+        except (TypeError, ValueError):
+            desconto_num = 0.0
         valores = [
-            linha['data_fmt'],
-            linha['paciente'],
-            linha['procedimento'],
-            linha['modalidade'],
-            linha['status_agendamento'],
-            linha['status'],
-            float(linha['valor'] or 0),
-            float(desconto or 0),
+            linha.get('data_fmt') or '-',
+            linha.get('paciente') or '-',
+            linha.get('procedimento') or '-',
+            linha.get('modalidade') or '-',
+            linha.get('status_agendamento') or '-',
+            linha.get('status') or '-',
+            valor_num,
+            desconto_num,
             _excel_texto_nf_linha(linha),
             _excel_discriminacao_linha(linha),
-            linha['solicitante'],
-            linha['medico'],
-            linha['convenio'],
+            linha.get('solicitante') or '-',
+            linha.get('medico') or '-',
+            linha.get('convenio') or '-',
         ]
         for col_idx, valor in enumerate(valores, start=1):
             if isinstance(valor, str):
@@ -4445,14 +4477,40 @@ def _montar_workbook_lancamentos_solicitante(empresa, coleta):
     return wb
 
 
-@login_required
 def exportar_lancamentos_solicitante_excel(request):
     """Exporta a tabela de lançamentos (lista de exames) para Excel."""
+    try:
+        return _exportar_lancamentos_solicitante_excel_impl(request)
+    except Exception:
+        logger.exception(
+            'exportar_lancamentos_solicitante_excel FATAL empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        return HttpResponse(
+            'Não foi possível gerar o Excel. Reduza o período, aplique filtros '
+            '(solicitante, médico, convênio) e tente novamente. '
+            'Se persistir, verifique os logs do servidor.',
+            status=500,
+            content_type='text/plain; charset=utf-8',
+        )
+
+
+def _exportar_lancamentos_solicitante_excel_impl(request):
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+
+        return redirect_to_login(request.get_full_path())
+
     if not request.session.get('empresa_id'):
-        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+        return HttpResponse(
+            'Sessão expirada. Faça login novamente.',
+            status=403,
+            content_type='text/plain; charset=utf-8',
+        )
 
     try:
-        coleta = _coletar_grid_linhas_exames_solicitante(request)
+        coleta = _coletar_grid_linhas_exames_solicitante(request, para_excel=True)
     except LancamentosExportLimiteExcedido as exc:
         return HttpResponse(
             (
@@ -4460,6 +4518,7 @@ def exportar_lancamentos_solicitante_excel(request):
                 'Filtre solicitante, médico ou convênio, ou reduza as datas.'
             ).replace(',', '.'),
             status=400,
+            content_type='text/plain; charset=utf-8',
         )
     except Exception:
         logger.exception(
@@ -4470,10 +4529,15 @@ def exportar_lancamentos_solicitante_excel(request):
             'Não foi possível montar a lista para o Excel. '
             'Reduza o período ou aplique filtros (solicitante, médico, convênio) e tente de novo.',
             status=500,
+            content_type='text/plain; charset=utf-8',
         )
 
     if not coleta.get('empresa_id'):
-        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+        return HttpResponse(
+            'Sessão expirada. Faça login novamente.',
+            status=403,
+            content_type='text/plain; charset=utf-8',
+        )
 
     max_linhas_excel = 25000
     qtd_linhas = len(coleta.get('grid_linhas') or [])
@@ -4482,6 +4546,7 @@ def exportar_lancamentos_solicitante_excel(request):
             f'Há {qtd_linhas:,} lançamento(s) no período — limite do Excel: {max_linhas_excel:,}. '
             'Filtre solicitante/médico/convênio ou reduza as datas.'.replace(',', '.'),
             status=400,
+            content_type='text/plain; charset=utf-8',
         )
 
     try:
@@ -4504,6 +4569,7 @@ def exportar_lancamentos_solicitante_excel(request):
             'Não foi possível gerar o arquivo Excel. '
             'Se o relatório na tela carrega, tente de novo; caso contrário, reduza o período.',
             status=500,
+            content_type='text/plain; charset=utf-8',
         )
 
     di = coleta['di'].strftime('%Y%m%d')
