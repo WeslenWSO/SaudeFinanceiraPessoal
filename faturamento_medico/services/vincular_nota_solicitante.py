@@ -408,6 +408,43 @@ def carregar_notas_por_data(
     return por_data
 
 
+def preparar_indice_vinculo_export(
+    notas_por_data: dict[date, list[NotaFiscalServico]],
+) -> list[tuple[date, NotaFiscalServico, str, str]]:
+    """Pré-calcula paciente/cliente de cada NF — acelera exportação em massa."""
+    indice: list[tuple[date, NotaFiscalServico, str, str]] = []
+    for dia, notas in notas_por_data.items():
+        for nota in notas:
+            paciente = _nome_paciente_nota(nota)
+            cliente = (nota.cliente or '').strip()
+            indice.append((dia, nota, paciente, cliente))
+    return indice
+
+
+def buscar_notas_paciente_indice(
+    indice: list[tuple[date, NotaFiscalServico, str, str]],
+    nome_paciente: str,
+    data_exame: date | None,
+    janela_antes: int = JANELA_DIAS_ANTES_EXAME,
+    janela_apos: int = JANELA_DIAS_APOS_EXAME,
+) -> list[NotaFiscalServico]:
+    if not data_exame or not (nome_paciente or '').strip() or nome_paciente == '-':
+        return []
+    min_d = data_exame - timedelta(days=janela_antes)
+    max_d = data_exame + timedelta(days=janela_apos)
+    matches: list[NotaFiscalServico] = []
+    for dia, nota, paciente_nota, cliente in indice:
+        if dia < min_d or dia > max_d:
+            continue
+        if cliente and _similaridade(nome_paciente, cliente) >= SIMILARIDADE_MIN_PACIENTE:
+            matches.append(nota)
+            continue
+        if paciente_nota and _similaridade(nome_paciente, paciente_nota) >= SIMILARIDADE_MIN_PACIENTE:
+            matches.append(nota)
+    matches.sort(key=lambda n: (abs((n.data_emissao - data_exame).days), n.numero_nota or ''))
+    return matches
+
+
 def buscar_notas_paciente(
     notas_por_data: dict[date, list[NotaFiscalServico]],
     nome_paciente: str,
@@ -583,6 +620,7 @@ def resolver_notas_linha(
     *,
     serializar_fn=None,
     cache_manuais: dict[str, NotaFiscalServico] | None = None,
+    indice_export: list[tuple[date, NotaFiscalServico, str, str]] | None = None,
 ) -> list[dict]:
     """Vínculo manual salvo tem prioridade; senão busca automática por paciente na NF."""
     ser = serializar_fn or serializar_nota_linha
@@ -592,7 +630,10 @@ def resolver_notas_linha(
         notas_manuais = buscar_notas_manuais_salvas(empresa_id, numero_nota_salvo)
     if notas_manuais:
         return [ser(n, manual=True) for n in notas_manuais]
-    notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
+    if indice_export is not None:
+        notas = buscar_notas_paciente_indice(indice_export, nome_paciente, data_exame)
+    else:
+        notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
     if notas:
         return [ser(n, manual=False) for n in notas]
     return []

@@ -3983,11 +3983,35 @@ def imprimir_resumo_mes_solicitante(request):
     return render(request, 'faturamento_medico/imprimir_resumo_mes_solicitante.html', context)
 
 
-@login_required
 def exportar_resumo_mes_solicitante_excel(request):
     """Exporta o resumo mês/solicitante (pivot) para Excel — uma aba por solicitante."""
+    try:
+        return _exportar_resumo_mes_solicitante_excel_impl(request)
+    except Exception:
+        logger.exception(
+            'exportar_resumo_mes_solicitante_excel FATAL empresa=%s',
+            request.session.get('empresa_id'),
+        )
+        return HttpResponse(
+            'Não foi possível gerar o Excel do resumo. Reduza o período ou aplique filtros.',
+            status=500,
+            content_type='text/plain; charset=utf-8',
+        )
+
+
+def _exportar_resumo_mes_solicitante_excel_impl(request):
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+
+        return redirect_to_login(request.get_full_path())
+
     if not request.session.get('empresa_id'):
-        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+        return HttpResponse(
+            'Sessão expirada. Faça login novamente.',
+            status=403,
+            content_type='text/plain; charset=utf-8',
+        )
 
     try:
         context, coleta = _montar_contexto_resumo_mes_solicitante(request)
@@ -3999,9 +4023,14 @@ def exportar_resumo_mes_solicitante_excel(request):
         return HttpResponse(
             'Não foi possível montar o resumo para Excel. Reduza o período ou aplique filtros.',
             status=500,
+            content_type='text/plain; charset=utf-8',
         )
     if context is None:
-        return HttpResponse('Sessão expirada. Faça login novamente.', status=403)
+        return HttpResponse(
+            'Sessão expirada. Faça login novamente.',
+            status=403,
+            content_type='text/plain; charset=utf-8',
+        )
 
     try:
         wb = _montar_workbook_resumo_mes_solicitante(context)
@@ -4016,6 +4045,7 @@ def exportar_resumo_mes_solicitante_excel(request):
         return HttpResponse(
             'Não foi possível gerar o arquivo Excel do resumo. Tente com um período menor.',
             status=500,
+            content_type='text/plain; charset=utf-8',
         )
 
     di = coleta['di'].strftime('%Y%m%d')
@@ -4179,6 +4209,7 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
         carregar_cache_notas_manuais_export,
         carregar_notas_por_data,
         notas_linha_para_json,
+        preparar_indice_vinculo_export,
         resolver_notas_linha,
         serializar_nota_linha_excel,
     )
@@ -4195,7 +4226,8 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
         )
 
     notas_por_data = {}
-    cache_notas_manuais_export = {}
+    cache_notas_manuais_export = None
+    indice_vinculo_export = None
     if vincular_nf_completo:
         try:
             notas_por_data = carregar_notas_por_data(empresa_id, di, df)
@@ -4210,10 +4242,16 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
             notas_por_data = {}
         if para_excel:
             try:
+                if notas_por_data:
+                    indice_vinculo_export = preparar_indice_vinculo_export(notas_por_data)
+            except Exception:
+                logger.exception('preparar_indice_vinculo_export falhou empresa=%s', empresa_id)
+                indice_vinculo_export = None
+            try:
                 cache_notas_manuais_export = carregar_cache_notas_manuais_export(empresa_id, qs)
             except Exception:
                 logger.exception('carregar_cache_notas_manuais_export falhou empresa=%s', empresa_id)
-                cache_notas_manuais_export = {}
+                cache_notas_manuais_export = None
 
     serializar_nf = serializar_nota_linha_excel if para_excel else None
 
@@ -4255,6 +4293,7 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                             _fat.nota_fiscal,
                             serializar_fn=serializar_nf,
                             cache_manuais=cache_notas_manuais_export if para_excel else None,
+                            indice_export=indice_vinculo_export if para_excel else None,
                         )
                     except Exception:
                         logger.exception(
