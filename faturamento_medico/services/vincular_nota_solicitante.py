@@ -306,6 +306,52 @@ def _rotulo_tomador_paciente_nota(nota: NotaFiscalServico) -> str:
     return cliente
 
 
+def _forma_pagamento_nota_leve(nota: NotaFiscalServico) -> str:
+    """Cadastro NF + discriminação — sem consultar Conta a Receber (export em massa)."""
+    if nota.forma_pagamento_id and nota.forma_pagamento:
+        desc = (nota.forma_pagamento.descricao or '').strip()
+        if desc:
+            return desc
+    return (nota.extract_payment_method_from_description() or '').strip() or '-'
+
+
+def forma_pagamento_exibicao_nota_leve(nota: NotaFiscalServico) -> str:
+    """Forma(s) na discriminação ou cadastro — sem consultar títulos financeiros."""
+    detalhes = pagamentos_detalhados_nota(nota)
+    if detalhes:
+        partes = [f"{rotulo} R$ {_valor_fmt_decimal(v)}" for rotulo, v in detalhes]
+        return ' + '.join(partes)
+    forma = _forma_pagamento_nota_leve(nota)
+    return forma or '-'
+
+
+def serializar_nota_linha_excel(nota: NotaFiscalServico, manual: bool = False) -> dict:
+    """Mesmos dados úteis da grade, sem URL e sem buscas extras por linha."""
+    forma = _forma_pagamento_nota_leve(nota)
+    forma_exibicao = forma_pagamento_exibicao_nota_leve(nota)
+    numero = (nota.numero_nota or '').strip() or f'#{nota.pk}'
+    paciente_nota = _nome_paciente_nota(nota)
+    valor_bruto = _decimal_para_json(nota.valor_bruto)
+    valor_liquido = _decimal_para_json(nota.valor_liquido)
+    disc = _discriminacao_texto(nota.discriminacao).strip()
+    if len(disc) > 12000:
+        disc = disc[:12000] + '…'
+    return {
+        'pk': nota.pk,
+        'numero': numero,
+        'forma_pagamento': forma or '-',
+        'forma_pagamento_exibicao': forma_exibicao,
+        'cliente': (nota.cliente or '').strip() or '-',
+        'paciente_nota': paciente_nota or (nota.cliente or '').strip() or '-',
+        'valor_fmt': _valor_fmt_nota(nota),
+        'valor_bruto': valor_bruto,
+        'valor_liquido': valor_liquido,
+        'discriminacao': disc,
+        'data_emissao_fmt': nota.data_emissao.strftime('%d/%m/%Y') if nota.data_emissao else '-',
+        'manual': manual,
+    }
+
+
 def serializar_nota_linha(nota: NotaFiscalServico, manual: bool = False) -> dict:
     forma = _forma_pagamento_nota(nota)
     pagamentos = pagamentos_detalhados_nota(nota)
@@ -440,6 +486,49 @@ def parse_numeros_notas_salvas(raw: str | None) -> list[str]:
     return out
 
 
+def notas_manuais_do_cache(
+    cache: dict[str, NotaFiscalServico] | None,
+    numeros_raw: str | None,
+) -> list[NotaFiscalServico]:
+    if not cache:
+        return []
+    numeros = parse_numeros_notas_salvas(numeros_raw)
+    vistos_pk: set[int] = set()
+    out: list[NotaFiscalServico] = []
+    for num in numeros:
+        nota = cache.get(num)
+        if nota and nota.pk not in vistos_pk:
+            vistos_pk.add(nota.pk)
+            out.append(nota)
+    return out
+
+
+def carregar_cache_notas_manuais_export(empresa_id: int | None, qs) -> dict[str, NotaFiscalServico]:
+    """Uma consulta para NFs citadas no campo nota_fiscal dos faturamentos (export Excel)."""
+    if not empresa_id:
+        return {}
+    numeros: set[str] = set()
+    for raw in qs.exclude(nota_fiscal__isnull=True).exclude(nota_fiscal='').values_list(
+        'nota_fiscal',
+        flat=True,
+    ).iterator(chunk_size=500):
+        numeros.update(parse_numeros_notas_salvas(raw))
+    if not numeros:
+        return {}
+    limite = 4000
+    lista = list(numeros)[:limite]
+    cache: dict[str, NotaFiscalServico] = {}
+    for nota in NotaFiscalServico.objects.filter(
+        empresa_id=empresa_id,
+        numero_nota__in=lista,
+        data_cancelamento__isnull=True,
+    ).select_related('forma_pagamento').iterator(chunk_size=500):
+        num = (nota.numero_nota or '').strip()
+        if num and num not in cache:
+            cache[num] = nota
+    return cache
+
+
 def buscar_notas_manuais_salvas(
     empresa_id: int | None,
     numeros_raw: str | None,
@@ -491,14 +580,21 @@ def resolver_notas_linha(
     nome_paciente: str,
     data_exame: date | None,
     numero_nota_salvo: str | None = None,
+    *,
+    serializar_fn=None,
+    cache_manuais: dict[str, NotaFiscalServico] | None = None,
 ) -> list[dict]:
     """Vínculo manual salvo tem prioridade; senão busca automática por paciente na NF."""
-    notas_manuais = buscar_notas_manuais_salvas(empresa_id, numero_nota_salvo)
+    ser = serializar_fn or serializar_nota_linha
+    if cache_manuais is not None:
+        notas_manuais = notas_manuais_do_cache(cache_manuais, numero_nota_salvo)
+    else:
+        notas_manuais = buscar_notas_manuais_salvas(empresa_id, numero_nota_salvo)
     if notas_manuais:
-        return [serializar_nota_linha(n, manual=True) for n in notas_manuais]
+        return [ser(n, manual=True) for n in notas_manuais]
     notas = buscar_notas_paciente(notas_por_data, nome_paciente, data_exame)
     if notas:
-        return [serializar_nota_linha(n, manual=False) for n in notas]
+        return [ser(n, manual=False) for n in notas]
     return []
 
 

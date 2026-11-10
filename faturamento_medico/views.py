@@ -4082,12 +4082,9 @@ def _excel_texto_nf_linha(linha):
         partes = [f"NF {nota.get('numero', '-')}"]
         if nota.get('valor_fmt'):
             partes.append(f"R$ {nota['valor_fmt']}")
-        forma = (
-            nota.get('forma_pagamento_exibicao')
-            or nota.get('forma_pagamento')
-        )
-        if forma and forma != '-':
-            partes.append(str(forma))
+        forma = nota.get('forma_pagamento_exibicao') or nota.get('forma_pagamento')
+        if forma and str(forma).strip() and str(forma).strip() != '-':
+            partes.append(str(forma).strip())
         if nota.get('manual'):
             partes.append('Manual')
         return ' · '.join(partes)
@@ -4179,19 +4176,26 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
     from django.db.models import prefetch_related_objects
 
     from faturamento_medico.services.vincular_nota_solicitante import (
+        carregar_cache_notas_manuais_export,
         carregar_notas_por_data,
         notas_linha_para_json,
         resolver_notas_linha,
+        serializar_nota_linha_excel,
     )
 
-    try:
-        qtd_faturamentos = qs.count()
-    except Exception:
-        qtd_faturamentos = None
-    vincular_nf_completo = (
-        qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
-    )
+    if para_excel:
+        vincular_nf_completo = True
+    else:
+        try:
+            qtd_faturamentos = qs.count()
+        except Exception:
+            qtd_faturamentos = None
+        vincular_nf_completo = (
+            qtd_faturamentos is None or qtd_faturamentos <= _LIMITE_FATURAMENTOS_VINCULO_NF_EXPORT
+        )
+
     notas_por_data = {}
+    cache_notas_manuais_export = {}
     if vincular_nf_completo:
         try:
             notas_por_data = carregar_notas_por_data(empresa_id, di, df)
@@ -4204,6 +4208,14 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                 para_excel,
             )
             notas_por_data = {}
+        if para_excel:
+            try:
+                cache_notas_manuais_export = carregar_cache_notas_manuais_export(empresa_id, qs)
+            except Exception:
+                logger.exception('carregar_cache_notas_manuais_export falhou empresa=%s', empresa_id)
+                cache_notas_manuais_export = {}
+
+    serializar_nf = serializar_nota_linha_excel if para_excel else None
 
     def _processar_faturamentos_export(faturamentos: list):
         for fat in faturamentos:
@@ -4241,6 +4253,8 @@ def _coletar_grid_linhas_exames_solicitante(request, *, para_excel=False):
                             _fat.nome or '',
                             _fat.data,
                             _fat.nota_fiscal,
+                            serializar_fn=serializar_nf,
+                            cache_manuais=cache_notas_manuais_export if para_excel else None,
                         )
                     except Exception:
                         logger.exception(
