@@ -3,6 +3,61 @@ from servicos_medicos.replicar_tabela_preco import MODO_COMPLETO, MODO_SOMENTE_F
 
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 
+XLSX_MIME = (
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+)
+
+
+class PlanilhaExcelImportForm(forms.Form):
+    arquivo = forms.FileField(
+        label='Planilha Excel (.xlsx)',
+        help_text='Use o modelo oficial (primeira linha com os títulos das colunas).',
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.xlsx'}),
+    )
+    atualizar_existentes = forms.BooleanField(
+        label='Atualizar registros já existentes',
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def clean_arquivo(self):
+        f = self.cleaned_data['arquivo']
+        name = (f.name or '').lower()
+        if not name.endswith('.xlsx'):
+            raise forms.ValidationError('Envie um arquivo .xlsx (Excel).')
+        if f.size and f.size > 8 * 1024 * 1024:
+            raise forms.ValidationError('Arquivo muito grande (máximo 8 MB).')
+        return f
+
+
+class TabelaPrecoImportForm(PlanilhaExcelImportForm):
+    cabecalho = forms.ModelChoiceField(
+        queryset=Cabecalho.objects.none(),
+        required=False,
+        label='Cabeçalho (opcional)',
+        help_text=(
+            'Se escolher um cabeçalho, a planilha só precisa de código do serviço e preços '
+            '(convênio e nome da tabela vêm do cabeçalho selecionado).'
+        ),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, empresa_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if empresa_id is not None:
+            try:
+                empresa_id = int(empresa_id)
+            except (TypeError, ValueError):
+                empresa_id = None
+        if empresa_id:
+            self.fields['cabecalho'].queryset = (
+                Cabecalho.objects.filter(empresa_id=empresa_id)
+                .select_related('convenio')
+                .order_by('convenio__nome', 'nome_tabela')
+            )
+
 class ConvenioForm(forms.ModelForm):
     class Meta:
         model = Convenio

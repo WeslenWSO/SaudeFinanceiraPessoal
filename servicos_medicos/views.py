@@ -1,18 +1,33 @@
 import json
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils import timezone
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.views import View
 from django.views.generic.list import ListView
 from django.views.generic.edit import UpdateView, CreateView
 from django.contrib import messages
 from django.db.models import Q
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
-from .forms import ConvenioForm, ReplicarTabelaPrecoForm, ServicosMedicosForm, TabelaPrecoForm
+from .forms import (
+    ConvenioForm,
+    PlanilhaExcelImportForm,
+    ReplicarTabelaPrecoForm,
+    ServicosMedicosForm,
+    TabelaPrecoForm,
+    TabelaPrecoImportForm,
+)
+from .import_planilha import (
+    importar_servicos_medicos,
+    importar_tabela_preco,
+    modelo_servicos_medicos_xlsx,
+    modelo_tabela_preco_xlsx,
+    parse_planilha_servicos,
+    parse_planilha_tabela_preco,
+)
 from .permissoes import usuario_pode_editar_tabela_preco_grid
 from .replicar_tabela_preco import (
     MODO_COMPLETO,
@@ -593,3 +608,131 @@ class ReplicarTabelaPrecoView(View):
                 "descricao": "Replicar tabela de preços",
             },
         )
+
+
+def _xlsx_response(data: bytes, filename: str) -> HttpResponse:
+    response = HttpResponse(
+        data,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def servicos_modelo_excel(request):
+    return _xlsx_response(modelo_servicos_medicos_xlsx(), 'modelo_servicos_medicos.xlsx')
+
+
+@login_required
+def servicos_importar_excel(request):
+    if request.method == 'POST':
+        form = PlanilhaExcelImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            content = form.cleaned_data['arquivo'].read()
+            linhas, avisos = parse_planilha_servicos(content)
+            if not linhas:
+                for msg in avisos[:12]:
+                    messages.error(request, msg)
+            else:
+                stats = importar_servicos_medicos(
+                    linhas,
+                    atualizar_existentes=form.cleaned_data['atualizar_existentes'],
+                )
+                messages.success(
+                    request,
+                    (
+                        f'Importação concluída: {stats["criados"]} criado(s), '
+                        f'{stats["atualizados"]} atualizado(s), '
+                        f'{stats["ignorados"]} ignorado(s).'
+                    ),
+                )
+                for msg in avisos[:8]:
+                    messages.warning(request, msg)
+                return redirect('servicos_medicos:servicos_list')
+    else:
+        form = PlanilhaExcelImportForm()
+    return render(
+        request,
+        'servicos_medicos/servicos_import.html',
+        {'descricao': 'Importar Serviços Médicos — Excel', 'form': form},
+    )
+
+
+@login_required
+def tabela_modelo_excel(request):
+    fixo = request.GET.get('cabecalho_id')
+    cabecalho_fixo = bool(fixo)
+    nome = 'modelo_tabela_preco.xlsx'
+    if cabecalho_fixo:
+        nome = 'modelo_tabela_preco_cabecalho.xlsx'
+    return _xlsx_response(modelo_tabela_preco_xlsx(cabecalho_fixo=cabecalho_fixo), nome)
+
+
+@login_required
+def tabela_importar_excel(request):
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa antes de importar.')
+        return redirect('empresa:lista')
+
+    if request.method == 'POST':
+        form = TabelaPrecoImportForm(request.POST, request.FILES, empresa_id=empresa_id)
+        if form.is_valid():
+            cab = form.cleaned_data.get('cabecalho')
+            cabecalho_fixo = cab is not None
+            content = form.cleaned_data['arquivo'].read()
+            linhas, avisos_parse = parse_planilha_tabela_preco(
+                content,
+                cabecalho_fixo=cabecalho_fixo,
+            )
+            if not linhas:
+                for msg in avisos_parse[:12]:
+                    messages.error(request, msg)
+            else:
+                stats, avisos = importar_tabela_preco(
+                    int(empresa_id),
+                    linhas,
+                    cabecalho_fixo=cab,
+                    atualizar_existentes=form.cleaned_data['atualizar_existentes'],
+                )
+                messages.success(
+                    request,
+                    (
+                        f'Importação concluída: {stats["criados"]} criado(s), '
+                        f'{stats["atualizados"]} atualizado(s), '
+                        f'{stats["ignorados"]} ignorado(s), '
+                        f'{stats["erros"]} com erro.'
+                    ),
+                )
+                for msg in avisos_parse[:5] + avisos[:10]:
+                    messages.warning(request, msg)
+                url = reverse('servicos_medicos:tabela_list')
+                if cab:
+                    url = f'{url}?cabecalho_id={cab.pk}'
+                return redirect(url)
+    else:
+        initial = {}
+        cab_raw = request.GET.get('cabecalho_id')
+        if cab_raw:
+            try:
+                initial['cabecalho'] = int(cab_raw)
+            except (TypeError, ValueError):
+                pass
+        form = TabelaPrecoImportForm(empresa_id=empresa_id, initial=initial)
+
+    cab_id = None
+    if form.initial.get('cabecalho'):
+        cab_id = form.initial['cabecalho']
+    elif request.GET.get('cabecalho_id'):
+        cab_id = request.GET.get('cabecalho_id')
+
+    return render(
+        request,
+        'servicos_medicos/tabela_import.html',
+        {
+            'descricao': 'Importar Tabela de Preço — Excel',
+            'form': form,
+            'cabecalho_id': cab_id,
+        },
+    )

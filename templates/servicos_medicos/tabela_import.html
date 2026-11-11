@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block nav_ %}{% include 'parcial/_nav.html' %}{% endblock %}
+{% block conteudo %}
+{% include 'servicos_medicos/_estilo_lista_tabela.html' %}
+<div class="container-fluid px-4 py-3" style="max-width: 760px;">
+  <h1 class="h4 mb-3">{{ descricao }}</h1>
+  {% include 'parcial/_messages.html' %}
+
+  <p class="text-muted small mb-3">
+    Baixe o modelo conforme o preenchimento:
+    <a href="{% url 'servicos_medicos:tabela_modelo_excel' %}" class="btn btn-outline-success btn-sm">
+      <i class="fas fa-file-excel"></i> Modelo completo
+    </a>
+    (com Convênio e Nome da tabela) ou
+    <a href="{% url 'servicos_medicos:tabela_modelo_excel' %}?cabecalho_id=1" class="btn btn-outline-success btn-sm">
+      Modelo só preços
+    </a>
+    (apenas código e valores — escolha o cabeçalho abaixo).
+    Cada linha precisa de um <strong>código de serviço já cadastrado</strong> em Serviços Médicos.
+  </p>
+
+  <form method="post" enctype="multipart/form-data" class="card shadow-sm p-4 card-servicos-medicos-lista">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label" for="id_cabecalho">{{ form.cabecalho.label }}</label>
+      {{ form.cabecalho }}
+      {% if form.cabecalho.help_text %}<div class="form-text">{{ form.cabecalho.help_text }}</div>{% endif %}
+      {% if form.cabecalho.errors %}<div class="text-danger small">{{ form.cabecalho.errors }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="id_arquivo">{{ form.arquivo.label }}</label>
+      {{ form.arquivo }}
+      {% if form.arquivo.help_text %}<div class="form-text">{{ form.arquivo.help_text }}</div>{% endif %}
+      {% if form.arquivo.errors %}<div class="text-danger small">{{ form.arquivo.errors }}</div>{% endif %}
+    </div>
+    <div class="mb-4 form-check">
+      {{ form.atualizar_existentes }}
+      <label class="form-check-label" for="id_atualizar_existentes">{{ form.atualizar_existentes.label }}</label>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button type="submit" class="btn btn-success">Importar</button>
+      <a href="{% url 'servicos_medicos:tabela_list' %}{% if cabecalho_id %}?cabecalho_id={{ cabecalho_id }}{% endif %}" class="btn btn-outline-secondary">Voltar à lista</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

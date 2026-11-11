@@ -16,6 +16,12 @@
       <a href="{% url 'servicos_medicos:tabela_replicar' %}{% if cabecalho_selecionado %}?destino_id={{ cabecalho_selecionado }}{% endif %}" class="btn btn-outline-primary mb-3 ms-2">
         Replicar de outra tabela
       </a>
+      <a href="{% url 'servicos_medicos:tabela_modelo_excel' %}{% if cabecalho_selecionado %}?cabecalho_id={{ cabecalho_selecionado }}{% endif %}" class="btn btn-outline-success mb-3 ms-2">
+        <i class="fas fa-file-excel"></i> Modelo Excel
+      </a>
+      <a href="{% url 'servicos_medicos:tabela_importar_excel' %}{% if cabecalho_selecionado %}?cabecalho_id={{ cabecalho_selecionado }}{% endif %}" class="btn btn-outline-primary mb-3 ms-1">
+        <i class="fas fa-file-upload"></i> Importar Excel
+      </a>
       {% if messages %}
       {% include 'parcial/_messages.html' %}
    {% endif %}

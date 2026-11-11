@@ -16,12 +16,17 @@ urlpatterns = [
     path("servicos/", ServicosMedicosList.as_view(), name='servicos_list'),
     path("servicos/create/", ServicosMedicosCreate.as_view(), name='servicos_create'),
     path("servicos/<pk>/update/", ServicosMedicosUpdate.as_view(), name='servicos_update'),
+    path("servicos/modelo-excel/", servicos_modelo_excel, name='servicos_modelo_excel'),
+    path("servicos/importar/", servicos_importar_excel, name='servicos_importar_excel'),
+
 
     # TabelaPreco
     path("tabela/", TabelaPrecoList.as_view(), name='tabela_list'),
     path("tabela/grid/atualizar/", TabelaPrecoGridAtualizarView.as_view(), name='tabela_grid_atualizar'),
     path("tabela/create/", TabelaPrecoCreate.as_view(), name='tabela_create'),
     path("tabela/replicar/", ReplicarTabelaPrecoView.as_view(), name='tabela_replicar'),
+    path("tabela/modelo-excel/", tabela_modelo_excel, name='tabela_modelo_excel'),
+    path("tabela/importar/", tabela_importar_excel, name='tabela_importar_excel'),
     path("tabela/<int:pk>/update/", TabelaPrecoUpdate.as_view(), name='tabela_update'),
 
     # Cabecalho
