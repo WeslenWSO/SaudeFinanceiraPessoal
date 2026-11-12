@@ -212,6 +212,13 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
     else:
         exames = []
 
+    if 'modalidade' in g:
+        modalidades = _parse_modalidades_filtro(request)
+    elif use_session_fallback:
+        modalidades = _modalidades_from_sess(sess.get('modalidade'))
+    else:
+        modalidades = []
+
     hoje = date.today()
     data_inicio = pick('data_inicio')
     data_fim = pick('data_fim')
@@ -239,6 +246,7 @@ def _filtros_listagem_faturamento(request, use_session_fallback=False):
         'convenios': convenios,
         'codigo_relatorio': pick('codigo_relatorio'),
         'exames': exames,
+        'modalidades': modalidades,
     }
 
 
@@ -256,6 +264,8 @@ def _query_export_faturamento(filtros):
         params.append(('status_conferencia', st))
     for conv in filtros.get('convenios') or []:
         params.append(('convenio', conv))
+    for mod in filtros.get('modalidades') or []:
+        params.append(('modalidade', mod))
     return urlencode(params)
 
 
@@ -306,6 +316,8 @@ def _tem_filtros_na_query(request):
             return True
     if 'convenio' in request.GET:
         return True
+    if 'modalidade' in request.GET:
+        return True
     return False
 
 
@@ -331,6 +343,19 @@ def _convenios_from_sess(raw) -> list[str]:
     if isinstance(raw, (list, tuple)):
         return [str(c).strip() for c in raw if c and str(c).strip()]
     return []
+
+
+def _modalidades_from_sess(raw) -> list[str]:
+    if not raw:
+        return []
+    codigos_validos = _codigos_modalidade_filtro_validos()
+    itens = raw if isinstance(raw, (list, tuple)) else [raw]
+    out: list[str] = []
+    for item in itens:
+        cod = _normalizar_codigo_modalidade(str(item).strip())
+        if cod in codigos_validos and cod not in out:
+            out.append(cod)
+    return out
 
 
 def _sanear_sessao_filtros_faturamento(request) -> None:
@@ -362,6 +387,7 @@ def _filtros_dict_from_session(sess):
         'codigo_relatorio': sess.get('codigo_relatorio') or '',
         'convenios': _convenios_from_sess(sess.get('convenio')),
         'exames': [],
+        'modalidades': _modalidades_from_sess(sess.get('modalidade')),
     }
 
 
@@ -385,6 +411,7 @@ def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
         'data_fim': filtros.get('data_fim') or '',
         'convenio': filtros.get('convenios') or [],
         'codigo_relatorio': filtros.get('codigo_relatorio') or '',
+        'modalidade': filtros.get('modalidades') or [],
         'per_page': str(per_page),
     }
     request.session.modified = True
@@ -1302,7 +1329,15 @@ def _parse_modalidades_filtro(request) -> list[str]:
 def _modalidade_permitida(codigo_normalizado: str, modalidades_sel: list[str]) -> bool:
     if not modalidades_sel:
         return True
-    return codigo_normalizado in modalidades_sel
+    cod = _normalizar_codigo_modalidade(codigo_normalizado)
+    principais = {c for c, _ in MODALIDADES_SOLICITANTE}
+    sel_principais = [m for m in modalidades_sel if m != 'OUTROS']
+    want_outros = 'OUTROS' in modalidades_sel
+    if cod in sel_principais:
+        return True
+    if want_outros and (cod == 'OUTROS' or cod not in principais):
+        return True
+    return False
 
 
 def _codigo_modalidade_faturamento_item(faturamento, item=None) -> str:
@@ -2662,6 +2697,7 @@ def listar_faturamentos(request):
     data_fim = filtros['data_fim']
     convenios = filtros['convenios']
     codigo_relatorio = filtros['codigo_relatorio']
+    modalidades_sel = filtros.get('modalidades') or []
 
     def _label_convenio_curto(nome, max_len=36):
         n = (nome or '').strip() or 'Não informado'
@@ -2794,6 +2830,9 @@ def listar_faturamentos(request):
             )
             if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
+            mod_linha = _modalidade_item(faturamento)
+            if not _modalidade_permitida(mod_linha, modalidades_sel):
+                continue
             grid_linhas.append({
                 'faturamento': faturamento,
                 'item': None,
@@ -2801,7 +2840,7 @@ def listar_faturamentos(request):
                 'medico_solicitante': (faturamento.medico_solicitante or '').strip() or '-',
                 'nome_associado': faturamento.nome_associado or faturamento.nome or '-',
                 'procedimento': faturamento.servico or '-',
-                'modalidade': _modalidade_item(faturamento),
+                'modalidade': mod_linha,
                 'com_contraste': 'contraste' in (faturamento.servico or '').lower(),
                 'valor': faturamento.total or 0,
                 'valor_fmt': _moeda_br(faturamento.total or 0),
@@ -2824,8 +2863,11 @@ def listar_faturamentos(request):
             )
             if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
-            itens_filtrados.append((item, status_label, status_css))
-        for idx, (item, status_label, status_css) in enumerate(itens_filtrados):
+            mod_item = _modalidade_item(faturamento, item)
+            if not _modalidade_permitida(mod_item, modalidades_sel):
+                continue
+            itens_filtrados.append((item, status_label, status_css, mod_item))
+        for idx, (item, status_label, status_css, mod_item) in enumerate(itens_filtrados):
             valor_item = item.total if item.total is not None else (item.valor or 0)
             valor_pago_item = _valor_pago_item_grid(item, valor_item)
             grid_linhas.append({
@@ -2835,7 +2877,7 @@ def listar_faturamentos(request):
                 'medico_solicitante': (faturamento.medico_solicitante or '').strip() or '-',
                 'nome_associado': faturamento.nome_associado or faturamento.nome or '-',
                 'procedimento': item.servico or '-',
-                'modalidade': _modalidade_item(faturamento, item),
+                'modalidade': mod_item,
                 'com_contraste': item.com_contraste,
                 'valor': valor_item,
                 'valor_fmt': _moeda_br(valor_item),
@@ -3047,8 +3089,10 @@ def listar_faturamentos(request):
             'data_fim': data_fim,
             'convenio': convenios,
             'codigo_relatorio': codigo_relatorio,
+            'modalidade': modalidades_sel,
             'per_page': str(per_page),
         },
+        'modalidades_opcoes': MODALIDADES_SOLICITANTE,
         'export_query_string': _query_export_faturamento(filtros),
         'relatorio_sedacao_query_string': _query_relatorio_sedacao(filtros),
         'listagem_query_string': _query_listagem_faturamento(filtros, per_page=per_page),
@@ -6247,6 +6291,7 @@ def exportar_excel(request):
     data_fim = filtros['data_fim']
     convenios = filtros['convenios']
     codigo_relatorio = filtros['codigo_relatorio']
+    modalidades_sel = filtros.get('modalidades') or []
 
     # Cache preços para status de conferência
     precos_por_codigo = set()
@@ -6331,6 +6376,8 @@ def exportar_excel(request):
         filtros_excel.append("Lote: Sem lote")
     elif lote:
         filtros_excel.append(f"Lote: {lote}")
+    if modalidades_sel:
+        filtros_excel.append(f"Modalidade: {', '.join(modalidades_sel)}")
     ws.cell(row=5, column=1).value = (
         "Filtros: " + ("; ".join(filtros_excel) if filtros_excel else "nenhum")
     )
@@ -6415,6 +6462,9 @@ def exportar_excel(request):
             )
             if not _status_conferencia_linha_aceita(status_label, status_conferencia):
                 continue
+            mod_linha = _modalidade_faturamento_item(faturamento)
+            if not _modalidade_permitida(mod_linha, modalidades_sel):
+                continue
             itens = [None]
         else:
             itens_filtrados = []
@@ -6423,6 +6473,9 @@ def exportar_excel(request):
                     faturamento, item, ids_internos=ids_lotes_int
                 )
                 if not _status_conferencia_linha_aceita(status_label, status_conferencia):
+                    continue
+                mod_item = _modalidade_faturamento_item(faturamento, item)
+                if not _modalidade_permitida(mod_item, modalidades_sel):
                     continue
                 itens_filtrados.append(item)
             if not itens_filtrados:

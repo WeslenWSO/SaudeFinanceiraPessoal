@@ -104,6 +104,31 @@ class ServicosMedicosForm(forms.ModelForm):
         model = ServicosMedicos
         fields = ['codigo', 'servicos', 'porte_anestesico']
 
+    def clean_codigo(self):
+        codigo = (self.cleaned_data.get('codigo') or '').strip()
+        if not codigo:
+            raise forms.ValidationError('Informe o código do serviço.')
+        if len(codigo) > 20:
+            codigo = codigo[:20]
+        qs = ServicosMedicos.objects.filter(codigo=codigo)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                f'Já existe um serviço cadastrado com o código «{codigo}». '
+                'Abra a edição desse registro ou use outro código.',
+            )
+        return codigo
+
+
+class ServicosMedicosImportForm(PlanilhaExcelImportForm):
+    atualizar_existentes = forms.BooleanField(
+        label='Atualizar serviços que já existem (mesmo código)',
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
 class TabelaPrecoForm(forms.ModelForm):
     class Meta:
         model = TabelaPreco

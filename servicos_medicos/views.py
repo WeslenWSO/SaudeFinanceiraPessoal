@@ -14,9 +14,9 @@ from django.db.models import Q
 from .models import Convenio, ServicosMedicos, TabelaPreco, Cabecalho
 from .forms import (
     ConvenioForm,
-    PlanilhaExcelImportForm,
     ReplicarTabelaPrecoForm,
     ServicosMedicosForm,
+    ServicosMedicosImportForm,
     TabelaPrecoForm,
     TabelaPrecoImportForm,
 )
@@ -627,15 +627,15 @@ def servicos_modelo_excel(request):
 @login_required
 def servicos_importar_excel(request):
     if request.method == 'POST':
-        form = PlanilhaExcelImportForm(request.POST, request.FILES)
+        form = ServicosMedicosImportForm(request.POST, request.FILES)
         if form.is_valid():
             content = form.cleaned_data['arquivo'].read()
-            linhas, avisos = parse_planilha_servicos(content)
+            linhas, avisos_parse = parse_planilha_servicos(content)
             if not linhas:
-                for msg in avisos[:12]:
+                for msg in avisos_parse[:12]:
                     messages.error(request, msg)
             else:
-                stats = importar_servicos_medicos(
+                stats, avisos_imp = importar_servicos_medicos(
                     linhas,
                     atualizar_existentes=form.cleaned_data['atualizar_existentes'],
                 )
@@ -644,14 +644,15 @@ def servicos_importar_excel(request):
                     (
                         f'Importação concluída: {stats["criados"]} criado(s), '
                         f'{stats["atualizados"]} atualizado(s), '
-                        f'{stats["ignorados"]} ignorado(s).'
+                        f'{stats["rejeitados"]} já existente(s) (não cadastrados), '
+                        f'{stats["ignorados"]} sem alteração.'
                     ),
                 )
-                for msg in avisos[:8]:
+                for msg in avisos_parse[:5] + avisos_imp[:10]:
                     messages.warning(request, msg)
                 return redirect('servicos_medicos:servicos_list')
     else:
-        form = PlanilhaExcelImportForm()
+        form = ServicosMedicosImportForm()
     return render(
         request,
         'servicos_medicos/servicos_import.html',

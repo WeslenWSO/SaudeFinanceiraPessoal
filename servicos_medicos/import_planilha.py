@@ -189,10 +189,11 @@ def importar_servicos_medicos(
     linhas: list[dict],
     *,
     atualizar_existentes: bool = True,
-) -> dict[str, int]:
-    stats = {'criados': 0, 'atualizados': 0, 'ignorados': 0}
+) -> tuple[dict[str, int], list[str]]:
+    stats = {'criados': 0, 'atualizados': 0, 'ignorados': 0, 'rejeitados': 0}
+    avisos: list[str] = []
     if not linhas:
-        return stats
+        return stats, avisos
     codigos = [ln['codigo'] for ln in linhas]
     existentes = {s.codigo: s for s in ServicosMedicos.objects.filter(codigo__in=codigos)}
     with transaction.atomic():
@@ -220,8 +221,12 @@ def importar_servicos_medicos(
                 else:
                     stats['ignorados'] += 1
             else:
-                stats['ignorados'] += 1
-    return stats
+                stats['rejeitados'] += 1
+                avisos.append(
+                    f"Código {cod} já cadastrado — linha {ln.get('_linha', '?')} ignorada "
+                    '(marque «Atualizar serviços que já existem» para alterar).',
+                )
+    return stats, avisos
 
 
 def parse_planilha_tabela_preco(
