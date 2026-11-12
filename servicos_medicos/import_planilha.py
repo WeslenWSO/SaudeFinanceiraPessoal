@@ -145,15 +145,17 @@ def _cel(row: tuple, idx: int | None) -> str:
 def parse_planilha_servicos(content: bytes) -> tuple[list[dict], list[str]]:
     avisos: list[str] = []
     try:
-        wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        wb = load_workbook(BytesIO(content), data_only=True)
     except Exception as exc:
         return [], [f'Arquivo Excel inválido: {exc}']
     ws = wb.active
     headers, start = _primeira_linha_dados(ws)
     if not headers:
+        wb.close()
         return [], ['Planilha vazia.']
     col = _map_colunas_servicos(headers)
     if col['codigo'] is None or col['servicos'] is None:
+        wb.close()
         return [], [
             'Cabeçalho não reconhecido. Use o modelo com colunas: Código, Serviços, Porte anestésico.',
         ]

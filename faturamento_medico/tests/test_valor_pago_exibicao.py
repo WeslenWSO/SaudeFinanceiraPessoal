@@ -17,6 +17,7 @@ def _item(**kwargs):
         'valor_desconto': Decimal('0'),
         'valor_acrescimo': Decimal('0'),
         'valor_pago': None,
+        'conferido': False,
     }
     base.update(kwargs)
     return MagicMock(**base)
@@ -26,6 +27,10 @@ class ValorPagoExibicaoTest(SimpleTestCase):
     def test_acrescimo_no_ris_maior_que_tabela(self):
         item = _item(valor_pago=Decimal('300'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('300'))
+
+    def test_conferido_ignora_valor_pago_desatualizado_do_ris(self):
+        item = _item(total=Decimal('80'), valor_pago=Decimal('160'), conferido=True)
+        self.assertEqual(valor_pago_para_exibicao(item), Decimal('80'))
 
     def test_tabela_atualizada_maior_que_ris(self):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))

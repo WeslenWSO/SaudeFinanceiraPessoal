@@ -13,7 +13,7 @@ class PlanilhaExcelImportForm(forms.Form):
     arquivo = forms.FileField(
         label='Planilha Excel (.xlsx)',
         help_text='Use o modelo oficial (primeira linha com os títulos das colunas).',
-        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.xlsx'}),
+        widget=forms.FileInput(attrs={'class': 'form-control', 'accept': '.xlsx'}),
     )
     atualizar_existentes = forms.BooleanField(
         label='Atualizar registros já existentes',

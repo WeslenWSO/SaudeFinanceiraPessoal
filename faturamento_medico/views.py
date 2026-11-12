@@ -352,7 +352,10 @@ def _modalidades_from_sess(raw) -> list[str]:
     itens = raw if isinstance(raw, (list, tuple)) else [raw]
     out: list[str] = []
     for item in itens:
-        cod = _normalizar_codigo_modalidade(str(item).strip())
+        texto = str(item).strip()
+        if not texto:
+            continue
+        cod = _normalizar_codigo_modalidade(texto)
         if cod in codigos_validos and cod not in out:
             out.append(cod)
     return out
@@ -1320,7 +1323,10 @@ def _parse_modalidades_filtro(request) -> list[str]:
     codigos_validos = _codigos_modalidade_filtro_validos()
     selecionados = []
     for raw in request.GET.getlist('modalidade'):
-        codigo = _normalizar_codigo_modalidade(str(raw).strip())
+        texto = str(raw).strip()
+        if not texto:
+            continue
+        codigo = _normalizar_codigo_modalidade(texto)
         if codigo in codigos_validos and codigo not in selecionados:
             selecionados.append(codigo)
     return selecionados

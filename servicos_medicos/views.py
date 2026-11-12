@@ -1,6 +1,8 @@
 import json
+import logging
 
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
@@ -38,6 +40,8 @@ from .replicar_tabela_preco import (
 )
 from .tabela_preco_grid import ErroGridTabelaPreco, atualizar_linha_grid
 from empresa.models import Empresa
+
+logger = logging.getLogger(__name__)
 
 # Convenio Views
 class ConvenioList(ListView):
@@ -629,28 +633,41 @@ def servicos_importar_excel(request):
     if request.method == 'POST':
         form = ServicosMedicosImportForm(request.POST, request.FILES)
         if form.is_valid():
-            content = form.cleaned_data['arquivo'].read()
-            linhas, avisos_parse = parse_planilha_servicos(content)
-            if not linhas:
-                for msg in avisos_parse[:12]:
-                    messages.error(request, msg)
-            else:
-                stats, avisos_imp = importar_servicos_medicos(
-                    linhas,
-                    atualizar_existentes=form.cleaned_data['atualizar_existentes'],
-                )
-                messages.success(
+            try:
+                content = form.cleaned_data['arquivo'].read()
+                linhas, avisos_parse = parse_planilha_servicos(content)
+                if not linhas:
+                    for msg in avisos_parse[:12]:
+                        messages.error(request, msg)
+                else:
+                    stats, avisos_imp = importar_servicos_medicos(
+                        linhas,
+                        atualizar_existentes=form.cleaned_data['atualizar_existentes'],
+                    )
+                    messages.success(
+                        request,
+                        (
+                            f'Importação concluída: {stats["criados"]} criado(s), '
+                            f'{stats["atualizados"]} atualizado(s), '
+                            f'{stats["rejeitados"]} já existente(s) (não cadastrados), '
+                            f'{stats["ignorados"]} sem alteração.'
+                        ),
+                    )
+                    for msg in avisos_parse[:5] + avisos_imp[:10]:
+                        messages.warning(request, msg)
+                    return redirect('servicos_medicos:servicos_list')
+            except IntegrityError:
+                messages.error(
                     request,
-                    (
-                        f'Importação concluída: {stats["criados"]} criado(s), '
-                        f'{stats["atualizados"]} atualizado(s), '
-                        f'{stats["rejeitados"]} já existente(s) (não cadastrados), '
-                        f'{stats["ignorados"]} sem alteração.'
-                    ),
+                    'Conflito de código duplicado na planilha ou no cadastro. '
+                    'Marque «Atualizar serviços que já existem» ou remova códigos repetidos.',
                 )
-                for msg in avisos_parse[:5] + avisos_imp[:10]:
-                    messages.warning(request, msg)
-                return redirect('servicos_medicos:servicos_list')
+            except Exception:
+                logger.exception('servicos_importar_excel')
+                messages.error(
+                    request,
+                    'Não foi possível importar o arquivo. Use o modelo Excel (.xlsx) e tente de novo.',
+                )
     else:
         form = ServicosMedicosImportForm()
     return render(

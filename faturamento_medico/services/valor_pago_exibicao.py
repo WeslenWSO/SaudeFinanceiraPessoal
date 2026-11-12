@@ -43,9 +43,12 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
     liquido = _liquido_item(item)
     vp_raw = getattr(item, 'valor_pago', None)
     vp = _decimal_campo(vp_raw)
+    conferido = bool(getattr(item, 'conferido', False))
 
     if liquido is not None:
         if vp is None or vp <= 0:
+            return liquido
+        if conferido and vp > liquido + _EPS:
             return liquido
         if vp > liquido + _EPS:
             return vp

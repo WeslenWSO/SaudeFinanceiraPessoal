@@ -155,7 +155,8 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-0">Modalidade</label>
-                                <select name="modalidade" class="form-control" multiple title="Ctrl+clique para várias modalidades">
+                                <select name="modalidade" class="form-control" multiple title="Ctrl+clique para várias modalidades" id="filtroModalidadeFat">
+                                    <option value="" {% if not filtros.modalidade %}selected{% endif %}>Todas as modalidades</option>
                                     {% for codigo, label in modalidades_opcoes %}
                                     <option value="{{ codigo }}" {% if codigo in filtros.modalidade %}selected{% endif %}>
                                         {{ codigo }} — {{ label }}
@@ -163,7 +164,7 @@
                                     {% endfor %}
                                     <option value="OUTROS" {% if 'OUTROS' in filtros.modalidade %}selected{% endif %}>Outros</option>
                                 </select>
-                                <div class="form-text small">Vazio = todas</div>
+                                <div class="form-text small">Escolha «Todas as modalidades» ou marque uma ou mais opções.</div>
                             </div>
                         </div>
                         <div class="row mt-2">
