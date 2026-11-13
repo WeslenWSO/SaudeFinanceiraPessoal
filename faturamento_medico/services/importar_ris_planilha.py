@@ -102,6 +102,15 @@ def _ler_grupos(ws, col: dict) -> tuple[list[dict], int, int, set[date]]:
         acrescimo = _parse_valor_ris(get(row, 'acrescimo_desconto'))
         valor_desconto = abs(acrescimo) if acrescimo < 0 else Decimal('0')
         valor_acrescimo = acrescimo if acrescimo > 0 else Decimal('0')
+        if (
+            valor_pago is not None
+            and valor_pago > 0
+            and valor_acrescimo > 0
+            and valor > 0
+            and valor_pago == valor
+            and valor_acrescimo == valor
+        ):
+            valor_acrescimo = Decimal('0')
         if _eh_status_agendamento_cancelado(status_raw):
             linhas_canceladas += 1
 

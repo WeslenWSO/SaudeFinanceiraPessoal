@@ -32,6 +32,19 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         item = _item(total=Decimal('80'), valor_pago=Decimal('160'), conferido=True)
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('80'))
 
+    def test_ris_duplica_valor_pago_mesmo_sem_conferir(self):
+        item = _item(total=Decimal('350'), valor_pago=Decimal('700'), conferido=False)
+        self.assertEqual(valor_pago_para_exibicao(item), Decimal('350'))
+
+    def test_acrescimo_ris_eco_valor_pago_nao_dobra_grade(self):
+        item = _item(
+            total=Decimal('80'),
+            valor_pago=Decimal('80'),
+            valor_acrescimo=Decimal('80'),
+            conferido=False,
+        )
+        self.assertEqual(valor_pago_para_exibicao(item), Decimal('80'))
+
     def test_tabela_atualizada_maior_que_ris(self):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('250'))
@@ -48,6 +61,37 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         )
         sincronizar_valor_pago_apos_preco(item)
         item.save.assert_not_called()
+
+    def test_sincronizar_zera_acrescimo_eco_ris(self):
+        item = MagicMock(
+            pk=11,
+            total=Decimal('350'),
+            valor=Decimal('350'),
+            valor_pago=Decimal('350'),
+            valor_acrescimo=Decimal('350'),
+        )
+        with patch('faturamento_medico.services.valor_pago_exibicao.ItemServico') as model:
+            model.objects.filter.return_value.update = MagicMock()
+            sincronizar_valor_pago_apos_preco(item, forcar=False)
+            model.objects.filter.return_value.update.assert_any_call(
+                valor_acrescimo=Decimal('0'),
+            )
+
+    def test_sincronizar_corrige_valor_pago_duplicado_do_ris(self):
+        item = MagicMock(
+            pk=12,
+            total=Decimal('80'),
+            valor=Decimal('80'),
+            valor_acrescimo=Decimal('0'),
+            qt=1,
+            valor_pago=Decimal('160'),
+        )
+        with patch('faturamento_medico.services.valor_pago_exibicao.ItemServico') as model:
+            model.objects.filter.return_value.update = MagicMock()
+            sincronizar_valor_pago_apos_preco(item, forcar=False)
+            model.objects.filter.return_value.update.assert_called_once_with(
+                valor_pago=Decimal('80'),
+            )
 
     def test_sincronizar_forcar_atualiza_valor_pago_maior_que_tabela(self):
         item = MagicMock(

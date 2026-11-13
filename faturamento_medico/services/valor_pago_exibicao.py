@@ -9,6 +9,35 @@ from faturamento_medico.models import ItemServico
 _EPS = Decimal('0.009')
 
 
+def _valor_pago_parece_duplicado_ris(
+    vp: Decimal,
+    liquido: Decimal,
+    item: ItemServico,
+) -> bool:
+    """
+    RIS/MedCloud às vezes grava valor pago = 2× (ou N×) o total do item sem acréscimo real.
+  """
+    if liquido <= 0 or vp <= liquido + _EPS:
+        return False
+    acrescimo = _decimal_campo(getattr(item, 'valor_acrescimo', None)) or Decimal('0')
+    if acrescimo > _EPS:
+        return False
+    try:
+        razao = vp / liquido
+    except Exception:
+        return False
+    qt = int(getattr(item, 'qt', None) or 1)
+    if qt < 1:
+        qt = 1
+    candidatos = {2}
+    if qt > 1:
+        candidatos.add(qt)
+    for n in candidatos:
+        if abs(razao - Decimal(n)) <= Decimal('0.015'):
+            return True
+    return abs(vp - liquido * Decimal('2')) <= _EPS
+
+
 def _decimal_campo(raw) -> Decimal | None:
     if raw is None:
         return None
@@ -18,6 +47,24 @@ def _decimal_campo(raw) -> Decimal | None:
         return None
 
 
+def _acrescimo_ris_eco_valor_pago(item: ItemServico) -> bool:
+    """
+    Planilha RIS às vezes repete o valor pago na coluna Acréscimo/Desconto (positivo).
+    Somar de novo na grade dá o dobro (ex.: total 80 + acréscimo 80 → R$ 160).
+    """
+    base = item.total if item.total is not None else item.valor
+    if base is None:
+        return False
+    base_dec = Decimal(str(base))
+    if base_dec <= 0:
+        return False
+    vp = _decimal_campo(getattr(item, 'valor_pago', None))
+    ac = _decimal_campo(getattr(item, 'valor_acrescimo', None)) or Decimal('0')
+    if ac <= _EPS or vp is None or vp <= 0:
+        return False
+    return abs(ac - base_dec) <= _EPS and abs(vp - base_dec) <= _EPS
+
+
 def _liquido_item(item: ItemServico) -> Decimal | None:
     base = item.total if item.total is not None else item.valor
     if base is None:
@@ -25,8 +72,10 @@ def _liquido_item(item: ItemServico) -> Decimal | None:
     bruto = Decimal(str(base))
     if bruto <= 0:
         return None
-    acrescimo = Decimal(str(getattr(item, 'valor_acrescimo', None) or 0))
-    desconto = Decimal(str(item.valor_desconto or 0))
+    acrescimo = _decimal_campo(getattr(item, 'valor_acrescimo', None)) or Decimal('0')
+    desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
+    if _acrescimo_ris_eco_valor_pago(item):
+        acrescimo = Decimal('0')
     liquido = bruto + acrescimo - desconto
     return liquido if liquido > 0 else None
 
@@ -48,9 +97,9 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
     if liquido is not None:
         if vp is None or vp <= 0:
             return liquido
-        if conferido and vp > liquido + _EPS:
-            return liquido
         if vp > liquido + _EPS:
+            if conferido or _valor_pago_parece_duplicado_ris(vp, liquido, item):
+                return liquido
             return vp
         if vp + _EPS < liquido:
             return liquido
@@ -115,12 +164,17 @@ def sincronizar_valor_pago_apos_preco(
     if total_dec <= 0:
         return
     vp_atual = _decimal_campo(item.valor_pago)
-    if (
-        not forcar
-        and vp_atual is not None
-        and vp_atual > total_dec + _EPS
-    ):
-        return
+    if _acrescimo_ris_eco_valor_pago(item):
+        ItemServico.objects.filter(pk=item.pk).update(valor_acrescimo=Decimal('0'))
+        item.valor_acrescimo = Decimal('0')
+    if vp_atual is not None and vp_atual > total_dec + _EPS:
+        if _valor_pago_parece_duplicado_ris(vp_atual, total_dec, item):
+            if item.valor_pago != total_dec:
+                ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
+                item.valor_pago = total_dec
+            return
+        if not forcar:
+            return
     if item.valor_pago != total_dec:
         ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
         item.valor_pago = total_dec
