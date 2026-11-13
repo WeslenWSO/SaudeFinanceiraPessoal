@@ -6938,6 +6938,8 @@ def conferencia_faturamento(request):
 
 
 def _tratar_falha_acerto_caixa(request, exc, *, empresa_id, logger):
+    from django.db import InterfaceError
+    from django.db.utils import Error as DjangoDbError
     from django.db.utils import OperationalError, ProgrammingError
 
     try:
@@ -6950,7 +6952,12 @@ def _tratar_falha_acerto_caixa(request, exc, *, empresa_id, logger):
     msg = None
     if capturar_erro_schema:
         msg = capturar_erro_schema(exc, contexto='acerto de caixa')
-    if not msg and isinstance(exc, (ProgrammingError, OperationalError)):
+    if not msg and isinstance(exc, InterfaceError):
+        msg = (
+            'A conexão com o banco expirou ao abrir o acerto de caixa. '
+            'Use um período menor (até cerca de 1 mês) e tente novamente.'
+        )
+    if not msg and isinstance(exc, (ProgrammingError, OperationalError, DjangoDbError)):
         if mensagem_schema_desatualizado:
             msg = mensagem_schema_desatualizado('acerto de caixa')
         else:
@@ -6984,13 +6991,16 @@ def acerto_caixa(request):
         return redirect('dashboard:relatorio_mensal')
 
     try:
+        from django.db import close_old_connections
         from django.db.utils import OperationalError, ProgrammingError
 
         from empresa.models import Empresa
         from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
 
+        close_old_connections()
         empresa = Empresa.objects.filter(pk=empresa_id).first()
         contexto = montar_contexto_acerto_caixa(request, empresa_id)
+        close_old_connections()
         contexto.setdefault('grade_oculta_resumo_ano', False)
         contexto.setdefault('resumo_pode_abrir_direto', False)
         contexto.setdefault('periodo_resumo_fmt', contexto.get('periodo_fmt', ''))
@@ -7002,6 +7012,13 @@ def acerto_caixa(request):
         return render(request, 'faturamento_medico/acerto_caixa.html', contexto)
     except (ProgrammingError, OperationalError) as exc:
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
+    except MemoryError as exc:
+        messages.error(
+            request,
+            'Período ou volume de exames grande demais para o acerto de caixa. '
+            'Reduza o intervalo de datas ou filtre por caixa/paciente.',
+        )
+        return redirect(f"{reverse('faturamento_medico:acerto_caixa')}?{request.GET.urlencode()}")
     except Exception as exc:
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)
 

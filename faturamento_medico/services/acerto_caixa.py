@@ -36,6 +36,7 @@ from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exib
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
     notas_linha_para_json,
+    preparar_indice_vinculo_export,
     resolver_notas_linha,
 )
 
@@ -50,6 +51,11 @@ STATUS_CANCELADOS = (
 
 # Botão «Ano» na tela: reativar quando o resumo anual estiver estável em produção.
 ACERTO_BOTAO_ANO_HABILITADO = False
+
+# Acima disso: vínculo automático paciente→NF é desligado (só número salvo no RIS).
+_LIMITE_DIAS_VINCULO_NF_ACERTO = 70
+# Acima disso: não monta grade (evita timeout no Render).
+_LIMITE_DIAS_PERIODO_ACERTO = 120
 
 MODALIDADES_RESUMO_ACERTO = (
     ('US', 'QUANTIDADE DE ULTRASSONOGRAFIA'),
@@ -2081,6 +2087,9 @@ def montar_blocos_impressao_acerto_caixa(
 
 def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     """Carrega linhas da grade conforme filtros GET (tela + drill-down AJAX)."""
+    from django.db import close_old_connections
+
+    close_old_connections()
     hoje = date.today()
     di_padrao, df_padrao = _periodo_padrao(hoje)
     di = _parse_data_filtro(request.GET.get('data_inicio')) or di_padrao
@@ -2163,11 +2172,67 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     if somente_marcados:
         qs = qs.filter(marcado_acerto_caixa=True)
 
+    dias_periodo = (df - di).days + 1
+    aviso_periodo_largo = ''
+    if dias_periodo > _LIMITE_DIAS_PERIODO_ACERTO and not modo_resumo_ano_leve:
+        aviso_periodo_largo = (
+            f'Período de {dias_periodo} dias é grande demais para o acerto de caixa '
+            f'(máximo {_LIMITE_DIAS_PERIODO_ACERTO} dias). Reduza as datas no filtro.'
+        )
+        filtros_dict_vazio = {
+            'data_inicio': di.isoformat(),
+            'data_fim': df.isoformat(),
+            'checkin': checkin if not checkin_por_sel else '',
+            'checkin_por': checkin_por_sel,
+            'caixa': caixas_sel,
+            'somente_marcados': somente_marcados,
+            'hora_inicial': hora_ini_str,
+            'hora_final': hora_fim_str,
+            'status_agendamento': status_sel,
+            'paciente': paciente_filtro,
+            'convenio': convenios_sel,
+            'dias_resumo': parse_dias_resumo_request(request),
+        }
+        return {
+            'di': di,
+            'df': df,
+            'linhas': [],
+            'linhas_grade': [],
+            'filtros_dict': filtros_dict_vazio,
+            'dias_resumo': filtros_dict_vazio['dias_resumo'],
+            'resumo_pode_abrir_direto': False,
+            'modo_resumo_ano_leve': modo_resumo_ano_leve,
+            'status_disponiveis': status_disponiveis,
+            'checkin_disponiveis': checkin_disponiveis,
+            'convenios_disponiveis': convenios_disponiveis,
+            'fechamentos_caixa': [],
+            'pode_fechar_caixa': False,
+            'aviso_periodo_largo': aviso_periodo_largo,
+            'aviso_nf_simplificada': '',
+        }
+
+    vinculo_nf_automatico = (
+        not modo_resumo_ano_leve and dias_periodo <= _LIMITE_DIAS_VINCULO_NF_ACERTO
+    )
+    aviso_nf_simplificada = ''
+    if not modo_resumo_ano_leve and not vinculo_nf_automatico:
+        aviso_nf_simplificada = (
+            f'Período maior que {_LIMITE_DIAS_VINCULO_NF_ACERTO} dias: '
+            'vínculo NF automático desligado (usa só número de NF salvo no exame). '
+            'Filtre um intervalo menor para localizar NF por paciente.'
+        )
+
     qs = qs.order_by('data', 'horario_inicio', 'nome').prefetch_related('itens_servico')
-    try:
-        notas_por_data = carregar_notas_por_data(empresa_id, di, df)
-    except Exception:
-        notas_por_data = {}
+    notas_por_data: dict = {}
+    indice_vinculo_nf = None
+    if vinculo_nf_automatico:
+        try:
+            notas_por_data = carregar_notas_por_data(empresa_id, di, df)
+            if notas_por_data:
+                indice_vinculo_nf = preparar_indice_vinculo_export(notas_por_data)
+        except Exception:
+            notas_por_data = {}
+            indice_vinculo_nf = None
     fechamentos_ativos = list(_fechamentos_ativos_empresa(empresa_id))
     fats_bloqueio: dict[int, bool] = {}
     try:
@@ -2186,13 +2251,25 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
             continue
 
         try:
-            notas = resolver_notas_linha(
-                notas_por_data,
-                empresa_id,
-                fat.nome or '',
-                fat.data,
-                fat.nota_fiscal,
-            )
+            if modo_resumo_ano_leve:
+                notas = []
+            elif vinculo_nf_automatico:
+                notas = resolver_notas_linha(
+                    notas_por_data,
+                    empresa_id,
+                    fat.nome or '',
+                    fat.data,
+                    fat.nota_fiscal,
+                    indice_export=indice_vinculo_nf,
+                )
+            else:
+                notas = resolver_notas_linha(
+                    {},
+                    empresa_id,
+                    fat.nome or '',
+                    fat.data,
+                    fat.nota_fiscal,
+                )
         except Exception:
             notas = []
         nota = _primeira_nota(notas)
@@ -2379,6 +2456,8 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'convenios_disponiveis': convenios_disponiveis,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
+        'aviso_periodo_largo': aviso_periodo_largo,
+        'aviso_nf_simplificada': aviso_nf_simplificada,
     }
 
 
@@ -2484,6 +2563,9 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     else:
         periodo_resumo_fmt = f'{di.strftime("%d/%m/%Y")} → {df.strftime("%d/%m/%Y")}'
 
+    aviso_periodo_largo = base.get('aviso_periodo_largo') or ''
+    aviso_nf_simplificada = base.get('aviso_nf_simplificada') or ''
+
     regua_ctx = montar_regua_dias_acerto(filtros_dict, di, df)
     try:
         matriz_anual_ctx = montar_contexto_matriz_anual_acerto(linhas_grade, di, df)
@@ -2578,4 +2660,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         **matriz_anual_ctx,
         **matriz_mes_dia_ctx,
         **graficos_resumo_ctx,
+        'aviso_periodo_largo': aviso_periodo_largo,
+        'aviso_nf_simplificada': aviso_nf_simplificada,
     }

@@ -680,6 +680,11 @@
             {% if empresa %}
             <p class="small mb-3"><strong>{{ empresa.razao }}</strong>{% if empresa.cnpj %} · CNPJ {{ empresa.cnpj }}{% endif %}</p>
             {% endif %}
+            {% if aviso_periodo_largo %}
+            <div class="alert alert-danger py-2" role="alert">{{ aviso_periodo_largo }}</div>
+            {% elif aviso_nf_simplificada %}
+            <div class="alert alert-warning py-2" role="alert">{{ aviso_nf_simplificada }}</div>
+            {% endif %}
 
             <div class="filtro-retratil mb-4" id="acertoFiltroWrap">
                 <button type="button"
