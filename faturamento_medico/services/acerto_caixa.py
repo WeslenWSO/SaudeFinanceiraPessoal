@@ -264,7 +264,7 @@ def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> 
         ('data_inicio', data_inicio.isoformat()),
         ('data_fim', data_fim.isoformat()),
     ]
-    for chave in ('caixa', 'checkin_por', 'status_agendamento', 'convenio'):
+    for chave in ('caixa', 'checkin_por', 'status_agendamento', 'convenio', 'forma_pagamento'):
         for val in filtros.get(chave) or []:
             if val:
                 pares.append((chave, str(val)))
@@ -835,6 +835,7 @@ def _filtros_para_snapshot(filtros: dict) -> dict:
         'status_agendamento': list(filtros.get('status_agendamento') or []),
         'paciente': (filtros.get('paciente') or '').strip(),
         'convenio': list(filtros.get('convenio') or []),
+        'forma_pagamento': list(filtros.get('forma_pagamento') or []),
     }
 
 
@@ -1094,6 +1095,11 @@ def filtrar_linhas_acerto_caixa(
             conv = (linha.get('convenio') or '').strip()
             if conv not in convenios_sel:
                 continue
+        formas_sel = list(filtros.get('forma_pagamento') or [])
+        if formas_sel:
+            grupo = _agrupar_forma_pagamento(linha.get('forma_pgto') or '-')
+            if grupo not in formas_sel:
+                continue
         filtradas.append(linha)
     return filtradas
 
@@ -1113,6 +1119,9 @@ def montar_resumo_filtros_acerto(filtros: dict, data_inicio: date, data_fim: dat
     convenios = filtros.get('convenio') or []
     if convenios:
         partes.append(f'{len(convenios)} convênio(s)')
+    formas = filtros.get('forma_pagamento') or []
+    if formas:
+        partes.append(f'{len(formas)} forma(s) pagto')
     paciente = (filtros.get('paciente') or '').strip()
     if paciente:
         partes.append(f'paciente «{paciente[:24]}{"…" if len(paciente) > 24 else ""}»')
@@ -2116,6 +2125,9 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     convenios_sel = [
         s.strip() for s in request.GET.getlist('convenio') if s and str(s).strip()
     ]
+    forma_pagamento_sel = [
+        s.strip() for s in request.GET.getlist('forma_pagamento') if s and str(s).strip()
+    ]
 
     qs_base = FaturamentoMedico.objects.filter(empresa_id=empresa_id)
     qs_periodo = qs_base.filter(data__gte=di, data__lte=df)
@@ -2183,6 +2195,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
             'status_agendamento': status_sel,
             'paciente': paciente_filtro,
             'convenio': convenios_sel,
+            'forma_pagamento': forma_pagamento_sel,
             'dias_resumo': parse_dias_resumo_request(request),
         }
         return {
@@ -2197,6 +2210,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
             'status_disponiveis': status_disponiveis,
             'checkin_disponiveis': checkin_disponiveis,
             'convenios_disponiveis': convenios_disponiveis,
+            'formas_pagamento_disponiveis': [],
             'fechamentos_caixa': [],
             'pode_fechar_caixa': False,
             'aviso_periodo_largo': aviso_periodo_largo,
@@ -2423,8 +2437,16 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'status_agendamento': status_sel,
         'paciente': paciente_filtro,
         'convenio': convenios_sel,
+        'forma_pagamento': forma_pagamento_sel,
         'dias_resumo': dias_resumo,
     }
+    formas_pagamento_disponiveis = sorted(
+        {
+            _agrupar_forma_pagamento(ln.get('forma_pgto') or '-')
+            for ln in linhas
+        },
+        key=str.lower,
+    )
     fechamentos_caixa = montar_status_fechamentos_caixa(empresa_id, filtros_dict)
     pode_fechar_caixa = bool(caixas_sel) and any(not row['fechado'] for row in fechamentos_caixa)
     linhas_grade = filtrar_linhas_acerto_caixa(linhas, empresa_id, filtros_dict)
@@ -2446,6 +2468,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
+        'formas_pagamento_disponiveis': formas_pagamento_disponiveis,
         'fechamentos_caixa': fechamentos_caixa,
         'pode_fechar_caixa': pode_fechar_caixa,
         'aviso_periodo_largo': aviso_periodo_largo,
@@ -2476,6 +2499,8 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     status_disponiveis = base['status_disponiveis']
     checkin_disponiveis = base['checkin_disponiveis']
     convenios_disponiveis = base['convenios_disponiveis']
+    formas_pagamento_disponiveis = base.get('formas_pagamento_disponiveis') or []
+    formas_pagamento_disponiveis = base.get('formas_pagamento_disponiveis') or []
     fechamentos_caixa = base['fechamentos_caixa']
     pode_fechar_caixa = base['pode_fechar_caixa']
     caixas_sel = list(filtros_dict.get('caixa') or [])
@@ -2624,6 +2649,7 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'status_disponiveis': status_disponiveis,
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
+        'formas_pagamento_disponiveis': formas_pagamento_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
         'caixas_acerto_grade': caixas_acerto_choices_filtrados(
             empresa_id, caixas_sel or None

@@ -148,6 +148,36 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]['paciente'], 'Maria Silva')
 
+    def test_filtrar_linhas_forma_pagamento(self):
+        linhas = [
+            {
+                'forma_pgto': 'PIX R$ 100,00',
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+            },
+            {
+                'forma_pgto': '-',
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+            },
+            {
+                'forma_pgto': 'Cartão de crédito R$ 50,00',
+                'checkin_por': 'A',
+                'status_agendamento': 'Concluído',
+            },
+        ]
+        out = filtrar_linhas_acerto_caixa(
+            linhas,
+            empresa_id=1,
+            filtros={'forma_pagamento': ['PIX', 'Sem NF / forma não informada']},
+        )
+        self.assertEqual(len(out), 2)
+        from faturamento_medico.services.acerto_caixa import _agrupar_forma_pagamento
+
+        grupos = {_agrupar_forma_pagamento(l['forma_pgto']) for l in out}
+        self.assertIn('PIX', grupos)
+        self.assertIn('Sem NF / forma não informada', grupos)
+
     def test_filtro_caixa_mantem_linha_sem_caixa_atribuido(self):
         linhas = [
             {

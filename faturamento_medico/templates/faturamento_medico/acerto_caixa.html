@@ -869,6 +869,31 @@
                             <div class="col-lg-3 col-md-6">
                                 <div class="acerto-filtro-bloco">
                                     <div class="acerto-filtro-bloco-head">
+                                        <span class="small fw-semibold">Forma de pagamento</span>
+                                        <span>
+                                            <button type="button" class="btn btn-link js-acerto-chk-all" data-target="forma_pagamento">Todas</button>
+                                            <button type="button" class="btn btn-link js-acerto-chk-none" data-target="forma_pagamento">Nenhuma</button>
+                                        </span>
+                                    </div>
+                                    <input type="search" class="form-control form-control-sm acerto-filtro-busca js-acerto-lista-busca"
+                                           data-lista="lista-forma-pagamento" placeholder="Buscar forma…" autocomplete="off">
+                                    <div class="fm-solicitante-lista js-acerto-lista" id="lista-forma-pagamento" style="max-height: 7rem;">
+                                        {% for forma in formas_pagamento_disponiveis %}
+                                        <label class="fm-solicitante-item js-acerto-lista-item">
+                                            <input type="checkbox" name="forma_pagamento" value="{{ forma }}"
+                                                   {% if forma in filtros.forma_pagamento %}checked{% endif %}>
+                                            <span>{{ forma }}</span>
+                                        </label>
+                                        {% empty %}
+                                        <span class="text-muted small">Nenhuma no período (aplique o filtro de datas).</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="form-text mb-0">Vazio = todas. Usa a forma exibida na grade (NF / pagamento).</div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <div class="acerto-filtro-bloco">
+                                    <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Status agendamento</span>
                                         <span>
                                             <button type="button" class="btn btn-link js-acerto-chk-all" data-target="status_agendamento">Todos</button>
@@ -1299,7 +1324,7 @@
                     </div>
                     {% endif %}
                     <p class="small text-muted mt-2 mb-0">
-                        Mesmos filtros do formulário (período, paciente, convênio, caixa, check-in, status, hora, marcados).
+                        Mesmos filtros do formulário (período, paciente, convênio, forma de pagamento, caixa, check-in, status, hora, marcados).
                         Soma da coluna <strong>Valor pago</strong> das linhas da grade abaixo.
                     </p>
                 </div>
