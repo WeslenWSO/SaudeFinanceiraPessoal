@@ -197,6 +197,38 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(pag.get('PIX'), Decimal('360'))
         self.assertEqual(sum(pag.values()) + sum(ag.values()), Decimal('360'))
 
+    def test_resumo_dinheiro_usa_valor_nf_nao_rateia_valor_pago(self):
+        """Soma manual por forma (ex.: Dinheiro) deve usar valores da NF, não % do valor pago."""
+        linhas = [
+            {
+                'faturamento_id': 10,
+                'aguardando_faturamento': False,
+                'valor_pago': Decimal('80'),
+                'pagamentos_acerto': [
+                    {'rotulo': 'Dinheiro', 'valor': Decimal('100')},
+                    {'rotulo': 'PIX', 'valor': Decimal('50')},
+                ],
+                'forma_pgto': 'Dinheiro + PIX',
+                'caixa_acerto': '1',
+                'caixa_exibicao': 'CAIXA TESTE',
+            },
+            {
+                'faturamento_id': 10,
+                'aguardando_faturamento': False,
+                'valor_pago': Decimal('50'),
+                'pagamentos_acerto': [
+                    {'rotulo': 'Dinheiro', 'valor': Decimal('100')},
+                    {'rotulo': 'PIX', 'valor': Decimal('50')},
+                ],
+                'forma_pgto': '-',
+                'caixa_acerto': '1',
+                'caixa_exibicao': 'CAIXA TESTE',
+            },
+        ]
+        pag, ag, _cx = recomputar_resumos_acerto_caixa_de_linhas(linhas)
+        self.assertEqual(pag.get('Dinheiro'), Decimal('100'))
+        self.assertEqual(pag.get('PIX'), Decimal('50'))
+
     def test_resumo_viabilidade_qt_valor(self):
         linhas = [
             {'convenio': 'CASSI', 'valor_pago': Decimal('100'), 'aguardando_faturamento': False},

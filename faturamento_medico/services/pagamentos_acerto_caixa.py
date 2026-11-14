@@ -300,6 +300,19 @@ def pagamentos_para_resumo(pagamentos: list[dict[str, Any]]) -> list[tuple[str, 
     return out
 
 
+def pagamentos_agrupados_resumo(
+    pagamentos: list[dict[str, Any]],
+) -> list[tuple[str, Decimal]]:
+    """Soma por forma (Dinheiro, PIX, …) usando os valores da NF / rateio manual."""
+    from collections import defaultdict
+
+    merged: dict[str, Decimal] = defaultdict(Decimal)
+    for chave, val in pagamentos_para_resumo(pagamentos):
+        if val > 0:
+            merged[chave] += val
+    return list(merged.items())
+
+
 def serializar_pagamentos_json(pagamentos: list[dict[str, Any]]) -> str:
     return json.dumps([
         {'cobranca_id': p.get('cobranca_id'), 'valor': str(p.get('valor'))}

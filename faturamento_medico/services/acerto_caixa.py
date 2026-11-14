@@ -614,32 +614,6 @@ def _valor_contabil_linha_acerto(linha: dict) -> Decimal:
     return Decimal('0')
 
 
-def _distribuir_valor_formas_pagamento(
-    total: Decimal,
-    pagamentos: list,
-) -> list[tuple[str, Decimal]]:
-    from faturamento_medico.services.pagamentos_acerto_caixa import pagamentos_para_resumo
-
-    if total <= 0:
-        return []
-    pares = pagamentos_para_resumo(pagamentos) if pagamentos else []
-    if not pares:
-        return []
-    soma = sum(v for _, v in pares)
-    if soma <= 0:
-        return [(pares[0][0], total)]
-    out: list[tuple[str, Decimal]] = []
-    acum = Decimal('0')
-    for i, (chave, val) in enumerate(pares):
-        if i == len(pares) - 1:
-            out.append((chave, total - acum))
-        else:
-            parte = (total * val / soma).quantize(Decimal('0.01'))
-            out.append((chave, parte))
-            acum += parte
-    return out
-
-
 def _bucket_caixa_resumo(
     resumo_caixas: dict[str, dict],
     caixa_val: str,
@@ -660,8 +634,9 @@ def recomputar_resumos_acerto_caixa_de_linhas(
     linhas: list[dict],
 ) -> tuple[dict[str, Decimal], dict[str, Decimal], dict[str, dict]]:
     """
-    Soma por forma de pagamento / convênio a partir da coluna Valor pago (por item),
-    agrupando formas no nível do faturamento quando há NF/pagamentos manuais.
+    Aguardando faturamento: soma por convênio (coluna Valor pago).
+    Demais: soma por forma com os valores da NF/rateio manual (bate com a soma na grade);
+    sem NF usa Valor pago do faturamento inteiro na forma exibida.
     """
     resumo_pagamento: dict[str, Decimal] = defaultdict(Decimal)
     resumo_aguardando: dict[str, Decimal] = defaultdict(Decimal)
@@ -697,7 +672,14 @@ def recomputar_resumos_acerto_caixa_de_linhas(
         bucket = _bucket_caixa_resumo(resumo_caixas, caixa_val, rotulo)
         pags = first.get('pagamentos_acerto') or []
         if pags:
-            distrib = _distribuir_valor_formas_pagamento(total_vp, pags)
+            from faturamento_medico.services.pagamentos_acerto_caixa import (
+                pagamentos_agrupados_resumo,
+            )
+
+            distrib = pagamentos_agrupados_resumo(pags)
+            if not distrib:
+                chave = _agrupar_forma_pagamento(first.get('forma_pgto') or '-')
+                distrib = [(chave, total_vp)]
         else:
             chave = _agrupar_forma_pagamento(first.get('forma_pgto') or '-')
             distrib = [(chave, total_vp)]
@@ -726,7 +708,11 @@ def _contagem_formas_pagamento_mes(linhas: list[dict]) -> dict[str, int]:
         first = fat_linhas[0]
         pags = first.get('pagamentos_acerto') or []
         if pags:
-            distrib = _distribuir_valor_formas_pagamento(total_vp, pags)
+            from faturamento_medico.services.pagamentos_acerto_caixa import (
+                pagamentos_agrupados_resumo,
+            )
+
+            distrib = pagamentos_agrupados_resumo(pags)
             for chave, val in distrib:
                 if val > 0:
                     contagem[chave] += 1
