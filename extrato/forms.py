@@ -133,7 +133,7 @@ class ContaBancariaForm(forms.ModelForm):
         tipo = cleaned.get("tipo") or getattr(self.instance, "tipo", "")
         descricao = cleaned.get("descricao") or getattr(self.instance, "descricao", "") or ""
         status = cleaned.get("status") or getattr(self.instance, "status", "A")
-        elegivel = tipo in ("CAIXA", "OUTROS") or "caixa" in descricao.lower()
+        elegivel = tipo == "CAIXA" or "caixa" in descricao.lower()
         if elegivel and status == "I":
             cleaned["inativo_acerto_caixa"] = True
         return cleaned

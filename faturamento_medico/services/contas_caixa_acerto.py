@@ -10,11 +10,15 @@ from extrato.models import ContaBancaria
 
 logger = logging.getLogger(__name__)
 
-_TIPOS_ACERTO_CAIXA = ('CAIXA', 'OUTROS')
+
+def _descricao_encerrada_acerto(descricao: str | None) -> bool:
+    d = (descricao or '').lower()
+    return 'encerrad' in d
 
 
 def conta_elegivel_acerto_caixa(conta: ContaBancaria) -> bool:
-    if conta.tipo in _TIPOS_ACERTO_CAIXA:
+    """Elegível ao cadastro do acerto: tipo Caixa ou descrição com «caixa» (não todo tipo Outros)."""
+    if conta.tipo == 'CAIXA':
         return True
     return 'caixa' in (conta.descricao or '').lower()
 
@@ -24,22 +28,27 @@ def conta_ativa_no_acerto_caixa(conta: ContaBancaria) -> bool:
         return False
     if getattr(conta, 'inativo_acerto_caixa', False):
         return False
-    return (conta.status or 'A') == 'A'
+    if (conta.status or 'A') != 'A':
+        return False
+    if _descricao_encerrada_acerto(conta.descricao):
+        return False
+    return True
 
 
 def queryset_contas_caixa_cadastro(empresa_id: int):
-    """Todas as contas elegíveis ao acerto (inclui marcadas inativas)."""
+    """Contas que podem aparecer no cadastro (inclui inativas no acerto)."""
     return (
         ContaBancaria.objects.filter(empresa_id=empresa_id)
-        .filter(Q(tipo__in=_TIPOS_ACERTO_CAIXA) | Q(descricao__icontains='caixa'))
+        .filter(Q(tipo='CAIXA') | Q(descricao__icontains='caixa'))
         .select_related('banco')
         .order_by('descricao', 'id')
     )
 
 
 def queryset_contas_caixa(empresa_id: int):
-    """Somente caixas ativos no acerto (inativos não entram no filtro)."""
+    """Somente caixas ativos no acerto (filtro da tela + select da grade)."""
     qs = queryset_contas_caixa_cadastro(empresa_id).filter(status='A')
+    qs = qs.exclude(descricao__icontains='encerrad')
     try:
         return qs.filter(inativo_acerto_caixa=False)
     except (ProgrammingError, OperationalError):
@@ -52,8 +61,8 @@ def caixa_valor_ativo_no_acerto(empresa_id: int, valor: str) -> bool:
     valor = (valor or '').strip()
     if not valor or not valor.isdigit():
         return False
-    conta = queryset_contas_caixa_cadastro(empresa_id).filter(pk=int(valor)).first()
-    return conta is not None and conta_ativa_no_acerto_caixa(conta)
+    conta = queryset_contas_caixa(empresa_id).filter(pk=int(valor)).first()
+    return conta is not None
 
 
 def rotulo_conta_caixa(conta: ContaBancaria) -> str:
@@ -66,11 +75,11 @@ def rotulo_conta_caixa(conta: ContaBancaria) -> str:
 
 
 def caixas_acerto_choices(empresa_id: int) -> list[tuple[str, str]]:
+    """Apenas contas com Status ativa e Acerto caixa = Ativo (sem encerradas)."""
     try:
         return [
             (str(conta.pk), rotulo_conta_caixa(conta))
-            for conta in queryset_contas_caixa_cadastro(empresa_id)
-            if conta_ativa_no_acerto_caixa(conta)
+            for conta in queryset_contas_caixa(empresa_id)
         ]
     except (ProgrammingError, OperationalError):
         logger.exception('Falha ao listar caixas (migrate extrato/faturamento?) empresa=%s', empresa_id)

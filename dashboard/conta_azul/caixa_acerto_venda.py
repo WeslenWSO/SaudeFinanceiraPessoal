@@ -7,7 +7,8 @@ import unicodedata
 from extrato.models import ContaBancaria
 from faturamento_medico.models import CAIXAS_ACERTO_CHOICES
 from faturamento_medico.services.contas_caixa_acerto import (
-    conta_elegivel_acerto_caixa,
+    conta_ativa_no_acerto_caixa,
+    queryset_contas_caixa,
     queryset_contas_caixa_cadastro,
 )
 
@@ -34,7 +35,7 @@ def caixa_acerto_por_nome_vendedor(empresa_id: int, nome_vendedor: str) -> str:
     norm = _normalizar_nome(nome)
     primeiro = norm.split()[0] if norm else ''
 
-    for conta in queryset_contas_caixa_cadastro(empresa_id):
+    for conta in queryset_contas_caixa(empresa_id):
         desc_norm = _normalizar_nome(conta.descricao or '')
         if norm in desc_norm or (primeiro and primeiro in desc_norm.split()):
             return str(conta.pk)
@@ -71,7 +72,7 @@ def caixa_acerto_de_venda_ca(empresa_id: int, envelope: dict | None) -> str:
             empresa_id=empresa_id,
             conta_azul_id=ca_id,
         ).first()
-        if conta and conta_elegivel_acerto_caixa(conta):
+        if conta and conta_ativa_no_acerto_caixa(conta):
             return str(conta.pk)
 
     vend = envelope.get('vendedor') if isinstance(envelope.get('vendedor'), dict) else {}

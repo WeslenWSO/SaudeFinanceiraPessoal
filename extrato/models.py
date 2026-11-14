@@ -101,7 +101,7 @@ class ContaBancaria(models.Model):
         return f"{self.get_tipo_display()} - {base}"
 
     def elegivel_acerto_caixa(self) -> bool:
-        if self.tipo in ('CAIXA', 'OUTROS'):
+        if self.tipo == 'CAIXA':
             return True
         return 'caixa' in (self.descricao or '').lower()
 
