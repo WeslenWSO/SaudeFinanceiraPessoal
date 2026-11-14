@@ -5503,15 +5503,30 @@ def vincular_nota_solicitante_faturamento(request):
         texto_forma_pgto,
     )
 
+    from faturamento_medico.services.contas_caixa_acerto import caixa_unico_filtro_acerto
+
+    caixa_filtro_post = (request.POST.get('caixa_filtro') or '').strip()
+    if not caixa_filtro_post:
+        caixas_post = [
+            str(c).strip()
+            for c in request.POST.getlist('caixa_filtro')
+            if str(c).strip()
+        ]
+        caixa_filtro_post = caixa_unico_filtro_acerto(empresa_id, caixas_post)
+
     numeros = [(n.numero_nota or '').strip() or str(n.pk) for n in notas]
     faturamento.nota_fiscal = gravar_numeros_notas_faturamento(numeros)
     faturamento.save(update_fields=['nota_fiscal'])
     if len(notas) == 1:
         pagamentos = aplicar_pagamentos_acerto_ao_vincular_nota(faturamento, notas[0])
-        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, notas[0])
+        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(
+            faturamento, notas[0], caixa_filtro=caixa_filtro_post
+        )
     else:
         pagamentos = aplicar_pagamentos_acerto_vincular_varias_notas(faturamento, notas)
-        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(faturamento, notas[0])
+        caixa_val = aplicar_caixa_acerto_ao_vincular_nota(
+            faturamento, notas[0], caixa_filtro=caixa_filtro_post
+        )
     forma_pgto = texto_forma_pgto(pagamentos)
     serializadas = [serializar_nota_linha(n, manual=True) for n in notas]
     total_nf = Decimal('0')
@@ -7007,6 +7022,8 @@ def acerto_caixa(request):
         contexto.setdefault('dias_resumo', [])
         contexto.setdefault('modo_resumo_ano_leve', False)
         contexto.setdefault('acerto_botao_ano_habilitado', False)
+        contexto.setdefault('caixas_acerto_grade', contexto.get('caixas_acerto'))
+        contexto.setdefault('caixa_filtro_unico', '')
         contexto['empresa'] = empresa
         contexto['redirect_qs'] = request.GET.urlencode()
         return render(request, 'faturamento_medico/acerto_caixa.html', contexto)

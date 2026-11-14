@@ -28,8 +28,10 @@ from faturamento_medico.models import (
     rotulo_caixa_acerto,
 )
 from faturamento_medico.services.contas_caixa_acerto import (
+    caixa_unico_filtro_acerto,
     caixa_valor_ativo_no_acerto,
     caixas_acerto_choices,
+    caixas_acerto_choices_filtrados,
     caixas_acerto_valores,
 )
 from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
@@ -1061,7 +1063,7 @@ def filtrar_linhas_acerto_caixa(
         caixa_val = (linha.get('caixa_acerto') or '').strip()
         if caixa_val and not _caixa_linha_ativo_no_acerto(empresa_id, caixa_val):
             continue
-        if caixas_sel and caixa_val not in caixas_sel:
+        if caixas_sel and caixa_val and caixa_val not in caixas_sel:
             continue
         if somente_marcados and not linha.get('marcado_acerto_caixa'):
             continue
@@ -2154,7 +2156,11 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     if convenios_sel:
         qs = qs.filter(convenio__in=convenios_sel)
     if caixas_sel:
-        qs = qs.filter(caixa_acerto__in=caixas_sel)
+        qs = qs.filter(
+            Q(caixa_acerto__in=caixas_sel)
+            | Q(caixa_acerto='')
+            | Q(caixa_acerto__isnull=True)
+        )
     if somente_marcados:
         qs = qs.filter(marcado_acerto_caixa=True)
 
@@ -2619,6 +2625,10 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'checkin_disponiveis': checkin_disponiveis,
         'convenios_disponiveis': convenios_disponiveis,
         'caixas_acerto': caixas_acerto_choices(empresa_id),
+        'caixas_acerto_grade': caixas_acerto_choices_filtrados(
+            empresa_id, caixas_sel or None
+        ),
+        'caixa_filtro_unico': caixa_unico_filtro_acerto(empresa_id, caixas_sel or None),
         'filtros': filtros_dict,
         'filtros_resumo': montar_resumo_filtros_acerto(filtros_dict, di, df),
         **regua_ctx,

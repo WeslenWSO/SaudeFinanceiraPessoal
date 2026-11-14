@@ -24,7 +24,7 @@ def conta_ativa_no_acerto_caixa(conta: ContaBancaria) -> bool:
         return False
     if getattr(conta, 'inativo_acerto_caixa', False):
         return False
-    return (conta.status or 'A') != 'I'
+    return (conta.status or 'A') == 'A'
 
 
 def queryset_contas_caixa_cadastro(empresa_id: int):
@@ -77,6 +77,33 @@ def caixas_acerto_choices(empresa_id: int) -> list[tuple[str, str]]:
         from faturamento_medico.models import CAIXAS_ACERTO_CHOICES
 
         return list(CAIXAS_ACERTO_CHOICES)
+
+
+def caixas_acerto_choices_filtrados(
+    empresa_id: int,
+    caixas_sel: list[str] | None,
+) -> list[tuple[str, str]]:
+    """Opções do select da grade: só caixas do filtro GET (se houver e forem ativos)."""
+    todas = caixas_acerto_choices(empresa_id)
+    if not caixas_sel:
+        return todas
+    permitidos = {str(c).strip() for c in caixas_sel if str(c).strip()}
+    filtradas = [(v, rot) for v, rot in todas if v in permitidos]
+    return filtradas if filtradas else todas
+
+
+def caixa_unico_filtro_acerto(empresa_id: int, caixas_sel: list[str] | None) -> str:
+    """Um único caixa ativo no filtro — para pré-preencher vínculo NF / marcação."""
+    if not caixas_sel:
+        return ''
+    escolhas = [
+        str(c).strip()
+        for c in caixas_sel
+        if str(c).strip() and conta_caixa_valida(empresa_id, str(c).strip())
+    ]
+    if len(escolhas) == 1:
+        return escolhas[0]
+    return ''
 
 
 def caixas_acerto_valores(empresa_id: int) -> frozenset[str]:

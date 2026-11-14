@@ -1130,8 +1130,8 @@
                                         {% if linha.caixa_bloqueado %}disabled title="Caixa fechado — reabra para alterar"{% endif %}
                                         aria-label="Caixa">
                                     <option value="">—</option>
-                                    {% for valor, rotulo in caixas_acerto %}
-                                    <option value="{{ valor }}" {% if linha.caixa_acerto == valor %}selected{% endif %}>{{ rotulo }}</option>
+                                    {% for valor, rotulo in caixas_acerto_grade|default:caixas_acerto %}
+                                    <option value="{{ valor }}" {% if linha.caixa_acerto == valor %}selected{% elif not linha.caixa_acerto and caixa_filtro_unico == valor %}selected{% endif %}>{{ rotulo }}</option>
                                     {% endfor %}
                                 </select>
                                 {% else %}

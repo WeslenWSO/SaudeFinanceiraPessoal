@@ -80,6 +80,35 @@
     csrfToken = csrfToken ? csrfToken.value : '';
     var vinculoAtual = { faturamentoId: null, paciente: '', data: '', celula: null };
     var multiAtual = { faturamentoId: null, paciente: '', data: '', celula: null, notas: [] };
+
+    function paramsCaixaFiltroAcerto() {
+        try {
+            return new URLSearchParams(window.location.search).getAll('caixa');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function anexarCaixaFiltroAoBody(body) {
+        paramsCaixaFiltroAcerto().forEach(function(c) {
+            if (c) body.append('caixa_filtro', c);
+        });
+        return body;
+    }
+
+    function atualizarCaixaNasLinhasFaturamento(faturamentoId, res) {
+        if (!res || !faturamentoId) return;
+        document.querySelectorAll('tr[data-faturamento-id="' + faturamentoId + '"]').forEach(function(tr) {
+            var sel = tr.querySelector('.js-caixa-acerto');
+            if (sel && res.caixa_acerto) {
+                sel.value = res.caixa_acerto;
+            }
+            var cb = tr.querySelector('.js-acerto-caixa-flag');
+            if (cb && res.marcado_acerto_caixa) {
+                cb.checked = true;
+            }
+        });
+    }
     var modalSubtitulo = document.getElementById('modalNotasMultiplasSubtitulo');
     var btnUsarNotasSel = document.getElementById('btnUsarNotasSelecionadas');
 
@@ -280,6 +309,7 @@
         if (!faturamentoId || !notaIds.length) return;
         var body = new URLSearchParams({ faturamento_id: String(faturamentoId) });
         notaIds.forEach(function(id) { body.append('nota_id', String(id)); });
+        anexarCaixaFiltroAoBody(body);
         return fetch(vincularUrl, {
             method: 'POST',
             headers: {
@@ -326,6 +356,7 @@
                         discriminacao: notas.map(function(n) { return n.discriminacao || ''; }).join(' | ')
                     }, res);
                 }
+                atualizarCaixaNasLinhasFaturamento(faturamentoId, res);
                 if (modalMulti && window.bootstrap) {
                     bootstrap.Modal.getOrCreateInstance(modalMulti).hide();
                 }
@@ -461,6 +492,7 @@
                             faturamento_id: String(vinculoAtual.faturamentoId),
                             nota_id: String(nota.pk)
                         });
+                        anexarCaixaFiltroAoBody(body);
                         fetch(vincularUrl, {
                             method: 'POST',
                             headers: {
@@ -493,6 +525,7 @@
                                     var notaPag = res.nota_resumo || notasRes[0];
                                     atualizarColunasPagamentoNota(vinculoAtual.faturamentoId, notaPag, res);
                                 }
+                                atualizarCaixaNasLinhasFaturamento(vinculoAtual.faturamentoId, res);
                                 if (modalVincular && window.bootstrap) {
                                     bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
                                 }

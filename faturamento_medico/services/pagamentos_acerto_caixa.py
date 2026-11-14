@@ -110,11 +110,26 @@ def pagamentos_da_nota(nota: dict | None, valor_ref: Decimal | None) -> list[dic
     }]
 
 
-def aplicar_caixa_acerto_ao_vincular_nota(faturamento, nota) -> str:
+def aplicar_caixa_acerto_ao_vincular_nota(
+    faturamento,
+    nota,
+    *,
+    caixa_filtro: str = '',
+) -> str:
     """Marca acerto de caixa e define caixa a partir da NF / venda CA sincronizada."""
     from faturamento_medico.models import CAIXAS_ACERTO_VALORES
     from faturamento_medico.services.contas_caixa_acerto import conta_caixa_valida
     from notasfiscais.discriminacao_nfse import extrair_id_venda_conta_azul
+
+    filtro = (caixa_filtro or '').strip()
+    if filtro and (
+        conta_caixa_valida(faturamento.empresa_id, filtro)
+        or filtro in CAIXAS_ACERTO_VALORES
+    ):
+        faturamento.caixa_acerto = filtro
+        faturamento.marcado_acerto_caixa = True
+        faturamento.save(update_fields=['caixa_acerto', 'marcado_acerto_caixa'])
+        return filtro
 
     caixa = (getattr(nota, 'caixa_acerto_sugerido', None) or '').strip()
     if not caixa:

@@ -148,6 +148,36 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0]['paciente'], 'Maria Silva')
 
+    def test_filtro_caixa_mantem_linha_sem_caixa_atribuido(self):
+        linhas = [
+            {
+                'caixa_acerto': '',
+                'checkin_por': 'Operador',
+                'status_agendamento': 'Concluído',
+                'valor_pago': Decimal('10'),
+            },
+            {
+                'caixa_acerto': 'Beatriz',
+                'checkin_por': 'Operador',
+                'status_agendamento': 'Concluído',
+                'valor_pago': Decimal('20'),
+            },
+            {
+                'caixa_acerto': 'Laura',
+                'checkin_por': 'Operador',
+                'status_agendamento': 'Concluído',
+                'valor_pago': Decimal('30'),
+            },
+        ]
+        out = filtrar_linhas_acerto_caixa(
+            linhas,
+            empresa_id=1,
+            filtros={'caixa': ['Beatriz'], 'status_agendamento': []},
+        )
+        self.assertEqual(len(out), 2)
+        caixas = {l.get('caixa_acerto') for l in out}
+        self.assertEqual(caixas, {'', 'Beatriz'})
+
     def test_regua_dias_mes_e_urls(self):
         filtros = {'caixa': ['1'], 'somente_marcados': True}
         ctx = montar_regua_dias_acerto(filtros, date(2026, 11, 1), date(2026, 11, 30))
