@@ -5,9 +5,27 @@
   {% include 'parcial/_head.html' %}
 </head>
 <body>
+  <script>
+  (function () {
+    try {
+      if (window.matchMedia('(min-width: 992px)').matches
+          && localStorage.getItem('sf_nav_sidebar_collapsed') === '1') {
+        document.body.classList.add('smart-nav-desktop-collapsed');
+      }
+    } catch (e) { /* ignore */ }
+  })();
+  </script>
   <div id="app-wrapper">
     {% block sid_Bar %}{% include 'parcial/_nav.html' %}{% endblock %}
     <div id="app-content" class="app-content-with-nav">
+      <button type="button"
+              class="smart-nav-expand-fab"
+              id="smart-nav-expand-fab"
+              aria-label="Mostrar menu"
+              title="Mostrar menu lateral">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+        <span class="visually-hidden">Menu</span>
+      </button>
       {% if estoque_alertas_abaixo_minimo and estoque_alertas_url %}
       <div class="alert alert-warning py-2 px-3 mb-0 rounded-0 border-0 border-bottom text-center small" role="alert">
         <i class="fas fa-exclamation-triangle me-1"></i>
@@ -32,6 +50,6 @@
     else csrfToken = '';
   </script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="{% static 'js/menu.js' %}"></script>
+  <script src="{% static 'js/menu.js' %}?v=sidebar-collapse-1"></script>
 </body>
 </html>

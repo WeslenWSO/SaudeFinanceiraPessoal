@@ -53,19 +53,114 @@
   overflow: hidden;
 }
 
+.smart-nav-brand-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.35rem;
+  border-bottom: 1px solid var(--smart-nav-border);
+  margin-bottom: 0.35rem;
+}
+
 .smart-nav-brand {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.65rem 1.15rem 1rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.6rem 0.65rem 0.8rem;
   font-size: 1.05rem;
   font-weight: 700;
   color: #fff;
   text-decoration: none;
   letter-spacing: 0.02em;
-  border-bottom: 1px solid var(--smart-nav-border);
-  margin-bottom: 0.35rem;
+  border-bottom: none;
+  margin-bottom: 0;
   line-height: 1.3;
+}
+
+.smart-nav-collapse-btn {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  width: 2.65rem;
+  min-height: 2.65rem;
+  margin: 0.45rem 0.35rem 0 0;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--smart-nav-text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.smart-nav-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.smart-nav-collapse-btn .fa-angles-left {
+  font-size: 0.95rem;
+}
+
+.smart-nav-expand-fab {
+  display: none;
+  position: fixed;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 1045;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--smart-nav-bg);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.smart-nav-expand-fab:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+body.smart-nav-desktop-collapsed .smart-nav-expand-fab {
+  display: inline-flex;
+}
+
+@media (min-width: 992px) {
+  .smart-nav-collapse-btn {
+    display: flex;
+  }
+
+  body.smart-nav-desktop-collapsed #smart-nav.smart-nav-sidebar {
+    transform: translateX(-105%);
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  body.smart-nav-desktop-collapsed .app-content-with-nav {
+    margin-left: 0;
+  }
+
+  #smart-nav.smart-nav-sidebar {
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.28s;
+  }
+
+  .app-content-with-nav {
+    transition: margin-left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 .smart-nav-brand-logo {
@@ -257,6 +352,18 @@
     height: var(--smart-nav-mobile-bar);
     padding: var(--smart-nav-safe-top) 0.75rem 0 1rem;
     overflow: visible;
+  }
+
+  .smart-nav-brand-row {
+    border: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .smart-nav-collapse-btn {
+    display: none !important;
   }
 
   .smart-nav-brand {

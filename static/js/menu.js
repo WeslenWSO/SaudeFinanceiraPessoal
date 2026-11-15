@@ -8,6 +8,7 @@
   const OPEN_DELAY = 120;
   const CLOSE_DELAY = 250;
   const MOBILE_BREAKPOINT = 991;
+  const STORAGE_NAV_COLLAPSED = 'sf_nav_sidebar_collapsed';
 
   function isMobile() {
     return window.matchMedia('(max-width: ' + MOBILE_BREAKPOINT + 'px)').matches;
@@ -103,10 +104,59 @@
       }, { passive: false });
     }
 
+    const collapseBtn = document.getElementById('smart-nav-collapse-btn');
+    const expandFab = document.getElementById('smart-nav-expand-fab');
+
+    function setDesktopNavCollapsed(collapsed) {
+      if (isMobile()) {
+        document.body.classList.remove('smart-nav-desktop-collapsed');
+        return;
+      }
+      document.body.classList.toggle('smart-nav-desktop-collapsed', collapsed);
+      try {
+        localStorage.setItem(STORAGE_NAV_COLLAPSED, collapsed ? '1' : '0');
+      } catch (err) { /* ignore */ }
+    }
+
+    function loadDesktopNavCollapsed() {
+      if (isMobile()) {
+        document.body.classList.remove('smart-nav-desktop-collapsed');
+        return;
+      }
+      var collapsed = false;
+      try {
+        collapsed = localStorage.getItem(STORAGE_NAV_COLLAPSED) === '1';
+      } catch (err) { /* ignore */ }
+      document.body.classList.toggle('smart-nav-desktop-collapsed', collapsed);
+    }
+
+    loadDesktopNavCollapsed();
+
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isMobile()) {
+          setDesktopNavCollapsed(true);
+          closeAll();
+        }
+      });
+    }
+
+    if (expandFab) {
+      expandFab.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (!isMobile()) {
+          setDesktopNavCollapsed(false);
+        }
+      });
+    }
+
     window.addEventListener('resize', function () {
       if (!isMobile() && isMobileOpen()) {
         setMobileOpen(false);
       }
+      loadDesktopNavCollapsed();
     });
 
     let openTimer = null;

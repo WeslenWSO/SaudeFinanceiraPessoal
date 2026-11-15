@@ -15,20 +15,30 @@
 <nav id="smart-nav" class="smart-nav smart-nav-sidebar" role="navigation" aria-label="Menu principal">
   <div class="smart-nav-backdrop" id="smart-nav-backdrop" hidden></div>
   <div class="smart-nav-inner">
-    <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">
-      <img
-        src="{% static 'img/saude-financeira-logo.png' %}"
-        alt=""
-        class="smart-nav-brand-logo"
-        width="44"
-        height="44"
-        decoding="async"
-      >
-      <span class="smart-nav-brand-text">
-        Saúde Financeira
-        <span class="smart-nav-brand-sub">Gestão</span>
-      </span>
-    </a>
+    <div class="smart-nav-brand-row">
+      <a href="{% url 'dashboard:index' %}" class="smart-nav-brand">
+        <img
+          src="{% static 'img/saude-financeira-logo.png' %}"
+          alt=""
+          class="smart-nav-brand-logo"
+          width="44"
+          height="44"
+          decoding="async"
+        >
+        <span class="smart-nav-brand-text">
+          Saúde Financeira
+          <span class="smart-nav-brand-sub">Gestão</span>
+        </span>
+      </a>
+      <button type="button"
+              class="smart-nav-collapse-btn"
+              id="smart-nav-collapse-btn"
+              aria-label="Ocultar menu"
+              title="Ocultar menu lateral">
+        <i class="fas fa-angles-left" aria-hidden="true"></i>
+        <span class="smart-nav-collapse-btn-text">Ocultar</span>
+      </button>
+    </div>
     <button type="button" class="smart-nav-toggler" aria-label="Abrir menu" aria-expanded="false" aria-controls="smart-nav-menu" id="smart-nav-toggler">
       <i class="fas fa-bars smart-nav-toggler-fa" aria-hidden="true"></i>
     </button>
