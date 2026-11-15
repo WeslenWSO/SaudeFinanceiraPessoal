@@ -846,19 +846,10 @@
                                     <button type="button" class="btn btn-outline-secondary js-acerto-periodo" data-preset="mes_anterior">Mês anterior</button>
                                 </div>
                             </div>
-                            <div class="col-lg-2 col-md-4">
+                            <div class="col-lg-3 col-md-5">
                                 <label class="form-label small mb-1" for="paciente">Paciente</label>
                                 <input type="search" id="paciente" name="paciente" class="form-control form-control-sm"
                                        placeholder="Nome (contém)" value="{{ filtros.paciente|default:'' }}" autocomplete="off">
-                            </div>
-                            <div class="col-lg-2 col-md-4">
-                                <label class="form-label small mb-1" for="hora_inicial">Hora</label>
-                                <div class="d-flex gap-1">
-                                    <input type="time" id="hora_inicial" name="hora_inicial" class="form-control form-control-sm"
-                                           value="{{ filtros.hora_inicial }}" title="Hora inicial">
-                                    <input type="time" id="hora_final" name="hora_final" class="form-control form-control-sm"
-                                           value="{{ filtros.hora_final }}" title="Hora final">
-                                </div>
                             </div>
                             <div class="col-lg-2 col-md-4 d-flex flex-wrap gap-2 align-items-end">
                                 <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
