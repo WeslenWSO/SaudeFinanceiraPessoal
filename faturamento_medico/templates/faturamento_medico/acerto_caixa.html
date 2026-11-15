@@ -107,15 +107,49 @@
     margin-top: 0 !important;
     pointer-events: none;
 }
-.filtro-retratil-painel:has(#acertoReguaDiasWrap:not(.acerto-regua-cal-fechado)) {
+.filtro-retratil-painel:has(#acertoReguaDiasWrap:not(.acerto-regua-cal-fechado)),
+.filtro-retratil-painel:has(.acerto-filtro-suspensa-painel:not(.acerto-filtro-suspensa-fechado)) {
     overflow: visible;
+}
+.acerto-filtro-suspensa {
+    position: relative;
+}
+.acerto-filtro-suspensa-trigger {
+    cursor: pointer;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+}
+.acerto-filtro-suspensa-trigger .acerto-filtro-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+.acerto-filtro-suspensa.is-open .acerto-filtro-suspensa-trigger .acerto-filtro-chevron {
+    transform: rotate(180deg);
+}
+.acerto-filtro-suspensa-painel {
+    position: absolute;
+    z-index: 1055;
+    top: 100%;
+    left: 0;
+    width: max(100%, 17rem);
+    max-width: min(24rem, calc(100vw - 1.5rem));
+    margin-top: 0.2rem;
+    box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.12);
+}
+.acerto-filtro-suspensa-fechado {
+    display: none;
+}
+.acerto-filtro-suspensa-painel .fm-solicitante-lista {
+    max-height: 11rem !important;
 }
 .acerto-filtro-bloco {
     border: 1px solid #dee2e6;
     border-radius: 0.5rem;
     padding: 0.65rem 0.75rem;
     background: #fff;
-    height: 100%;
 }
 .acerto-filtro-bloco-head {
     display: flex;
@@ -866,8 +900,17 @@
                             </div>
                         </div>
                         <div class="row g-2 mt-2">
-                            <div class="col-lg-3 col-md-6">
-                                <div class="acerto-filtro-bloco">
+                            <div class="col-6 col-md-4 col-xl acerto-filtro-suspensa">
+                                <label class="form-label small mb-1">Caixa (ativos)</label>
+                                <button type="button"
+                                        class="form-control form-control-sm acerto-filtro-suspensa-trigger js-acerto-filtro-suspensa-trigger"
+                                        aria-expanded="false"
+                                        data-checkbox-name="caixa"
+                                        data-resumo-vazio="Todos os caixas">
+                                    <span class="js-acerto-filtro-resumo text-truncate">Todos os caixas</span>
+                                    <i class="fas fa-chevron-down small text-muted acerto-filtro-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="acerto-filtro-bloco acerto-filtro-suspensa-painel acerto-filtro-suspensa-fechado" role="dialog" aria-label="Filtro caixa">
                                     <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Caixa (ativos)</span>
                                         <span>
@@ -890,8 +933,17 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="acerto-filtro-bloco">
+                            <div class="col-6 col-md-4 col-xl acerto-filtro-suspensa">
+                                <label class="form-label small mb-1">Check-in por</label>
+                                <button type="button"
+                                        class="form-control form-control-sm acerto-filtro-suspensa-trigger js-acerto-filtro-suspensa-trigger"
+                                        aria-expanded="false"
+                                        data-checkbox-name="checkin_por"
+                                        data-resumo-vazio="Todos">
+                                    <span class="js-acerto-filtro-resumo text-truncate">Todos</span>
+                                    <i class="fas fa-chevron-down small text-muted acerto-filtro-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="acerto-filtro-bloco acerto-filtro-suspensa-painel acerto-filtro-suspensa-fechado" role="dialog" aria-label="Filtro check-in">
                                     <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Check-in por</span>
                                         <span>
@@ -915,8 +967,17 @@
                                     <div class="form-text mb-0">Vazio = todos.</div>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="acerto-filtro-bloco">
+                            <div class="col-6 col-md-4 col-xl acerto-filtro-suspensa">
+                                <label class="form-label small mb-1">Convênio</label>
+                                <button type="button"
+                                        class="form-control form-control-sm acerto-filtro-suspensa-trigger js-acerto-filtro-suspensa-trigger"
+                                        aria-expanded="false"
+                                        data-checkbox-name="convenio"
+                                        data-resumo-vazio="Todos">
+                                    <span class="js-acerto-filtro-resumo text-truncate">Todos</span>
+                                    <i class="fas fa-chevron-down small text-muted acerto-filtro-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="acerto-filtro-bloco acerto-filtro-suspensa-painel acerto-filtro-suspensa-fechado" role="dialog" aria-label="Filtro convênio">
                                     <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Convênio</span>
                                         <span>
@@ -939,8 +1000,17 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="acerto-filtro-bloco">
+                            <div class="col-6 col-md-4 col-xl acerto-filtro-suspensa">
+                                <label class="form-label small mb-1">Forma de pagamento</label>
+                                <button type="button"
+                                        class="form-control form-control-sm acerto-filtro-suspensa-trigger js-acerto-filtro-suspensa-trigger"
+                                        aria-expanded="false"
+                                        data-checkbox-name="forma_pagamento"
+                                        data-resumo-vazio="Todas">
+                                    <span class="js-acerto-filtro-resumo text-truncate">Todas</span>
+                                    <i class="fas fa-chevron-down small text-muted acerto-filtro-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="acerto-filtro-bloco acerto-filtro-suspensa-painel acerto-filtro-suspensa-fechado" role="dialog" aria-label="Filtro forma de pagamento">
                                     <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Forma de pagamento</span>
                                         <span>
@@ -964,8 +1034,17 @@
                                     <div class="form-text mb-0">Vazio = todas. Usa a forma exibida na grade (NF / pagamento).</div>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6">
-                                <div class="acerto-filtro-bloco">
+                            <div class="col-6 col-md-4 col-xl acerto-filtro-suspensa">
+                                <label class="form-label small mb-1">Status agendamento</label>
+                                <button type="button"
+                                        class="form-control form-control-sm acerto-filtro-suspensa-trigger js-acerto-filtro-suspensa-trigger"
+                                        aria-expanded="false"
+                                        data-checkbox-name="status_agendamento"
+                                        data-resumo-vazio="Padrão (sem cancelados)">
+                                    <span class="js-acerto-filtro-resumo text-truncate">Padrão (sem cancelados)</span>
+                                    <i class="fas fa-chevron-down small text-muted acerto-filtro-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="acerto-filtro-bloco acerto-filtro-suspensa-painel acerto-filtro-suspensa-fechado" role="dialog" aria-label="Filtro status">
                                     <div class="acerto-filtro-bloco-head">
                                         <span class="small fw-semibold">Status agendamento</span>
                                         <span>
@@ -2428,7 +2507,97 @@
             if (row && row.style.display === 'none') return;
             cb.checked = checked;
         });
+        atualizarResumoFiltroSuspensa(name);
     }
+
+    function atualizarResumoFiltroSuspensa(checkboxName) {
+        document.querySelectorAll('.js-acerto-filtro-suspensa-trigger').forEach(function(trigger) {
+            var name = trigger.getAttribute('data-checkbox-name');
+            if (checkboxName && name !== checkboxName) return;
+            var resumoEl = trigger.querySelector('.js-acerto-filtro-resumo');
+            if (!resumoEl) return;
+            var vazio = trigger.getAttribute('data-resumo-vazio') || 'Todos';
+            var marcados = [];
+            document.querySelectorAll('input[name="' + name + '"]:checked').forEach(function(cb) {
+                var row = cb.closest('.js-acerto-lista-item');
+                if (row && row.style.display === 'none') return;
+                var lbl = row ? row.querySelector('span') : null;
+                marcados.push(lbl ? (lbl.textContent || '').trim() : cb.value);
+            });
+            if (!marcados.length) {
+                resumoEl.textContent = vazio;
+                resumoEl.setAttribute('title', vazio);
+                return;
+            }
+            if (marcados.length === 1) {
+                resumoEl.textContent = marcados[0];
+                resumoEl.setAttribute('title', marcados[0]);
+                return;
+            }
+            var texto = marcados.length + ' selecionado(s)';
+            resumoEl.textContent = texto;
+            resumoEl.setAttribute('title', marcados.join(', '));
+        });
+    }
+
+    function fecharFiltrosSuspensos(excetoWrap) {
+        document.querySelectorAll('.acerto-filtro-suspensa').forEach(function(wrap) {
+            if (excetoWrap && wrap === excetoWrap) return;
+            var painel = wrap.querySelector('.acerto-filtro-suspensa-painel');
+            var trigger = wrap.querySelector('.js-acerto-filtro-suspensa-trigger');
+            if (painel) painel.classList.add('acerto-filtro-suspensa-fechado');
+            wrap.classList.remove('is-open');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function abrirFiltroSuspenso(wrap) {
+        if (!wrap) return;
+        fecharFiltrosSuspensos(wrap);
+        var painel = wrap.querySelector('.acerto-filtro-suspensa-painel');
+        var trigger = wrap.querySelector('.js-acerto-filtro-suspensa-trigger');
+        if (painel) painel.classList.remove('acerto-filtro-suspensa-fechado');
+        wrap.classList.add('is-open');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+        var busca = painel && painel.querySelector('.js-acerto-lista-busca');
+        if (busca) {
+            setTimeout(function() { busca.focus(); }, 0);
+        }
+    }
+
+    document.querySelectorAll('.js-acerto-filtro-suspensa-trigger').forEach(function(trigger) {
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var wrap = trigger.closest('.acerto-filtro-suspensa');
+            var painel = wrap && wrap.querySelector('.acerto-filtro-suspensa-painel');
+            var aberto = painel && !painel.classList.contains('acerto-filtro-suspensa-fechado');
+            if (aberto) {
+                fecharFiltrosSuspensos();
+            } else {
+                abrirFiltroSuspenso(wrap);
+            }
+        });
+    });
+
+    document.querySelectorAll('.acerto-filtro-suspensa-painel').forEach(function(painel) {
+        painel.addEventListener('click', function(e) { e.stopPropagation(); });
+    });
+
+    document.addEventListener('click', function() {
+        fecharFiltrosSuspensos();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') fecharFiltrosSuspensos();
+    });
+
+    document.querySelectorAll('#formFiltrosAcerto input[type="checkbox"]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            atualizarResumoFiltroSuspensa(cb.getAttribute('name'));
+        });
+    });
+    atualizarResumoFiltroSuspensa();
+
     document.querySelectorAll('.js-acerto-chk-all').forEach(function(btn) {
         btn.addEventListener('click', function() {
             toggleNamedChecks(btn.getAttribute('data-target'), true);
