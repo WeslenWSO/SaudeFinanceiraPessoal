@@ -107,6 +107,9 @@
     margin-top: 0 !important;
     pointer-events: none;
 }
+.filtro-retratil-painel:has(#acertoReguaDiasWrap:not(.acerto-regua-cal-fechado)) {
+    overflow: visible;
+}
 .acerto-filtro-bloco {
     border: 1px solid #dee2e6;
     border-radius: 0.5rem;
@@ -132,11 +135,27 @@
     margin-bottom: 0.35rem;
 }
 .acerto-periodo-atalhos .btn { font-size: 0.72rem; padding: 0.15rem 0.45rem; }
+.acerto-periodo-cal-anchor {
+    position: relative;
+}
 .acerto-regua-dias {
     border: 1px solid #dee2e6;
     border-radius: 0.5rem;
     padding: 0.5rem 0.65rem;
     background: #f8fafc;
+}
+.acerto-regua-dias.acerto-regua-cal-popup {
+    position: absolute;
+    z-index: 1060;
+    top: 100%;
+    left: 0;
+    width: max(100%, 20rem);
+    max-width: min(38rem, calc(100vw - 1.5rem));
+    margin-top: 0.15rem;
+    box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.12);
+}
+.acerto-regua-dias.acerto-regua-cal-fechado {
+    display: none;
 }
 .acerto-regua-cal-nav {
     display: flex;
@@ -752,68 +771,74 @@
                 </button>
                 <div class="filtro-retratil-painel mt-2" id="painelFiltrosAcerto">
                     <form method="get" id="formFiltrosAcerto">
-                        <div class="acerto-regua-dias mb-3" id="acertoReguaDiasWrap">
-                            <div class="acerto-resumo-dias-aviso" id="acertoResumoDiasAviso" role="status">
-                                <i class="fas fa-hand-pointer me-1"></i>
-                                Selecione <strong>um ou mais dias</strong> no calendário (clique para marcar/desmarcar).
-                                Depois clique em <strong>Abrir resumo</strong>.
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="btnCancelarModoResumoDias">Cancelar</button>
-                            </div>
-                            <div class="acerto-regua-anos" role="navigation" aria-label="Anos">
-                                <span class="acerto-regua-anos-label">Ano</span>
-                                {% for ba in regua_botoes_anos %}
-                                <a class="acerto-regua-ano{% if ba.ativo %} active{% elif ba.parcial %} parcial{% endif %}"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ ba.url_query }}"
-                                   title="Período = {{ ba.label }} inteiro">{{ ba.label }}</a>
-                                {% endfor %}
-                            </div>
-                            <div class="acerto-regua-meses" role="navigation" aria-label="Meses do ano">
-                                <span class="acerto-regua-meses-label">{{ regua_ano }}</span>
-                                {% for bm in regua_botoes_meses %}
-                                <a class="acerto-regua-mes{% if bm.ativo %} active{% elif bm.parcial %} parcial{% endif %}"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ bm.url_query }}"
-                                   title="{{ bm.label }} {{ regua_ano }} (mês inteiro)">{{ bm.label }}</a>
-                                {% endfor %}
-                            </div>
-                            <div class="acerto-regua-cal-nav" role="navigation" aria-label="Navegação do mês">
-                                <a class="acerto-regua-nav"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_anterior }}"
-                                   title="Período = mês anterior inteiro">‹ Mês anterior</a>
-                                <span class="small fw-semibold">{{ regua_titulo }}</span>
-                                <a class="acerto-regua-nav"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_seguinte }}"
-                                   title="Período = mês seguinte inteiro">Mês seguinte ›</a>
-                            </div>
-                            <div class="acerto-regua-cal-weekdays" aria-hidden="true">
-                                <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span>
-                                <span>Qui</span><span>Sex</span><span>Sáb</span>
-                            </div>
-                            <div class="acerto-regua-cal-grid" role="navigation" aria-label="Calendário de dias">
-                                {% for semana in regua_calendario_semanas %}
-                                {% for cel in semana %}
-                                {% if cel %}
-                                <a class="acerto-regua-dia js-regua-dia{% if cel.ativo_dia %} active{% elif cel.no_intervalo %} in-range{% endif %}{% if cel.escolhido_resumo %} picked-resumo{% endif %}{% if cel.fim_semana %} weekend{% endif %}"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ cel.url_query }}"
-                                   data-iso="{{ cel.iso }}"
-                                   title="{{ cel.iso }}">
-                                    <span class="dow">{{ cel.dia_semana }}</span>
-                                    <span class="num">{{ cel.numero }}</span>
-                                </a>
-                                {% else %}
-                                <span class="acerto-regua-cal-vazio"></span>
-                                {% endif %}
-                                {% endfor %}
-                                {% endfor %}
-                            </div>
-                        </div>
                         <div class="row g-2 align-items-end">
                             <div class="col-lg-4">
                                 <label class="form-label small mb-1">Período</label>
-                                <div class="d-flex gap-2 mb-1">
-                                    <input type="date" id="data_inicio" name="data_inicio" class="form-control form-control-sm"
-                                           value="{{ filtros.data_inicio }}" aria-label="Data início">
-                                    <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm"
-                                           value="{{ filtros.data_fim }}" aria-label="Data fim">
+                                <div class="acerto-periodo-cal-anchor mb-1">
+                                <div class="d-flex gap-2">
+                                    <input type="date" id="data_inicio" name="data_inicio" class="form-control form-control-sm js-acerto-abre-calendario"
+                                           value="{{ filtros.data_inicio }}" aria-label="Data início" autocomplete="off">
+                                    <input type="date" id="data_fim" name="data_fim" class="form-control form-control-sm js-acerto-abre-calendario"
+                                           value="{{ filtros.data_fim }}" aria-label="Data fim" autocomplete="off">
+                                </div>
+                                <div class="acerto-regua-dias acerto-regua-cal-popup acerto-regua-cal-fechado"
+                                     id="acertoReguaDiasWrap"
+                                     role="dialog"
+                                     aria-label="Calendário do período"
+                                     aria-hidden="true">
+                                    <div class="acerto-resumo-dias-aviso" id="acertoResumoDiasAviso" role="status">
+                                        <i class="fas fa-hand-pointer me-1"></i>
+                                        Selecione <strong>um ou mais dias</strong> no calendário (clique para marcar/desmarcar).
+                                        Depois clique em <strong>Abrir resumo</strong>.
+                                        <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="btnCancelarModoResumoDias">Cancelar</button>
+                                    </div>
+                                    <div class="acerto-regua-anos" role="navigation" aria-label="Anos">
+                                        <span class="acerto-regua-anos-label">Ano</span>
+                                        {% for ba in regua_botoes_anos %}
+                                        <a class="acerto-regua-ano{% if ba.ativo %} active{% elif ba.parcial %} parcial{% endif %}"
+                                           href="{% url 'faturamento_medico:acerto_caixa' %}?{{ ba.url_query }}"
+                                           title="Período = {{ ba.label }} inteiro">{{ ba.label }}</a>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="acerto-regua-meses" role="navigation" aria-label="Meses do ano">
+                                        <span class="acerto-regua-meses-label">{{ regua_ano }}</span>
+                                        {% for bm in regua_botoes_meses %}
+                                        <a class="acerto-regua-mes{% if bm.ativo %} active{% elif bm.parcial %} parcial{% endif %}"
+                                           href="{% url 'faturamento_medico:acerto_caixa' %}?{{ bm.url_query }}"
+                                           title="{{ bm.label }} {{ regua_ano }} (mês inteiro)">{{ bm.label }}</a>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="acerto-regua-cal-nav" role="navigation" aria-label="Navegação do mês">
+                                        <a class="acerto-regua-nav"
+                                           href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_anterior }}"
+                                           title="Período = mês anterior inteiro">‹ Mês anterior</a>
+                                        <span class="small fw-semibold">{{ regua_titulo }}</span>
+                                        <a class="acerto-regua-nav"
+                                           href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_seguinte }}"
+                                           title="Período = mês seguinte inteiro">Mês seguinte ›</a>
+                                    </div>
+                                    <div class="acerto-regua-cal-weekdays" aria-hidden="true">
+                                        <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span>
+                                        <span>Qui</span><span>Sex</span><span>Sáb</span>
+                                    </div>
+                                    <div class="acerto-regua-cal-grid" role="navigation" aria-label="Calendário de dias">
+                                        {% for semana in regua_calendario_semanas %}
+                                        {% for cel in semana %}
+                                        {% if cel %}
+                                        <a class="acerto-regua-dia js-regua-dia{% if cel.ativo_dia %} active{% elif cel.no_intervalo %} in-range{% endif %}{% if cel.escolhido_resumo %} picked-resumo{% endif %}{% if cel.fim_semana %} weekend{% endif %}"
+                                           href="{% url 'faturamento_medico:acerto_caixa' %}?{{ cel.url_query }}"
+                                           data-iso="{{ cel.iso }}"
+                                           title="{{ cel.iso }}">
+                                            <span class="dow">{{ cel.dia_semana }}</span>
+                                            <span class="num">{{ cel.numero }}</span>
+                                        </a>
+                                        {% else %}
+                                        <span class="acerto-regua-cal-vazio"></span>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
                                 </div>
                                 <div class="acerto-periodo-atalhos btn-group btn-group-sm flex-wrap" role="group" aria-label="Atalhos de período">
                                     <button type="button" class="btn btn-outline-secondary js-acerto-periodo" data-preset="hoje">Hoje</button>
@@ -2986,6 +3011,12 @@
         }
     }
 
+    function setCalendarioPeriodoAberto(aberto) {
+        if (!reguaWrap) return;
+        reguaWrap.classList.toggle('acerto-regua-cal-fechado', !aberto);
+        reguaWrap.setAttribute('aria-hidden', aberto ? 'false' : 'true');
+    }
+
     function setModoResumoDias(ativo) {
         modoResumoDias = !!ativo;
         if (reguaWrap) reguaWrap.classList.toggle('acerto-regua-modo-resumo', modoResumoDias);
@@ -2993,8 +3024,26 @@
             btnResumo.classList.toggle('btn-success', modoResumoDias);
             btnResumo.classList.toggle('btn-outline-success', !modoResumoDias);
         }
+        setCalendarioPeriodoAberto(!!ativo);
         atualizarLabelBtnResumo();
     }
+
+    var periodoCalAnchor = reguaWrap ? reguaWrap.closest('.acerto-periodo-cal-anchor') : null;
+    document.querySelectorAll('.js-acerto-abre-calendario').forEach(function(inp) {
+        inp.addEventListener('focus', function() { setCalendarioPeriodoAberto(true); });
+        inp.addEventListener('click', function() { setCalendarioPeriodoAberto(true); });
+    });
+    document.addEventListener('click', function(e) {
+        if (!reguaWrap || reguaWrap.classList.contains('acerto-regua-cal-fechado') || modoResumoDias) return;
+        if (periodoCalAnchor && periodoCalAnchor.contains(e.target)) return;
+        if (reguaWrap.contains(e.target)) return;
+        setCalendarioPeriodoAberto(false);
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && reguaWrap && !reguaWrap.classList.contains('acerto-regua-cal-fechado') && !modoResumoDias) {
+            setCalendarioPeriodoAberto(false);
+        }
+    });
 
     document.querySelectorAll('.js-regua-dia').forEach(function(el) {
         el.addEventListener('click', function(e) {
@@ -3036,7 +3085,7 @@
             }
             if (modoResumoDias) {
                 if (diasPickedResumo.size < 1) {
-                    alert('Selecione ao menos um dia na régua (destacados em verde).');
+                    alert('Selecione ao menos um dia no calendário (destacados em verde).');
                     return;
                 }
                 navegarResumoComDias();
