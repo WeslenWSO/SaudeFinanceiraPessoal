@@ -93,6 +93,10 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
     vp_raw = getattr(item, 'valor_pago', None)
     vp = _decimal_campo(vp_raw)
     conferido = bool(getattr(item, 'conferido', False))
+    status = (getattr(item, 'status_conferencia', None) or '').strip()
+
+    if liquido is not None and liquido > 0 and (conferido or status in ('CONFERIDO', 'LOTE OK')):
+        return liquido
 
     if liquido is not None:
         if vp is None or vp <= 0:
@@ -164,6 +168,11 @@ def sincronizar_valor_pago_apos_preco(
     if total_dec <= 0:
         return
     vp_atual = _decimal_campo(item.valor_pago)
+    if vp_atual is None or vp_atual < total_dec - _EPS:
+        if item.pk:
+            ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
+        item.valor_pago = total_dec
+        return
     if _acrescimo_ris_eco_valor_pago(item):
         ItemServico.objects.filter(pk=item.pk).update(valor_acrescimo=Decimal('0'))
         item.valor_acrescimo = Decimal('0')

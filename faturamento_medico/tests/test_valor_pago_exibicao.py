@@ -49,6 +49,30 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('250'))
 
+    def test_conferido_usa_total_mesmo_com_ris_maior(self):
+        item = _item(
+            total=Decimal('350'),
+            valor_pago=Decimal('141'),
+            conferido=True,
+        )
+        self.assertEqual(valor_pago_para_exibicao(item), Decimal('350'))
+
+    def test_sincronizar_eleva_valor_pago_quando_total_aumentou(self):
+        item = MagicMock(
+            pk=99,
+            total=Decimal('350'),
+            valor=Decimal('350'),
+            valor_acrescimo=Decimal('0'),
+            valor_pago=Decimal('141'),
+        )
+        with patch('faturamento_medico.services.valor_pago_exibicao.ItemServico') as model:
+            model.objects.filter.return_value.update = MagicMock()
+            sincronizar_valor_pago_apos_preco(item, forcar=True)
+            model.objects.filter.return_value.update.assert_called_with(
+                valor_pago=Decimal('350'),
+            )
+            self.assertEqual(item.valor_pago, Decimal('350'))
+
     def test_liquido_com_acrescimo_cadastrado(self):
         item = _item(valor_acrescimo=Decimal('80'), valor_pago=None)
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('300'))

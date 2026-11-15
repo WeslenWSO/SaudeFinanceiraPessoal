@@ -240,6 +240,12 @@ class FaturamentoMedico(models.Model):
         self.total = total_itens
         # Salva sem chamar save() novamente para evitar loop
         super().save(update_fields=['total'])
+        from faturamento_medico.services.valor_pago_exibicao import (
+            sincronizar_valor_pago_apos_preco,
+        )
+
+        for item in self.itens_servico.all():
+            sincronizar_valor_pago_apos_preco(item, forcar=True)
 
 
 def documento_upload_path(instance, filename):
