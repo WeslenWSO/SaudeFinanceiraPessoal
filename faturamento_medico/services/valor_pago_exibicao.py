@@ -207,28 +207,32 @@ def sincronizar_valor_pago_apos_preco(
 def valor_pago_grade_item(item: ItemServico | None) -> Decimal | None:
     """
     Valor pago nas grades (faturamento e acerto de caixa) — mesma regra nas duas telas.
+
+    Respeita o valor pago rateado no caixa (ex.: PIX R$ 900 em vários exames).
+    Só substitui pelo total do item quando o preço conferido ficou bem acima do RIS
+    (desconto importado obsoleto após corrigir tabela).
     """
     if item is None:
         return None
+    vp = valor_pago_para_exibicao(item)
     try:
         total_dec = Decimal(
             str(item.total if item.total is not None else (item.valor or 0))
         )
     except Exception:
         total_dec = Decimal('0')
-    vp = valor_pago_para_exibicao(item)
     if total_dec <= 0:
         return vp
-    if vp is None or vp + _EPS < total_dec:
-        desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
-        if desconto <= 0:
+    if vp is None or vp <= 0:
+        return total_dec
+    if vp + _EPS >= total_dec:
+        return vp
+    desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
+    if desconto <= 0:
+        return total_dec
+    try:
+        if vp > 0 and total_dec / vp >= Decimal('1.45'):
             return total_dec
-        liquido = _liquido_item(item)
-        if (
-            liquido
-            and total_dec > liquido + _EPS
-            and vp is not None
-            and abs(vp - liquido) <= _EPS
-        ):
-            return total_dec
+    except Exception:
+        pass
     return vp
