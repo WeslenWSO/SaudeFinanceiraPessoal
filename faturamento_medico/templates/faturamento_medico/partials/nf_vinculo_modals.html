@@ -1,3 +1,19 @@
+<style>
+.fm-nota-candidata {
+    cursor: pointer;
+    border: 1px solid #e9ecef;
+    border-radius: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    margin-bottom: 0.35rem;
+    background: #fff;
+}
+.fm-nota-candidata:hover { background: #eef4ff; border-color: #cfe2ff; }
+.fm-nota-candidata.fm-nota-candidata-destaque {
+    border-color: #9ec5fe;
+    background: #f8fbff;
+}
+.fm-nota-candidata-valor-ok { font-size: 0.68rem; }
+</style>
 <div class="modal fade" id="modalNotasMultiplas" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -44,6 +60,11 @@
                 <p class="small text-muted mb-2">
                     Paciente: <strong id="vincularNFPaciente"></strong>
                     · Exame: <strong id="vincularNFData"></strong>
+                    <span class="d-none" id="vincularNFValorLinhaWrap"> · Valor pago da linha: <strong id="vincularNFValorLinha"></strong></span>
+                </p>
+                <p class="small text-muted mb-2" id="vincularNFInstrucao">
+                    Clique na nota ou em <strong>Usar esta NF</strong>.
+                    Várias notas no mesmo dia: use <strong>Vincular por valor</strong> no rodapé ou repita em cada linha.
                 </p>
                 <div class="input-group input-group-sm mb-2">
                     <input type="search"
@@ -55,8 +76,9 @@
                 </div>
                 <div id="vincularNFLista" class="small text-muted">Carregando candidatas...</div>
             </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            <div class="modal-footer py-2 d-flex flex-wrap gap-2 justify-content-between w-100">
+                <button type="button" class="btn btn-success btn-sm d-none" id="btnVincularNotasLote"></button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-bs-dismiss="modal">Cancelar</button>
             </div>
         </div>
     </div>
@@ -78,8 +100,12 @@
     var desvincularUrl = "{% url 'faturamento_medico:desvincular_nota_solicitante_faturamento' %}";
     var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     csrfToken = csrfToken ? csrfToken.value : '';
-    var vinculoAtual = { faturamentoId: null, paciente: '', data: '', celula: null };
+    var vinculoAtual = { faturamentoId: null, paciente: '', data: '', celula: null, valorPago: null };
     var multiAtual = { faturamentoId: null, paciente: '', data: '', celula: null, notas: [] };
+    var notasVinculoCandidatas = [];
+    var btnVincularNotasLote = document.getElementById('btnVincularNotasLote');
+    var vincularValorLinhaWrap = document.getElementById('vincularNFValorLinhaWrap');
+    var vincularValorLinhaEl = document.getElementById('vincularNFValorLinha');
 
     function paramsCaixaFiltroAcerto() {
         try {
@@ -183,6 +209,200 @@
         var partes = s.split(',');
         partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         return 'R$ ' + partes.join(',');
+    }
+
+    function normalizarNomePaciente(nome) {
+        return String(nome || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    }
+
+    function pacientesCompativel(a, b) {
+        var na = normalizarNomePaciente(a);
+        var nb = normalizarNomePaciente(b);
+        if (!na || !nb) return false;
+        if (na === nb) return true;
+        if (na.indexOf(nb) === 0 || nb.indexOf(na) === 0) return true;
+        var ta = na.split(' ')[0];
+        var tb = nb.split(' ')[0];
+        return ta.length > 2 && ta === tb;
+    }
+
+    function coletarFaturamentosPacienteDia(paciente, dataIso) {
+        var porFat = {};
+        document.querySelectorAll('tr[data-faturamento-id]').forEach(function(tr) {
+            if (dataIso && tr.getAttribute('data-sort-data') !== dataIso) return;
+            var pacTr = tr.getAttribute('data-paciente') || '';
+            if (!pacientesCompativel(paciente, pacTr)) {
+                var cel = tr.querySelector('.fm-celula-nf');
+                pacTr = (cel && cel.getAttribute('data-paciente')) || pacTr;
+                if (!pacientesCompativel(paciente, pacTr)) return;
+            }
+            var fatId = tr.getAttribute('data-faturamento-id');
+            if (!fatId) return;
+            var celula = tr.querySelector('.fm-celula-nf');
+            if (!celula) return;
+            var vp = parseFloat(tr.getAttribute('data-valor-pago') || '0');
+            if (!porFat[fatId]) {
+                porFat[fatId] = {
+                    faturamentoId: fatId,
+                    valorPago: isNaN(vp) ? null : vp,
+                    celula: celula,
+                    tr: tr
+                };
+            }
+        });
+        return Object.keys(porFat).map(function(k) { return porFat[k]; });
+    }
+
+    function diferencaValorNota(nota, valorRef) {
+        var vn = valorNumericoNota(nota);
+        if (vn == null || valorRef == null || isNaN(valorRef)) return null;
+        return Math.abs(vn - valorRef);
+    }
+
+    function ordenarNotasPorValorLinha(notas, valorRef) {
+        if (valorRef == null || isNaN(valorRef)) return notas.slice();
+        return notas.slice().sort(function(a, b) {
+            var da = diferencaValorNota(a, valorRef);
+            var db = diferencaValorNota(b, valorRef);
+            if (da == null && db == null) return 0;
+            if (da == null) return 1;
+            if (db == null) return -1;
+            return da - db;
+        });
+    }
+
+    function parearLinhasNotasPorValor(linhas, notas) {
+        var pares = [];
+        var notasRestantes = notas.slice();
+        linhas.slice().sort(function(a, b) {
+            return (b.valorPago || 0) - (a.valorPago || 0);
+        }).forEach(function(linha) {
+            if (!notasRestantes.length) return;
+            var melhorIdx = 0;
+            var melhorDiff = null;
+            notasRestantes.forEach(function(nota, idx) {
+                var d = diferencaValorNota(nota, linha.valorPago);
+                if (d == null) return;
+                if (melhorDiff == null || d < melhorDiff) {
+                    melhorDiff = d;
+                    melhorIdx = idx;
+                }
+            });
+            var nota = notasRestantes.splice(melhorIdx, 1)[0];
+            pares.push({ linha: linha, nota: nota });
+        });
+        return pares;
+    }
+
+    function aplicarVinculoResposta(faturamentoId, celula, res) {
+        var notasRes = res.notas && res.notas.length ? res.notas : (res.nota ? [res.nota] : []);
+        if (celula) {
+            if (notasRes.length > 1) {
+                renderCelulaNFMulti(celula, notasRes);
+            } else if (notasRes.length === 1) {
+                renderCelulaNF(celula, notasRes[0]);
+            }
+        }
+        if (notasRes.length === 1) {
+            atualizarLinhasMesmoFaturamento(faturamentoId, notasRes[0], res);
+        } else if (notasRes.length > 1) {
+            document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + faturamentoId + '"]').forEach(function(cel) {
+                renderCelulaNFMulti(cel, notasRes);
+            });
+            var notaPag = res.nota_resumo || notasRes[0];
+            atualizarColunasPagamentoNota(faturamentoId, notaPag, res);
+        }
+        atualizarCaixaNasLinhasFaturamento(faturamentoId, res);
+    }
+
+    function postVincularNota(faturamentoId, notaIds) {
+        var body = new URLSearchParams({ faturamento_id: String(faturamentoId) });
+        notaIds.forEach(function(id) { body.append('nota_id', String(id)); });
+        anexarCaixaFiltroAoBody(body);
+        return fetch(vincularUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: body.toString()
+        }).then(function(resp) { return resp.json(); });
+    }
+
+    function vincularUmaNota(nota, celulaOverride) {
+        if (!vinculoAtual.faturamentoId || !nota || !nota.pk) return Promise.reject();
+        var cel = celulaOverride || vinculoAtual.celula;
+        return postVincularNota(vinculoAtual.faturamentoId, [nota.pk]).then(function(res) {
+            if (!res.ok) {
+                alert(res.error || 'Não foi possível vincular a NF.');
+                return res;
+            }
+            aplicarVinculoResposta(vinculoAtual.faturamentoId, cel, res);
+            return res;
+        });
+    }
+
+    function atualizarBotaoVinculoLote(notas) {
+        if (!btnVincularNotasLote) return;
+        btnVincularNotasLote.classList.add('d-none');
+        btnVincularNotasLote.onclick = null;
+        if (!notas || notas.length < 2) return;
+        var linhas = coletarFaturamentosPacienteDia(vinculoAtual.paciente, vinculoAtual.data);
+        if (linhas.length >= 2) {
+            btnVincularNotasLote.textContent = 'Vincular as notas por valor (' + linhas.length + ' linha(s))';
+            btnVincularNotasLote.classList.remove('d-none');
+            btnVincularNotasLote.onclick = function() {
+                var pares = parearLinhasNotasPorValor(linhas, notas);
+                if (!pares.length) {
+                    alert('Não foi possível parear notas com as linhas.');
+                    return;
+                }
+                btnVincularNotasLote.disabled = true;
+                var chain = Promise.resolve();
+                pares.forEach(function(par) {
+                    chain = chain.then(function() {
+                        return postVincularNota(par.linha.faturamentoId, [par.nota.pk]).then(function(res) {
+                            if (res.ok) {
+                                aplicarVinculoResposta(par.linha.faturamentoId, par.linha.celula, res);
+                            } else {
+                                throw new Error(res.error || 'Falha ao vincular NF ' + (par.nota.numero || ''));
+                            }
+                        });
+                    });
+                });
+                chain
+                    .then(function() {
+                        if (modalVincular && window.bootstrap) {
+                            bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
+                        }
+                    })
+                    .catch(function(err) {
+                        alert(err && err.message ? err.message : 'Erro ao vincular notas.');
+                    })
+                    .finally(function() { btnVincularNotasLote.disabled = false; });
+            };
+        } else if (linhas.length === 1 && notas.length >= 2) {
+            btnVincularNotasLote.textContent = 'Vincular as ' + notas.length + ' notas neste atendimento';
+            btnVincularNotasLote.classList.remove('d-none');
+            btnVincularNotasLote.onclick = function() {
+                var ids = notas.slice(0, 2).map(function(n) { return n.pk; });
+                btnVincularNotasLote.disabled = true;
+                postVincularNota(vinculoAtual.faturamentoId, ids)
+                    .then(function(res) {
+                        if (!res.ok) {
+                            alert(res.error || 'Não foi possível vincular.');
+                            return;
+                        }
+                        aplicarVinculoResposta(vinculoAtual.faturamentoId, vinculoAtual.celula, res);
+                        if (modalVincular && window.bootstrap) {
+                            bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
+                        }
+                    })
+                    .catch(function() { alert('Erro ao vincular notas.'); })
+                    .finally(function() { btnVincularNotasLote.disabled = false; });
+            };
+        }
     }
 
     function atualizarDiferencaLinha(tr, valorNfNum) {
@@ -473,66 +693,50 @@
             .then(function(resp) { return resp.json(); })
             .then(function(data) {
                 var notas = data.notas || [];
+                notasVinculoCandidatas = notas;
+                atualizarBotaoVinculoLote(notas);
                 if (!notas.length) {
                     vincularListaEl.innerHTML = '<div class="text-muted">Nenhuma NF encontrada no intervalo do exame (−20 a +20 dias).</div>';
                     return;
                 }
+                var valorRef = vinculoAtual.valorPago;
+                notas = ordenarNotasPorValorLinha(notas, valorRef);
                 vincularListaEl.innerHTML = '';
-                notas.forEach(function(nota) {
+                notas.forEach(function(nota, idx) {
+                    var diff = diferencaValorNota(nota, valorRef);
+                    var destaqueValor = diff != null && diff < 0.02;
                     var item = document.createElement('div');
-                    item.className = 'fm-nota-candidata';
+                    item.className = 'fm-nota-candidata' + (destaqueValor ? ' fm-nota-candidata-destaque' : '') + (idx === 0 && valorRef != null ? ' fm-nota-candidata-destaque' : '');
+                    var badgeValor = destaqueValor
+                        ? ' <span class="badge bg-success fm-nota-candidata-valor-ok">valor da linha</span>'
+                        : '';
                     item.innerHTML =
-                        '<div class="d-flex justify-content-between gap-2">' +
-                        '<div><strong>NF ' + escapeHtml(nota.numero) + '</strong> · ' + escapeHtml(nota.nome_exibicao_vinculo || nota.cliente || nota.paciente_nota) + '</div>' +
-                        '<div>R$ ' + escapeHtml(nota.valor_fmt) + '</div>' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">' +
+                        '<div><strong>NF ' + escapeHtml(nota.numero) + '</strong> · ' +
+                        escapeHtml(nota.nome_exibicao_vinculo || nota.cliente || nota.paciente_nota) + badgeValor +
                         '</div>' +
-                        '<div class="text-muted">' + escapeHtml(nota.data_emissao_fmt) + ' · ' + escapeHtml(nota.forma_pagamento) + '</div>';
-                    item.addEventListener('click', function() {
-                        var body = new URLSearchParams({
-                            faturamento_id: String(vinculoAtual.faturamentoId),
-                            nota_id: String(nota.pk)
-                        });
-                        anexarCaixaFiltroAoBody(body);
-                        fetch(vincularUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'X-CSRFToken': csrfToken,
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            body: body.toString()
-                        })
-                            .then(function(resp) { return resp.json(); })
+                        '<div class="d-flex align-items-center gap-2">' +
+                        '<span>R$ ' + escapeHtml(nota.valor_fmt) + '</span>' +
+                        '<button type="button" class="btn btn-primary btn-sm py-0 px-2 js-usar-esta-nf">Usar esta NF</button>' +
+                        '</div></div>' +
+                        '<div class="text-muted mt-1">' + escapeHtml(nota.data_emissao_fmt) + ' · ' + escapeHtml(nota.forma_pagamento) + '</div>';
+                    function confirmarVinculo() {
+                        vincularUmaNota(nota)
                             .then(function(res) {
-                                if (!res.ok) {
-                                    alert(res.error || 'Não foi possível vincular a NF.');
-                                    return;
-                                }
-                                var notasRes = res.notas && res.notas.length ? res.notas : (res.nota ? [res.nota] : []);
-                                if (vinculoAtual.celula) {
-                                    if (notasRes.length > 1) {
-                                        renderCelulaNFMulti(vinculoAtual.celula, notasRes);
-                                    } else if (notasRes.length === 1) {
-                                        renderCelulaNF(vinculoAtual.celula, notasRes[0]);
-                                    }
-                                }
-                                if (notasRes.length === 1) {
-                                    atualizarLinhasMesmoFaturamento(vinculoAtual.faturamentoId, notasRes[0], res);
-                                } else if (notasRes.length > 1) {
-                                    document.querySelectorAll('.fm-celula-nf[data-faturamento-id="' + vinculoAtual.faturamentoId + '"]').forEach(function(cel) {
-                                        renderCelulaNFMulti(cel, notasRes);
-                                    });
-                                    var notaPag = res.nota_resumo || notasRes[0];
-                                    atualizarColunasPagamentoNota(vinculoAtual.faturamentoId, notaPag, res);
-                                }
-                                atualizarCaixaNasLinhasFaturamento(vinculoAtual.faturamentoId, res);
-                                if (modalVincular && window.bootstrap) {
+                                if (res && res.ok && modalVincular && window.bootstrap) {
                                     bootstrap.Modal.getOrCreateInstance(modalVincular).hide();
                                 }
                             })
-                            .catch(function() {
-                                alert('Erro ao vincular a NF.');
-                            });
+                            .catch(function() { alert('Erro ao vincular a NF.'); });
+                    }
+                    item.querySelector('.js-usar-esta-nf').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        confirmarVinculo();
+                    });
+                    item.addEventListener('click', function(e) {
+                        if (e.target.closest('.js-usar-esta-nf')) return;
+                        confirmarVinculo();
                     });
                     vincularListaEl.appendChild(item);
                 });
@@ -547,6 +751,20 @@
         vinculoAtual.paciente = btn.getAttribute('data-paciente') || '';
         vinculoAtual.data = btn.getAttribute('data-data') || '';
         vinculoAtual.celula = btn.closest('.fm-celula-nf');
+        vinculoAtual.valorPago = null;
+        var tr = btn.closest('tr');
+        if (tr) {
+            var vp = parseFloat(tr.getAttribute('data-valor-pago') || '');
+            if (!isNaN(vp)) vinculoAtual.valorPago = vp;
+        }
+        if (vincularValorLinhaWrap && vincularValorLinhaEl) {
+            if (vinculoAtual.valorPago != null) {
+                vincularValorLinhaEl.textContent = formatMoedaBR(vinculoAtual.valorPago);
+                vincularValorLinhaWrap.classList.remove('d-none');
+            } else {
+                vincularValorLinhaWrap.classList.add('d-none');
+            }
+        }
         if (vincularTitulo) {
             vincularTitulo.textContent = btn.textContent.trim() === 'Vincular NF'
                 ? 'Vincular nota fiscal'

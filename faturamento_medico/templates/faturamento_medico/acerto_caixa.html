@@ -1210,6 +1210,7 @@
                     <tbody>
                         {% for linha in linhas_grade_exibir|default:linhas %}
                         <tr data-faturamento-id="{{ linha.faturamento_id }}"
+                            data-paciente="{{ linha.paciente|default:'' }}"
                             data-valor-pago="{{ linha.valor_pago|default:'' }}"
                             data-modalidade="{{ linha.modalidade|default:'' }}"
                             data-valor-tabela="{{ linha.valor_tabela }}"
