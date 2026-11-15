@@ -485,10 +485,29 @@ class ItemServico(models.Model):
     def save(self, *args, **kwargs):
         """Calcula o total automaticamente"""
         from decimal import Decimal
+
+        precos_mudaram = False
+        if self.pk:
+            prev = (
+                ItemServico.objects.filter(pk=self.pk)
+                .values('valor', 'percentual', 'qt')
+                .first()
+            )
+            if prev:
+                precos_mudaram = (
+                    prev['valor'] != self.valor
+                    or prev['percentual'] != self.percentual
+                    or prev['qt'] != self.qt
+                )
         pct = Decimal(str(self.percentual or 1))
         if pct == 0:
             pct = Decimal('1')
         self.total = Decimal(self.qt) * Decimal(str(self.valor)) * pct
+        if precos_mudaram and Decimal(str(self.valor_desconto or 0)) > 0:
+            self.valor_desconto = Decimal('0')
+            uf = kwargs.get('update_fields')
+            if uf is not None:
+                kwargs['update_fields'] = list(set(uf) | {'valor_desconto', 'total'})
         if self.conferido and (self.status_conferencia or '').strip() != 'LOTE OK':
             self.status_conferencia = 'CONFERIDO'
             update_fields = kwargs.get('update_fields')

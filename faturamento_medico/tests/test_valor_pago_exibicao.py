@@ -49,6 +49,15 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('250'))
 
+    def test_desconto_ris_obsoleto_usa_total_apos_aumento_preco(self):
+        item = _item(
+            total=Decimal('350'),
+            valor_pago=Decimal('141.08'),
+            valor_desconto=Decimal('208.92'),
+            conferido=False,
+        )
+        self.assertEqual(valor_pago_para_exibicao(item), Decimal('350'))
+
     def test_conferido_usa_total_mesmo_com_ris_maior(self):
         item = _item(
             total=Decimal('350'),

@@ -95,8 +95,23 @@ def valor_pago_para_exibicao(item: ItemServico | None) -> Decimal | None:
     conferido = bool(getattr(item, 'conferido', False))
     status = (getattr(item, 'status_conferencia', None) or '').strip()
 
+    total_bruto = _decimal_campo(item.total if item.total is not None else item.valor)
+
     if liquido is not None and liquido > 0 and (conferido or status in ('CONFERIDO', 'LOTE OK')):
+        if total_bruto and total_bruto > liquido + _EPS:
+            return total_bruto
         return liquido
+
+    if (
+        total_bruto
+        and liquido
+        and vp
+        and total_bruto > liquido + _EPS
+        and total_bruto > liquido * Decimal('1.35')
+        and vp + _EPS < total_bruto
+        and abs(vp - liquido) <= _EPS
+    ):
+        return total_bruto
 
     if liquido is not None:
         if vp is None or vp <= 0:
