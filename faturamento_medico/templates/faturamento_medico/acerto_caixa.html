@@ -1278,9 +1278,9 @@
                             <td class="text-nowrap" data-col="inicio" data-sort-val="{{ linha.horario_inicio|default:'' }}">{{ linha.horario_inicio }}</td>
                             <td class="text-nowrap" data-col="fim" data-sort-val="{{ linha.horario_fim|default:'' }}">{{ linha.horario_fim }}</td>
                             <td data-col="motivo_cancel" data-sort-val="{{ linha.motivo_cancelamento|default:'' }}">{{ linha.motivo_cancelamento|truncatechars:25 }}</td>
-                            <td class="text-nowrap" data-col="lancamento" data-sort-val="{{ linha.faturamento_id }}"
+                            <td class="text-nowrap" data-col="lancamento" data-sort-val="{{ linha.faturamento_id }}">
                                 <a href="{% url 'faturamento_medico:editar' linha.faturamento_id %}?next={{ request.get_full_path|urlencode }}"
-                                   class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                   class="btn btn-success btn-sm py-0 px-2"
                                    title="Alterar faturamento médico (paciente, convênio, guia, itens…)">
                                     <i class="fas fa-edit"></i> Editar
                                 </a>
