@@ -59,6 +59,15 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         )
         self.assertEqual(valor_pago_grade_item(item), Decimal('180'))
 
+    def test_grade_item_corrige_valor_pago_copiado_do_total(self):
+        item = _item(
+            total=Decimal('205.70'),
+            valor_pago=Decimal('205.70'),
+            valor_desconto=Decimal('25.70'),
+            conferido=False,
+        )
+        self.assertEqual(valor_pago_grade_item(item), Decimal('180'))
+
     def test_grade_item_corrige_preco_ris_muito_abaixo_do_conferido(self):
         item = _item(
             total=Decimal('350'),
@@ -85,7 +94,7 @@ class ValorPagoExibicaoTest(SimpleTestCase):
         )
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('350'))
 
-    def test_sincronizar_eleva_valor_pago_quando_total_aumentou(self):
+    def test_sincronizar_eleva_valor_pago_quando_ris_muito_defasado(self):
         item = MagicMock(
             pk=99,
             total=Decimal('350'),
@@ -100,6 +109,19 @@ class ValorPagoExibicaoTest(SimpleTestCase):
                 valor_pago=Decimal('350'),
             )
             self.assertEqual(item.valor_pago, Decimal('350'))
+
+    def test_sincronizar_nao_sobe_valor_pago_quando_ajuste_moderado_tabela(self):
+        item = MagicMock(
+            pk=88,
+            total=Decimal('205.70'),
+            valor=Decimal('205.70'),
+            valor_acrescimo=Decimal('0'),
+            valor_pago=Decimal('180'),
+        )
+        with patch('faturamento_medico.services.valor_pago_exibicao.ItemServico') as model:
+            model.objects.filter.return_value.update = MagicMock()
+            sincronizar_valor_pago_apos_preco(item, forcar=True)
+            model.objects.filter.return_value.update.assert_not_called()
 
     def test_liquido_com_acrescimo_cadastrado(self):
         item = _item(valor_acrescimo=Decimal('80'), valor_pago=None)

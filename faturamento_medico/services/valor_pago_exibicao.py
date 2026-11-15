@@ -183,7 +183,12 @@ def sincronizar_valor_pago_apos_preco(
     if total_dec <= 0:
         return
     vp_atual = _decimal_campo(item.valor_pago)
-    if vp_atual is None or vp_atual < total_dec - _EPS:
+    if vp_atual is None or vp_atual <= 0:
+        if item.pk:
+            ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
+        item.valor_pago = total_dec
+        return
+    if vp_atual < total_dec - _EPS and total_dec > 0 and vp_atual < total_dec * Decimal('0.55'):
         if item.pk:
             ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
         item.valor_pago = total_dec
@@ -199,40 +204,51 @@ def sincronizar_valor_pago_apos_preco(
             return
         if not forcar:
             return
-    if item.valor_pago != total_dec:
-        ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
-        item.valor_pago = total_dec
+    if forcar and vp_atual is not None and vp_atual > total_dec + _EPS:
+        if item.valor_pago != total_dec:
+            ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
+            item.valor_pago = total_dec
 
 
 def valor_pago_grade_item(item: ItemServico | None) -> Decimal | None:
     """
     Valor pago nas grades (faturamento e acerto de caixa) — mesma regra nas duas telas.
 
-    Respeita o valor pago rateado no caixa (ex.: PIX R$ 900 em vários exames).
-    Só substitui pelo total do item quando o preço conferido ficou bem acima do RIS
-    (desconto importado obsoleto após corrigir tabela).
+    Prioriza o valor pago gravado no item (rateio PIX/caixa). Corrige só quando o RIS
+    ficou muito defasado ou valor_pago foi copiado por engano igual ao total conferido.
     """
     if item is None:
         return None
-    vp = valor_pago_para_exibicao(item)
     try:
         total_dec = Decimal(
             str(item.total if item.total is not None else (item.valor or 0))
         )
     except Exception:
         total_dec = Decimal('0')
-    if total_dec <= 0:
+    vp_db = _decimal_campo(getattr(item, 'valor_pago', None))
+    liquido = _liquido_item(item)
+    if (
+        vp_db
+        and vp_db > 0
+        and total_dec > 0
+        and liquido
+        and abs(vp_db - total_dec) <= _EPS
+        and liquido + _EPS < total_dec
+    ):
+        try:
+            if total_dec / liquido >= Decimal('1.45'):
+                return total_dec
+        except Exception:
+            pass
+        return liquido
+    if vp_db and vp_db > 0:
+        if total_dec > 0 and vp_db + _EPS < total_dec:
+            if total_dec >= vp_db * Decimal('1.45'):
+                corrigido = valor_pago_para_exibicao(item)
+                if corrigido and corrigido > vp_db:
+                    return corrigido
+        return vp_db
+    vp = valor_pago_para_exibicao(item)
+    if vp is not None and vp > 0:
         return vp
-    if vp is None or vp <= 0:
-        return total_dec
-    if vp + _EPS >= total_dec:
-        return vp
-    desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
-    if desconto <= 0:
-        return total_dec
-    try:
-        if vp > 0 and total_dec / vp >= Decimal('1.45'):
-            return total_dec
-    except Exception:
-        pass
-    return vp
+    return total_dec if total_dec > 0 else None
