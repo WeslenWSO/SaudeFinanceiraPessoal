@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.test import SimpleTestCase
 
 from faturamento_medico.services.valor_pago_exibicao import (
+    mapear_valor_pago_itens_grade,
     sincronizar_valor_pago_apos_preco,
     valor_agregacao_analises,
     valor_pago_grade_item,
@@ -49,6 +50,31 @@ class ValorPagoExibicaoTest(SimpleTestCase):
     def test_tabela_atualizada_maior_que_ris(self):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('250'))
+
+    def test_grade_item_desconto_ris_obsoleto_pos_preco(self):
+        item = _item(
+            total=Decimal('275'),
+            valor_pago=Decimal('216.82'),
+            valor_desconto=Decimal('58.18'),
+        )
+        self.assertEqual(valor_pago_grade_item(item), Decimal('275'))
+
+    def test_grade_item_atualiza_preco_sem_desconto_ris(self):
+        item = _item(
+            total=Decimal('275'),
+            valor_pago=Decimal('216.82'),
+            valor_desconto=Decimal('0'),
+        )
+        self.assertEqual(valor_pago_grade_item(item), Decimal('275'))
+
+    def test_mapear_soma_total_igual_nf(self):
+        i1 = _item(total=Decimal('275'), valor_pago=Decimal('216.82'))
+        i1.pk = 1
+        i2 = _item(total=Decimal('275'), valor_pago=Decimal('216.82'))
+        i2.pk = 2
+        m = mapear_valor_pago_itens_grade([i1, i2], Decimal('550'))
+        self.assertEqual(m[1], Decimal('275'))
+        self.assertEqual(m[2], Decimal('275'))
 
     def test_grade_item_mantem_rateio_caixa_quando_total_so_ajuste_tabela(self):
         item = _item(

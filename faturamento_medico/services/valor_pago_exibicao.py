@@ -188,6 +188,21 @@ def sincronizar_valor_pago_apos_preco(
             ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
         item.valor_pago = total_dec
         return
+    desconto = _decimal_campo(item.valor_desconto) or Decimal('0')
+    if (
+        vp_atual < total_dec - _EPS
+        and desconto > _EPS
+        and abs(vp_atual + desconto - total_dec) <= Decimal('0.06')
+        and desconto >= total_dec * Decimal('0.17')
+    ):
+        if item.pk:
+            ItemServico.objects.filter(pk=item.pk).update(
+                valor_pago=total_dec,
+                valor_desconto=Decimal('0'),
+            )
+        item.valor_pago = total_dec
+        item.valor_desconto = Decimal('0')
+        return
     if vp_atual < total_dec - _EPS and total_dec > 0 and vp_atual < total_dec * Decimal('0.55'):
         if item.pk:
             ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
@@ -243,6 +258,21 @@ def valor_pago_grade_item(item: ItemServico | None) -> Decimal | None:
         return liquido
     if vp_db and vp_db > 0:
         if total_dec > 0 and vp_db + _EPS < total_dec:
+            desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
+            if (
+                desconto > _EPS
+                and abs(vp_db + desconto - total_dec) <= Decimal('0.06')
+                and desconto >= total_dec * Decimal('0.17')
+            ):
+                return total_dec
+            if liquido and desconto > _EPS and abs(vp_db - liquido) <= _EPS:
+                try:
+                    if total_dec / liquido < Decimal('1.22'):
+                        return vp_db
+                except Exception:
+                    return vp_db
+            if desconto <= _EPS:
+                return total_dec
             if total_dec >= vp_db * Decimal('1.45'):
                 corrigido = valor_pago_para_exibicao(item)
                 if corrigido and corrigido > vp_db:
@@ -252,3 +282,46 @@ def valor_pago_grade_item(item: ItemServico | None) -> Decimal | None:
     if vp is not None and vp > 0:
         return vp
     return total_dec if total_dec > 0 else None
+
+
+def mapear_valor_pago_itens_grade(
+    itens: list[ItemServico],
+    valor_referencia_nf: Decimal | None,
+) -> dict[int, Decimal]:
+    """
+    Valor pago por item quando a guia tem vários exames e NF vinculada.
+
+    Se a soma dos totais dos itens = valor da NF, cada linha usa o total do item
+    (preço conferido). Se a soma dos valores pago RIS já = NF, mantém o rateio.
+    """
+    if not itens:
+        return {}
+    pares: list[tuple[ItemServico, Decimal, Decimal]] = []
+    soma_total = Decimal('0')
+    soma_vp = Decimal('0')
+    for it in itens:
+        try:
+            total = Decimal(str(it.total if it.total is not None else (it.valor or 0)))
+        except Exception:
+            total = Decimal('0')
+        vp = valor_pago_grade_item(it) or Decimal('0')
+        pares.append((it, total, vp))
+        soma_total += total
+        soma_vp += vp
+    out: dict[int, Decimal] = {}
+    nf = valor_referencia_nf
+    if nf is not None and nf > 0:
+        if abs(soma_total - nf) <= Decimal('0.05'):
+            for it, total, _ in pares:
+                if it.pk:
+                    out[it.pk] = total
+            return out
+        if soma_vp > 0 and abs(soma_vp - nf) <= Decimal('0.05'):
+            for it, _, vp in pares:
+                if it.pk:
+                    out[it.pk] = vp
+            return out
+    for it, total, vp in pares:
+        if it.pk:
+            out[it.pk] = vp if vp > 0 else total
+    return out

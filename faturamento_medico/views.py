@@ -2873,9 +2873,31 @@ def listar_faturamentos(request):
             if not _modalidade_permitida(mod_item, modalidades_sel):
                 continue
             itens_filtrados.append((item, status_label, status_css, mod_item))
+        vp_map_ft: dict[int, Decimal] = {}
+        if itens_filtrados:
+            from decimal import Decimal
+
+            from faturamento_medico.services.valor_pago_exibicao import (
+                mapear_valor_pago_itens_grade,
+            )
+            from faturamento_medico.services.vincular_nota_solicitante import (
+                resolver_notas_faturamento_acerto,
+                valor_total_notas_serializadas,
+            )
+
+            only_items = [row[0] for row in itens_filtrados]
+            nf_val = None
+            try:
+                notas_ft = resolver_notas_faturamento_acerto(empresa_id, faturamento)
+                nf_val = valor_total_notas_serializadas(notas_ft)
+            except Exception:
+                nf_val = None
+            vp_map_ft = mapear_valor_pago_itens_grade(only_items, nf_val)
         for idx, (item, status_label, status_css, mod_item) in enumerate(itens_filtrados):
             valor_item = item.total if item.total is not None else (item.valor or 0)
-            valor_pago_item = _valor_pago_item_grid(item, valor_item)
+            valor_pago_item = vp_map_ft.get(item.pk) if item.pk else None
+            if valor_pago_item is None:
+                valor_pago_item = _valor_pago_item_grid(item, valor_item)
             grid_linhas.append({
                 'faturamento': faturamento,
                 'item': item,

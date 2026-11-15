@@ -34,7 +34,10 @@ from faturamento_medico.services.contas_caixa_acerto import (
     caixas_acerto_choices_filtrados,
     caixas_acerto_valores,
 )
-from faturamento_medico.services.valor_pago_exibicao import valor_pago_grade_item
+from faturamento_medico.services.valor_pago_exibicao import (
+    mapear_valor_pago_itens_grade,
+    valor_pago_grade_item,
+)
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
     notas_linha_para_json,
@@ -615,6 +618,66 @@ def conferir_itens_pendentes_ao_fechar_caixa(
                 registrar_log_status_conferencia_item(request, item, status_novo)
             atualizados += 1
     return atualizados
+
+
+def _reconciliar_valor_pago_linhas_mesma_nf(linhas: list[dict]) -> None:
+    """Alinha valor pago ao total do item quando soma dos itens = valor da NF."""
+    from collections import defaultdict
+
+    grupos: dict[tuple, list[int]] = defaultdict(list)
+    for idx, ln in enumerate(linhas):
+        if ln.get('aguardando_faturamento'):
+            continue
+        nf_txt = (ln.get('nota_fiscal') or '').strip()
+        if not nf_txt or nf_txt == '-':
+            continue
+        key = (
+            ln.get('data_iso') or '',
+            (ln.get('paciente') or '').strip().upper(),
+            nf_txt,
+        )
+        grupos[key].append(idx)
+
+    for indices in grupos.values():
+        if len(indices) < 2:
+            continue
+        soma_total = Decimal('0')
+        valor_nf = None
+        for i in indices:
+            try:
+                soma_total += Decimal(str(linhas[i].get('total_item') or 0))
+            except Exception:
+                pass
+            vn = linhas[i].get('valor_nota')
+            if vn is not None and valor_nf is None:
+                try:
+                    valor_nf = Decimal(str(vn))
+                except Exception:
+                    pass
+        if valor_nf is None or valor_nf <= 0:
+            continue
+        if abs(soma_total - valor_nf) > Decimal('0.05'):
+            continue
+        qtd = len(indices)
+        nf_por_linha = valor_nf / Decimal(qtd)
+        for i in indices:
+            try:
+                ti = Decimal(str(linhas[i].get('total_item') or 0))
+            except Exception:
+                continue
+            if ti <= 0:
+                continue
+            linhas[i]['valor_pago'] = ti
+            linhas[i]['valor_pago_fmt'] = _moeda_br(ti)
+            linhas[i]['valor_pago_exibir'] = True
+            vn_linha = linhas[i].get('valor_nota')
+            if vn_linha is not None:
+                try:
+                    diff = Decimal(str(vn_linha)) / Decimal(qtd) - ti
+                except Exception:
+                    diff = Decimal(str(vn_linha)) - ti
+                linhas[i]['diferenca'] = diff
+                linhas[i]['diferenca_fmt'] = _moeda_br(diff)
 
 
 def _valor_contabil_linha_acerto(linha: dict) -> Decimal:
@@ -2315,6 +2378,24 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         convenio = (fat.convenio or '-').strip() or '-'
 
         itens = list(fat.itens_servico.all())
+        valor_nf_ref = None
+        if valor_nota is not None:
+            try:
+                valor_nf_ref = Decimal(str(valor_nota))
+            except Exception:
+                valor_nf_ref = None
+        if (valor_nf_ref is None or valor_nf_ref <= 0) and pagamentos_efetivos:
+            try:
+                soma_pg = sum(
+                    Decimal(str(p.get('valor') or 0)) for p in pagamentos_efetivos
+                )
+                if soma_pg > 0:
+                    valor_nf_ref = soma_pg
+            except Exception:
+                pass
+        vp_por_item = (
+            mapear_valor_pago_itens_grade(itens, valor_nf_ref) if itens else {}
+        )
         primeira_linha_faturamento = True
         data_iso = fat.data.isoformat() if fat.data else ''
         qtd_notas = len(notas)
@@ -2332,8 +2413,10 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 modalidade = _modalidade_item(fat, item) or '-'
                 com_contraste = item.com_contraste
                 total_item = item.total if item.total is not None else (item.valor or 0)
-                valor_tabela = item.valor or 0
-                valor_pago = valor_pago_grade_item(item)
+                valor_tabela = total_item
+                valor_pago = vp_por_item.get(item.pk) if item.pk else None
+                if valor_pago is None:
+                    valor_pago = valor_pago_grade_item(item)
             else:
                 procedimento = fat.servico or '-'
                 codigo = fat.codigo_servico or '-'
@@ -2372,7 +2455,10 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 base_diferenca = Decimal(str(valor_nota_linha))
             else:
                 base_diferenca = Decimal(str(total_item or 0))
-            diferenca = base_diferenca - valor_tabela_dec
+            if item is not None and valor_pago is not None:
+                diferenca = base_diferenca - Decimal(str(valor_pago))
+            else:
+                diferenca = base_diferenca - valor_tabela_dec
 
             if fat.pk not in fats_bloqueio:
                 fats_bloqueio[fat.pk] = faturamento_caixa_bloqueado(fat, fechamentos_ativos)
@@ -2437,6 +2523,8 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 _add_linha(item)
         else:
             _add_linha(None)
+
+    _reconciliar_valor_pago_linhas_mesma_nf(linhas)
 
     dias_resumo = parse_dias_resumo_request(request)
     filtros_dict = {
