@@ -34,7 +34,7 @@ from faturamento_medico.services.contas_caixa_acerto import (
     caixas_acerto_choices_filtrados,
     caixas_acerto_valores,
 )
-from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
+from faturamento_medico.services.valor_pago_exibicao import valor_pago_grade_item
 from faturamento_medico.services.vincular_nota_solicitante import (
     carregar_notas_por_data,
     notas_linha_para_json,
@@ -2333,14 +2333,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
                 com_contraste = item.com_contraste
                 total_item = item.total if item.total is not None else (item.valor or 0)
                 valor_tabela = item.valor or 0
-                valor_pago = valor_pago_para_exibicao(item)
-                try:
-                    total_item_dec = Decimal(str(total_item or 0))
-                except Exception:
-                    total_item_dec = Decimal('0')
-                if total_item_dec > 0:
-                    if valor_pago is None or valor_pago < total_item_dec - Decimal('0.01'):
-                        valor_pago = total_item_dec
+                valor_pago = valor_pago_grade_item(item)
             else:
                 procedimento = fat.servico or '-'
                 codigo = fat.codigo_servico or '-'

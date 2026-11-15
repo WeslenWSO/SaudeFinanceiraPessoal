@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 from faturamento_medico.services.valor_pago_exibicao import (
     sincronizar_valor_pago_apos_preco,
     valor_agregacao_analises,
+    valor_pago_grade_item,
     valor_pago_para_exibicao,
 )
 
@@ -48,6 +49,15 @@ class ValorPagoExibicaoTest(SimpleTestCase):
     def test_tabela_atualizada_maior_que_ris(self):
         item = _item(total=Decimal('250'), valor_pago=Decimal('220'))
         self.assertEqual(valor_pago_para_exibicao(item), Decimal('250'))
+
+    def test_grade_item_desconto_ris_total_acima_do_liquido(self):
+        item = _item(
+            total=Decimal('205.70'),
+            valor_pago=Decimal('180'),
+            valor_desconto=Decimal('25.70'),
+            conferido=False,
+        )
+        self.assertEqual(valor_pago_grade_item(item), Decimal('205.70'))
 
     def test_desconto_ris_obsoleto_usa_total_apos_aumento_preco(self):
         item = _item(

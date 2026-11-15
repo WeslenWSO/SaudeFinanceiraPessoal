@@ -4203,21 +4203,10 @@ def _exportar_resumo_mes_solicitante_excel_impl(request):
 
 
 def _valor_pago_item_grid(item, valor_tabela) -> Decimal | None:
-    """Valor pago na grade: campo RIS ou total conferido (ver valor_pago_exibicao)."""
-    from decimal import Decimal
+    """Valor pago na grade: campo RIS ou total conferido (ver valor_pago_grade_item)."""
+    from faturamento_medico.services.valor_pago_exibicao import valor_pago_grade_item
 
-    from faturamento_medico.services.valor_pago_exibicao import valor_pago_para_exibicao
-
-    vp = valor_pago_para_exibicao(item)
-    try:
-        total_linha = Decimal(str(valor_tabela or 0))
-    except Exception:
-        total_linha = Decimal('0')
-    if total_linha > 0 and (vp is None or vp + Decimal('0.009') < total_linha):
-        desconto = Decimal(str(getattr(item, 'valor_desconto', 0) or 0))
-        if desconto <= 0:
-            return total_linha
-    return vp
+    return valor_pago_grade_item(item)
 
 
 def _valor_desconto_linha(linha):

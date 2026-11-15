@@ -202,3 +202,33 @@ def sincronizar_valor_pago_apos_preco(
     if item.valor_pago != total_dec:
         ItemServico.objects.filter(pk=item.pk).update(valor_pago=total_dec)
         item.valor_pago = total_dec
+
+
+def valor_pago_grade_item(item: ItemServico | None) -> Decimal | None:
+    """
+    Valor pago nas grades (faturamento e acerto de caixa) — mesma regra nas duas telas.
+    """
+    if item is None:
+        return None
+    try:
+        total_dec = Decimal(
+            str(item.total if item.total is not None else (item.valor or 0))
+        )
+    except Exception:
+        total_dec = Decimal('0')
+    vp = valor_pago_para_exibicao(item)
+    if total_dec <= 0:
+        return vp
+    if vp is None or vp + _EPS < total_dec:
+        desconto = _decimal_campo(getattr(item, 'valor_desconto', None)) or Decimal('0')
+        if desconto <= 0:
+            return total_dec
+        liquido = _liquido_item(item)
+        if (
+            liquido
+            and total_dec > liquido + _EPS
+            and vp is not None
+            and abs(vp - liquido) <= _EPS
+        ):
+            return total_dec
+    return vp
