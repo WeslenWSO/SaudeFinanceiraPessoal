@@ -55,6 +55,20 @@
 }
 .acerto-table thead th { font-size: 0.72rem; white-space: nowrap; vertical-align: middle; }
 .acerto-table td { font-size: 0.78rem; vertical-align: middle; }
+.acerto-th-sort {
+    cursor: pointer;
+    user-select: none;
+}
+.acerto-th-sort:hover {
+    background-color: #3d5a80 !important;
+}
+.acerto-th-sort.sorted-asc .acerto-sort-icon::after,
+.acerto-th-sort.sorted-desc .acerto-sort-icon::after {
+    font-size: 0.6rem;
+    opacity: 0.9;
+}
+.acerto-th-sort.sorted-asc .acerto-sort-icon::after { content: ' ▲'; }
+.acerto-th-sort.sorted-desc .acerto-sort-icon::after { content: ' ▼'; }
 .acerto-table .fm-celula-discriminacao[title] { cursor: help; }
 .acerto-table th.acerto-col-caixa,
 .acerto-table td.fm-celula-caixa-select {
@@ -1068,7 +1082,12 @@
                 </div>
             </div>
 
-            <p class="small text-muted mb-2"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <p class="small text-muted mb-0"><strong>{{ quantidade_linhas }}</strong> linha(s)</p>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnColunasAcertoCaixa" title="Exibir ou ocultar colunas da grade">
+                    <i class="fas fa-columns"></i> Colunas
+                </button>
+            </div>
             {% if modo_resumo_ano_leve %}
             <div class="alert alert-info py-2 small mb-2">
                 Resumo anual: a grade detalhada e os vínculos de NF na tabela foram omitidos para agilizar.
@@ -1096,28 +1115,28 @@
                 <table id="acertoCaixaTable" data-compact-nf-celula class="table table-sm table-striped table-bordered acerto-table mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th>Data</th>
-                            <th>Paciente</th>
-                            <th>Código</th>
-                            <th>Procedimento</th>
-                            <th>Mod.</th>
-                            <th>Contraste</th>
-                            <th class="text-end">Valor pago</th>
-                            <th title="Incluir no acerto de caixa">Acerto</th>
-                            <th class="acerto-col-caixa">Caixa</th>
-                            <th>NF</th>
-                            <th>Forma pgto.</th>
-                            <th class="text-end">Valor NF</th>
-                            <th>Operador check-in</th>
-                            <th>Discriminação NF</th>
-                            <th class="text-end">V. tabela</th>
-                            <th class="text-end">Diferença</th>
-                            <th>Status agenda</th>
-                            <th>Convênio (viabilidade)</th>
-                            <th>Início</th>
-                            <th>Fim</th>
-                            <th>Motivo cancel.</th>
-                            <th class="text-nowrap">Lançamento</th>
+                            <th class="acerto-th-sort" data-col="data" data-sort-type="date" scope="col" title="Ordenar">Data<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="paciente" data-sort-type="text" scope="col" title="Ordenar">Paciente<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="codigo" data-sort-type="text" scope="col" title="Ordenar">Código<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="procedimento" data-sort-type="text" scope="col" title="Ordenar">Procedimento<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="modalidade" data-sort-type="text" scope="col" title="Ordenar">Mod.<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="contraste" data-sort-type="text" scope="col" title="Ordenar">Contraste<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort text-end" data-col="valor_pago" data-sort-type="number" scope="col" title="Ordenar">Valor pago<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="acerto" data-sort-type="bool" scope="col" title="Incluir no acerto de caixa · Ordenar">Acerto<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort acerto-col-caixa" data-col="caixa" data-sort-type="text" scope="col" title="Ordenar">Caixa<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="nf" data-sort-type="text" scope="col" title="Ordenar">NF<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="forma_pgto" data-sort-type="text" scope="col" title="Ordenar">Forma pgto.<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort text-end" data-col="valor_nf" data-sort-type="number" scope="col" title="Ordenar">Valor NF<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="checkin" data-sort-type="text" scope="col" title="Ordenar">Operador check-in<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="discriminacao" data-sort-type="text" scope="col" title="Ordenar">Discriminação NF<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort text-end" data-col="valor_tabela" data-sort-type="number" scope="col" title="Ordenar">V. tabela<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort text-end" data-col="diferenca" data-sort-type="number" scope="col" title="Ordenar">Diferença<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="status_agenda" data-sort-type="text" scope="col" title="Ordenar">Status agenda<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="convenio" data-sort-type="text" scope="col" title="Ordenar">Convênio (viabilidade)<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="inicio" data-sort-type="text" scope="col" title="Ordenar">Início<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="fim" data-sort-type="text" scope="col" title="Ordenar">Fim<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort" data-col="motivo_cancel" data-sort-type="text" scope="col" title="Ordenar">Motivo cancel.<span class="acerto-sort-icon"></span></th>
+                            <th class="acerto-th-sort text-nowrap" data-col="lancamento" data-sort-type="number" scope="col" title="Ordenar">Lançamento<span class="acerto-sort-icon"></span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1126,17 +1145,18 @@
                             data-valor-pago="{{ linha.valor_pago|default:'' }}"
                             data-modalidade="{{ linha.modalidade|default:'' }}"
                             data-valor-tabela="{{ linha.valor_tabela }}"
+                            data-sort-data="{{ linha.data_iso }}"
                             {% if linha.caixa_bloqueado %}data-caixa-bloqueado="1"{% endif %}>
-                            <td class="text-nowrap">{{ linha.data_fmt }}</td>
-                            <td>{{ linha.paciente|truncatechars:28 }}</td>
-                            <td><code class="small">{{ linha.codigo_servico }}</code></td>
-                            <td>{{ linha.procedimento|truncatechars:45 }}</td>
-                            <td>{{ linha.modalidade }}</td>
-                            <td>{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                            <td class="text-end fm-celula-valor-pago">
+                            <td class="text-nowrap" data-col="data" data-sort-val="{{ linha.data_iso }}">{{ linha.data_fmt }}</td>
+                            <td data-col="paciente" data-sort-val="{{ linha.paciente|default:'' }}">{{ linha.paciente|truncatechars:28 }}</td>
+                            <td data-col="codigo" data-sort-val="{{ linha.codigo_servico|default:'' }}"><code class="small">{{ linha.codigo_servico }}</code></td>
+                            <td data-col="procedimento" data-sort-val="{{ linha.procedimento|default:'' }}">{{ linha.procedimento|truncatechars:45 }}</td>
+                            <td data-col="modalidade" data-sort-val="{{ linha.modalidade|default:'' }}">{{ linha.modalidade }}</td>
+                            <td data-col="contraste" data-sort-val="{% if linha.com_contraste %}1{% else %}0{% endif %}">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
+                            <td class="text-end fm-celula-valor-pago" data-col="valor_pago" data-sort-val="{{ linha.valor_pago|default:'' }}"
                                 {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
                             </td>
-                            <td class="text-center fm-celula-acerto-flag">
+                            <td class="text-center fm-celula-acerto-flag" data-col="acerto" data-sort-val="{% if linha.marcado_acerto_caixa %}1{% else %}0{% endif %}"
                                 {% if linha.mostrar_acerto_celula %}
                                 <input type="checkbox"
                                        class="form-check-input js-acerto-caixa-flag m-0"
@@ -1148,8 +1168,7 @@
                                 <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
-                            <td class="fm-celula-caixa-select">
-                                {% if linha.mostrar_acerto_celula %}
+                            <td class="fm-celula-caixa-select" data-col="caixa" data-sort-val="{{ linha.caixa_acerto|default:linha.caixa_exibicao|default:'' }}"
                                 <select class="form-select form-select-sm js-caixa-acerto"
                                         data-faturamento-id="{{ linha.faturamento_id }}"
                                         {% if linha.caixa_bloqueado %}disabled title="Caixa fechado — reabra para alterar"{% endif %}
@@ -1163,7 +1182,7 @@
                                 <span class="fm-celula-caixa-nome" title="{{ linha.caixa_exibicao }}">{{ linha.caixa_exibicao|default:"—" }}</span>
                                 {% endif %}
                             </td>
-                            <td class="fm-celula-nf"
+                            <td class="fm-celula-nf" data-col="nf" data-sort-val="{{ linha.nota_fiscal|default:'' }}"
                                 data-faturamento-id="{{ linha.faturamento_id }}"
                                 data-paciente="{{ linha.paciente }}"
                                 data-data="{{ linha.data_iso }}">
@@ -1223,7 +1242,7 @@
                                 <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
-                            <td class="fm-celula-forma-pgto"
+                            <td class="fm-celula-forma-pgto" data-col="forma_pgto" data-sort-val="{{ linha.forma_pgto|default:'' }}"
                                 data-faturamento-id="{{ linha.faturamento_id }}"
                                 data-valor-nf="{{ linha.valor_nota|default:'' }}"
                                 data-numero-nf="{{ linha.nota_fiscal|default:'' }}"
@@ -1247,18 +1266,18 @@
                                 <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
-                            <td class="text-end fm-celula-valor-nf">{{ linha.valor_nota_fmt }}</td>
-                            <td class="fm-celula-checkin">{{ linha.checkin_por|truncatechars:20 }}</td>
-                            <td class="fm-celula-discriminacao"
+                            <td class="text-end fm-celula-valor-nf" data-col="valor_nf" data-sort-val="{{ linha.valor_nota|default:'' }}">{{ linha.valor_nota_fmt }}</td>
+                            <td class="fm-celula-checkin" data-col="checkin" data-sort-val="{{ linha.checkin_por|default:'' }}">{{ linha.checkin_por|truncatechars:20 }}</td>
+                            <td class="fm-celula-discriminacao" data-col="discriminacao" data-sort-val="{{ linha.discriminacao|default:'' }}"
                                 {% if linha.discriminacao and linha.discriminacao != '-' %}title="{{ linha.discriminacao }}"{% endif %}>{{ linha.discriminacao|truncatechars:40 }}</td>
-                            <td class="text-end fm-celula-valor-tabela">R$ {{ linha.valor_tabela_fmt }}</td>
-                            <td class="text-end fm-celula-diferenca">R$ {{ linha.diferenca_fmt }}</td>
-                            <td><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
-                            <td>{{ linha.convenio|truncatechars:28 }}</td>
-                            <td class="text-nowrap">{{ linha.horario_inicio }}</td>
-                            <td class="text-nowrap">{{ linha.horario_fim }}</td>
-                            <td>{{ linha.motivo_cancelamento|truncatechars:25 }}</td>
-                            <td class="text-nowrap">
+                            <td class="text-end fm-celula-valor-tabela" data-col="valor_tabela" data-sort-val="{{ linha.valor_tabela }}">R$ {{ linha.valor_tabela_fmt }}</td>
+                            <td class="text-end fm-celula-diferenca" data-col="diferenca" data-sort-val="{{ linha.diferenca }}">R$ {{ linha.diferenca_fmt }}</td>
+                            <td data-col="status_agenda" data-sort-val="{{ linha.status_agendamento|default:'' }}"><span class="badge bg-{{ linha.status_css }}">{{ linha.status_agendamento }}</span></td>
+                            <td data-col="convenio" data-sort-val="{{ linha.convenio|default:'' }}">{{ linha.convenio|truncatechars:28 }}</td>
+                            <td class="text-nowrap" data-col="inicio" data-sort-val="{{ linha.horario_inicio|default:'' }}">{{ linha.horario_inicio }}</td>
+                            <td class="text-nowrap" data-col="fim" data-sort-val="{{ linha.horario_fim|default:'' }}">{{ linha.horario_fim }}</td>
+                            <td data-col="motivo_cancel" data-sort-val="{{ linha.motivo_cancelamento|default:'' }}">{{ linha.motivo_cancelamento|truncatechars:25 }}</td>
+                            <td class="text-nowrap" data-col="lancamento" data-sort-val="{{ linha.faturamento_id }}"
                                 <a href="{% url 'faturamento_medico:editar' linha.faturamento_id %}?next={{ request.get_full_path|urlencode }}"
                                    class="btn btn-outline-secondary btn-sm py-0 px-2"
                                    title="Alterar faturamento médico (paciente, convênio, guia, itens…)">
@@ -2031,6 +2050,25 @@
     </div>
 </div>
 
+<dialog id="modalColunasAcertoCaixa" aria-labelledby="modalColunasAcertoCaixaLabel" style="max-width: 28rem; width: 95vw; border: none; border-radius: 0.5rem; padding: 0;">
+    <div class="p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 id="modalColunasAcertoCaixaLabel" class="mb-0"><i class="fas fa-columns"></i> Colunas da grade</h5>
+            <button type="button" class="btn-close" onclick="document.getElementById('modalColunasAcertoCaixa').close();" aria-label="Fechar"></button>
+        </div>
+        <p class="small text-muted mb-2">Marque as colunas visíveis. A preferência fica salva neste navegador.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnColunasAcertoMostrarTodas">Mostrar todas</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnColunasAcertoRestaurar">Restaurar padrão</button>
+        </div>
+        <ul id="listaColunasAcertoCaixa" class="list-unstyled mb-3" style="max-height: 55vh; overflow: auto;"></ul>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" id="btnColunasAcertoAplicar">Aplicar</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('modalColunasAcertoCaixa').close();">Fechar</button>
+        </div>
+    </div>
+</dialog>
+
 {% include 'faturamento_medico/partials/nf_vinculo_modals.html' %}
 
 {{ formas_pagamento_acerto|json_script:"formas-pagamento-acerto-data" }}
@@ -2060,6 +2098,214 @@
 </div>
 
 <script>
+(function initAcertoGradeColunasOrdenacao() {
+    var STORAGE_KEY = 'acerto_caixa_colunas_v1';
+    var COLS = [
+        'data', 'paciente', 'codigo', 'procedimento', 'modalidade', 'contraste', 'valor_pago',
+        'acerto', 'caixa', 'nf', 'forma_pgto', 'valor_nf', 'checkin', 'discriminacao',
+        'valor_tabela', 'diferenca', 'status_agenda', 'convenio', 'inicio', 'fim',
+        'motivo_cancel', 'lancamento'
+    ];
+    var DEFAULT_OFF = ['codigo', 'discriminacao', 'fim', 'motivo_cancel', 'inicio'];
+    var LABELS = {
+        data: 'Data',
+        paciente: 'Paciente',
+        codigo: 'Código',
+        procedimento: 'Procedimento',
+        modalidade: 'Modalidade',
+        contraste: 'Contraste',
+        valor_pago: 'Valor pago',
+        acerto: 'Acerto',
+        caixa: 'Caixa',
+        nf: 'NF',
+        forma_pgto: 'Forma pgto.',
+        valor_nf: 'Valor NF',
+        checkin: 'Operador check-in',
+        discriminacao: 'Discriminação NF',
+        valor_tabela: 'V. tabela',
+        diferenca: 'Diferença',
+        status_agenda: 'Status agenda',
+        convenio: 'Convênio (viabilidade)',
+        inicio: 'Início',
+        fim: 'Fim',
+        motivo_cancel: 'Motivo cancel.',
+        lancamento: 'Lançamento'
+    };
+    var table = document.getElementById('acertoCaixaTable');
+    if (!table) return;
+
+    function defaultVisible() {
+        var vis = {};
+        COLS.forEach(function(k) {
+            vis[k] = DEFAULT_OFF.indexOf(k) === -1;
+        });
+        return vis;
+    }
+
+    function loadPrefs() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return defaultVisible();
+            var parsed = JSON.parse(raw);
+            var base = defaultVisible();
+            Object.keys(parsed).forEach(function(k) {
+                if (COLS.indexOf(k) !== -1) base[k] = !!parsed[k];
+            });
+            return base;
+        } catch (e) {
+            return defaultVisible();
+        }
+    }
+
+    function savePrefs(visible) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(visible)); } catch (e) {}
+    }
+
+    function applyColumnVisibility(visible) {
+        table.querySelectorAll('[data-col]').forEach(function(cell) {
+            var key = cell.getAttribute('data-col');
+            if (!key || COLS.indexOf(key) === -1) return;
+            cell.style.display = visible[key] === false ? 'none' : '';
+        });
+    }
+
+    var colPrefs = loadPrefs();
+    applyColumnVisibility(colPrefs);
+
+    function renderColModalList(prefs) {
+        var ul = document.getElementById('listaColunasAcertoCaixa');
+        if (!ul) return;
+        ul.innerHTML = '';
+        COLS.forEach(function(key) {
+            var li = document.createElement('li');
+            li.className = 'd-flex align-items-center gap-2 py-2 border-bottom';
+            var checked = prefs[key] !== false ? 'checked' : '';
+            li.innerHTML =
+                '<input type="checkbox" class="form-check-input col-vis-acerto mt-0" data-key="' + key + '" ' + checked + ' id="colvis_ac_' + key + '">' +
+                '<label class="form-check-label flex-grow-1 mb-0" for="colvis_ac_' + key + '">' + (LABELS[key] || key) + '</label>';
+            ul.appendChild(li);
+        });
+    }
+
+    var modalCols = document.getElementById('modalColunasAcertoCaixa');
+    var btnCols = document.getElementById('btnColunasAcertoCaixa');
+    if (btnCols && modalCols) {
+        btnCols.addEventListener('click', function() {
+            colPrefs = loadPrefs();
+            renderColModalList(colPrefs);
+            if (typeof modalCols.showModal === 'function') modalCols.showModal();
+        });
+    }
+    var listaCols = document.getElementById('listaColunasAcertoCaixa');
+    if (listaCols) {
+        listaCols.addEventListener('change', function(e) {
+            if (!e.target.classList.contains('col-vis-acerto')) return;
+            colPrefs[e.target.dataset.key] = e.target.checked;
+        });
+    }
+    var btnAplicarCols = document.getElementById('btnColunasAcertoAplicar');
+    if (btnAplicarCols) {
+        btnAplicarCols.addEventListener('click', function() {
+            savePrefs(colPrefs);
+            applyColumnVisibility(colPrefs);
+            if (modalCols) modalCols.close();
+        });
+    }
+    var btnTodas = document.getElementById('btnColunasAcertoMostrarTodas');
+    if (btnTodas) {
+        btnTodas.addEventListener('click', function() {
+            COLS.forEach(function(k) { colPrefs[k] = true; });
+            renderColModalList(colPrefs);
+        });
+    }
+    var btnRest = document.getElementById('btnColunasAcertoRestaurar');
+    if (btnRest) {
+        btnRest.addEventListener('click', function() {
+            colPrefs = defaultVisible();
+            renderColModalList(colPrefs);
+        });
+    }
+
+    function parseBrNumber(raw) {
+        if (raw == null || raw === '') return NaN;
+        var s = String(raw).trim().replace(/\s/g, '').replace(/R\$/gi, '');
+        if (!s || s === '—' || s === '-') return NaN;
+        if (s.indexOf(',') !== -1) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        }
+        var n = parseFloat(s);
+        return isNaN(n) ? NaN : n;
+    }
+
+    function sortKeyFromCell(td, sortType) {
+        var raw = td.getAttribute('data-sort-val');
+        if (raw == null || raw === '') raw = (td.textContent || '').trim();
+        if (sortType === 'number') {
+            var n = parseBrNumber(raw);
+            return isNaN(n) ? -Infinity : n;
+        }
+        if (sortType === 'bool') {
+            if (raw === '1' || raw === 'true') return 1;
+            if (td.querySelector('input[type=checkbox]')) {
+                return td.querySelector('input[type=checkbox]').checked ? 1 : 0;
+            }
+            return 0;
+        }
+        if (sortType === 'date') {
+            return raw || '0000-00-00';
+        }
+        return String(raw).toLowerCase();
+    }
+
+    var sortState = { col: '', dir: '' };
+
+    function sortTableByColumn(col, dir) {
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        var th = table.querySelector('thead th[data-col="' + col + '"]');
+        var sortType = (th && th.getAttribute('data-sort-type')) || 'text';
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-faturamento-id]'));
+        rows.sort(function(a, b) {
+            var ta = a.querySelector('td[data-col="' + col + '"]');
+            var tb = b.querySelector('td[data-col="' + col + '"]');
+            var ka = ta ? sortKeyFromCell(ta, sortType) : '';
+            var kb = tb ? sortKeyFromCell(tb, sortType) : '';
+            var cmp = 0;
+            if (typeof ka === 'number' && typeof kb === 'number') {
+                cmp = ka - kb;
+            } else {
+                cmp = String(ka).localeCompare(String(kb), 'pt-BR', { numeric: true, sensitivity: 'base' });
+            }
+            return dir === 'desc' ? -cmp : cmp;
+        });
+        rows.forEach(function(tr) { tbody.appendChild(tr); });
+    }
+
+    table.querySelectorAll('thead th.acerto-th-sort').forEach(function(th) {
+        function onSort() {
+            var col = th.getAttribute('data-col');
+            if (!col) return;
+            var nextDir = 'asc';
+            if (sortState.col === col) {
+                nextDir = sortState.dir === 'asc' ? 'desc' : 'asc';
+            }
+            sortState = { col: col, dir: nextDir };
+            table.querySelectorAll('thead th.acerto-th-sort').forEach(function(h) {
+                h.classList.remove('sorted-asc', 'sorted-desc');
+            });
+            th.classList.add(nextDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+            sortTableByColumn(col, nextDir);
+        }
+        th.addEventListener('click', onSort);
+        th.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSort();
+            }
+        });
+    });
+})();
+
 (function initAcertoFiltrosUi() {
     var wrap = document.getElementById('acertoFiltroWrap');
     var btnToggle = document.getElementById('btnToggleFiltrosAcerto');
