@@ -138,14 +138,48 @@
     padding: 0.5rem 0.65rem;
     background: #f8fafc;
 }
-.acerto-regua-dias-scroll {
+.acerto-regua-cal-nav {
     display: flex;
-    flex-wrap: nowrap;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.acerto-regua-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
     gap: 0.25rem;
-    overflow-x: auto;
-    padding-bottom: 0.15rem;
-    -webkit-overflow-scrolling: touch;
+    margin-bottom: 0.25rem;
+}
+.acerto-regua-cal-weekdays span {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    color: #6c757d;
+}
+.acerto-regua-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.25rem;
+}
+.acerto-regua-cal-vazio {
+    display: block;
+    min-height: 2.75rem;
+}
+.acerto-regua-cal-grid .acerto-regua-dia {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2.75rem;
+    min-width: 0;
+    padding: 0.25rem 0.15rem;
+}
+.acerto-regua-cal-grid .acerto-regua-dia .dow {
+    font-size: 0.55rem;
 }
 .acerto-regua-nav {
     flex: 0 0 auto;
@@ -721,7 +755,7 @@
                         <div class="acerto-regua-dias mb-3" id="acertoReguaDiasWrap">
                             <div class="acerto-resumo-dias-aviso" id="acertoResumoDiasAviso" role="status">
                                 <i class="fas fa-hand-pointer me-1"></i>
-                                Selecione <strong>um ou mais dias</strong> na régua (clique para marcar/desmarcar).
+                                Selecione <strong>um ou mais dias</strong> no calendário (clique para marcar/desmarcar).
                                 Depois clique em <strong>Abrir resumo</strong>.
                                 <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="btnCancelarModoResumoDias">Cancelar</button>
                             </div>
@@ -741,26 +775,35 @@
                                    title="{{ bm.label }} {{ regua_ano }} (mês inteiro)">{{ bm.label }}</a>
                                 {% endfor %}
                             </div>
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-1">
-                                <span class="small fw-semibold">{{ regua_titulo }}</span>
-                                <span class="text-muted small">Mês acima · dia abaixo · extremos mudam o mês</span>
-                            </div>
-                            <div class="acerto-regua-dias-scroll" role="navigation" aria-label="Régua de dias">
+                            <div class="acerto-regua-cal-nav" role="navigation" aria-label="Navegação do mês">
                                 <a class="acerto-regua-nav"
                                    href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_anterior }}"
                                    title="Período = mês anterior inteiro">‹ Mês anterior</a>
-                                {% for d in regua_dias %}
-                                <a class="acerto-regua-dia js-regua-dia{% if d.ativo_dia %} active{% elif d.no_intervalo %} in-range{% endif %}{% if d.escolhido_resumo %} picked-resumo{% endif %}{% if d.fim_semana %} weekend{% endif %}"
-                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ d.url_query }}"
-                                   data-iso="{{ d.iso }}"
-                                   title="{{ d.iso }}">
-                                    <span class="dow">{{ d.dia_semana }}</span>
-                                    <span class="num">{{ d.numero }}</span>
-                                </a>
-                                {% endfor %}
+                                <span class="small fw-semibold">{{ regua_titulo }}</span>
                                 <a class="acerto-regua-nav"
                                    href="{% url 'faturamento_medico:acerto_caixa' %}?{{ regua_url_mes_seguinte }}"
                                    title="Período = mês seguinte inteiro">Mês seguinte ›</a>
+                            </div>
+                            <div class="acerto-regua-cal-weekdays" aria-hidden="true">
+                                <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span>
+                                <span>Qui</span><span>Sex</span><span>Sáb</span>
+                            </div>
+                            <div class="acerto-regua-cal-grid" role="navigation" aria-label="Calendário de dias">
+                                {% for semana in regua_calendario_semanas %}
+                                {% for cel in semana %}
+                                {% if cel %}
+                                <a class="acerto-regua-dia js-regua-dia{% if cel.ativo_dia %} active{% elif cel.no_intervalo %} in-range{% endif %}{% if cel.escolhido_resumo %} picked-resumo{% endif %}{% if cel.fim_semana %} weekend{% endif %}"
+                                   href="{% url 'faturamento_medico:acerto_caixa' %}?{{ cel.url_query }}"
+                                   data-iso="{{ cel.iso }}"
+                                   title="{{ cel.iso }}">
+                                    <span class="dow">{{ cel.dia_semana }}</span>
+                                    <span class="num">{{ cel.numero }}</span>
+                                </a>
+                                {% else %}
+                                <span class="acerto-regua-cal-vazio"></span>
+                                {% endif %}
+                                {% endfor %}
+                                {% endfor %}
                             </div>
                         </div>
                         <div class="row g-2 align-items-end">

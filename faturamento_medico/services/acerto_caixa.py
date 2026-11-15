@@ -347,8 +347,21 @@ def pode_abrir_resumo_acerto_direto(request, data_inicio: date, data_fim: date) 
     return False
 
 
+def _grade_semanas_calendario_regua(
+    dias: list[dict], primeiro: date
+) -> list[list[dict | None]]:
+    """Grade mensal (domingo = 1ª coluna), semanas de 7 células."""
+    by_num = {d['numero']: d for d in dias}
+    offset = (primeiro.weekday() + 1) % 7
+    cells: list[dict | None] = [None] * offset
+    cells.extend(by_num.get(n) for n in range(1, len(dias) + 1))
+    while len(cells) % 7:
+        cells.append(None)
+    return [cells[i : i + 7] for i in range(0, len(cells), 7)]
+
+
 def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -> dict:
-    """Régua horizontal: mês anterior | dias do mês | mês seguinte."""
+    """Filtro por calendário: anos/meses e grade de dias do mês."""
     ref = data_inicio
     y, m = ref.year, ref.month
     if data_fim.year == data_inicio.year and data_fim.month == data_inicio.month:
@@ -419,6 +432,7 @@ def montar_regua_dias_acerto(filtros: dict, data_inicio: date, data_fim: date) -
         'regua_botoes_meses': _botoes_meses_ano(filtros, data_inicio, data_fim, y),
         'regua_botoes_anos': _botoes_anos(filtros, data_inicio, data_fim, y),
         'regua_dias': dias,
+        'regua_calendario_semanas': _grade_semanas_calendario_regua(dias, primeiro),
     }
 
 

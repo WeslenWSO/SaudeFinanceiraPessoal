@@ -212,6 +212,9 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         filtros = {'caixa': ['1'], 'somente_marcados': True}
         ctx = montar_regua_dias_acerto(filtros, date(2026, 11, 1), date(2026, 11, 30))
         self.assertEqual(len(ctx['regua_dias']), 30)
+        semanas = ctx['regua_calendario_semanas']
+        self.assertEqual(sum(1 for s in semanas for c in s if c), 30)
+        self.assertTrue(all(len(s) == 7 for s in semanas))
         self.assertIn('Novembro', ctx['regua_titulo'])
         dia15 = next(d for d in ctx['regua_dias'] if d['numero'] == 15)
         self.assertTrue(dia15['no_intervalo'])
