@@ -1153,10 +1153,10 @@
                             <td data-col="procedimento" data-sort-val="{{ linha.procedimento|default:'' }}">{{ linha.procedimento|truncatechars:45 }}</td>
                             <td data-col="modalidade" data-sort-val="{{ linha.modalidade|default:'' }}">{{ linha.modalidade }}</td>
                             <td data-col="contraste" data-sort-val="{% if linha.com_contraste %}1{% else %}0{% endif %}">{% if linha.com_contraste %}Sim{% else %}Não{% endif %}</td>
-                            <td class="text-end fm-celula-valor-pago" data-col="valor_pago" data-sort-val="{{ linha.valor_pago|default:'' }}"
+                            <td class="text-end fm-celula-valor-pago" data-col="valor_pago" data-sort-val="{{ linha.valor_pago|default:'' }}">
                                 {% if linha.valor_pago_exibir %}R$ {{ linha.valor_pago_fmt }}{% else %}—{% endif %}
                             </td>
-                            <td class="text-center fm-celula-acerto-flag" data-col="acerto" data-sort-val="{% if linha.marcado_acerto_caixa %}1{% else %}0{% endif %}"
+                            <td class="text-center fm-celula-acerto-flag" data-col="acerto" data-sort-val="{% if linha.marcado_acerto_caixa %}1{% else %}0{% endif %}">
                                 {% if linha.mostrar_acerto_celula %}
                                 <input type="checkbox"
                                        class="form-check-input js-acerto-caixa-flag m-0"
@@ -1168,7 +1168,8 @@
                                 <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
-                            <td class="fm-celula-caixa-select" data-col="caixa" data-sort-val="{{ linha.caixa_acerto|default:linha.caixa_exibicao|default:'' }}"
+                            <td class="fm-celula-caixa-select" data-col="caixa" data-sort-val="{{ linha.caixa_acerto|default:linha.caixa_exibicao|default:'' }}">
+                                {% if linha.mostrar_acerto_celula %}
                                 <select class="form-select form-select-sm js-caixa-acerto"
                                         data-faturamento-id="{{ linha.faturamento_id }}"
                                         {% if linha.caixa_bloqueado %}disabled title="Caixa fechado — reabra para alterar"{% endif %}

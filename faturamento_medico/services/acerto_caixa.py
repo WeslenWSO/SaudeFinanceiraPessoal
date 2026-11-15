@@ -2500,7 +2500,6 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
     checkin_disponiveis = base['checkin_disponiveis']
     convenios_disponiveis = base['convenios_disponiveis']
     formas_pagamento_disponiveis = base.get('formas_pagamento_disponiveis') or []
-    formas_pagamento_disponiveis = base.get('formas_pagamento_disponiveis') or []
     fechamentos_caixa = base['fechamentos_caixa']
     pode_fechar_caixa = base['pode_fechar_caixa']
     caixas_sel = list(filtros_dict.get('caixa') or [])
