@@ -1298,3 +1298,89 @@ def importar_relatorio_liquidos(request):
             return redirect("contasapagar:importar_relatorio_liquidos")
 
     return render(request, "contasapagar/importar_relatorio_liquidos.html")
+
+
+@login_required
+def relatorio_despesas_recorrentes(request):
+    """Despesas pagas que se repetem, agrupadas por descrição e dia do mês."""
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        return _redirect_sem_empresa(request)
+
+    meses = 4
+    raw_meses = (request.GET.get('meses') or '').strip()
+    if raw_meses.isdigit():
+        meses = max(1, min(24, int(raw_meses)))
+
+    from contasapagar.services.relatorio_despesas_recorrentes import (
+        _fmt_moeda_br,
+        montar_relatorio_despesas_recorrentes,
+    )
+
+    ctx = montar_relatorio_despesas_recorrentes(empresa_id, meses=meses)
+    for g in ctx['grupos']:
+        g.valor_total_fmt = _fmt_moeda_br(g.valor_total)
+        g.valor_medio_fmt = _fmt_moeda_br(g.valor_medio)
+
+    formato = (request.GET.get('formato') or '').strip().lower()
+    if formato == 'xlsx':
+        import os
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from django.conf import settings
+        from django.http import FileResponse
+
+        from contasapagar.services.relatorio_despesas_recorrentes import (
+            caminhos_export_servidor,
+            exportar_xlsx_despesas_recorrentes,
+        )
+
+        emp = Empresa.objects.filter(pk=empresa_id).first()
+        rotulo = (emp.razao if emp else '') or str(empresa_id)
+        fd, tmp_name = tempfile.mkstemp(suffix='.xlsx')
+        os.close(fd)
+        tmp = Path(tmp_name)
+        exportar_xlsx_despesas_recorrentes(ctx, tmp, empresa_rotulo=rotulo)
+        nome = (
+            f"despesas_recorrentes_{ctx['data_inicio']:%Y%m%d}_"
+            f"{ctx['data_fim']:%Y%m%d}.xlsx"
+        )
+        fixo, datado, _ = caminhos_export_servidor(empresa_id, nome)
+        shutil.copy2(tmp, fixo)
+        shutil.copy2(tmp, datado)
+        messages.success(
+            request,
+            (
+                'O Excel foi baixado pelo navegador (verifique a pasta Downloads) '
+                f'e uma cópia ficou no servidor: {settings.MEDIA_URL}exports/'
+                f'{empresa_id}/ultimo_despesas_recorrentes.xlsx'
+            ),
+        )
+        return FileResponse(
+            open(tmp, 'rb'),
+            as_attachment=True,
+            filename=nome,
+            content_type=(
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ),
+        )
+
+    from django.conf import settings
+
+    from contasapagar.services.relatorio_despesas_recorrentes import (
+        caminhos_export_servidor,
+    )
+
+    fixo, _, pasta = caminhos_export_servidor(
+        empresa_id, 'ultimo_despesas_recorrentes.xlsx'
+    )
+    ctx['meses_param'] = meses
+    ctx['export_servidor_url'] = (
+        f"{settings.MEDIA_URL}exports/{empresa_id}/ultimo_despesas_recorrentes.xlsx"
+        if fixo.is_file()
+        else ''
+    )
+    ctx['export_servidor_pasta_abs'] = str(pasta.resolve()) if pasta.is_dir() else ''
+    return render(request, 'contasapagar/relatorio_despesas_recorrentes.html', ctx)

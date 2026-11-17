@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block nav_ %}
+    {% include 'parcial/_nav.html' %}
+{% endblock %}
+
+{% block conteudo %}
+{% include 'parcial/_messages.html' %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h3 class="card-title mb-0">Despesas recorrentes (por dia do mês)</h3>
+                <small class="text-muted">
+                    Pagamentos de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}
+                    — últimos {{ meses }} meses · somente despesas pagas (categoria tipo Despesa)
+                </small>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'contasapagar:listaAPagar' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Contas a pagar
+                </a>
+                <a class="btn btn-success"
+                   href="?meses={{ meses_param }}&formato=xlsx">
+                    <i class="fas fa-file-excel"></i> Exportar Excel
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-secondary small mb-3">
+                <strong>Onde fica o Excel?</strong>
+                <ul class="mb-0 ps-3">
+                    <li>Ao clicar em <em>Exportar Excel</em>, o arquivo vai para a pasta <strong>Downloads</strong> do Windows (Ctrl+J no Chrome / Edge para ver downloads).</li>
+                    {% if export_servidor_url %}
+                    <li>Última exportação salva no servidor:
+                        <a href="{{ export_servidor_url }}" download>baixar novamente</a>
+                    </li>
+                    {% else %}
+                    <li>Ainda não há cópia no servidor — clique em <em>Exportar Excel</em> uma vez.</li>
+                    {% endif %}
+                </ul>
+            </div>
+            <form method="get" class="row g-2 align-items-end mb-4">
+                <div class="col-auto">
+                    <label for="meses" class="form-label">Meses</label>
+                    <select name="meses" id="meses" class="form-select">
+                        <option value="3" {% if meses_param == 3 %}selected{% endif %}>3</option>
+                        <option value="4" {% if meses_param == 4 %}selected{% endif %}>4</option>
+                        <option value="6" {% if meses_param == 6 %}selected{% endif %}>6</option>
+                        <option value="12" {% if meses_param == 12 %}selected{% endif %}>12</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Atualizar</button>
+                </div>
+                <div class="col-12 col-md">
+                    <p class="mb-0 text-muted small">
+                        {{ total_grupos }} combinação(ões) descrição + dia com repetição
+                        · {{ total_pagamentos }} pagamento(s) no relatório
+                    </p>
+                </div>
+            </form>
+
+            {% if grupos %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Descrição</th>
+                            <th scope="col" class="text-center">Dia</th>
+                            <th scope="col" class="text-end">Qtd.</th>
+                            <th scope="col">Valores (R$)</th>
+                            <th scope="col">Datas</th>
+                            <th scope="col" class="text-end">Total</th>
+                            <th scope="col" class="text-end">Média</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for g in grupos %}
+                        <tr>
+                            <td>{{ g.descricao }}</td>
+                            <td class="text-center fw-semibold">{{ g.dia }}</td>
+                            <td class="text-end">{{ g.quantidade }}</td>
+                            <td class="text-nowrap">{{ g.valores_fmt }}</td>
+                            <td class="small text-muted">{{ g.datas_fmt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ g.valor_total_fmt }}</td>
+                            <td class="text-end text-nowrap">R$ {{ g.valor_medio_fmt }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">
+                Nenhuma despesa repetida encontrada no período.
+                São listadas apenas descrições com pelo menos dois pagamentos no mesmo dia do mês
+                (ou pagamentos em meses diferentes).
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

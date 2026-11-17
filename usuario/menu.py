@@ -183,6 +183,13 @@ ITENS_MENU: tuple[MenuItemDef, ...] = (
     ),
     MenuItemDef('contas_pagar', 'Contas a Pagar', 'fa-money-check-alt', 'financeiro', url_name='contasapagar:listaAPagar'),
     MenuItemDef('categorizar_pagos', 'Categorizar pagos', 'fa-tags', 'financeiro', url_name='contasapagar:categorizar_baixados'),
+    MenuItemDef(
+        'despesas_recorrentes',
+        'Despesas recorrentes',
+        'fa-calendar-day',
+        'financeiro',
+        url_name='contasapagar:relatorio_despesas_recorrentes',
+    ),
     MenuItemDef('contas_receber', 'Contas a Receber', 'fa-hand-holding-usd', 'financeiro', url_name='contasareceber:crlistar'),
     MenuItemDef('categorizar_recebidos', 'Categorizar recebidos', 'fa-tags', 'financeiro', url_name='contasareceber:categorizar_baixados'),
     MenuItemDef('extrato_import', 'Extrato Bancário (Importar)', 'fa-file-upload', 'financeiro', url_name='extrato:upload_ofx'),
