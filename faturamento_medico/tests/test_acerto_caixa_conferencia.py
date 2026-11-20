@@ -10,6 +10,7 @@ from faturamento_medico.services.acerto_caixa import (
     _eh_aguardando_faturamento,
     _item_conferencia_pendente,
     filtrar_linhas_acerto_caixa,
+    montar_resumo_filtros_acerto,
     montar_regua_dias_acerto,
     montar_resumo_modalidades_acerto,
     montar_resumo_viabilidade_acerto,
@@ -666,3 +667,20 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
             {'dias_resumo': ['2026-11-03', '2026-11-05', 'invalido']}
         )
         self.assertEqual(parse_dias_resumo_request(req), ['2026-11-03', '2026-11-05'])
+
+    def test_url_query_preserva_observacao_faturamento(self):
+        q = url_query_acerto_caixa(
+            {'observacao': 'retorno centro', 'paciente': ''},
+            date(2026, 8, 1),
+            date(2026, 8, 31),
+        )
+        self.assertIn('observacao=retorno', q)
+
+    def test_resumo_filtros_inclui_observacao(self):
+        txt = montar_resumo_filtros_acerto(
+            {'observacao': 'particular'},
+            date(2026, 8, 1),
+            date(2026, 8, 31),
+        )
+        self.assertIn('obs.', txt)
+        self.assertIn('particular', txt)

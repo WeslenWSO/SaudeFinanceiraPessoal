@@ -279,6 +279,8 @@ def url_query_acerto_caixa(filtros: dict, data_inicio: date, data_fim: date) -> 
         pares.append(('hora_final', str(filtros['hora_final'])))
     if filtros.get('paciente'):
         pares.append(('paciente', str(filtros['paciente'])))
+    if filtros.get('observacao'):
+        pares.append(('observacao', str(filtros['observacao'])))
     if filtros.get('somente_marcados'):
         pares.append(('somente_marcados', '1'))
     for dia_iso in filtros.get('dias_resumo') or []:
@@ -911,6 +913,7 @@ def _filtros_para_snapshot(filtros: dict) -> dict:
         'hora_final': filtros.get('hora_final') or '',
         'status_agendamento': list(filtros.get('status_agendamento') or []),
         'paciente': (filtros.get('paciente') or '').strip(),
+        'observacao': (filtros.get('observacao') or '').strip(),
         'convenio': list(filtros.get('convenio') or []),
         'forma_pagamento': list(filtros.get('forma_pagamento') or []),
     }
@@ -963,6 +966,9 @@ def _fechamento_cobre_faturamento(fech: AcertoCaixaFechamento, fat: FaturamentoM
 
     paciente = (snap.get('paciente') or '').strip()
     if paciente and paciente.lower() not in (fat.nome or '').lower():
+        return False
+    obs = (snap.get('observacao') or '').strip()
+    if obs and obs.lower() not in (fat.observacao or '').lower():
         return False
     convenios_snap = snap.get('convenio') or []
     if convenios_snap:
@@ -1202,6 +1208,11 @@ def montar_resumo_filtros_acerto(filtros: dict, data_inicio: date, data_fim: dat
     paciente = (filtros.get('paciente') or '').strip()
     if paciente:
         partes.append(f'paciente «{paciente[:24]}{"…" if len(paciente) > 24 else ""}»')
+    observacao = (filtros.get('observacao') or '').strip()
+    if observacao:
+        partes.append(
+            f'obs. «{observacao[:24]}{"…" if len(observacao) > 24 else ""}»'
+        )
     if filtros.get('hora_inicial') or filtros.get('hora_final'):
         hi = filtros.get('hora_inicial') or '…'
         hf = filtros.get('hora_final') or '…'
@@ -2199,6 +2210,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         s.strip() for s in request.GET.getlist('status_agendamento') if s and str(s).strip()
     ]
     paciente_filtro = (request.GET.get('paciente') or '').strip()
+    observacao_filtro = (request.GET.get('observacao') or '').strip()
     convenios_sel = [
         s.strip() for s in request.GET.getlist('convenio') if s and str(s).strip()
     ]
@@ -2242,6 +2254,8 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
     )
     if paciente_filtro:
         qs = qs.filter(nome__icontains=paciente_filtro)
+    if observacao_filtro:
+        qs = qs.filter(observacao__icontains=observacao_filtro)
     if convenios_sel:
         qs = qs.filter(convenio__in=convenios_sel)
     if caixas_sel:
@@ -2271,6 +2285,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
             'hora_final': hora_fim_str,
             'status_agendamento': status_sel,
             'paciente': paciente_filtro,
+            'observacao': observacao_filtro,
             'convenio': convenios_sel,
             'forma_pagamento': forma_pagamento_sel,
             'dias_resumo': parse_dias_resumo_request(request),
@@ -2538,6 +2553,7 @@ def montar_linhas_grade_acerto_caixa(request, empresa_id: int) -> dict:
         'hora_final': hora_fim_str,
         'status_agendamento': status_sel,
         'paciente': paciente_filtro,
+        'observacao': observacao_filtro,
         'convenio': convenios_sel,
         'forma_pagamento': forma_pagamento_sel,
         'dias_resumo': dias_resumo,
