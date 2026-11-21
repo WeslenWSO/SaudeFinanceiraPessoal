@@ -7254,6 +7254,57 @@ def imprimir_acerto_caixa(request):
 
 
 @login_required
+def exportar_resumo_acerto_caixa_excel(request):
+    """Excel do resumo mensal (por dia) ou anual (por mês), mesmo layout das matrizes da tela."""
+    import logging
+    from io import BytesIO
+
+    from django.http import HttpResponse
+
+    from faturamento_medico.services.acerto_caixa import montar_contexto_acerto_caixa
+    from faturamento_medico.services.exportar_resumo_acerto_excel import (
+        montar_workbook_resumo_acerto,
+    )
+
+    logger = logging.getLogger(__name__)
+    empresa_id = request.session.get('empresa_id')
+    if not empresa_id:
+        messages.error(request, 'Selecione uma empresa.')
+        return redirect('dashboard:relatorio_mensal')
+
+    try:
+        ctx = montar_contexto_acerto_caixa(request, empresa_id)
+        visao = (request.GET.get('visao_resumo') or 'mes').strip().lower()
+        if visao not in ('mes', 'ano'):
+            visao = 'mes'
+        wb = montar_workbook_resumo_acerto(ctx, visao=visao)
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        di = request.GET.get('data_inicio') or ctx.get('filtros', {}).get('data_inicio', '')
+        df = request.GET.get('data_fim') or ctx.get('filtros', {}).get('data_fim', '')
+        sufixo = 'anual' if visao == 'ano' else 'mensal'
+        nome = f'acerto_caixa_resumo_{sufixo}_{di}_{df}.xlsx'
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type=(
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ),
+        )
+        resp['Content-Disposition'] = content_disposition_header(
+            as_attachment=True,
+            filename=nome,
+        )
+        return resp
+    except Exception as exc:
+        logger.exception('exportar_resumo_acerto_caixa_excel empresa=%s', empresa_id)
+        messages.error(request, 'Não foi possível gerar o Excel do resumo.')
+        qs = request.GET.urlencode()
+        url = reverse('faturamento_medico:acerto_caixa')
+        return redirect(f'{url}?{qs}' if qs else url)
+
+
+@login_required
 @require_POST
 def fechar_acerto_caixa(request):
     """Fecha o acerto para os caixas selecionados no filtro (grava data e saldo)."""

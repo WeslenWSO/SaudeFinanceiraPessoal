@@ -767,6 +767,11 @@
                     <i class="fas fa-chart-pie"></i> <span class="js-btn-resumo-label">Resumo</span>
                 </button>
                 {% if regua_botao_mes_ativo or request.GET.visao_resumo == 'mes' or request.GET.visao_resumo == 'ano' %}
+                <a href="{% url 'faturamento_medico:exportar_resumo_acerto_caixa_excel' %}?{{ redirect_qs }}"
+                   class="btn btn-success btn-sm"
+                   title="Exporta resumo para Excel (matrizes por dia ou por mês)">
+                    <i class="fas fa-file-excel"></i> Excel
+                </a>
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo&auto_print=1"
                    class="btn btn-outline-primary btn-sm"
                    target="_blank"
@@ -2117,6 +2122,11 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <a href="{% url 'faturamento_medico:exportar_resumo_acerto_caixa_excel' %}?{% if redirect_qs %}{{ redirect_qs }}{% endif %}"
+                   class="btn btn-success btn-sm px-3 js-link-excel-resumo-modal"
+                   title="Exportar para Excel no mesmo formato das matrizes desta tela">
+                    <i class="fas fa-file-excel me-1"></i> Exportar Excel
+                </a>
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo&auto_print=1"
                    class="btn btn-primary btn-sm px-3 js-link-imprimir-resumo-modal" target="_blank" rel="noopener"
                    title="Abre a versão para impressão igual a esta tela (inclui gráficos e matrizes por dia)">
@@ -3103,6 +3113,14 @@
         });
         var anoEl = document.querySelector('.resumo-visao-ano');
         if (anoEl) anoEl.classList.toggle('d-none', visao !== 'ano');
+        var linkExcel = document.querySelector('.js-link-excel-resumo-modal');
+        if (linkExcel) {
+            try {
+                var u = new URL(linkExcel.href, window.location.origin);
+                u.searchParams.set('visao_resumo', visao);
+                linkExcel.href = u.pathname + '?' + u.searchParams.toString();
+            } catch (e) { /* noop */ }
+        }
         montarChartsModal();
     }
 

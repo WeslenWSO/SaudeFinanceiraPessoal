@@ -77,6 +77,11 @@ urlpatterns = [
     ),
     path('acerto-caixa/imprimir/', views.imprimir_acerto_caixa, name='imprimir_acerto_caixa'),
     path(
+        'acerto-caixa/resumo/excel/',
+        views.exportar_resumo_acerto_caixa_excel,
+        name='exportar_resumo_acerto_caixa_excel',
+    ),
+    path(
         'acerto-caixa/salvar-faturamento/',
         views.salvar_acerto_caixa_faturamento,
         name='salvar_acerto_caixa_faturamento',

@@ -684,3 +684,45 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         )
         self.assertIn('obs.', txt)
         self.assertIn('particular', txt)
+
+    def test_export_workbook_resumo_mensal(self):
+        from faturamento_medico.services.exportar_resumo_acerto_excel import (
+            montar_workbook_resumo_acerto,
+        )
+
+        ctx = {
+            'periodo_fmt': '01/11/2026 → 30/11/2026',
+            'filtros_resumo': 'teste',
+            'quantidade_linhas': 3,
+            'resumo_pagamento': [{'rotulo': 'PIX', 'total_fmt': '100,00'}],
+            'total_resumo_geral_fmt': '350,00',
+            'total_valor_pago_grade_fmt': '350,00',
+            'resumo_quantidade_total': 3,
+            'resumo_valor_total_fmt': '350,00',
+            'resumo_matriz_mes': True,
+            'resumo_matriz_mes_titulo': 'Novembro 2026',
+            'resumo_dias_colunas': [{'label_curto': '3'}, {'label_curto': '5'}],
+            'modalidades_matriz_dia_linhas': [
+                {
+                    'label': 'US',
+                    'meses': [{'qt': 1, 'valor_fmt': '100,00'}, {'qt': 0, 'valor_fmt': '0,00'}],
+                    'total_qt': 1,
+                    'total_valor_fmt': '100,00',
+                }
+            ],
+            'modalidades_matriz_dia_totais': [
+                {'qt': 1, 'valor_fmt': '100,00'},
+                {'qt': 0, 'valor_fmt': '0,00'},
+            ],
+            'viabilidade_matriz_dia_linhas': [],
+            'viabilidade_matriz_dia_totais': [],
+            'pagamento_matriz_dia_formas': [],
+            'pagamento_matriz_dia_totais': [],
+            'resumo_viabilidade_total_qt': 0,
+            'resumo_viabilidade_total_valor_fmt': '0,00',
+            'resumo_solicitante': [],
+        }
+        wb = montar_workbook_resumo_acerto(ctx, visao='mes')
+        self.assertIn('Modalidade', wb.sheetnames)
+        self.assertIn('Viabilidade', wb.sheetnames)
+        self.assertIn('Pagamento', wb.sheetnames)
