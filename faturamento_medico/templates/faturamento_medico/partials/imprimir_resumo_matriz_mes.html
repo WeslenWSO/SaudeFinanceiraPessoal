@@ -10,7 +10,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}" title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
-                    <th rowspan="2">Média R$/Qt</th>
+                    <th rowspan="2">Média Total/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}
@@ -56,7 +56,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
-                    <th rowspan="2">Média R$/Qt</th>
+                    <th rowspan="2">Média Total/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}
@@ -102,7 +102,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
-                    <th rowspan="2">Média R$/Qt</th>
+                    <th rowspan="2">Média Total/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}

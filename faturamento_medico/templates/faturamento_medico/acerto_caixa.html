@@ -692,8 +692,37 @@
 .acerto-matriz-anual thead .col-fixa { z-index: 4; background: #e2e8f0; }
 .acerto-matriz-anual .subcol { min-width: 2.1rem; text-align: center; }
 .acerto-matriz-anual .subcol-val { min-width: 3.5rem; text-align: right; }
-.acerto-matriz-anual .col-media { min-width: 4.75rem; text-align: right; font-size: 0.8rem; }
+.acerto-matriz-anual .col-media { min-width: 5.25rem; text-align: right; font-size: 0.8rem; }
 .acerto-matriz-anual thead .col-media { text-align: center; font-size: 0.72rem; line-height: 1.15; vertical-align: middle; }
+.acerto-matriz-por-dia th.col-sticky-media,
+.acerto-matriz-por-dia td.col-sticky-media {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: -4px 0 6px rgba(15, 23, 42, 0.07);
+}
+.acerto-matriz-por-dia th.col-sticky-total-val,
+.acerto-matriz-por-dia td.col-sticky-total-val {
+    position: sticky;
+    right: 5.25rem;
+    z-index: 2;
+    background: #fff;
+    box-shadow: -4px 0 6px rgba(15, 23, 42, 0.05);
+}
+.acerto-matriz-por-dia th.col-sticky-total-qt,
+.acerto-matriz-por-dia td.col-sticky-total-qt {
+    position: sticky;
+    right: 8.75rem;
+    z-index: 2;
+    background: #fff;
+}
+.acerto-matriz-por-dia thead th.col-sticky-media,
+.acerto-matriz-por-dia thead th.col-sticky-total-val,
+.acerto-matriz-por-dia thead th.col-sticky-total-qt { background: #e2e8f0; z-index: 3; }
+.acerto-matriz-por-dia tr.row-total td.col-sticky-media,
+.acerto-matriz-por-dia tr.row-total td.col-sticky-total-val,
+.acerto-matriz-por-dia tr.row-total td.col-sticky-total-qt { background: #eff6ff; font-weight: 700; }
 .acerto-matriz-anual tr.row-total td { background: #eff6ff; font-weight: 700; }
 .acerto-matriz-anual th.dia-fim-semana { color: #64748b; font-weight: 600; }
 .acerto-matriz-por-dia th.dia-zebra-a,
@@ -1693,7 +1722,7 @@
                                             <th colspan="2">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total ano</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>R$/Qt</th>
+                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_meses_colunas %}
@@ -1772,7 +1801,7 @@
                                             <th colspan="2">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total ano</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>R$/Qt</th>
+                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_meses_colunas %}
@@ -1840,7 +1869,7 @@
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>R$/Qt</th>
+                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
@@ -1895,15 +1924,15 @@
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>R$/Qt</th>
+                                            <th class="col-media col-sticky-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
                                             <th class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">Qt</th>
                                             <th class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">R$</th>
                                             {% endfor %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol col-sticky-total-qt">Qt</th>
+                                            <th class="subcol-val col-sticky-total-val">R$</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1914,9 +1943,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ row.total_qt }}</td>
-                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                            <td class="col-media">{{ row.media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ row.total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ row.total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endfor %}
                                         <tr class="row-total">
@@ -1925,9 +1954,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ resumo_viabilidade_total_qt }}</td>
-                                            <td class="subcol-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
-                                            <td class="col-media">{{ resumo_viabilidade_media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ resumo_viabilidade_total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ resumo_viabilidade_media_valor_qt_fmt }}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1950,7 +1979,7 @@
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>R$/Qt</th>
+                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
@@ -2062,6 +2091,7 @@
                                             <th class="text-start">Viabilidade</th>
                                             <th>Qt</th>
                                             <th>Valor</th>
+                                            <th title="Total R$ ÷ total Qt">Média Total/Qt</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2070,15 +2100,17 @@
                                             <td>{{ row.viabilidade }}</td>
                                             <td class="text-center">{{ row.quantidade }}</td>
                                             <td class="text-end">R$ {{ row.valor_fmt }}</td>
+                                            <td class="text-end">R$ {{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% empty %}
-                                        <tr><td colspan="3" class="text-muted text-center py-3">Sem dados.</td></tr>
+                                        <tr><td colspan="4" class="text-muted text-center py-3">Sem dados.</td></tr>
                                         {% endfor %}
                                         {% if resumo_viabilidade %}
                                         <tr class="row-total row-total-valor">
                                             <td>Total</td>
                                             <td class="text-center">{{ resumo_viabilidade_total_qt }}</td>
                                             <td class="text-end">R$ {{ resumo_viabilidade_total_valor_fmt }}</td>
+                                            <td class="text-end">R$ {{ resumo_viabilidade_media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endif %}
                                     </tbody>

@@ -1341,6 +1341,9 @@ def montar_resumo_viabilidade_acerto(linhas: list[dict]) -> list[dict]:
                 'quantidade': dados['quantidade'],
                 'valor': dados['valor'],
                 'valor_fmt': _moeda_br(dados['valor']),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(
+                    dados['quantidade'], dados['valor']
+                ),
             }
             for nome, dados in agreg.items()
         ],

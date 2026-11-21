@@ -142,7 +142,7 @@ def _cabecalho_matriz(ws, start_row: int, rotulo_col: str, colunas: list[dict]) 
         ws,
         start_row,
         c_media,
-        'Média\nR$/Qt',
+        'Média\nTotal/Qt',
         bold=True,
         fill=_FILL_CAB,
         center=True,

@@ -716,8 +716,22 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
                 {'qt': 1, 'valor_fmt': '100,00'},
                 {'qt': 0, 'valor_fmt': '0,00'},
             ],
-            'viabilidade_matriz_dia_linhas': [],
-            'viabilidade_matriz_dia_totais': [],
+            'viabilidade_matriz_dia_linhas': [
+                {
+                    'viabilidade': 'JARDEL',
+                    'meses': [{'qt': 2, 'valor_fmt': '1.000,00'}, {'qt': 1, 'valor_fmt': '188,00'}],
+                    'total_qt': 3,
+                    'total_valor_fmt': '1.188,00',
+                    'media_valor_qt_fmt': '396,00',
+                }
+            ],
+            'viabilidade_matriz_dia_totais': [
+                {'qt': 2, 'valor_fmt': '1.000,00'},
+                {'qt': 1, 'valor_fmt': '188,00'},
+            ],
+            'resumo_viabilidade_media_valor_qt_fmt': '396,00',
+            'resumo_media_valor_qt_fmt': '100,00',
+            'resumo_geral_media_valor_qt_fmt': '116,67',
             'pagamento_matriz_dia_formas': [],
             'pagamento_matriz_dia_totais': [],
             'resumo_viabilidade_total_qt': 0,
@@ -728,3 +742,6 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         self.assertIn('Modalidade', wb.sheetnames)
         self.assertIn('Viabilidade', wb.sheetnames)
         self.assertIn('Pagamento', wb.sheetnames)
+        ws_v = wb['Viabilidade']
+        self.assertEqual(ws_v['G6'].value, '1.188,00')  # total R$
+        self.assertEqual(ws_v['H6'].value, '396,00')  # média total/qt
