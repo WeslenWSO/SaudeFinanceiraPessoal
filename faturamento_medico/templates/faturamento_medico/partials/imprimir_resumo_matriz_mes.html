@@ -10,6 +10,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}" title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
+                    <th rowspan="2">Média R$/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}
@@ -28,6 +29,7 @@
                     {% endfor %}
                     <td class="num">{{ item.total_qt }}</td>
                     <td class="num">{{ item.total_valor_fmt }}</td>
+                    <td class="num">{{ item.media_valor_qt_fmt }}</td>
                 </tr>
                 {% endfor %}
                 <tr class="total-linha">
@@ -38,6 +40,7 @@
                     {% endfor %}
                     <td class="num">{{ resumo_quantidade_total }}</td>
                     <td class="num">{{ resumo_valor_total_fmt }}</td>
+                    <td class="num">{{ resumo_media_valor_qt_fmt }}</td>
                 </tr>
             </tbody>
         </table>
@@ -53,6 +56,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
+                    <th rowspan="2">Média R$/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}
@@ -71,6 +75,7 @@
                     {% endfor %}
                     <td class="num">{{ row.total_qt }}</td>
                     <td class="num">{{ row.total_valor_fmt }}</td>
+                    <td class="num">{{ row.media_valor_qt_fmt }}</td>
                 </tr>
                 {% endfor %}
                 <tr class="total-linha">
@@ -81,6 +86,7 @@
                     {% endfor %}
                     <td class="num">{{ resumo_viabilidade_total_qt }}</td>
                     <td class="num">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                    <td class="num">{{ resumo_viabilidade_media_valor_qt_fmt }}</td>
                 </tr>
             </tbody>
         </table>
@@ -96,6 +102,7 @@
                     <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
                     {% endfor %}
                     <th colspan="2">Total</th>
+                    <th rowspan="2">Média R$/Qt</th>
                 </tr>
                 <tr>
                     {% for col in resumo_dias_colunas %}
@@ -114,6 +121,7 @@
                     {% endfor %}
                     <td class="num">{{ row.total_qt }}</td>
                     <td class="num">{{ row.total_valor_fmt }}</td>
+                    <td class="num">{{ row.media_valor_qt_fmt }}</td>
                 </tr>
                 {% endfor %}
                 {% if pagamento_matriz_dia_aguardando %}
@@ -127,6 +135,7 @@
                     {% endfor %}
                     <td class="num">{{ row.total_qt }}</td>
                     <td class="num">{{ row.total_valor_fmt }}</td>
+                    <td class="num">{{ row.media_valor_qt_fmt }}</td>
                 </tr>
                 {% endfor %}
                 {% endif %}
@@ -138,6 +147,7 @@
                     {% endfor %}
                     <td class="num">—</td>
                     <td class="num">{{ total_resumo_geral_fmt }}</td>
+                    <td class="num">{{ resumo_geral_media_valor_qt_fmt }}</td>
                 </tr>
             </tbody>
         </table>

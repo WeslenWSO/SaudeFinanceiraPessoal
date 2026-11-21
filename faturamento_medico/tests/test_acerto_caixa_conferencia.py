@@ -383,6 +383,8 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
         )
         self.assertEqual(us['meses'][2]['qt'], 1)
         self.assertEqual(us['meses'][4]['qt'], 1)
+        self.assertEqual(us['total_qt'], 2)
+        self.assertEqual(us['media_valor_qt_fmt'], '75,00')
         cassi = next(
             r for r in ctx['viabilidade_matriz_dia_linhas'] if r['viabilidade'] == 'CASSI'
         )
@@ -441,7 +443,7 @@ class AcertoCaixaConferenciaHelpersTests(SimpleTestCase):
             linhas, date(2026, 1, 1), date(2026, 12, 31)
         )
         self.assertTrue(ctx['resumo_matriz_anual'])
-        self.assertEqual(ctx['matriz_anual_colspan_secao'], 27)
+        self.assertEqual(ctx['matriz_anual_colspan_secao'], 28)
         us = next(
             r for r in ctx['modalidades_matriz_linhas'] if r['codigo'] == 'US'
         )

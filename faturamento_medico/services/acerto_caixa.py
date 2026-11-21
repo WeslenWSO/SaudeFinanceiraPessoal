@@ -541,6 +541,16 @@ def _moeda_br(valor) -> str:
     return f'{v:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def _media_valor_por_qt_fmt(qt: int, valor: Decimal) -> str:
+    """Média R$ por quantidade (total valor ÷ total qt) para matrizes do resumo."""
+    if not qt:
+        return '—'
+    try:
+        return _moeda_br(Decimal(valor) / Decimal(qt))
+    except Exception:
+        return '—'
+
+
 def _eh_aguardando_faturamento(status_txt: str) -> bool:
     s = (status_txt or '').lower()
     return 'aguard' in s and 'fatur' in s
@@ -1303,6 +1313,7 @@ def montar_resumo_modalidades_acerto(
         'resumo_modalidades': resumo_modalidades,
         'resumo_quantidade_total': len(linhas),
         'resumo_valor_total_fmt': _moeda_br(valor_total),
+        'resumo_media_valor_qt_fmt': _media_valor_por_qt_fmt(len(linhas), valor_total),
         'resumo_outros_quantidade': outros_qtd,
         'resumo_outros_valor_fmt': _moeda_br(outros_valor) if outros_qtd else '',
         'modalidades_fora_resumo': modalidades_fora_resumo,
@@ -1595,6 +1606,7 @@ def montar_resumo_viabilidade_matriz_mes(linhas: list[dict], ano: int) -> dict:
                 'meses': meses_cel,
                 'total_qt': total_qt,
                 'total_valor_fmt': _moeda_br(total_valor),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(total_qt, total_valor),
             }
         )
 
@@ -1705,6 +1717,7 @@ def montar_resumo_modalidades_matriz_mes(linhas: list[dict], ano: int) -> dict:
                 'meses': meses_cel,
                 'total_qt': total_qt,
                 'total_valor_fmt': _moeda_br(total_valor),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(total_qt, total_valor),
             }
         )
 
@@ -1765,6 +1778,7 @@ def montar_resumo_modalidades_matriz_dia(
                 'meses': dias_cel,
                 'total_qt': total_qt,
                 'total_valor_fmt': _moeda_br(total_valor),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(total_qt, total_valor),
             }
         )
 
@@ -1835,6 +1849,7 @@ def montar_resumo_viabilidade_matriz_dia(
                 'meses': dias_cel,
                 'total_qt': total_qt,
                 'total_valor_fmt': _moeda_br(total_valor),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(total_qt, total_valor),
             }
         )
 
@@ -1874,7 +1889,7 @@ def montar_contexto_matriz_mensal_por_dia(
         'resumo_matriz_mes': True,
         'resumo_matriz_mes_titulo': f'{titulo_mes} {data_inicio.year}',
         'resumo_dias_colunas': colunas,
-        'matriz_mes_colspan_secao': len(colunas) * 2 + 3,
+        'matriz_mes_colspan_secao': len(colunas) * 2 + 4,
         **montar_resumo_modalidades_matriz_dia(linhas, colunas),
         **montar_resumo_viabilidade_matriz_dia(linhas, colunas),
         **montar_resumo_pagamento_matriz_dia(linhas, colunas),
@@ -1909,6 +1924,7 @@ def _matriz_pagamento_linhas_celulas(
                 'meses': celulas,
                 'total_qt': total_qt,
                 'total_valor_fmt': _moeda_br(total_valor),
+                'media_valor_qt_fmt': _media_valor_por_qt_fmt(total_qt, total_valor),
             }
         )
     return out
@@ -2116,7 +2132,7 @@ def montar_contexto_matriz_anual_acerto(linhas: list[dict], di: date, df: date) 
         'resumo_matriz_anual': True,
         'resumo_matriz_ano': ano,
         'resumo_meses_colunas': meses_colunas,
-        'matriz_anual_colspan_secao': n_meses * 2 + 3,
+        'matriz_anual_colspan_secao': n_meses * 2 + 4,
         **montar_resumo_modalidades_matriz_mes(linhas, ano),
         **montar_resumo_pagamento_matriz_mes(linhas, ano),
     }
@@ -2791,6 +2807,12 @@ def montar_contexto_acerto_caixa(request, empresa_id: int) -> dict:
         'resumo_viabilidade': resumo_viabilidade,
         'resumo_viabilidade_total_qt': total_viab_qt,
         'resumo_viabilidade_total_valor_fmt': _moeda_br(total_viab_valor),
+        'resumo_viabilidade_media_valor_qt_fmt': _media_valor_por_qt_fmt(
+            total_viab_qt, total_viab_valor
+        ),
+        'resumo_geral_media_valor_qt_fmt': _media_valor_por_qt_fmt(
+            len(linhas_grade), total_resumo_geral
+        ),
         'resumo_solicitante': resumo_solicitante,
         'resumo_solicitante_total_qt': total_sol_qt,
         'resumo_solicitante_total_valor_fmt': _moeda_br(total_sol_valor),
