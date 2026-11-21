@@ -766,12 +766,23 @@
                         title="Resumo: use Mês/Ano ou selecione um ou mais dias na régua">
                     <i class="fas fa-chart-pie"></i> <span class="js-btn-resumo-label">Resumo</span>
                 </button>
+                {% if regua_botao_mes_ativo or request.GET.visao_resumo == 'mes' or request.GET.visao_resumo == 'ano' %}
+                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo&auto_print=1"
+                   class="btn btn-outline-primary btn-sm"
+                   target="_blank"
+                   rel="noopener"
+                   title="Imprime o resumo mensal/anual (gráficos e matrizes)">
+                    <i class="fas fa-print"></i> Imprimir resumo
+                </a>
+                {% else %}
                 <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{{ redirect_qs }}"
                    class="btn btn-outline-primary btn-sm"
                    target="_blank"
-                   rel="noopener">
+                   rel="noopener"
+                   title="Imprime a grade de procedimentos">
                     <i class="fas fa-print"></i> Imprimir
                 </a>
+                {% endif %}
                 <a href="{% url 'faturamento_medico:ftlistar' %}" class="btn btn-secondary btn-sm">
                     <i class="fas fa-arrow-left"></i> Faturamento
                 </a>
@@ -2106,8 +2117,9 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo"
-                   class="btn btn-primary btn-sm px-3" target="_blank" rel="noopener">
+                <a href="{% url 'faturamento_medico:imprimir_acerto_caixa' %}?{% if redirect_qs %}{{ redirect_qs }}&{% endif %}modo=resumo&auto_print=1"
+                   class="btn btn-primary btn-sm px-3 js-link-imprimir-resumo-modal" target="_blank" rel="noopener"
+                   title="Abre a versão para impressão igual a esta tela (inclui gráficos e matrizes por dia)">
                     <i class="fas fa-print me-1"></i> Imprimir
                 </a>
                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Fechar</button>

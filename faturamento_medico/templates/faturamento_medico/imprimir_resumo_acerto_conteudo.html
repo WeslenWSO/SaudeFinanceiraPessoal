@@ -117,6 +117,11 @@
         </div>
     </div>
 
+    {% if resumo_matriz_mes %}
+    {% include 'faturamento_medico/partials/imprimir_resumo_matriz_mes.html' %}
+    {% endif %}
+
+    {% if not resumo_matriz_mes %}
     <div class="resumo-impressao-duas-colunas">
         <div class="resumo-impressao-bloco">
             <h2>Modalidade — qt · valor pago</h2>
@@ -219,6 +224,7 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
     <div class="resumo-impressao-duas-colunas page-break-before">
         <div class="resumo-impressao-bloco">
@@ -372,6 +378,12 @@
             '#6366f1'
         );
     }
+
+    {% if auto_print %}
+    window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 900);
+    });
+    {% endif %}
 
 })();
 </script>

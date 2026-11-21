@@ -293,7 +293,36 @@
         .matriz-impressao .num { text-align: right; }
         .nota-fora { font-size: 7px; margin-top: 6px; }
         .page-break-before { page-break-before: always; margin-top: 12px; }
+        .secao-matriz-mes-impressao { margin-top: 14px; }
+        .matriz-mes-titulo-secao {
+            font-size: 10px;
+            text-transform: uppercase;
+            margin: 12px 0 6px;
+            border-bottom: 1px solid #94a3b8;
+            padding-bottom: 4px;
+        }
+        .matriz-mes-badge {
+            font-size: 8px;
+            font-weight: 600;
+            color: #1e40af;
+            text-transform: none;
+        }
+        .matriz-por-dia-impressao .th-fim-semana { background: #fef3c7; }
+        .matriz-por-dia-impressao .total-linha td {
+            font-weight: bold;
+            background: #eff6ff;
+        }
         @media print {
+            .secao-matriz-mes-impressao .matriz-impressao-wrap {
+                overflow: visible;
+            }
+            @page resumo-matriz-larga {
+                size: A4 landscape;
+                margin: 8mm;
+            }
+            .secao-matriz-mes-impressao {
+                page: resumo-matriz-larga;
+            }
             body { margin: 0; }
             .no-print { display: none !important; }
             table.grid thead { display: table-header-group; }

@@ -7247,6 +7247,7 @@ def imprimir_acerto_caixa(request):
         qs_voltar.pop('modo', None)
         contexto['redirect_qs'] = qs_voltar.urlencode()
         contexto['modo_resumo'] = request.GET.get('modo') == 'resumo'
+        contexto['auto_print'] = request.GET.get('auto_print') == '1'
         return render(request, 'faturamento_medico/imprimir_acerto_caixa.html', contexto)
     except Exception as exc:
         return _tratar_falha_acerto_caixa(request, exc, empresa_id=empresa_id, logger=logger)

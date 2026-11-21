@@ -1,0 +1,152 @@
+{# Matrizes por dia (visão mensal) — espelha o modal Resumo na tela. #}
+<div class="secao-matriz-mes-impressao">
+    <h2 class="matriz-mes-titulo-secao">Modalidade — por dia <span class="matriz-mes-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span></h2>
+    <div class="matriz-impressao-wrap">
+        <table class="matriz-impressao matriz-por-dia-impressao">
+            <thead>
+                <tr>
+                    <th class="col-fixa" rowspan="2">Modalidade</th>
+                    {% for col in resumo_dias_colunas %}
+                    <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}" title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
+                    {% endfor %}
+                    <th colspan="2">Total</th>
+                </tr>
+                <tr>
+                    {% for col in resumo_dias_colunas %}
+                    <th>Qt</th><th>R$</th>
+                    {% endfor %}
+                    <th>Qt</th><th>R$</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in modalidades_matriz_dia_linhas %}
+                <tr>
+                    <td class="col-fixa">{{ item.label }}</td>
+                    {% for cel in item.meses %}
+                    <td class="num">{{ cel.qt }}</td>
+                    <td class="num">{{ cel.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ item.total_qt }}</td>
+                    <td class="num">{{ item.total_valor_fmt }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-linha">
+                    <td class="col-fixa">Total</td>
+                    {% for tot in modalidades_matriz_dia_totais %}
+                    <td class="num">{{ tot.qt }}</td>
+                    <td class="num">{{ tot.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ resumo_quantidade_total }}</td>
+                    <td class="num">{{ resumo_valor_total_fmt }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="matriz-mes-titulo-secao page-break-before">Viabilidade — por dia <span class="matriz-mes-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span></h2>
+    <div class="matriz-impressao-wrap">
+        <table class="matriz-impressao matriz-por-dia-impressao">
+            <thead>
+                <tr>
+                    <th class="col-fixa" rowspan="2">Viabilidade</th>
+                    {% for col in resumo_dias_colunas %}
+                    <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
+                    {% endfor %}
+                    <th colspan="2">Total</th>
+                </tr>
+                <tr>
+                    {% for col in resumo_dias_colunas %}
+                    <th>Qt</th><th>R$</th>
+                    {% endfor %}
+                    <th>Qt</th><th>R$</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in viabilidade_matriz_dia_linhas %}
+                <tr>
+                    <td class="col-fixa">{{ row.viabilidade|truncatechars:36 }}</td>
+                    {% for cel in row.meses %}
+                    <td class="num">{{ cel.qt }}</td>
+                    <td class="num">{{ cel.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ row.total_qt }}</td>
+                    <td class="num">{{ row.total_valor_fmt }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-linha">
+                    <td class="col-fixa">Total</td>
+                    {% for tot in viabilidade_matriz_dia_totais %}
+                    <td class="num">{{ tot.qt }}</td>
+                    <td class="num">{{ tot.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ resumo_viabilidade_total_qt }}</td>
+                    <td class="num">{{ resumo_viabilidade_total_valor_fmt }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="matriz-mes-titulo-secao page-break-before">Formas de pagamento — por dia <span class="matriz-mes-badge">{{ resumo_matriz_mes_titulo }} · qt · R$</span></h2>
+    <div class="matriz-impressao-wrap">
+        <table class="matriz-impressao matriz-por-dia-impressao">
+            <thead>
+                <tr>
+                    <th class="col-fixa" rowspan="2">Forma / convênio</th>
+                    {% for col in resumo_dias_colunas %}
+                    <th colspan="2" class="{% if col.fim_semana %}th-fim-semana{% endif %}">{{ col.label_curto }}</th>
+                    {% endfor %}
+                    <th colspan="2">Total</th>
+                </tr>
+                <tr>
+                    {% for col in resumo_dias_colunas %}
+                    <th>Qt</th><th>R$</th>
+                    {% endfor %}
+                    <th>Qt</th><th>R$</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in pagamento_matriz_dia_formas %}
+                <tr>
+                    <td class="col-fixa">{{ row.rotulo }}</td>
+                    {% for cel in row.meses %}
+                    <td class="num">{{ cel.qt }}</td>
+                    <td class="num">{{ cel.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ row.total_qt }}</td>
+                    <td class="num">{{ row.total_valor_fmt }}</td>
+                </tr>
+                {% endfor %}
+                {% if pagamento_matriz_dia_aguardando %}
+                <tr class="secao-linha"><td class="col-fixa" colspan="99">Aguardando faturamento</td></tr>
+                {% for row in pagamento_matriz_dia_aguardando %}
+                <tr>
+                    <td class="col-fixa ps-2">{{ row.rotulo }}</td>
+                    {% for cel in row.meses %}
+                    <td class="num">{{ cel.qt }}</td>
+                    <td class="num">{{ cel.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">{{ row.total_qt }}</td>
+                    <td class="num">{{ row.total_valor_fmt }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+                <tr class="total-linha">
+                    <td class="col-fixa">Total geral</td>
+                    {% for tot in pagamento_matriz_dia_totais %}
+                    <td class="num">—</td>
+                    <td class="num">{{ tot.valor_fmt }}</td>
+                    {% endfor %}
+                    <td class="num">—</td>
+                    <td class="num">{{ total_resumo_geral_fmt }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% if modalidades_fora_resumo %}
+    <p class="nota-fora"><strong>Fora do padrão:</strong>
+        {% for item in modalidades_fora_resumo %}
+        {{ item.codigo }} ({{ item.quantidade }} · R$ {{ item.valor_fmt }}){% if not forloop.last %}; {% endif %}
+        {% endfor %}
+    </p>
+    {% endif %}
+</div>
