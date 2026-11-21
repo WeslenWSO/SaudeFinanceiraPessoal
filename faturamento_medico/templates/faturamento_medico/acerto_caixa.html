@@ -694,35 +694,35 @@
 .acerto-matriz-anual .subcol-val { min-width: 3.5rem; text-align: right; }
 .acerto-matriz-anual .col-media { min-width: 5.25rem; text-align: right; font-size: 0.8rem; }
 .acerto-matriz-anual thead .col-media { text-align: center; font-size: 0.72rem; line-height: 1.15; vertical-align: middle; }
-.acerto-matriz-por-dia th.col-sticky-media,
-.acerto-matriz-por-dia td.col-sticky-media {
+.acerto-matriz-anual th.col-sticky-media,
+.acerto-matriz-anual td.col-sticky-media {
     position: sticky;
     right: 0;
     z-index: 2;
     background: #fff;
     box-shadow: -4px 0 6px rgba(15, 23, 42, 0.07);
 }
-.acerto-matriz-por-dia th.col-sticky-total-val,
-.acerto-matriz-por-dia td.col-sticky-total-val {
+.acerto-matriz-anual th.col-sticky-total-val,
+.acerto-matriz-anual td.col-sticky-total-val {
     position: sticky;
     right: 5.25rem;
     z-index: 2;
     background: #fff;
     box-shadow: -4px 0 6px rgba(15, 23, 42, 0.05);
 }
-.acerto-matriz-por-dia th.col-sticky-total-qt,
-.acerto-matriz-por-dia td.col-sticky-total-qt {
+.acerto-matriz-anual th.col-sticky-total-qt,
+.acerto-matriz-anual td.col-sticky-total-qt {
     position: sticky;
     right: 8.75rem;
     z-index: 2;
     background: #fff;
 }
-.acerto-matriz-por-dia thead th.col-sticky-media,
-.acerto-matriz-por-dia thead th.col-sticky-total-val,
-.acerto-matriz-por-dia thead th.col-sticky-total-qt { background: #e2e8f0; z-index: 3; }
-.acerto-matriz-por-dia tr.row-total td.col-sticky-media,
-.acerto-matriz-por-dia tr.row-total td.col-sticky-total-val,
-.acerto-matriz-por-dia tr.row-total td.col-sticky-total-qt { background: #eff6ff; font-weight: 700; }
+.acerto-matriz-anual thead th.col-sticky-media,
+.acerto-matriz-anual thead th.col-sticky-total-val,
+.acerto-matriz-anual thead th.col-sticky-total-qt { background: #e2e8f0; z-index: 3; }
+.acerto-matriz-anual tr.row-total td.col-sticky-media,
+.acerto-matriz-anual tr.row-total td.col-sticky-total-val,
+.acerto-matriz-anual tr.row-total td.col-sticky-total-qt { background: #eff6ff; font-weight: 700; }
 .acerto-matriz-anual tr.row-total td { background: #eff6ff; font-weight: 700; }
 .acerto-matriz-anual th.dia-fim-semana { color: #64748b; font-weight: 600; }
 .acerto-matriz-por-dia th.dia-zebra-a,
@@ -1722,15 +1722,15 @@
                                             <th colspan="2">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total ano</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
+                                            <th class="col-media col-sticky-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_meses_colunas %}
                                             <th class="subcol">Qt</th>
                                             <th class="subcol-val">R$</th>
                                             {% endfor %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol col-sticky-total-qt">Qt</th>
+                                            <th class="subcol-val col-sticky-total-val">R$</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1741,9 +1741,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ row.total_qt }}</td>
-                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                            <td class="col-media">{{ row.media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ row.total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ row.total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endfor %}
                                         {% if pagamento_matriz_aguardando %}
@@ -1757,9 +1757,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ row.total_qt }}</td>
-                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                            <td class="col-media">{{ row.media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ row.total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ row.total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endfor %}
                                         {% endif %}
@@ -1769,9 +1769,9 @@
                                             <td class="subcol">—</td>
                                             <td class="subcol-val">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">—</td>
-                                            <td class="subcol-val">{{ total_resumo_geral_fmt }}</td>
-                                            <td class="col-media">{{ resumo_geral_media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">—</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ total_resumo_geral_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ resumo_geral_media_valor_qt_fmt }}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1979,15 +1979,15 @@
                                                 title="{{ col.label }} · {{ col.dia_semana }}">{{ col.label_curto }}</th>
                                             {% endfor %}
                                             <th colspan="2">Total</th>
-                                            <th class="col-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
+                                            <th class="col-media col-sticky-media" rowspan="2" title="Total R$ ÷ total Qt">Média<br>Total/Qt</th>
                                         </tr>
                                         <tr>
                                             {% for col in resumo_dias_colunas %}
                                             <th class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">Qt</th>
                                             <th class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">R$</th>
                                             {% endfor %}
-                                            <th class="subcol">Qt</th>
-                                            <th class="subcol-val">R$</th>
+                                            <th class="subcol col-sticky-total-qt">Qt</th>
+                                            <th class="subcol-val col-sticky-total-val">R$</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1998,9 +1998,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ row.total_qt }}</td>
-                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                            <td class="col-media">{{ row.media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ row.total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ row.total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endfor %}
                                         {% if pagamento_matriz_dia_aguardando %}
@@ -2014,9 +2014,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.qt }}</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ cel.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">{{ row.total_qt }}</td>
-                                            <td class="subcol-val">{{ row.total_valor_fmt }}</td>
-                                            <td class="col-media">{{ row.media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">{{ row.total_qt }}</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ row.total_valor_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ row.media_valor_qt_fmt }}</td>
                                         </tr>
                                         {% endfor %}
                                         {% endif %}
@@ -2026,9 +2026,9 @@
                                             <td class="subcol dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">—</td>
                                             <td class="subcol-val dia-zebra-{% if forloop.counter0|divisibleby:2 %}a{% else %}b{% endif %}">{{ tot.valor_fmt }}</td>
                                             {% endfor %}
-                                            <td class="subcol">—</td>
-                                            <td class="subcol-val">{{ total_resumo_geral_fmt }}</td>
-                                            <td class="col-media">{{ resumo_geral_media_valor_qt_fmt }}</td>
+                                            <td class="subcol col-sticky-total-qt">—</td>
+                                            <td class="subcol-val col-sticky-total-val">{{ total_resumo_geral_fmt }}</td>
+                                            <td class="col-media col-sticky-media">{{ resumo_geral_media_valor_qt_fmt }}</td>
                                         </tr>
                                     </tbody>
                                 </table>
