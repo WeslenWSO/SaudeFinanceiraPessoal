@@ -10,9 +10,21 @@ from estoque.setores import SetorEstoque
 # Usuários de login cujas senhas autorizam estorno de entrada NF (confirmação explícita).
 _USUARIOS_SENHA_ESTORNO_NF = ('admin', 'saude')
 
+# Administração de requisição concluída (estornar estoque / excluir / reabrir).
+_USUARIOS_ADMIN_REQUISICAO = ('admin', 'saude', 'master')
+
 
 def usuario_e_admin_estoque(user: User) -> bool:
     return bool(user.is_authenticated and (user.is_superuser or user.is_staff))
+
+
+def usuario_pode_administrar_requisicao_estoque(user: User) -> bool:
+    """Master / Admin / staff: estornar requisição concluída, excluir e reabrir edição."""
+    if usuario_e_admin_estoque(user):
+        return True
+    if not user.is_authenticated or not user.is_active:
+        return False
+    return (user.username or '').strip().lower() in _USUARIOS_ADMIN_REQUISICAO
 
 
 def usuario_responsavel_setor(user: User, empresa_id: int, setor: str) -> bool:

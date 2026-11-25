@@ -27,6 +27,7 @@ from estoque.models import (
 )
 from estoque.permissoes import (
     usuario_e_admin_estoque,
+    usuario_pode_administrar_requisicao_estoque,
     usuario_pode_baixa_setor,
     usuario_pode_requisicao_farmacia,
     validar_aprovacao_estorno_nf,
@@ -50,6 +51,8 @@ from estoque.services.kpis import montar_kpis_estoque
 from estoque.services.movimentacao import (
     EstoqueErro,
     concluir_requisicao,
+    estornar_requisicao_concluida,
+    excluir_requisicao_admin,
     estornar_entrada_desde_item_nota,
     gerar_entrada_desde_item_nota,
     pode_estornar_entrada_nota,
@@ -590,6 +593,7 @@ def _contexto_requisicao_tela(
         descricao = f'Requisição #{requisicao.pk} · Rascunho'
     else:
         descricao = f'Requisição #{requisicao.pk}'
+    admin_req = usuario_pode_administrar_requisicao_estoque(request.user)
     return {
         'requisicao': requisicao,
         'form': form,
@@ -601,6 +605,21 @@ def _contexto_requisicao_tela(
             requisicao
             and requisicao.status == RequisicaoEstoque.Status.CANCELADA
             and not requisicao.movimentos.exists()
+        ),
+        'pode_administrar_requisicao': bool(
+            admin_req
+            and requisicao
+            and requisicao.status == RequisicaoEstoque.Status.CONCLUIDA
+        ),
+        'pode_excluir_requisicao_admin': bool(
+            admin_req
+            and requisicao
+            and requisicao.status
+            in (
+                RequisicaoEstoque.Status.RASCUNHO,
+                RequisicaoEstoque.Status.CANCELADA,
+                RequisicaoEstoque.Status.CONCLUIDA,
+            )
         ),
     }
 
@@ -688,6 +707,29 @@ def requisicao_edit(request, pk: int | None):
 
         if not requisicao:
             return redirect('estoque:requisicao_nova')
+
+        if acao in ('estornar_reabrir', 'excluir_admin'):
+            if not usuario_pode_administrar_requisicao_estoque(request.user):
+                messages.error(request, 'Apenas Admin/Master pode estornar ou excluir requisição.')
+                return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+            try:
+                if acao == 'estornar_reabrir':
+                    estornar_requisicao_concluida(requisicao, usuario=request.user, reabrir=True)
+                    messages.success(
+                        request,
+                        f'Requisição #{requisicao.pk}: estoque devolvido e reaberta em rascunho. '
+                        'Você pode editar e concluir novamente.',
+                    )
+                    return redirect('estoque:requisicao_detail', pk=requisicao.pk)
+                excluir_requisicao_admin(requisicao, usuario=request.user)
+                messages.success(
+                    request,
+                    'Requisição excluída; saldos de estoque foram devolvidos quando aplicável.',
+                )
+                return redirect('estoque:requisicao_list')
+            except EstoqueErro as exc:
+                messages.error(request, str(exc))
+            return redirect('estoque:requisicao_detail', pk=requisicao.pk)
 
         if acao == 'reabrir':
             if requisicao.status != RequisicaoEstoque.Status.CANCELADA:

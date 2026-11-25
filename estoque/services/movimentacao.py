@@ -548,3 +548,64 @@ def concluir_requisicao(requisicao: RequisicaoEstoque, *, usuario) -> None:
     requisicao.concluida_em = timezone.now()
     requisicao.concluida_por = usuario
     requisicao.save(update_fields=['status', 'concluida_em', 'concluida_por'])
+
+
+@transaction.atomic
+def estornar_requisicao_concluida(
+    requisicao: RequisicaoEstoque,
+    *,
+    usuario,
+    reabrir: bool = True,
+) -> None:
+    """Desfaz movimentos da requisição concluída e devolve saldos (farmácia / setores)."""
+    if requisicao.status != RequisicaoEstoque.Status.CONCLUIDA:
+        raise EstoqueErro('Somente requisição concluída pode ter o estoque estornado.')
+
+    movs = list(requisicao.movimentos.select_related('produto'))
+    if not movs:
+        raise EstoqueErro('Requisição concluída sem movimentos registrados.')
+
+    for mov in movs:
+        q = mov.quantidade or Decimal('0')
+        if q <= 0:
+            continue
+        produto = mov.produto
+        if mov.tipo == MovimentoEstoque.Tipo.TRANSFERENCIA:
+            dest = (mov.setor_destino or '').strip()
+            if dest:
+                _ajustar_setor(produto, dest, -q)
+            _ajustar_farmacia(produto, q)
+        elif mov.tipo == MovimentoEstoque.Tipo.BAIXA:
+            origem = (mov.setor_origem or '').strip() or SetorEstoque.FARMACIA
+            if origem == SetorEstoque.FARMACIA:
+                _ajustar_farmacia(produto, q)
+            else:
+                _ajustar_setor(produto, origem, q)
+        else:
+            raise EstoqueErro(
+                f'Movimento #{mov.pk} (tipo {mov.tipo}) não pode ser estornado automaticamente.'
+            )
+
+    requisicao.movimentos.all().delete()
+    for linha in requisicao.itens.all():
+        if (linha.quantidade_atendida or Decimal('0')) != 0:
+            linha.quantidade_atendida = Decimal('0')
+            linha.save(update_fields=['quantidade_atendida'])
+
+    requisicao.concluida_em = None
+    requisicao.concluida_por = None
+    if reabrir:
+        requisicao.status = RequisicaoEstoque.Status.RASCUNHO
+        requisicao.save(update_fields=['status', 'concluida_em', 'concluida_por'])
+    else:
+        requisicao.save(update_fields=['concluida_em', 'concluida_por'])
+
+
+@transaction.atomic
+def excluir_requisicao_admin(requisicao: RequisicaoEstoque, *, usuario) -> None:
+    """Exclui a requisição; se concluída, devolve o estoque antes."""
+    if requisicao.status == RequisicaoEstoque.Status.CONCLUIDA:
+        estornar_requisicao_concluida(requisicao, usuario=usuario, reabrir=False)
+    elif requisicao.movimentos.exists():
+        raise EstoqueErro('Há movimentos de estoque vinculados; estorne ou use exclusão em concluída.')
+    requisicao.delete()

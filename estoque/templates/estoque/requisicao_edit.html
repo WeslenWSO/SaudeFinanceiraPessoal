@@ -34,7 +34,13 @@
         Crie uma <a href="{% url 'estoque:requisicao_nova' %}">nova requisição</a>.
         {% endif %}
       {% elif requisicao.status == 'concluida' %}
-        Requisição concluída — estoque já foi movimentado. Para nova saída/transferência, abra uma nova requisição.
+        Requisição concluída — estoque já foi movimentado.
+        {% if pode_administrar_requisicao %}
+        Como <strong>Admin/Master</strong>, você pode <strong>estornar o estoque e reabrir</strong> para editar,
+        ou <strong>excluir</strong> a requisição (devolve os saldos).
+        {% else %}
+        Para nova saída/transferência, abra uma nova requisição.
+        {% endif %}
       {% else %}
         Esta requisição não está em rascunho.
       {% endif %}
@@ -45,6 +51,28 @@
       <input type="hidden" name="acao" value="reabrir">
       <button type="submit" class="btn btn-warning btn-sm">Reabrir rascunho</button>
     </form>
+    {% endif %}
+    {% if pode_administrar_requisicao %}
+    <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="estornar_reabrir">
+        <button type="submit" class="btn btn-warning btn-sm"
+                onclick="return confirm('Devolver todo o estoque desta requisição e reabrir em rascunho para edição?');">
+          Estornar estoque e editar
+        </button>
+      </form>
+      {% if pode_excluir_requisicao_admin %}
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="excluir_admin">
+        <button type="submit" class="btn btn-outline-danger btn-sm"
+                onclick="return confirm('Excluir a requisição e devolver o estoque? Esta ação não pode ser desfeita.');">
+          Excluir requisição
+        </button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
   {% endif %}
@@ -224,6 +252,18 @@
         <input type="hidden" name="acao" value="cancelar">
         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Descartar esta requisição?');">
           Cancelar requisição
+        </button>
+      </form>
+    </div>
+    {% endif %}
+    {% if requisicao and pode_excluir_requisicao_admin and not pode_administrar_requisicao and pode_editar %}
+    <div class="card-footer border-top bg-light">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="excluir_admin">
+        <button type="submit" class="btn btn-outline-danger btn-sm"
+                onclick="return confirm('Excluir esta requisição em rascunho?');">
+          Excluir rascunho (Admin)
         </button>
       </form>
     </div>
