@@ -318,6 +318,9 @@ def _tem_filtros_na_query(request):
         return True
     if 'modalidade' in request.GET:
         return True
+    # per_page sozinho não basta (sessão antiga gerava redirect infinito na URL seca)
+    if request.GET.get('page'):
+        return True
     return False
 
 
@@ -421,14 +424,11 @@ def _salvar_filtros_listagem_sessao(request, filtros, *, per_page='25'):
 
 
 def _url_ftlistar_com_filtros_sessao(request):
-    sess = request.session.get('faturamento_filters') or {}
+    """URL da listagem com filtros efetivos (sessão + padrão do mês), evitando redirect em loop."""
+    filtros = _filtros_listagem_faturamento(request, use_session_fallback=True)
+    per_page = (request.session.get('faturamento_filters') or {}).get('per_page')
     url = reverse('faturamento_medico:ftlistar')
-    if not sess:
-        return url
-    qs = _query_listagem_faturamento(
-        _filtros_dict_from_session(sess),
-        per_page=sess.get('per_page'),
-    )
+    qs = _query_listagem_faturamento(filtros, per_page=per_page)
     return f'{url}?{qs}' if qs else url
 
 
@@ -2661,6 +2661,42 @@ def _enriquecer_nf_grid_pagina_ftlistar(grid_linhas, empresa_id):
         )
 
 
+def _tratar_falha_ftlistar(request, exc, *, empresa_id, logger=None):
+    from django.db.utils import Error as DjangoDbError
+    from django.db.utils import OperationalError, ProgrammingError
+
+    try:
+        from SaudeFinanceira.db_schema import capturar_erro_schema, mensagem_schema_desatualizado
+    except ImportError:
+        capturar_erro_schema = None
+        mensagem_schema_desatualizado = None
+
+    log = logger or logging.getLogger(__name__)
+    log.exception('ftlistar empresa=%s', empresa_id)
+    msg = None
+    if capturar_erro_schema:
+        msg = capturar_erro_schema(exc, contexto='listagem faturamento médico')
+    if not msg and isinstance(exc, (ProgrammingError, OperationalError, DjangoDbError)):
+        if mensagem_schema_desatualizado:
+            msg = mensagem_schema_desatualizado('listagem faturamento médico')
+        else:
+            msg = (
+                'O banco no servidor está desatualizado. '
+                'Execute python manage.py migrate --noinput no Shell do Render.'
+            )
+    if not msg:
+        msg = (
+            'Não foi possível abrir a listagem de faturamento. '
+            'Confira os logs do servidor ou tente novamente em instantes.'
+        )
+    messages.error(request, msg)
+    try:
+        return redirect('empresa:lista')
+    except Exception:
+        return HttpResponse(msg, status=503, content_type='text/plain; charset=utf-8')
+
+
+@login_required
 def listar_faturamentos(request):
     """Lista todos os faturamentos médicos com filtros"""
     if request.GET.get('limpar'):
@@ -2680,15 +2716,28 @@ def listar_faturamentos(request):
 
     tem_filtros_url = _tem_filtros_na_query(request)
     if not tem_filtros_url:
-        sess = request.session.get('faturamento_filters') or {}
-        if sess:
-            return redirect(_url_ftlistar_com_filtros_sessao(request))
+        # Sempre canonicaliza a URL (sessão + mês corrente) — evita loop ?per_page= sem datas
+        return redirect(_url_ftlistar_com_filtros_sessao(request))
 
     empresa_id = request.session.get('empresa_id')
     if not empresa_id:
         messages.error(request, 'Selecione uma empresa para continuar.')
         return redirect('empresa:lista')
 
+    try:
+        from django.db.utils import OperationalError, ProgrammingError
+
+        FaturamentoMedico.objects.filter(empresa_id=empresa_id).values('id')[:1].exists()
+    except (ProgrammingError, OperationalError) as exc:
+        return _tratar_falha_ftlistar(request, exc, empresa_id=empresa_id, logger=logger)
+
+    try:
+        return _render_listar_faturamentos(request, empresa_id=empresa_id, tem_filtros_url=tem_filtros_url)
+    except Exception as exc:
+        return _tratar_falha_ftlistar(request, exc, empresa_id=empresa_id, logger=logger)
+
+
+def _render_listar_faturamentos(request, *, empresa_id, tem_filtros_url: bool):
     faturamentos = FaturamentoMedico.objects.filter(empresa_id=empresa_id).order_by('-data')
 
     filtros = _filtros_listagem_faturamento(request, use_session_fallback=not tem_filtros_url)
